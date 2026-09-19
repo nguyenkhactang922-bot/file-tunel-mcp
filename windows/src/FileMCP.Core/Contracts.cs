@@ -65,14 +65,31 @@ public sealed class FileMcpException(string message) : Exception(message);
 
 internal sealed record ToolCallOutput(JsonArray Content, JsonObject StructuredContent);
 
+public sealed class FileMcpWorkspaceSettings
+{
+    public string Key { get; set; } = "";
+    public bool Enabled { get; set; }
+    public string TunnelId { get; set; } = "";
+    public string Profile { get; set; } = "";
+    public int Port { get; set; }
+    public string AllowedDirectory { get; set; } = "";
+    public string HealthAddress { get; set; } = "127.0.0.1:0";
+}
+
 public sealed class FileMcpSettings
 {
+    // Legacy single-workspace fields are retained for backward compatibility with
+    // existing settings.json files and older callers. SettingsStore keeps them
+    // synchronized with the first enabled workspace.
     public string TunnelId { get; set; } = "";
     public string Profile { get; set; } = "filemcp";
     public int Port { get; set; } = 8008;
     public string AllowedDirectory { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FileMCP");
     public string HealthAddress { get; set; } = "127.0.0.1:0";
+
+    public List<FileMcpWorkspaceSettings> Workspaces { get; set; } = [];
+
     public string GitUserName { get; set; } = "";
     public string GitUserEmail { get; set; } = "";
     public bool EnableCommands { get; set; }

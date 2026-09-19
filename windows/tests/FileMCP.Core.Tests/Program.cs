@@ -63,6 +63,10 @@ internal static class Program
         };
         store.Save(settings); var loaded = store.Load();
         Assert(loaded.TunnelId == settings.TunnelId && loaded.Profile == settings.Profile && loaded.EnableCommands, "settings roundtrip");
+        Assert(loaded.Workspaces.Count == 4 && loaded.Workspaces.Select(item => item.Key).SequenceEqual(new[] { "C", "D", "E", "F" }), "multi-workspace defaults");
+        Assert(loaded.Workspaces.Count(item => item.Enabled) == 1 && loaded.Workspaces.Any(item => item.Enabled && item.AllowedDirectory == settings.AllowedDirectory), "legacy workspace mapped to matching drive");
+        Assert(loaded.Workspaces.Select(item => item.Port).Distinct().Count() == 4, "workspace ports unique");
+        Assert(loaded.Workspaces.Select(item => item.Profile).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 4, "workspace profiles unique");
         Assert(!File.ReadAllText(Path.Combine(settingsDir, "settings.json")).Contains("apiKey", StringComparison.OrdinalIgnoreCase), "settings contain no API key");
 
         var target = "FileMCP/tests/" + Guid.NewGuid().ToString("N");

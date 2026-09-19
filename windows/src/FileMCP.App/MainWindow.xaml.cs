@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using FileMCP.Core;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
@@ -11,9 +13,11 @@ namespace FileMCP.App;
 
 public partial class MainWindow : Window
 {
+    private static readonly string[] WorkspaceKeys = ["C", "D", "E", "F"];
+
     private readonly SettingsStore _settingsStore = new();
     private readonly WindowsCredentialStore _credentialStore = new();
-    private readonly LocalMcpRuntime _runtime = new();
+    private readonly Dictionary<string, LocalMcpRuntime> _runtimes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Forms.NotifyIcon _trayIcon;
     private FileMcpSettings _settings;
     private bool _quitting;
@@ -27,8 +31,15 @@ public partial class MainWindow : Window
         ApplySettings(_settings);
         UpdateApiKeyStatus();
 
-        _runtime.Log += text => Dispatcher.BeginInvoke(new Action(() => AppendLog(text)));
-        _runtime.StateChanged += state => Dispatcher.BeginInvoke(new Action(() => UpdateRuntimeState(state)));
+        foreach (var key in WorkspaceKeys)
+        {
+            var runtime = new LocalMcpRuntime();
+            var capturedKey = key;
+            runtime.Log += text => Dispatcher.BeginInvoke(new Action(() => AppendLog($"[{capturedKey}] {text}")));
+            runtime.StateChanged += state => Dispatcher.BeginInvoke(new Action(() => UpdateRuntimeState(capturedKey, state)));
+            _runtimes[capturedKey] = runtime;
+        }
+
         Closing += OnClosing;
         PreviewKeyDown += OnPreviewKeyDown;
 
@@ -45,7 +56,8 @@ public partial class MainWindow : Window
             Icon = LoadApplicationIcon(),
         };
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
-        UpdateRuntimeState(_runtime.State);
+
+        RefreshRuntimeUi();
     }
 
     private FileMcpSettings LoadSettingsSafely()
@@ -60,11 +72,19 @@ public partial class MainWindow : Window
 
     private void ApplySettings(FileMcpSettings settings)
     {
-        TunnelIdBox.Text = settings.TunnelId;
-        ProfileBox.Text = settings.Profile;
-        PortBox.Text = settings.Port.ToString();
-        DirectoryBox.Text = settings.AllowedDirectory;
-        HealthAddressBox.Text = settings.HealthAddress;
+        foreach (var key in WorkspaceKeys)
+        {
+            var workspace = settings.Workspaces.FirstOrDefault(item => item.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+            if (workspace is null) continue;
+
+            EnabledBox(key).IsChecked = workspace.Enabled;
+            TunnelBox(key).Text = workspace.TunnelId;
+            PathBox(key).Text = workspace.AllowedDirectory;
+            ProfileBoxFor(key).Text = workspace.Profile;
+            PortBoxFor(key).Text = workspace.Port.ToString();
+            HealthBox(key).Text = workspace.HealthAddress;
+        }
+
         GitNameBox.Text = settings.GitUserName;
         GitEmailBox.Text = settings.GitUserEmail;
         EnableCommandsCheckBox.IsChecked = settings.EnableCommands;
@@ -79,66 +99,74 @@ public partial class MainWindow : Window
 
     private async void Connect_Click(object sender, RoutedEventArgs e)
     {
-        var status = _runtime.State.Status;
-        if (status is LocalMcpRuntimeStatus.Running or LocalMcpRuntimeStatus.Starting)
+        if (_runtimes.Values.Any(runtime => runtime.State.Status is LocalMcpRuntimeStatus.Running or LocalMcpRuntimeStatus.Starting or LocalMcpRuntimeStatus.Stopping))
         {
-            await _runtime.StopAsync();
+            await StopAllAsync();
             return;
         }
-        if (status == LocalMcpRuntimeStatus.Stopping) return;
+
         if (!ValidateConnection(requireApiKey: true) || !ValidateSettings()) return;
 
         try
         {
-            var typedKey = ApiKeyBox.Password.Trim();
-            if (typedKey.Length > 0)
-            {
-                _credentialStore.SaveApiKey(typedKey);
-                ApiKeyBox.Password = "";
-                UpdateApiKeyStatus();
-            }
-            var apiKey = _credentialStore.ReadApiKey();
+            SaveTypedApiKeyIfPresent();
             SaveAllSettings();
-            var configuration = new LocalMcpConfiguration(
-                TunnelIdBox.Text.Trim(), apiKey, ProfileBox.Text.Trim(), checked((ushort)_settings.Port),
-                DirectoryBox.Text.Trim(), HealthAddressBox.Text.Trim(), GitNameBox.Text.Trim(), GitEmailBox.Text.Trim(),
-                EnableCommandsCheckBox.IsChecked == true);
-            await _runtime.StartAsync(configuration);
+            var apiKey = _credentialStore.ReadApiKey();
+
+            foreach (var workspace in _settings.Workspaces.Where(item => item.Enabled))
+            {
+                var runtime = _runtimes[workspace.Key];
+                await runtime.StartAsync(BuildConfiguration(workspace, apiKey));
+            }
+
+            RefreshRuntimeUi();
         }
-        catch (Exception ex) { ShowError(ex.Message); }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
     }
 
     private void SaveConnection_Click(object sender, RoutedEventArgs e)
     {
         if (!ValidateConnection(requireApiKey: true)) return;
+
         try
         {
-            var typedKey = ApiKeyBox.Password.Trim();
-            if (typedKey.Length > 0)
-            {
-                _credentialStore.SaveApiKey(typedKey);
-                ApiKeyBox.Password = "";
-            }
-            _settings.TunnelId = TunnelIdBox.Text.Trim();
+            SaveTypedApiKeyIfPresent();
+            SaveConnectionFields();
             _settingsStore.Save(_settings);
             UpdateApiKeyStatus();
             AppendLog("Connection settings saved.\n");
-            if (_runtime.State.Status != LocalMcpRuntimeStatus.Stopped) AppendLog("Changes will take effect the next time the tunnel starts.\n");
+
+            if (_runtimes.Values.Any(runtime => runtime.State.Status != LocalMcpRuntimeStatus.Stopped))
+                AppendLog("Connection changes will take effect after the affected workspace reconnects.\n");
         }
-        catch (Exception ex) { ShowError(ex.Message); }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
     }
 
     private void SaveSettings_Click(object sender, RoutedEventArgs e)
     {
         if (!ValidateSettings()) return;
+
         try
         {
             SaveSettingsFields();
             _settingsStore.Save(_settings);
-            AppendLog("Settings saved.\n");
-            if (_runtime.State.Status != LocalMcpRuntimeStatus.Stopped) AppendLog("Changes will take effect the next time the tunnel starts.\n");
+            AppendLog("Workspace settings saved.\n");
+
+            if (_runtimes.Values.Any(runtime => runtime.State.Status != LocalMcpRuntimeStatus.Stopped))
+                AppendLog("Workspace changes will take effect after the affected workspace reconnects.\n");
+
+            RefreshRuntimeUi();
         }
-        catch (Exception ex) { ShowError(ex.Message); }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
     }
 
     private void DeleteApiKey_Click(object sender, RoutedEventArgs e)
@@ -149,91 +177,398 @@ public partial class MainWindow : Window
             ApiKeyBox.Password = "";
             UpdateApiKeyStatus();
         }
-        catch (Exception ex) { ShowError(ex.Message); }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
     }
 
     private void BrowseDirectory_Click(object sender, RoutedEventArgs e)
     {
+        if (sender is not System.Windows.Controls.Button button || button.Tag is not string key || !WorkspaceKeys.Contains(key))
+            return;
+
+        var pathBox = PathBox(key);
+        var initialDirectory = Directory.Exists(pathBox.Text)
+            ? pathBox.Text
+            : key == "C"
+                ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+                : key + @":\";
+
         var dialog = new OpenFolderDialog
         {
-            Title = "Choose shared directory",
+            Title = $"Choose shared directory for drive {key}",
             Multiselect = false,
-            InitialDirectory = Directory.Exists(DirectoryBox.Text) ? DirectoryBox.Text : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            InitialDirectory = initialDirectory,
         };
-        if (dialog.ShowDialog(this) == true) DirectoryBox.Text = dialog.FolderName;
+
+        if (dialog.ShowDialog(this) == true)
+            pathBox.Text = dialog.FolderName;
     }
 
     private async void Quit_Click(object sender, RoutedEventArgs e) => await QuitAsync();
 
     private bool ValidateConnection(bool requireApiKey)
     {
-        var tunnelId = TunnelIdBox.Text.Trim();
-        if (tunnelId.Length == 0) { MainTabs.SelectedItem = ConnectionTab; ShowError("Enter a Tunnel ID in the Connection tab."); return false; }
-        if (!LocalMcpRuntime.IsValidTunnelId(tunnelId)) { MainTabs.SelectedItem = ConnectionTab; ShowError("Tunnel ID must match tunnel_<32 lowercase letters or digits>."); return false; }
-        if (requireApiKey && ApiKeyBox.Password.Trim().Length == 0 && !_credentialStore.HasSavedApiKey) { MainTabs.SelectedItem = ConnectionTab; ShowError("Enter a Runtime API key in the Connection tab."); return false; }
+        var enabled = WorkspaceKeys.Where(key => EnabledBox(key).IsChecked == true).ToArray();
+        if (enabled.Length == 0)
+        {
+            MainTabs.SelectedItem = SettingsTab;
+            ShowError("Enable at least one workspace in Settings.");
+            return false;
+        }
+
+        foreach (var key in enabled)
+        {
+            var tunnelId = TunnelBox(key).Text.Trim();
+            if (tunnelId.Length == 0)
+            {
+                MainTabs.SelectedItem = ConnectionTab;
+                ShowError($"Enter a Tunnel ID for drive {key}.");
+                return false;
+            }
+
+            if (!LocalMcpRuntime.IsValidTunnelId(tunnelId))
+            {
+                MainTabs.SelectedItem = ConnectionTab;
+                ShowError($"Drive {key}: Tunnel ID must match tunnel_<32 lowercase letters or digits>.");
+                return false;
+            }
+        }
+
+        if (requireApiKey && ApiKeyBox.Password.Trim().Length == 0 && !_credentialStore.HasSavedApiKey)
+        {
+            MainTabs.SelectedItem = ConnectionTab;
+            ShowError("Enter a Runtime API key in the Connection tab.");
+            return false;
+        }
+
         return true;
     }
 
     private bool ValidateSettings()
     {
-        if (DirectoryBox.Text.Trim().Length == 0) { MainTabs.SelectedItem = SettingsTab; ShowError("Choose a shared directory."); return false; }
-        if (!LocalMcpRuntime.IsValidProfileName(ProfileBox.Text.Trim())) { MainTabs.SelectedItem = SettingsTab; AdvancedExpander.IsExpanded = true; ShowError("Profile must start with a letter or number and contain only letters, numbers, '.', '_' or '-' (maximum 128 characters)."); return false; }
-        if (!int.TryParse(PortBox.Text.Trim(), out var port) || port is < 1 or > 65535) { MainTabs.SelectedItem = SettingsTab; AdvancedExpander.IsExpanded = true; ShowError("MCP port must be between 1 and 65535."); return false; }
-        if (LocalMcpRuntime.NormalizeHealthAddress(HealthAddressBox.Text.Trim()) is null) { MainTabs.SelectedItem = SettingsTab; AdvancedExpander.IsExpanded = true; ShowError("Health listener must use localhost, 127.0.0.1, or [::1] with a port from 0 to 65535."); return false; }
+        var enabledKeys = new List<string>();
+        var usedPorts = new HashSet<int>();
+        var usedProfiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var key in WorkspaceKeys)
+        {
+            var enabled = EnabledBox(key).IsChecked == true;
+            if (enabled) enabledKeys.Add(key);
+
+            var path = PathBox(key).Text.Trim();
+            var profile = ProfileBoxFor(key).Text.Trim();
+            var health = HealthBox(key).Text.Trim();
+
+            if (!LocalMcpRuntime.IsValidProfileName(profile))
+            {
+                MainTabs.SelectedItem = SettingsTab;
+                AdvancedExpander.IsExpanded = true;
+                ShowError($"Drive {key}: profile must start with a letter or number and contain only letters, numbers, '.', '_' or '-' (maximum 128 characters).");
+                return false;
+            }
+
+            if (!int.TryParse(PortBoxFor(key).Text.Trim(), out var port) || port is < 1 or > 65535)
+            {
+                MainTabs.SelectedItem = SettingsTab;
+                AdvancedExpander.IsExpanded = true;
+                ShowError($"Drive {key}: MCP port must be between 1 and 65535.");
+                return false;
+            }
+
+            if (LocalMcpRuntime.NormalizeHealthAddress(health) is null)
+            {
+                MainTabs.SelectedItem = SettingsTab;
+                AdvancedExpander.IsExpanded = true;
+                ShowError($"Drive {key}: health listener must use localhost, 127.0.0.1, or [::1] with a port from 0 to 65535.");
+                return false;
+            }
+
+            if (!enabled) continue;
+
+            if (path.Length == 0 || !Directory.Exists(path))
+            {
+                MainTabs.SelectedItem = SettingsTab;
+                ShowError($"Drive {key}: choose an existing shared directory.");
+                return false;
+            }
+
+            if (!PathBelongsToDrive(path, key))
+            {
+                MainTabs.SelectedItem = SettingsTab;
+                ShowError($"Drive {key}: the shared directory must be located on drive {key}:.");
+                return false;
+            }
+
+            if (!usedPorts.Add(port))
+            {
+                MainTabs.SelectedItem = SettingsTab;
+                AdvancedExpander.IsExpanded = true;
+                ShowError($"Drive {key}: MCP port {port} is already used by another enabled workspace.");
+                return false;
+            }
+
+            if (!usedProfiles.Add(profile))
+            {
+                MainTabs.SelectedItem = SettingsTab;
+                AdvancedExpander.IsExpanded = true;
+                ShowError($"Drive {key}: profile '{profile}' is already used by another enabled workspace.");
+                return false;
+            }
+        }
+
+        if (enabledKeys.Count == 0)
+        {
+            MainTabs.SelectedItem = SettingsTab;
+            ShowError("Enable at least one workspace.");
+            return false;
+        }
+
         return true;
+    }
+
+    private static bool PathBelongsToDrive(string path, string key)
+    {
+        try
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(path));
+            return !string.IsNullOrWhiteSpace(root) &&
+                   root.Length >= 2 &&
+                   char.ToUpperInvariant(root[0]) == key[0] &&
+                   root[1] == ':';
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void SaveTypedApiKeyIfPresent()
+    {
+        var typedKey = ApiKeyBox.Password.Trim();
+        if (typedKey.Length == 0) return;
+
+        _credentialStore.SaveApiKey(typedKey);
+        ApiKeyBox.Password = "";
+        UpdateApiKeyStatus();
     }
 
     private void SaveAllSettings()
     {
-        _settings.TunnelId = TunnelIdBox.Text.Trim();
+        SaveConnectionFields();
         SaveSettingsFields();
         _settingsStore.Save(_settings);
     }
 
+    private void SaveConnectionFields()
+    {
+        foreach (var key in WorkspaceKeys)
+            Workspace(key).TunnelId = TunnelBox(key).Text.Trim();
+    }
+
     private void SaveSettingsFields()
     {
-        _settings.Profile = ProfileBox.Text.Trim();
-        _settings.Port = int.Parse(PortBox.Text.Trim());
-        _settings.AllowedDirectory = DirectoryBox.Text.Trim();
-        _settings.HealthAddress = HealthAddressBox.Text.Trim();
+        foreach (var key in WorkspaceKeys)
+        {
+            var workspace = Workspace(key);
+            workspace.Enabled = EnabledBox(key).IsChecked == true;
+            workspace.AllowedDirectory = PathBox(key).Text.Trim();
+            workspace.Profile = ProfileBoxFor(key).Text.Trim();
+            workspace.Port = int.Parse(PortBoxFor(key).Text.Trim());
+            workspace.HealthAddress = HealthBox(key).Text.Trim();
+        }
+
         _settings.GitUserName = GitNameBox.Text.Trim();
         _settings.GitUserEmail = GitEmailBox.Text.Trim();
         _settings.EnableCommands = EnableCommandsCheckBox.IsChecked == true;
     }
 
-    private void UpdateRuntimeState(LocalMcpRuntimeState state)
+    private LocalMcpConfiguration BuildConfiguration(FileMcpWorkspaceSettings workspace, string apiKey) =>
+        new(
+            workspace.TunnelId,
+            apiKey,
+            workspace.Profile,
+            checked((ushort)workspace.Port),
+            workspace.AllowedDirectory,
+            workspace.HealthAddress,
+            _settings.GitUserName,
+            _settings.GitUserEmail,
+            _settings.EnableCommands);
+
+    private async Task StopAllAsync()
     {
+        var tasks = _runtimes.Values
+            .Where(runtime => runtime.State.Status != LocalMcpRuntimeStatus.Stopped)
+            .Select(runtime => runtime.StopAsync())
+            .ToArray();
+
+        if (tasks.Length > 0)
+            await Task.WhenAll(tasks);
+
+        RefreshRuntimeUi();
+    }
+
+    private void UpdateRuntimeState(string key, LocalMcpRuntimeState state)
+    {
+        UpdateWorkspaceStatus(key, state);
+        UpdateConnectButton();
+
+        if (state.Status == LocalMcpRuntimeStatus.Failed && !string.IsNullOrEmpty(state.Error))
+            ShowError($"Drive {key}: {state.Error}");
+    }
+
+    private void RefreshRuntimeUi()
+    {
+        foreach (var key in WorkspaceKeys)
+            UpdateWorkspaceStatus(key, _runtimes.TryGetValue(key, out var runtime) ? runtime.State : LocalMcpRuntimeState.Stopped);
+
+        UpdateConnectButton();
+    }
+
+    private void UpdateWorkspaceStatus(string key, LocalMcpRuntimeState state)
+    {
+        var status = StatusText(key);
+        var enabled = EnabledBox(key).IsChecked == true;
+
+        if (!enabled && state.Status == LocalMcpRuntimeStatus.Stopped)
+        {
+            status.Text = "Disabled";
+            status.Foreground = System.Windows.Media.Brushes.Gray;
+            return;
+        }
+
         switch (state.Status)
         {
             case LocalMcpRuntimeStatus.Stopped:
-            case LocalMcpRuntimeStatus.Failed:
-                ConnectButton.Content = "Connect"; ConnectButton.IsEnabled = true; break;
+                status.Text = "Stopped";
+                status.Foreground = System.Windows.Media.Brushes.Gray;
+                break;
             case LocalMcpRuntimeStatus.Starting:
-                ConnectButton.Content = "Connecting…"; ConnectButton.IsEnabled = false; break;
+                status.Text = "Connecting...";
+                status.Foreground = System.Windows.Media.Brushes.DarkOrange;
+                break;
             case LocalMcpRuntimeStatus.Running:
-                ConnectButton.Content = "Disconnect"; ConnectButton.IsEnabled = true; break;
+                status.Text = "Connected";
+                status.Foreground = System.Windows.Media.Brushes.ForestGreen;
+                break;
             case LocalMcpRuntimeStatus.Stopping:
-                ConnectButton.Content = "Disconnecting…"; ConnectButton.IsEnabled = false; break;
+                status.Text = "Disconnecting...";
+                status.Foreground = System.Windows.Media.Brushes.DarkOrange;
+                break;
+            case LocalMcpRuntimeStatus.Failed:
+                status.Text = "Failed";
+                status.Foreground = System.Windows.Media.Brushes.Firebrick;
+                break;
         }
-        if (state.Status == LocalMcpRuntimeStatus.Failed && !string.IsNullOrEmpty(state.Error)) ShowError(state.Error);
     }
+
+    private void UpdateConnectButton()
+    {
+        var states = _runtimes.Values.Select(runtime => runtime.State.Status).ToArray();
+
+        if (states.Any(status => status is LocalMcpRuntimeStatus.Starting or LocalMcpRuntimeStatus.Stopping))
+        {
+            ConnectButton.Content = states.Any(status => status == LocalMcpRuntimeStatus.Starting) ? "Connecting..." : "Disconnecting...";
+            ConnectButton.IsEnabled = false;
+            return;
+        }
+
+        if (states.Any(status => status == LocalMcpRuntimeStatus.Running))
+        {
+            ConnectButton.Content = "Disconnect all";
+            ConnectButton.IsEnabled = true;
+            return;
+        }
+
+        ConnectButton.Content = "Connect all";
+        ConnectButton.IsEnabled = true;
+    }
+
+    private FileMcpWorkspaceSettings Workspace(string key) =>
+        _settings.Workspaces.First(item => item.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+
+    private System.Windows.Controls.CheckBox EnabledBox(string key) => key switch
+    {
+        "C" => CEnabledCheckBox,
+        "D" => DEnabledCheckBox,
+        "E" => EEnabledCheckBox,
+        "F" => FEnabledCheckBox,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private System.Windows.Controls.TextBox TunnelBox(string key) => key switch
+    {
+        "C" => CTunnelIdBox,
+        "D" => DTunnelIdBox,
+        "E" => ETunnelIdBox,
+        "F" => FTunnelIdBox,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private System.Windows.Controls.TextBox PathBox(string key) => key switch
+    {
+        "C" => CPathBox,
+        "D" => DPathBox,
+        "E" => EPathBox,
+        "F" => FPathBox,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private System.Windows.Controls.TextBox ProfileBoxFor(string key) => key switch
+    {
+        "C" => CProfileBox,
+        "D" => DProfileBox,
+        "E" => EProfileBox,
+        "F" => FProfileBox,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private System.Windows.Controls.TextBox PortBoxFor(string key) => key switch
+    {
+        "C" => CPortBox,
+        "D" => DPortBox,
+        "E" => EPortBox,
+        "F" => FPortBox,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private System.Windows.Controls.TextBox HealthBox(string key) => key switch
+    {
+        "C" => CHealthBox,
+        "D" => DHealthBox,
+        "E" => EHealthBox,
+        "F" => FHealthBox,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private System.Windows.Controls.TextBlock StatusText(string key) => key switch
+    {
+        "C" => CStatusText,
+        "D" => DStatusText,
+        "E" => EStatusText,
+        "F" => FStatusText,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
 
     private void AppendLog(string text)
     {
         _logBuffer += text;
         if (_logBuffer.Length > MaxLogCharacters)
             _logBuffer = "[...older log truncated...]\n" + _logBuffer[^MaxLogCharacters..];
+
         LogBox.Text = _logBuffer;
         LogBox.ScrollToEnd();
     }
 
-    private void ShowError(string message) => System.Windows.MessageBox.Show(this, message, "FileMCP", MessageBoxButton.OK, MessageBoxImage.Warning);
+    private void ShowError(string message) =>
+        System.Windows.MessageBox.Show(this, message, "FileMCP", MessageBoxButton.OK, MessageBoxImage.Warning);
 
     private void ShowAbout()
     {
         System.Windows.MessageBox.Show(
             this,
-            "FileMCP 0.4.0\n\nNative Windows MCP bridge for controlled local file, Git, and optional command access.",
+            "FileMCP 0.4.0\n\nNative Windows MCP bridge with multi-workspace C/D/E/F support for controlled local file, Git, and optional command access.",
             "About FileMCP",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
@@ -251,14 +586,20 @@ public partial class MainWindow : Window
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
-        Topmost = true; Topmost = false;
+        Topmost = true;
+        Topmost = false;
     }
 
     public void ShutdownForSystemSession()
     {
         if (_quitting) return;
         _quitting = true;
-        try { _runtime.ShutdownAsync().GetAwaiter().GetResult(); } catch { }
+
+        foreach (var runtime in _runtimes.Values)
+        {
+            try { runtime.ShutdownAsync().GetAwaiter().GetResult(); } catch { }
+        }
+
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
     }
@@ -267,12 +608,19 @@ public partial class MainWindow : Window
     {
         if (_quitting) return;
         _quitting = true;
-        try { await _runtime.ShutdownAsync(); }
+
+        try
+        {
+            await Task.WhenAll(_runtimes.Values.Select(runtime => runtime.ShutdownAsync()));
+        }
         finally
         {
             _trayIcon.Visible = false;
             _trayIcon.Dispose();
-            await _runtime.DisposeAsync();
+
+            foreach (var runtime in _runtimes.Values)
+                await runtime.DisposeAsync();
+
             System.Windows.Application.Current.Shutdown();
         }
     }
@@ -280,14 +628,31 @@ public partial class MainWindow : Window
     private void OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
-        if (e.Key == Key.W) { Hide(); e.Handled = true; }
-        else if (e.Key == Key.OemComma) { MainTabs.SelectedItem = SettingsTab; ShowFromTray(); e.Handled = true; }
-        else if (e.Key == Key.Q) { _ = QuitAsync(); e.Handled = true; }
+
+        if (e.Key == Key.W)
+        {
+            Hide();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.OemComma)
+        {
+            MainTabs.SelectedItem = SettingsTab;
+            ShowFromTray();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Q)
+        {
+            _ = QuitAsync();
+            e.Handled = true;
+        }
     }
 
     private static System.Drawing.Icon LoadApplicationIcon()
     {
-        var icon = Environment.ProcessPath is { Length: > 0 } path ? System.Drawing.Icon.ExtractAssociatedIcon(path) : null;
+        var icon = Environment.ProcessPath is { Length: > 0 } path
+            ? System.Drawing.Icon.ExtractAssociatedIcon(path)
+            : null;
+
         return icon ?? SystemIcons.Application;
     }
 }
