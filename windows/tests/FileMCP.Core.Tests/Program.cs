@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json.Nodes;
 using FileMCP.Core;
+using Microsoft.Data.Sqlite;
 
 namespace FileMCP.Core.Tests;
 
@@ -28,6 +29,7 @@ internal static class Program
         {
             TestObservabilityContracts();
             await TestWorkspaceUsageMeterAsync();
+            await TestTelemetryPersistenceAsync(root);
             await TestSettingsAndCredentialsAsync(root);
             await TestProcessRunnerAsync(root);
             await TestFilesystemAndToolsAsync(root);
@@ -179,6 +181,123 @@ internal static class Program
         Assert(defensiveSnapshot.McpRequests == 1 && defensiveSnapshot.RequestBytes == 0 && defensiveSnapshot.ResponseBytes == 0, "usage meter clamps invalid byte metrics without breaking request path");
         Assert(defensiveSnapshot.ToolCalls == 1 && defensiveSnapshot.OtherCalls == 1 && defensiveSnapshot.TotalLatencyTicks == 0, "usage meter defensive unknown tool/latency");
         Console.WriteLine("windows-observability-meter: ok");
+    }
+    private sealed class FailOnceTelemetryStore : ITelemetryDeltaStore
+    {
+        private bool _failed;
+        public int InitializeCalls { get; private set; }
+        public Dictionary<string, UsageCounters> Persisted { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public Task InitializeAsync(CancellationToken cancellationToken = default)
+        {
+            InitializeCalls++;
+            return Task.CompletedTask;
+        }
+
+        public Task UpsertDeltasAsync(DateTimeOffset capturedAtUtc, IReadOnlyDictionary<string, UsageCounters> deltas, CancellationToken cancellationToken = default)
+        {
+            if (!_failed)
+            {
+                _failed = true;
+                throw new IOException("intentional telemetry store failure");
+            }
+            foreach (var pair in deltas)
+                Persisted[pair.Key] = Persisted.TryGetValue(pair.Key, out var existing) ? existing + pair.Value : pair.Value;
+            return Task.CompletedTask;
+        }
+    }
+
+    private static async Task TestTelemetryPersistenceAsync(string root)
+    {
+        var directory = Path.Combine(root, "telemetry");
+        Directory.CreateDirectory(directory);
+        var database = Path.Combine(directory, "observability.sqlite3");
+        var store = new TelemetrySqliteStore(database);
+        await store.InitializeAsync();
+        await store.InitializeAsync();
+        Assert(File.Exists(database), "telemetry sqlite database created");
+
+        await using (var connection = new SqliteConnection($"Data Source={database}"))
+        {
+            await connection.OpenAsync();
+            await using var journal = connection.CreateCommand();
+            journal.CommandText = "PRAGMA journal_mode;";
+            Assert(string.Equals((string?)await journal.ExecuteScalarAsync(), "wal", StringComparison.OrdinalIgnoreCase), "telemetry sqlite WAL enabled");
+
+            await using var meta = connection.CreateCommand();
+            meta.CommandText = "SELECT value FROM telemetry_meta WHERE key='schema_version';";
+            Assert((string?)await meta.ExecuteScalarAsync() == TelemetrySqliteStore.SchemaVersion.ToString(), "telemetry schema version");
+            meta.CommandText = "SELECT value FROM telemetry_meta WHERE key='token_estimator';";
+            Assert((string?)await meta.ExecuteScalarAsync() == McpTokenEstimator.EstimatorId, "telemetry estimator metadata");
+
+            foreach (var table in new[] { "usage_minute", "usage_hour", "usage_day" })
+            {
+                await using var schema = connection.CreateCommand();
+                schema.CommandText = $"PRAGMA table_info({table});";
+                await using var reader = await schema.ExecuteReaderAsync();
+                var columns = new List<string>();
+                while (await reader.ReadAsync()) columns.Add(reader.GetString(1));
+                Assert(columns.Contains("workspace_key") && columns.Contains("request_bytes") && columns.Contains("tokens_out_est"), $"telemetry {table} expected columns");
+                Assert(!columns.Any(name => name.Contains("content", StringComparison.OrdinalIgnoreCase) || name.Contains("argument", StringComparison.OrdinalIgnoreCase) || name.Contains("body", StringComparison.OrdinalIgnoreCase)), $"telemetry {table} stores no MCP content/body/arguments");
+            }
+        }
+
+        var meter = new WorkspaceUsageMeter("D");
+        await using var writer = new TelemetryWriter([meter], store, TimeSpan.FromHours(1));
+        var captured = DateTimeOffset.Parse("2026-09-22T00:00:30Z");
+        meter.RecordRequest(5);
+        meter.RecordResponse(9);
+        meter.RecordToolCall("write_file", false, Stopwatch.Frequency / 1_000);
+        await writer.FlushOnceAsync(captured);
+        Assert(writer.PendingSnapshotForTests().Count == 0, "telemetry writer clears pending after commit");
+
+        meter.RecordRequest(4);
+        meter.RecordResponse(4);
+        meter.RecordToolCall("git_status", true, Stopwatch.Frequency / 2_000);
+        await writer.FlushOnceAsync(captured.AddSeconds(10));
+
+        await using (var connection = new SqliteConnection($"Data Source={database}"))
+        {
+            await connection.OpenAsync();
+            foreach (var (table, size) in new[] { ("usage_minute", 60L), ("usage_hour", 3_600L), ("usage_day", 86_400L) })
+            {
+                var epoch = TelemetrySqliteStore.FloorBucket(captured.ToUnixTimeSeconds(), size);
+                await using var query = connection.CreateCommand();
+                query.CommandText = $"SELECT mcp_requests,tool_calls,execution_tasks,request_bytes,response_bytes,tokens_in_est,tokens_out_est,errors,read_calls,write_calls,git_calls,total_latency_us,max_latency_us FROM {table} WHERE workspace_key='D' AND bucket_epoch=$bucket;";
+                query.Parameters.AddWithValue("$bucket", epoch);
+                await using var reader = await query.ExecuteReaderAsync();
+                Assert(await reader.ReadAsync(), $"telemetry {table} row exists");
+                Assert(reader.GetInt64(0) == 2 && reader.GetInt64(1) == 2 && reader.GetInt64(2) == 1, $"telemetry {table} call/task aggregation");
+                Assert(reader.GetInt64(3) == 9 && reader.GetInt64(4) == 13, $"telemetry {table} byte aggregation");
+                Assert(reader.GetInt64(5) == 3 && reader.GetInt64(6) == 4, $"telemetry {table} token aggregation");
+                Assert(reader.GetInt64(7) == 1 && reader.GetInt64(8) == 0 && reader.GetInt64(9) == 1 && reader.GetInt64(10) == 1, $"telemetry {table} category/error aggregation");
+                Assert(reader.GetInt64(11) > 0 && reader.GetInt64(12) > 0 && reader.GetInt64(12) <= reader.GetInt64(11), $"telemetry {table} latency aggregation");
+            }
+        }
+
+        var retryMeter = new WorkspaceUsageMeter("E");
+        var failOnce = new FailOnceTelemetryStore();
+        await using var retryWriter = new TelemetryWriter([retryMeter], failOnce, TimeSpan.FromHours(1));
+        retryMeter.RecordRequest(8);
+        retryMeter.RecordResponse(12);
+        retryMeter.RecordToolCall("run_command", false, 5);
+        await AssertThrowsAsync(() => retryWriter.FlushOnceAsync(captured), "intentional telemetry store failure", "telemetry writer surfaces explicit test flush failure");
+        Assert(retryWriter.PendingSnapshotForTests().TryGetValue("E", out var pending) && pending.McpRequests == 1 && pending.CommandCalls == 1, "telemetry writer retains pending delta after failed commit");
+        await retryWriter.FlushOnceAsync(captured.AddSeconds(1));
+        Assert(retryWriter.PendingSnapshotForTests().Count == 0, "telemetry writer clears pending after retry");
+        Assert(failOnce.Persisted.TryGetValue("E", out var retried) && retried.McpRequests == 1 && retried.RequestBytes == 8 && retried.ResponseBytes == 12, "telemetry writer retry persists original delta once");
+
+        var newer = Path.Combine(directory, "newer.sqlite3");
+        await using (var connection = new SqliteConnection($"Data Source={newer}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE telemetry_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL); INSERT INTO telemetry_meta(key,value) VALUES('schema_version','999');";
+            await command.ExecuteNonQueryAsync();
+        }
+        var newerStore = new TelemetrySqliteStore(newer);
+        await AssertThrowsAsync(() => newerStore.InitializeAsync(), "newer than supported", "telemetry rejects newer schema");
+        Console.WriteLine("windows-observability-sqlite: ok");
     }
     private static Task TestSettingsAndCredentialsAsync(string root)
     {

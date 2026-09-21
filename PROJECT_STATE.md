@@ -11,6 +11,8 @@ Completed:
 - FMR-001 PASS - drive-root containment; suite 65 assertions.
 - OBS-001 PASS - metric contracts/estimator/classifier; suite 130 assertions.
 - OBS-002 PASS - concurrent atomic hot meter/snapshot/delta drain; suite 150 assertions.
+- OBS-003 PASS - SQLite WAL schema/writer/retry-safe persistence; suite 184 assertions.
 
 Current evidence: Release build PASS, 0 warnings/errors.
-Next task: OBS-003 - SQLite WAL schema + writer + migrations.
+Ready tasks: OBS-004, OBS-005.
+Next task: OBS-004 - Historical queries + retention + timezone ranges.
