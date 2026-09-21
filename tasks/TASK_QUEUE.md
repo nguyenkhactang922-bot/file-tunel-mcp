@@ -3,8 +3,8 @@
 | ID | State | Depends | Acceptance |
 |---|---|---|---|
 | FMR-001 | PASS | - | Drive root D:\ resolves descendants; root listing/read/write/search work; traversal/junction/root-delete protections remain passing |
-| OBS-001 | READY | FMR-001 | Usage contracts, bytes_div_4_v1 estimator, tool classifier, semantics tests |
-| OBS-002 | BLOCKED | OBS-001 | Interlocked hot counters, exact concurrent increments, immutable snapshot + atomic delta drain tests |
+| OBS-001 | PASS | FMR-001 | Usage contracts, bytes_div_4_v1 estimator, tool classifier, semantics tests |
+| OBS-002 | READY | OBS-001 | Interlocked hot counters, exact concurrent increments, immutable snapshot + atomic delta drain tests |
 | OBS-003 | BLOCKED | OBS-002 | Microsoft.Data.Sqlite integration, WAL schema/versioning, pending-delta writer, failed-flush retry tests |
 | OBS-004 | BLOCKED | OBS-003 | minute/hour/day period queries, Today/Yesterday/7d/30d local-boundary and retention tests |
 | OBS-005 | BLOCKED | OBS-003 | LocalMcpServer request/response/tool/error/latency hooks with unchanged protocol/security behavior |
@@ -17,4 +17,4 @@
 | OBS-012 | BLOCKED | OBS-011 | privacy DB inspection, load/concurrency, DB failure/corruption/migration/security regression suite |
 | OBS-013 | BLOCKED | OBS-012 | self-contained win-x64 publish, native SQLite smoke, one live ChatGPT correlation proof, final acceptance |
 
-NEXT_EXACT_ACTION: CLAIM OBS-001.
+NEXT_EXACT_ACTION: CLAIM OBS-002.

@@ -26,6 +26,7 @@ internal static class Program
         Directory.CreateDirectory(root);
         try
         {
+            TestObservabilityContracts();
             await TestSettingsAndCredentialsAsync(root);
             await TestProcessRunnerAsync(root);
             await TestFilesystemAndToolsAsync(root);
@@ -51,6 +52,62 @@ internal static class Program
         }
     }
 
+    private static void TestObservabilityContracts()
+    {
+        Assert(McpTokenEstimator.EstimatorId == "bytes_div_4_v1", "token estimator id");
+        Assert(McpTokenEstimator.EstimateFromUtf8Bytes(0) == 0, "token estimate zero");
+        Assert(McpTokenEstimator.EstimateFromUtf8Bytes(1) == 1, "token estimate one byte");
+        Assert(McpTokenEstimator.EstimateFromUtf8Bytes(4) == 1, "token estimate four bytes");
+        Assert(McpTokenEstimator.EstimateFromUtf8Bytes(5) == 2, "token estimate rounds up");
+        Assert(McpTokenEstimator.EstimateFromUtf8Bytes(long.MaxValue) > 0, "token estimate avoids overflow");
+        try
+        {
+            _ = McpTokenEstimator.EstimateFromUtf8Bytes(-1);
+            throw new Exception("Assertion failed: negative token bytes rejected");
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            Assert(true, "negative token bytes rejected");
+        }
+
+        var cases = new (string Name, ToolUsageCategory Category, bool Task)[]
+        {
+            ("list_files", ToolUsageCategory.Read, false),
+            ("read_file", ToolUsageCategory.Read, false),
+            ("read_file_range", ToolUsageCategory.Read, false),
+            ("search_content", ToolUsageCategory.Read, false),
+            ("search_filenames", ToolUsageCategory.Read, false),
+            ("write_file", ToolUsageCategory.Write, true),
+            ("delete_file", ToolUsageCategory.Write, true),
+            ("delete_directory", ToolUsageCategory.Write, true),
+            ("run_command", ToolUsageCategory.Command, true),
+            ("git_init", ToolUsageCategory.Git, true),
+            ("git_status", ToolUsageCategory.Git, false),
+            ("git_log", ToolUsageCategory.Git, false),
+            ("git_diff", ToolUsageCategory.Git, false),
+            ("git_add", ToolUsageCategory.Git, true),
+            ("git_commit", ToolUsageCategory.Git, true),
+            ("git_push", ToolUsageCategory.Git, true),
+            ("list_codex_skills", ToolUsageCategory.Skill, false),
+            ("load_codex_skill", ToolUsageCategory.Skill, false),
+        };
+        foreach (var item in cases)
+        {
+            var classification = ToolUsageClassifier.Classify(item.Name);
+            Assert(classification.IsKnownTool, $"classifier knows {item.Name}");
+            Assert(classification.Category == item.Category, $"classifier category {item.Name}");
+            Assert(classification.IsExecutionTask == item.Task, $"classifier task flag {item.Name}");
+        }
+        var unknown = ToolUsageClassifier.Classify("future_tool");
+        Assert(!unknown.IsKnownTool && unknown.Category == ToolUsageCategory.Other && !unknown.IsExecutionTask, "classifier unknown tool");
+        var nullTool = ToolUsageClassifier.Classify(null);
+        Assert(!nullTool.IsKnownTool && nullTool.Category == ToolUsageCategory.Other, "classifier null tool");
+
+        var counters = new UsageCounters(1, 2, 3, 10, 20, 3, 5, 0, 1, 1, 0, 0, 0, 0, 7, 4);
+        Assert(counters.TotalPayloadBytes == 30, "usage counters total bytes");
+        Assert(counters.TotalTokensEst == 8, "usage counters total token estimate");
+        Console.WriteLine("windows-observability-contracts: ok");
+    }
     private static Task TestSettingsAndCredentialsAsync(string root)
     {
         var settingsDir = Path.Combine(root, "settings");

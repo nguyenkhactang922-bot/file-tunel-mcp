@@ -17,7 +17,7 @@ PROCESS:
 - Implementation: ACTIVE
 
 Completed:
-- FMR-001 PASS: drive-root containment fixed.
-- Evidence: Release build PASS, 0 warnings/errors; Windows integration PASS, 65 assertions.
+- FMR-001 PASS: drive-root containment fixed; integration 65 assertions PASS.
+- OBS-001 PASS: observability contracts, bytes_div_4_v1 estimator, tool classifier; integration 130 assertions PASS.
 
-Next task: OBS-001 - Metric contracts + estimator + classifier.
+Next task: OBS-002 - Atomic hot meter + immutable snapshots.
