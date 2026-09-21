@@ -27,6 +27,7 @@ internal static class Program
         try
         {
             TestObservabilityContracts();
+            await TestWorkspaceUsageMeterAsync();
             await TestSettingsAndCredentialsAsync(root);
             await TestProcessRunnerAsync(root);
             await TestFilesystemAndToolsAsync(root);
@@ -107,6 +108,77 @@ internal static class Program
         Assert(counters.TotalPayloadBytes == 30, "usage counters total bytes");
         Assert(counters.TotalTokensEst == 8, "usage counters total token estimate");
         Console.WriteLine("windows-observability-contracts: ok");
+    }
+    private static async Task TestWorkspaceUsageMeterAsync()
+    {
+        var meter = new WorkspaceUsageMeter("d");
+        Assert(meter.WorkspaceKey == "D", "usage meter normalizes workspace key");
+        meter.RecordRequest(5);
+        meter.RecordResponse(9);
+        meter.RecordToolCall("write_file", isError: true, latencyTicks: 7);
+        var first = meter.Snapshot();
+        Assert(first.McpRequests == 1 && first.ToolCalls == 1 && first.ExecutionTasks == 1, "usage meter basic counts");
+        Assert(first.RequestBytes == 5 && first.ResponseBytes == 9, "usage meter basic bytes");
+        Assert(first.TokensInEst == 2 && first.TokensOutEst == 3, "usage meter basic token estimates");
+        Assert(first.Errors == 1 && first.WriteCalls == 1, "usage meter basic category and error");
+        Assert(first.TotalLatencyTicks == 7 && first.MaxLatencyTicks == 7, "usage meter basic latency");
+        var firstDelta = meter.DrainDelta();
+        Assert(firstDelta == first, "usage meter first delta equals first lifetime snapshot");
+        Assert(meter.DrainDelta().IsZero, "usage meter drain resets pending only");
+        Assert(meter.Snapshot() == first, "usage meter drain preserves lifetime snapshot");
+
+        var concurrent = new WorkspaceUsageMeter("E");
+        const int workers = 8;
+        const int perWorker = 2_000;
+        var done = 0;
+        UsageCounters drained = default;
+        var drainTask = Task.Run(async () =>
+        {
+            var total = default(UsageCounters);
+            while (Volatile.Read(ref done) == 0)
+            {
+                total += concurrent.DrainDelta();
+                await Task.Yield();
+            }
+            total += concurrent.DrainDelta();
+            drained = total;
+        });
+
+        var producers = Enumerable.Range(0, workers).Select(_ => Task.Run(() =>
+        {
+            for (var i = 0; i < perWorker; i++)
+            {
+                concurrent.RecordRequest(5);
+                concurrent.RecordResponse(9);
+                concurrent.RecordToolCall("write_file", i % 10 == 0, (i % 17) + 1);
+            }
+        })).ToArray();
+        await Task.WhenAll(producers);
+        Volatile.Write(ref done, 1);
+        await drainTask;
+
+        var expectedCalls = workers * perWorker;
+        var errorsPerWorker = ((perWorker - 1) / 10) + 1;
+        var latencyPerWorker = Enumerable.Range(0, perWorker).Sum(i => (long)((i % 17) + 1));
+        var lifetime = concurrent.Snapshot();
+        Assert(lifetime.McpRequests == expectedCalls, "usage meter concurrent request count");
+        Assert(lifetime.ToolCalls == expectedCalls && lifetime.ExecutionTasks == expectedCalls, "usage meter concurrent tool/task count");
+        Assert(lifetime.RequestBytes == expectedCalls * 5L && lifetime.ResponseBytes == expectedCalls * 9L, "usage meter concurrent bytes");
+        Assert(lifetime.TokensInEst == expectedCalls * 2L && lifetime.TokensOutEst == expectedCalls * 3L, "usage meter concurrent token estimates");
+        Assert(lifetime.Errors == workers * errorsPerWorker, "usage meter concurrent errors");
+        Assert(lifetime.WriteCalls == expectedCalls && lifetime.ReadCalls == 0 && lifetime.OtherCalls == 0, "usage meter concurrent category");
+        Assert(lifetime.TotalLatencyTicks == workers * latencyPerWorker && lifetime.MaxLatencyTicks == 17, "usage meter concurrent latency");
+        Assert(drained == lifetime, "usage meter concurrent drains lose no increments");
+        Assert(concurrent.DrainDelta().IsZero, "usage meter pending empty after concurrent drain");
+
+        var defensive = new WorkspaceUsageMeter("F");
+        defensive.RecordRequest(-1);
+        defensive.RecordResponse(-2);
+        defensive.RecordToolCall(null, false, -3);
+        var defensiveSnapshot = defensive.Snapshot();
+        Assert(defensiveSnapshot.McpRequests == 1 && defensiveSnapshot.RequestBytes == 0 && defensiveSnapshot.ResponseBytes == 0, "usage meter clamps invalid byte metrics without breaking request path");
+        Assert(defensiveSnapshot.ToolCalls == 1 && defensiveSnapshot.OtherCalls == 1 && defensiveSnapshot.TotalLatencyTicks == 0, "usage meter defensive unknown tool/latency");
+        Console.WriteLine("windows-observability-meter: ok");
     }
     private static Task TestSettingsAndCredentialsAsync(string root)
     {

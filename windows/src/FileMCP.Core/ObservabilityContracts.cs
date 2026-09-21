@@ -72,4 +72,23 @@ public readonly record struct UsageCounters(
 {
     public long TotalPayloadBytes => RequestBytes + ResponseBytes;
     public long TotalTokensEst => TokensInEst + TokensOutEst;
+    public bool IsZero => this == default;
+
+    public static UsageCounters operator +(UsageCounters left, UsageCounters right) => new(
+        left.McpRequests + right.McpRequests,
+        left.ToolCalls + right.ToolCalls,
+        left.ExecutionTasks + right.ExecutionTasks,
+        left.RequestBytes + right.RequestBytes,
+        left.ResponseBytes + right.ResponseBytes,
+        left.TokensInEst + right.TokensInEst,
+        left.TokensOutEst + right.TokensOutEst,
+        left.Errors + right.Errors,
+        left.ReadCalls + right.ReadCalls,
+        left.WriteCalls + right.WriteCalls,
+        left.CommandCalls + right.CommandCalls,
+        left.GitCalls + right.GitCalls,
+        left.SkillCalls + right.SkillCalls,
+        left.OtherCalls + right.OtherCalls,
+        left.TotalLatencyTicks + right.TotalLatencyTicks,
+        Math.Max(left.MaxLatencyTicks, right.MaxLatencyTicks));
 }
