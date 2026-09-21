@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly SettingsStore _settingsStore = new();
     private readonly WindowsCredentialStore _credentialStore = new();
     private readonly Dictionary<string, LocalMcpRuntime> _runtimes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ObservabilityHub _observability;
     private readonly Forms.NotifyIcon _trayIcon;
     private FileMcpSettings _settings;
     private bool _quitting;
@@ -27,14 +28,15 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _observability = new ObservabilityHub(WorkspaceKeys, log: text => Dispatcher.BeginInvoke(new Action(() => AppendLog(text))));
         _settings = LoadSettingsSafely();
         ApplySettings(_settings);
         UpdateApiKeyStatus();
 
         foreach (var key in WorkspaceKeys)
         {
-            var runtime = new LocalMcpRuntime();
             var capturedKey = key;
+            var runtime = new LocalMcpRuntime(capturedKey, _observability);
             runtime.Log += text => Dispatcher.BeginInvoke(new Action(() => AppendLog($"[{capturedKey}] {text}")));
             runtime.StateChanged += state => Dispatcher.BeginInvoke(new Action(() => UpdateRuntimeState(capturedKey, state)));
             _runtimes[capturedKey] = runtime;
@@ -58,8 +60,21 @@ public partial class MainWindow : Window
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
 
         RefreshRuntimeUi();
+        _ = StartObservabilityAsync();
     }
 
+    private async Task StartObservabilityAsync()
+    {
+        try
+        {
+            await _observability.StartAsync();
+            AppendLog("[Telemetry] Observability store ready.\n");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Telemetry] Persistent observability unavailable; MCP remains operational: {ex.Message}\n");
+        }
+    }
     private FileMcpSettings LoadSettingsSafely()
     {
         try { return _settingsStore.Load(); }
@@ -600,6 +615,8 @@ public partial class MainWindow : Window
             try { runtime.ShutdownAsync().GetAwaiter().GetResult(); } catch { }
         }
 
+        try { _observability.DisposeAsync().AsTask().GetAwaiter().GetResult(); } catch { }
+
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
     }
@@ -620,6 +637,8 @@ public partial class MainWindow : Window
 
             foreach (var runtime in _runtimes.Values)
                 await runtime.DisposeAsync();
+
+            await _observability.DisposeAsync();
 
             System.Windows.Application.Current.Shutdown();
         }

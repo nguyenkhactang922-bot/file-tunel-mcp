@@ -10,11 +10,12 @@ Implementation: ACTIVE
 Completed:
 - FMR-001 PASS - drive-root containment.
 - OBS-001 PASS - metric contracts/estimator/classifier.
-- OBS-002 PASS - concurrent hot meter/snapshot/delta drain.
+- OBS-002 PASS - concurrent atomic hot meter/snapshot/delta drain.
 - OBS-003 PASS - SQLite WAL persistence.
 - OBS-004 PASS - exact local-period queries/retention.
-- OBS-005 PASS - LocalMcpServer instrumentation; suite 207 assertions.
+- OBS-005 PASS - LocalMcpServer instrumentation.
+- OBS-006 PASS - multi-drive ObservabilityHub + app/runtime uptime; suite 220 assertions.
 
 Current evidence: Release build PASS, 0 warnings/errors.
-Ready tasks: OBS-006, OBS-007.
-Next task: OBS-006 - Multi-drive ObservabilityHub + runtime uptime.
+Ready tasks: OBS-007, OBS-009.
+Next task: OBS-007 - Logical chat connect/correlation facade.

@@ -31,6 +31,7 @@ internal static class Program
             await TestWorkspaceUsageMeterAsync();
             await TestTelemetryPersistenceAsync(root);
             await TestUsagePeriodsAndRetentionAsync(root);
+            await TestObservabilityHubAsync(root);
             await TestSettingsAndCredentialsAsync(root);
             await TestProcessRunnerAsync(root);
             await TestFilesystemAndToolsAsync(root);
@@ -368,6 +369,59 @@ internal static class Program
         }
         Console.WriteLine("windows-observability-periods: ok");
     }
+    private static async Task TestObservabilityHubAsync(string root)
+    {
+        var database = Path.Combine(root, "observability-hub", "hub.sqlite3");
+        await using var hub = new ObservabilityHub(["C", "D", "E", "F"], database, TimeSpan.FromHours(1));
+        await hub.StartAsync();
+        await hub.StartAsync();
+
+        hub.MeterFor("d").RecordRequest(5);
+        hub.MeterFor("D").RecordResponse(9);
+        hub.MeterFor("D").RecordToolCall("write_file", false, 7);
+        hub.MeterFor("E").RecordRequest(4);
+        hub.MeterFor("E").RecordResponse(8);
+        hub.MeterFor("E").RecordToolCall("read_file", true, 5);
+
+        var initial = hub.Snapshot();
+        Assert(initial.AppUptime >= TimeSpan.Zero, "observability hub app uptime available");
+        Assert(initial.Workspaces.Count == 4, "observability hub exposes all workspaces");
+        Assert(initial.Workspaces["D"].LifetimeUsage.McpRequests == 1 && initial.Workspaces["E"].LifetimeUsage.McpRequests == 1, "observability hub per-workspace usage");
+        Assert(initial.GlobalUsage == initial.Workspaces.Values.Select(item => item.LifetimeUsage).Aggregate(default(UsageCounters), (sum, value) => sum + value), "observability hub global usage equals workspace sum");
+        Assert(initial.GlobalUsage.McpRequests == 2 && initial.GlobalUsage.ToolCalls == 2 && initial.GlobalUsage.Errors == 1, "observability hub global counters");
+
+        hub.MarkRuntimeRunning("D");
+        await Task.Delay(20);
+        var running1 = hub.Snapshot();
+        Assert(running1.Workspaces["D"].RuntimeRunning && running1.Workspaces["D"].RuntimeUptime > TimeSpan.Zero, "observability hub runtime uptime starts");
+        var uptime1 = running1.Workspaces["D"].RuntimeUptime;
+        hub.MarkRuntimeRunning("D");
+        await Task.Delay(15);
+        var running2 = hub.Snapshot();
+        Assert(running2.Workspaces["D"].RuntimeUptime > uptime1, "observability hub repeated running mark does not reset uptime");
+        hub.MarkRuntimeStopped("D");
+        var stopped = hub.Snapshot();
+        Assert(!stopped.Workspaces["D"].RuntimeRunning && stopped.Workspaces["D"].RuntimeUptime == TimeSpan.Zero, "observability hub runtime stop clears current uptime");
+
+        var captured = new DateTimeOffset(2026, 9, 22, 0, 12, 0, TimeSpan.Zero);
+        await hub.FlushOnceForTestsAsync(captured);
+        var range = new UsagePeriodRange(captured, captured.AddMinutes(1));
+        var dPersisted = await hub.QueryExactPeriodAsync(range, "D");
+        var globalPersisted = await hub.QueryExactPeriodAsync(range);
+        Assert(dPersisted.McpRequests == 1 && dPersisted.WriteCalls == 1, "observability hub persists/query D usage");
+        Assert(globalPersisted.McpRequests == 2 && globalPersisted.ReadCalls == 1 && globalPersisted.WriteCalls == 1, "observability hub global persisted query");
+
+        try
+        {
+            _ = hub.MeterFor("Z");
+            throw new Exception("Assertion failed: observability hub rejects unknown workspace");
+        }
+        catch (KeyNotFoundException)
+        {
+            Assert(true, "observability hub rejects unknown workspace");
+        }
+        Console.WriteLine("windows-observability-hub: ok");
+    }
     private static Task TestSettingsAndCredentialsAsync(string root)
     {
         var settingsDir = Path.Combine(root, "settings");
@@ -653,12 +707,17 @@ internal static class Program
         Environment.SetEnvironmentVariable("MCP_TEST_ENV_CAPTURE", capture);
         Environment.SetEnvironmentVariable("LOG_HTTP_RAW_UNSAFE", "true");
         Environment.SetEnvironmentVariable("MCP_SERVER_URL", "http://evil.invalid/mcp");
-        var runtime = new LocalMcpRuntime(profiles); var logs = new StringBuilder(); runtime.Log += text => logs.Append(text);
+        await using var observability = new ObservabilityHub(["D"], Path.Combine(root, "runtime-observability.sqlite3"), TimeSpan.FromHours(1));
+        await observability.StartAsync();
+        var runtime = new LocalMcpRuntime("D", observability, profiles); var logs = new StringBuilder(); runtime.Log += text => logs.Append(text);
         try
         {
             var config = new LocalMcpConfiguration("tunnel_" + new string('b', 32), "sk-runtime-test-secret", "runtime-test", (ushort)FreePort(), workspace, "127.0.0.1:0", "", "", false);
             await runtime.StartAsync(config);
             Assert(runtime.State.Status == LocalMcpRuntimeStatus.Running, "runtime running");
+            await Task.Delay(10);
+            var runningObservation = observability.Snapshot().Workspaces["D"];
+            Assert(runningObservation.RuntimeRunning && runningObservation.RuntimeUptime > TimeSpan.Zero, "runtime reports connected uptime to observability hub");
             Assert(File.Exists(Path.Combine(profiles, "runtime-test.yaml")), "isolated profile created");
             var captureText = File.ReadAllText(capture);
             Assert(captureText.Contains("X-FileMCP-Local-Token: env:FILEMCP_LOCAL_AUTH_TOKEN"), "local auth header env indirection");
@@ -668,6 +727,8 @@ internal static class Program
             Assert(logs.ToString().Contains("[Skills]", StringComparison.Ordinal), "skill scan logged on connect");
             await runtime.StopAsync();
             Assert(runtime.State.Status == LocalMcpRuntimeStatus.Stopped, "runtime stopped");
+            var stoppedObservation = observability.Snapshot().Workspaces["D"];
+            Assert(!stoppedObservation.RuntimeRunning && stoppedObservation.RuntimeUptime == TimeSpan.Zero, "runtime clears connected uptime when stopped");
         }
         finally
         {

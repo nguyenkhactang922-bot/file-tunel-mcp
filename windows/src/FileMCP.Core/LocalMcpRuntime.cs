@@ -42,6 +42,9 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
     private readonly SemaphoreSlim _serial = new(1, 1);
     private readonly object _stateGate = new();
     private readonly string? _profileDirectoryOverride;
+    private readonly string? _workspaceKey;
+    private readonly ObservabilityHub? _observability;
+    private readonly WorkspaceUsageMeter? _usageMeter;
     private LocalMcpRuntimeState _state = LocalMcpRuntimeState.Stopped;
     private CancellationTokenSource? _startupCts;
     private LocalMcpServer? _server;
@@ -50,6 +53,17 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
     private bool _requestedStop;
 
     public LocalMcpRuntime(string? profileDirectory = null) => _profileDirectoryOverride = profileDirectory;
+
+    public LocalMcpRuntime(string workspaceKey, ObservabilityHub observability, string? profileDirectory = null)
+    {
+        ArgumentNullException.ThrowIfNull(observability);
+        _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey)
+            ? throw new ArgumentException("Workspace key cannot be empty.", nameof(workspaceKey))
+            : workspaceKey.Trim().ToUpperInvariant();
+        _observability = observability;
+        _usageMeter = observability.MeterFor(_workspaceKey);
+        _profileDirectoryOverride = profileDirectory;
+    }
 
     public event Action<LocalMcpRuntimeState>? StateChanged;
     public event Action<string>? Log;
@@ -72,7 +86,7 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
                 var healthAddress = ValidateConfiguration(configuration);
                 _profileLock = new ProfileLock(configuration.Profile); _profileLock.Acquire();
                 var localAuthToken = MakeLocalAuthToken();
-                _server = new LocalMcpServer(configuration.Port, configuration.AllowedDirectory, configuration.GitUserName, configuration.GitUserEmail, configuration.EnableCommands, localAuthToken, EmitLog);
+                _server = new LocalMcpServer(configuration.Port, configuration.AllowedDirectory, configuration.GitUserName, configuration.GitUserEmail, configuration.EnableCommands, localAuthToken, EmitLog, _usageMeter);
                 await _server.StartAsync(cancellationToken).ConfigureAwait(false);
 
                 var tunnelClient = TunnelClientPath(); var profileDirectory = TunnelProfileDirectory();
@@ -223,7 +237,32 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
 
     private static string Redact(string text, IReadOnlyList<string> sensitive) { foreach (var secret in sensitive.Where(s => s.Length > 0)) text = text.Replace(secret, "[REDACTED]", StringComparison.Ordinal); return text; }
     private void EmitLog(string text) => Log?.Invoke(text);
-    private void SetState(LocalMcpRuntimeState state) { lock (_stateGate) _state = state; StateChanged?.Invoke(state); }
+    private void SetState(LocalMcpRuntimeState state)
+    {
+        LocalMcpRuntimeState previous;
+        lock (_stateGate)
+        {
+            previous = _state;
+            _state = state;
+        }
+
+        if (_observability is not null && _workspaceKey is not null)
+        {
+            try
+            {
+                if (previous.Status != LocalMcpRuntimeStatus.Running && state.Status == LocalMcpRuntimeStatus.Running)
+                    _observability.MarkRuntimeRunning(_workspaceKey);
+                else if (previous.Status == LocalMcpRuntimeStatus.Running && state.Status != LocalMcpRuntimeStatus.Running)
+                    _observability.MarkRuntimeStopped(_workspaceKey);
+            }
+            catch (Exception ex)
+            {
+                EmitLog($"[Telemetry] runtime uptime metric ignored: {ex.Message}\n");
+            }
+        }
+
+        StateChanged?.Invoke(state);
+    }
 
     public async ValueTask DisposeAsync() { await ShutdownAsync().ConfigureAwait(false); _serial.Dispose(); _startupCts?.Dispose(); }
 }
