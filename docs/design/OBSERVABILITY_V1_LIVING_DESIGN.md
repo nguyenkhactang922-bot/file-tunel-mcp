@@ -1,4 +1,4 @@
-﻿# OBSERVABILITY V1 — LIVING DESIGN HISTORY
+# OBSERVABILITY V1 — LIVING DESIGN HISTORY
 
 Status: DESIGN HISTORY; not implementation authority after freeze.
 
@@ -31,3 +31,6 @@ MCP 2026-07-28 removes initialize/initialized and protocol-level Mcp-Session-Id.
 
 ## Draft 7 — final direction
 Telemetry truth first, persistence second, server instrumentation third, identity fourth, UI last. No UI-owned counters.
+
+## Draft 8 — OBS-004 boundary correction after freeze
+Independent implementation review found that 48h minute retention cannot produce exact 7d/30d local-day totals for non-whole-hour offsets. ADR 0002 amends retention to 35 days and uses minute rows for exact headline totals; hour rows remain for chart efficiency.

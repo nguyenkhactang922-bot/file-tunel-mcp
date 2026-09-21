@@ -6,7 +6,7 @@
 | OBS-001 | PASS | FMR-001 | Usage contracts, bytes_div_4_v1 estimator, tool classifier, semantics tests |
 | OBS-002 | PASS | OBS-001 | Interlocked hot counters, exact concurrent increments, immutable snapshot + atomic delta drain tests |
 | OBS-003 | PASS | OBS-002 | Microsoft.Data.Sqlite integration, WAL schema/versioning, pending-delta writer, failed-flush retry tests |
-| OBS-004 | READY | OBS-003 | minute/hour/day period queries, Today/Yesterday/7d/30d local-boundary and retention tests |
+| OBS-004 | ACTIVE | OBS-003 | minute/hour/day period queries, Today/Yesterday/7d/30d local-boundary and retention tests |
 | OBS-005 | READY | OBS-003 | LocalMcpServer request/response/tool/error/latency hooks with unchanged protocol/security behavior |
 | OBS-006 | BLOCKED | OBS-005 | process-wide hub, C/D/E/F aggregation, app/runtime uptime tests |
 | OBS-007 | BLOCKED | OBS-005 | filemcp_observability_connect, optional _filemcp_chat facade metadata, no authority semantics |

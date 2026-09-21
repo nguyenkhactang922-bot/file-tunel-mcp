@@ -1,4 +1,4 @@
-﻿# FILEMCP OBSERVABILITY V1 — FROZEN ARCHITECTURE
+# FILEMCP OBSERVABILITY V1 — FROZEN ARCHITECTURE
 
 Status: FROZEN FOR IMPLEMENTATION
 Freeze date: 2026-09-22
@@ -166,7 +166,7 @@ No event queue is required for V1.
 ## 9. Retention
 
 - realtime second samples: RAM ring buffer only, target 15 minutes
-- usage_minute: 48 hours
+- usage_minute: 35 days
 - usage_hour: 90 days
 - usage_day: long-term
 
