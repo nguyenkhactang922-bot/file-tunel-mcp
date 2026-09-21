@@ -1,8 +1,9 @@
-﻿# CURRENT HANDOFF
+# CURRENT HANDOFF
 
-STATUS: DESIGN FREEZE COMPLETE; READY TO CODE
+STATUS: IMPLEMENTATION ACTIVE
 BRANCH: chatgpt/OBS-001-observability-foundation
-NEXT TASK: FMR-001 — Drive-root containment correctness
+COMPLETED: FMR-001 - Drive-root containment correctness
+NEXT TASK: OBS-001 - Metric contracts + estimator + classifier
 
 Read in order:
 1. AGENTS.md
@@ -16,4 +17,4 @@ Read in order:
 9. tasks/TASK_QUEUE.md
 
 NEXT_EXACT_ACTION:
-Claim FMR-001. Fix SafePathResolver containment when the shared root is a volume root such as D:\. Add regression coverage proving descendants work while traversal/junction/root-delete protections remain intact. Run Release build + Windows integration suite. Only after FMR-001 PASS may OBS-001 become READY.
+Claim OBS-001. Implement the frozen metric contracts, bytes_div_4_v1 estimator, and tool classifier with tests. Run Release build + Windows integration suite.

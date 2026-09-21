@@ -113,6 +113,23 @@ internal static class Program
         Assert(safe.ToolDefinitions.Count == 15 && !safe.HasTool("run_command"), "safe tool count");
         Assert(full.ToolDefinitions.Count == 16 && full.HasTool("run_command"), "full tool count");
 
+        var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
+        var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);
+        var volumeFull = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", true);
+        var volumeWorkspace = Path.GetRelativePath(volumeRoot, workspace).Replace('\\', '/');
+        var volumeFile = volumeWorkspace + "/volume-root.txt";
+        await volumeSafe.CallAsync("write_file", Obj(("relative_path", volumeFile), ("content", "volume-root-ok\n")));
+        var volumeRead = await volumeSafe.CallAsync("read_file", Obj(("relative_path", volumeFile)));
+        Assert(volumeRead.StructuredContent["result"]!.GetValue<string>().Contains("volume-root-ok"), "volume-root read/write descendant");
+        var volumeList = await volumeSafe.CallAsync("list_files", Obj(("subpath", volumeWorkspace)));
+        Assert(volumeList.StructuredContent["result"]!.AsArray().Any(n => n!.GetValue<string>() == "volume-root.txt"), "volume-root list descendant");
+        var volumeSearch = await volumeSafe.CallAsync("search_content", Obj(("query", "volume-root-ok"), ("path", volumeWorkspace)));
+        Assert(volumeSearch.StructuredContent["matches"]!.AsArray().Count == 1, "volume-root search descendant");
+        var volumeCommand = await volumeFull.CallAsync("run_command", Obj(("command", "Write-Output volume-root-command-ok"), ("cwd", volumeWorkspace), ("timeout_seconds", 5)));
+        Assert(volumeCommand.StructuredContent["result"]!.GetValue<string>().Contains("volume-root-command-ok"), "volume-root command cwd descendant");
+        await AssertThrowsAsync(() => volumeSafe.CallAsync("delete_directory", Obj(("relative_path", ""))), "shared root directory", "volume-root deletion refused");
+        await volumeSafe.CallAsync("delete_file", Obj(("relative_path", volumeFile)));
+
         await safe.CallAsync("write_file", Obj(("relative_path", "docs/note.txt"), ("content", "alpha\nbeta\ngamma\n")));
         var read = await safe.CallAsync("read_file", Obj(("relative_path", "docs/note.txt")));
         Assert(read.StructuredContent["result"]!.GetValue<string>().Contains("beta"), "read file");

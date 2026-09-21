@@ -1,4 +1,4 @@
-﻿# PROJECT STATE
+# PROJECT STATE
 
 Project: FileMCP
 Baseline main HEAD: dd9df8effb5b8ebdf221bcd0cfc88a5b4cec4be3
@@ -14,14 +14,10 @@ PROCESS:
 - Architecture: FROZEN
 - Dependency graph: FROZEN
 - Task split: COMPLETE
-- Feature code: NOT STARTED at this checkpoint
+- Implementation: ACTIVE
 
-Important audit finding:
-SafePathResolver has a drive-root containment defect for roots such as D:\. This was discovered during audit, any premature patch was reverted, and FMR-001 is now the first formally scheduled implementation task.
+Completed:
+- FMR-001 PASS: drive-root containment fixed.
+- Evidence: Release build PASS, 0 warnings/errors; Windows integration PASS, 65 assertions.
 
-Baseline evidence before implementation:
-- Windows Release build PASS
-- 0 warnings / 0 errors
-- Windows integration suite PASS (60 baseline assertions before audit experiment)
-
-Next task: FMR-001
+Next task: OBS-001 - Metric contracts + estimator + classifier.
