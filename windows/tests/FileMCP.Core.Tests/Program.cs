@@ -606,6 +606,40 @@ internal static class Program
         Assert(modernJson["result"]!["resultType"]!.GetValue<string>() == "complete", "modern result type");
         Assert(modernJson["result"]!["tools"]!.AsArray().Count == 17, "modern tools list");
 
+        var meteredPort = FreePort();
+        var meter = new WorkspaceUsageMeter("D");
+        await using var meteredServer = new LocalMcpServer((ushort)meteredPort, workspace, "", "", false, token, _ => { }, meter);
+        await meteredServer.StartAsync();
+        var meteredBefore = meter.Snapshot();
+        _ = await SendHttpAsync(meteredPort, "POST", "/mcp", new Dictionary<string, string> { ["Content-Type"] = "application/json" }, "");
+        _ = await SendHttpAsync(meteredPort, "POST", "/mcp", AuthHeaders(token), "{");
+        Assert(meter.Snapshot() == meteredBefore, "telemetry ignores unauthenticated and malformed MCP traffic");
+
+        const string meteredListBody = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}";
+        const string meteredReadBody = "{\"jsonrpc\":\"2.0\",\"id\":31,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"relative_path\":\"hello.txt\"}}}";
+        const string meteredUnknownBody = "{\"jsonrpc\":\"2.0\",\"id\":32,\"method\":\"tools/call\",\"params\":{\"name\":\"future_tool\",\"arguments\":{}}}";
+        var meteredList = await SendHttpAsync(meteredPort, "POST", "/mcp", AuthHeaders(token), meteredListBody);
+        var unmeteredRead = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), meteredReadBody);
+        var meteredRead = await SendHttpAsync(meteredPort, "POST", "/mcp", AuthHeaders(token), meteredReadBody);
+        var unmeteredUnknown = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), meteredUnknownBody);
+        var meteredUnknown = await SendHttpAsync(meteredPort, "POST", "/mcp", AuthHeaders(token), meteredUnknownBody);
+        Assert(HttpBody(meteredList) == HttpBody(legacy), "telemetry preserves tools/list JSON-RPC body");
+        Assert(HttpBody(meteredRead) == HttpBody(unmeteredRead), "telemetry preserves successful tool response body");
+        Assert(HttpBody(meteredUnknown) == HttpBody(unmeteredUnknown), "telemetry preserves tool error response body");
+
+        var meteredSnapshot = meter.Snapshot();
+        var requestBodies = new[] { meteredListBody, meteredReadBody, meteredUnknownBody };
+        var responseBodies = new[] { HttpBody(meteredList), HttpBody(meteredRead), HttpBody(meteredUnknown) };
+        var expectedRequestBytes = requestBodies.Sum(body => (long)Encoding.UTF8.GetByteCount(body));
+        var expectedResponseBytes = responseBodies.Sum(body => (long)Encoding.UTF8.GetByteCount(body));
+        var expectedTokensIn = requestBodies.Sum(body => McpTokenEstimator.EstimateFromUtf8Bytes(Encoding.UTF8.GetByteCount(body)));
+        var expectedTokensOut = responseBodies.Sum(body => McpTokenEstimator.EstimateFromUtf8Bytes(Encoding.UTF8.GetByteCount(body)));
+        Assert(meteredSnapshot.McpRequests == 3 && meteredSnapshot.ToolCalls == 2, "telemetry counts accepted MCP/tool calls");
+        Assert(meteredSnapshot.ReadCalls == 1 && meteredSnapshot.OtherCalls == 1 && meteredSnapshot.Errors == 1, "telemetry classifies successful and unknown tool calls");
+        Assert(meteredSnapshot.ExecutionTasks == 0, "telemetry does not mark read/unknown calls as execution tasks");
+        Assert(meteredSnapshot.RequestBytes == expectedRequestBytes && meteredSnapshot.ResponseBytes == expectedResponseBytes, "telemetry counts MCP JSON payload bytes only");
+        Assert(meteredSnapshot.TokensInEst == expectedTokensIn && meteredSnapshot.TokensOutEst == expectedTokensOut, "telemetry estimates each MCP payload independently");
+        Assert(meteredSnapshot.TotalLatencyTicks > 0 && meteredSnapshot.MaxLatencyTicks > 0, "telemetry captures tool latency");
         var badHost = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), "", host: "evil.example");
         Assert(badHost.StartsWith("HTTP/1.1 403 Forbidden", StringComparison.Ordinal), "host validation");
         Console.WriteLine("windows-http-mcp: ok");

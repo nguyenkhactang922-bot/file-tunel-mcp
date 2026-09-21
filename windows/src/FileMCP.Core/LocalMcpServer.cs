@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -28,14 +29,15 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private readonly LocalTools _tools;
     private readonly CodexSkillRegistry _skills;
     private readonly Action<string> _log;
+    private readonly WorkspaceUsageMeter? _usageMeter;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _acceptLoop;
 
-    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log)
+    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null)
     {
         if (Encoding.UTF8.GetByteCount(localAuthToken) < 32) throw new FileMcpException("Local MCP authentication token is too short");
-        _port = port; _localAuthToken = localAuthToken; _log = log;
+        _port = port; _localAuthToken = localAuthToken; _log = log; _usageMeter = usageMeter;
         _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, enableCommands);
         _skills = new CodexSkillRegistry(allowedDirectory, log);
     }
@@ -196,27 +198,28 @@ public sealed class LocalMcpServer : IAsyncDisposable
         catch { return JsonRpcError(null, -32700, "Parse error", status: 400); }
         if (message["jsonrpc"]?.GetValue<string>() != "2.0") return JsonRpcError(null, -32600, "Invalid Request", status: 400);
         if (message["method"] is not JsonValue methodNode || !methodNode.TryGetValue<string>(out var method)) return JsonRpcError(message["id"], -32600, "Invalid Request", status: 400);
+
+        RecordRequestSafely(request.Body.LongLength);
         var id = message["id"]?.DeepClone();
         var headerVersion = request.Headers.GetValueOrDefault("mcp-protocol-version");
         var headerModern = headerVersion is not null && !FileMcpConstants.LegacySupportedVersions.Contains(headerVersion);
         JsonObject parameters;
         if (message["params"] is null) parameters = new JsonObject();
         else if (message["params"] is JsonObject obj) parameters = obj;
-        else return JsonRpcError(id, -32602, "Invalid params: expected an object", status: headerModern ? 400 : 200);
+        else return MeterResponse(JsonRpcError(id, -32602, "Invalid params: expected an object", status: headerModern ? 400 : 200));
         var meta = parameters["_meta"] as JsonObject; var bodyVersion = meta?["io.modelcontextprotocol/protocolVersion"]?.GetValue<string>();
         var bodyModern = bodyVersion is not null && !FileMcpConstants.LegacySupportedVersions.Contains(bodyVersion); var modernIntent = headerModern || bodyModern;
-        if (modernIntent && headerVersion is not null && bodyVersion is not null && headerVersion != bodyVersion) return HeaderMismatch(id, $"MCP-Protocol-Version header '{headerVersion}' does not match body protocol version '{bodyVersion}'");
-        if (headerVersion is not null && headerVersion != FileMcpConstants.ModernProtocolVersion && !FileMcpConstants.LegacySupportedVersions.Contains(headerVersion)) return UnsupportedProtocol(id, headerVersion);
+        if (modernIntent && headerVersion is not null && bodyVersion is not null && headerVersion != bodyVersion) return MeterResponse(HeaderMismatch(id, $"MCP-Protocol-Version header '{headerVersion}' does not match body protocol version '{bodyVersion}'"));
+        if (headerVersion is not null && headerVersion != FileMcpConstants.ModernProtocolVersion && !FileMcpConstants.LegacySupportedVersions.Contains(headerVersion)) return MeterResponse(UnsupportedProtocol(id, headerVersion));
         if (modernIntent)
         {
-            var error = ValidateModernRequest(request, method, parameters, id); if (error is not null) return error;
-            if (message["id"] is null) return HttpResponse(202, [], "application/json");
-            return await ProcessModernRequestAsync(id, method, parameters, cancellationToken).ConfigureAwait(false);
+            var error = ValidateModernRequest(request, method, parameters, id); if (error is not null) return MeterResponse(error);
+            if (message["id"] is null) return MeterResponse(HttpResponse(202, [], "application/json"));
+            return MeterResponse(await ProcessModernRequestAsync(id, method, parameters, cancellationToken).ConfigureAwait(false));
         }
-        if (message["id"] is null) return HttpResponse(202, [], "application/json");
-        return await ProcessLegacyRequestAsync(id, method, parameters, cancellationToken).ConfigureAwait(false);
+        if (message["id"] is null) return MeterResponse(HttpResponse(202, [], "application/json"));
+        return MeterResponse(await ProcessLegacyRequestAsync(id, method, parameters, cancellationToken).ConfigureAwait(false));
     }
-
     private async Task<byte[]> ProcessLegacyRequestAsync(JsonNode? id, string method, JsonObject parameters, CancellationToken cancellationToken) => method switch
     {
         "initialize" => JsonRpcResult(id, new JsonObject { ["protocolVersion"] = NegotiateLegacy(parameters["protocolVersion"]?.GetValue<string>()), ["capabilities"] = ServerCapabilities(), ["serverInfo"] = ServerInfo() }),
@@ -254,28 +257,53 @@ public sealed class LocalMcpServer : IAsyncDisposable
 
     private async Task<byte[]> CallToolAsync(JsonNode? id, JsonObject parameters, bool modern, CancellationToken cancellationToken)
     {
-        if (parameters["name"] is not JsonValue nameNode || !nameNode.TryGetValue<string>(out var name)) return JsonRpcError(id, -32602, "Missing tool name", status: modern ? 400 : 200);
-        if (!_tools.HasTool(name) && !_skills.HasTool(name)) return JsonRpcError(id, -32602, $"Unknown tool: {name}");
-        JsonObject arguments;
-        if (parameters["arguments"] is null) arguments = new JsonObject();
-        else if (parameters["arguments"] is JsonObject obj) arguments = obj;
-        else { var invalid = new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "Invalid arguments: expected an object" }), ["isError"] = true }; if (modern) invalid = ModernComplete(invalid); return JsonRpcResult(id, invalid); }
+        var started = Stopwatch.GetTimestamp();
+        string? name = null;
+        var isError = true;
         try
         {
-            var output = _skills.HasTool(name)
-                ? _skills.Call(name, arguments)
-                : await _tools.CallAsync(name, arguments, cancellationToken).ConfigureAwait(false);
-            var result = new JsonObject { ["content"] = output.Content, ["structuredContent"] = output.StructuredContent, ["isError"] = false };
-            if (modern) result = ModernComplete(result); return JsonRpcResult(id, result);
+            if (parameters["name"] is not JsonValue nameNode || !nameNode.TryGetValue<string>(out name))
+                return JsonRpcError(id, -32602, "Missing tool name", status: modern ? 400 : 200);
+            if (!_tools.HasTool(name) && !_skills.HasTool(name))
+                return JsonRpcError(id, -32602, $"Unknown tool: {name}");
+
+            JsonObject arguments;
+            if (parameters["arguments"] is null) arguments = new JsonObject();
+            else if (parameters["arguments"] is JsonObject obj) arguments = obj;
+            else
+            {
+                var invalid = new JsonObject
+                {
+                    ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "Invalid arguments: expected an object" }),
+                    ["isError"] = true,
+                };
+                if (modern) invalid = ModernComplete(invalid);
+                return JsonRpcResult(id, invalid);
+            }
+
+            try
+            {
+                var output = _skills.HasTool(name)
+                    ? _skills.Call(name, arguments)
+                    : await _tools.CallAsync(name, arguments, cancellationToken).ConfigureAwait(false);
+                var result = new JsonObject { ["content"] = output.Content, ["structuredContent"] = output.StructuredContent, ["isError"] = false };
+                if (modern) result = ModernComplete(result);
+                isError = false;
+                return JsonRpcResult(id, result);
+            }
+            catch (Exception ex)
+            {
+                if (_skills.HasTool(name)) _log($"[Skills] ERROR: {ex.Message}\n");
+                var result = new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = ex.Message }), ["isError"] = true };
+                if (modern) result = ModernComplete(result);
+                return JsonRpcResult(id, result);
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            if (_skills.HasTool(name)) _log($"[Skills] ERROR: {ex.Message}\n");
-            var result = new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = ex.Message }), ["isError"] = true };
-            if (modern) result = ModernComplete(result); return JsonRpcResult(id, result);
+            RecordToolCallSafely(name, isError, Math.Max(0, Stopwatch.GetTimestamp() - started));
         }
     }
-
     private byte[]? ValidateModernRequest(HttpRequestData request, string method, JsonObject parameters, JsonNode? id)
     {
         if (!request.Headers.TryGetValue("mcp-protocol-version", out var headerVersion)) return HeaderMismatch(id, "Missing required MCP-Protocol-Version header");
@@ -346,6 +374,37 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private static byte[] JsonRpcError(JsonNode? id, int code, string message, JsonNode? data = null, int status = 200) { var error = new JsonObject { ["code"] = code, ["message"] = message }; if (data is not null) error["data"] = data; return JsonResponse(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id?.DeepClone(), ["error"] = error }, status); }
     private static byte[] JsonResponse(JsonNode node, int status = 200) => HttpResponse(status, Encoding.UTF8.GetBytes(node.ToJsonString()), "application/json");
 
+    private byte[] MeterResponse(byte[] response)
+    {
+        try
+        {
+            _usageMeter?.RecordResponse(HttpBodyByteLength(response));
+        }
+        catch (Exception ex)
+        {
+            _log($"[Telemetry] response metric ignored: {ex.Message}\n");
+        }
+        return response;
+    }
+
+    private void RecordRequestSafely(long requestBytes)
+    {
+        try { _usageMeter?.RecordRequest(requestBytes); }
+        catch (Exception ex) { _log($"[Telemetry] request metric ignored: {ex.Message}\n"); }
+    }
+
+    private void RecordToolCallSafely(string? name, bool isError, long latencyTicks)
+    {
+        try { _usageMeter?.RecordToolCall(name, isError, latencyTicks); }
+        catch (Exception ex) { _log($"[Telemetry] tool metric ignored: {ex.Message}\n"); }
+    }
+
+    private static int HttpBodyByteLength(byte[] response)
+    {
+        var separator = Encoding.ASCII.GetBytes("\r\n\r\n");
+        var index = IndexOf(response, separator);
+        return index < 0 ? 0 : response.Length - index - separator.Length;
+    }
     private static byte[] HttpResponse(int status, byte[] body, string contentType)
     {
         var reason = status switch { 200 => "OK", 202 => "Accepted", 204 => "No Content", 400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden", 404 => "Not Found", 405 => "Method Not Allowed", 413 => "Payload Too Large", 415 => "Unsupported Media Type", 431 => "Request Header Fields Too Large", 500 => "Internal Server Error", _ => "Error" };

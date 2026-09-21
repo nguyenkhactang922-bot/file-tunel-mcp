@@ -8,11 +8,13 @@ Architecture: FROZEN + ADR 0002 amendment
 Implementation: ACTIVE
 
 Completed:
-- FMR-001 PASS - drive-root containment; suite 65 assertions.
-- OBS-001 PASS - metric contracts/estimator/classifier; suite 130 assertions.
-- OBS-002 PASS - concurrent atomic hot meter/snapshot/delta drain; suite 150 assertions.
-- OBS-003 PASS - SQLite WAL schema/writer/retry-safe persistence; suite 184 assertions.
-- OBS-004 PASS - exact local-period queries + 35d/90d retention; suite 197 assertions.
+- FMR-001 PASS - drive-root containment.
+- OBS-001 PASS - metric contracts/estimator/classifier.
+- OBS-002 PASS - concurrent hot meter/snapshot/delta drain.
+- OBS-003 PASS - SQLite WAL persistence.
+- OBS-004 PASS - exact local-period queries/retention.
+- OBS-005 PASS - LocalMcpServer instrumentation; suite 207 assertions.
 
 Current evidence: Release build PASS, 0 warnings/errors.
-Active task: OBS-005 - LocalMcpServer instrumentation.
+Ready tasks: OBS-006, OBS-007.
+Next task: OBS-006 - Multi-drive ObservabilityHub + runtime uptime.

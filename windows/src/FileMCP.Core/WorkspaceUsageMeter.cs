@@ -1,6 +1,6 @@
 namespace FileMCP.Core;
 
-internal sealed class WorkspaceUsageMeter
+public sealed class WorkspaceUsageMeter
 {
     private sealed class AtomicCounterSet
     {

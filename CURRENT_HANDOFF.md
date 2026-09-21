@@ -2,8 +2,8 @@
 
 STATUS: IMPLEMENTATION ACTIVE
 BRANCH: chatgpt/OBS-001-observability-foundation
-COMPLETED: FMR-001, OBS-001, OBS-002, OBS-003, OBS-004
-ACTIVE: OBS-005 - LocalMcpServer instrumentation
+COMPLETED: FMR-001 through OBS-005
+NEXT TASK: OBS-006 - Multi-drive ObservabilityHub + runtime uptime
 
 NEXT_EXACT_ACTION:
-Instrument accepted MCP request bytes, response bytes, tool classification/error/latency through WorkspaceUsageMeter without changing auth, validation, JSON-RPC response bytes, or tool behavior. Add protocol regression assertions comparing metered vs unmetered semantics.
+Create process-wide ObservabilityHub for C/D/E/F, aggregate immutable hot snapshots, track app and per-runtime connected uptime, pass workspace meter through LocalMcpRuntime to LocalMcpServer, and wire lifecycle into the WPF app without adding Overview UI yet.

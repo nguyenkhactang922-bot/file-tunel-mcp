@@ -7,9 +7,9 @@
 | OBS-002 | PASS | OBS-001 | Interlocked hot counters, exact concurrent increments, immutable snapshot + atomic delta drain tests |
 | OBS-003 | PASS | OBS-002 | Microsoft.Data.Sqlite integration, WAL schema/versioning, pending-delta writer, failed-flush retry tests |
 | OBS-004 | PASS | OBS-003 | minute/hour/day period queries, Today/Yesterday/7d/30d local-boundary and retention tests |
-| OBS-005 | ACTIVE | OBS-003 | LocalMcpServer request/response/tool/error/latency hooks with unchanged protocol/security behavior |
-| OBS-006 | BLOCKED | OBS-005 | process-wide hub, C/D/E/F aggregation, app/runtime uptime tests |
-| OBS-007 | BLOCKED | OBS-005 | filemcp_observability_connect, optional _filemcp_chat facade metadata, no authority semantics |
+| OBS-005 | PASS | OBS-003 | LocalMcpServer request/response/tool/error/latency hooks with unchanged protocol/security behavior |
+| OBS-006 | READY | OBS-005 | process-wide hub, C/D/E/F aggregation, app/runtime uptime tests |
+| OBS-007 | READY | OBS-005 | filemcp_observability_connect, optional _filemcp_chat facade metadata, no authority semantics |
 | OBS-008 | BLOCKED | OBS-007 | live logical/unbound session registry, active/idle/stale state machine, hashed durable id |
 | OBS-009 | BLOCKED | OBS-004,OBS-006 | Overview tab + truthful usage/activity/per-drive cards sourced only from Core snapshots |
 | OBS-010 | BLOCKED | OBS-008,OBS-009 | period controls, live session table/detail, exact-chat label feature gate |
@@ -17,4 +17,4 @@
 | OBS-012 | BLOCKED | OBS-011 | privacy DB inspection, load/concurrency, DB failure/corruption/migration/security regression suite |
 | OBS-013 | BLOCKED | OBS-012 | self-contained win-x64 publish, native SQLite smoke, one live ChatGPT correlation proof, final acceptance |
 
-NEXT_EXACT_ACTION: COMPLETE OBS-005.
+NEXT_EXACT_ACTION: CLAIM OBS-006.
