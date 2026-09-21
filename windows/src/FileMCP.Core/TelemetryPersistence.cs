@@ -82,6 +82,106 @@ internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
         }
     }
 
+    public async Task<UsageCounters> QueryExactPeriodAsync(
+        UsagePeriodRange range,
+        string? workspaceKey = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (range.ToUtc <= range.FromUtc) return default;
+        if (range.FromUtc.UtcTicks % TimeSpan.TicksPerMinute != 0)
+            throw new ArgumentException("Exact period queries require a minute-aligned start boundary.", nameof(range));
+
+        await InitializeAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await OpenConfiguredConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        var fromEpoch = FloorBucket(range.FromUtc.ToUnixTimeSeconds(), 60);
+        var toEpoch = CeilingMinuteExclusive(range.ToUtc);
+        command.CommandText = """
+            SELECT
+                COALESCE(SUM(mcp_requests),0),
+                COALESCE(SUM(tool_calls),0),
+                COALESCE(SUM(execution_tasks),0),
+                COALESCE(SUM(request_bytes),0),
+                COALESCE(SUM(response_bytes),0),
+                COALESCE(SUM(tokens_in_est),0),
+                COALESCE(SUM(tokens_out_est),0),
+                COALESCE(SUM(errors),0),
+                COALESCE(SUM(read_calls),0),
+                COALESCE(SUM(write_calls),0),
+                COALESCE(SUM(command_calls),0),
+                COALESCE(SUM(git_calls),0),
+                COALESCE(SUM(skill_calls),0),
+                COALESCE(SUM(other_calls),0),
+                COALESCE(SUM(total_latency_us),0),
+                COALESCE(MAX(max_latency_us),0)
+            FROM usage_minute
+            WHERE bucket_epoch >= $from_epoch AND bucket_epoch < $to_epoch
+              AND ($workspace IS NULL OR workspace_key = $workspace);
+            """;
+        command.Parameters.AddWithValue("$from_epoch", fromEpoch);
+        command.Parameters.AddWithValue("$to_epoch", toEpoch);
+        command.Parameters.AddWithValue("$workspace", workspaceKey is null ? DBNull.Value : workspaceKey);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return default;
+        return new UsageCounters(
+            reader.GetInt64(0),
+            reader.GetInt64(1),
+            reader.GetInt64(2),
+            reader.GetInt64(3),
+            reader.GetInt64(4),
+            reader.GetInt64(5),
+            reader.GetInt64(6),
+            reader.GetInt64(7),
+            reader.GetInt64(8),
+            reader.GetInt64(9),
+            reader.GetInt64(10),
+            reader.GetInt64(11),
+            reader.GetInt64(12),
+            reader.GetInt64(13),
+            MicrosecondsToTicks(reader.GetInt64(14)),
+            MicrosecondsToTicks(reader.GetInt64(15)));
+    }
+
+    public async Task CleanupRetentionAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await OpenConfiguredConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await DeleteOlderThanAsync(connection, transaction, "usage_minute", FloorBucket(nowUtc.ToUniversalTime().AddDays(-35).ToUnixTimeSeconds(), 60), cancellationToken).ConfigureAwait(false);
+            await DeleteOlderThanAsync(connection, transaction, "usage_hour", FloorBucket(nowUtc.ToUniversalTime().AddDays(-90).ToUnixTimeSeconds(), 3_600), cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            try { await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); } catch { }
+            throw;
+        }
+    }
+
+    private static async Task DeleteOlderThanAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        string table,
+        long cutoffEpoch,
+        CancellationToken cancellationToken)
+    {
+        if (table is not ("usage_minute" or "usage_hour")) throw new ArgumentOutOfRangeException(nameof(table));
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = $"DELETE FROM {table} WHERE bucket_epoch < $cutoff;";
+        command.Parameters.AddWithValue("$cutoff", cutoffEpoch);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static long CeilingMinuteExclusive(DateTimeOffset value)
+    {
+        var utc = value.ToUniversalTime();
+        var unix = utc.ToUnixTimeSeconds();
+        var floor = FloorBucket(unix, 60);
+        return utc.UtcTicks % TimeSpan.TicksPerMinute == 0 ? floor : floor + 60;
+    }
     internal static long FloorBucket(long unixSeconds, long bucketSeconds) =>
         unixSeconds - Mod(unixSeconds, bucketSeconds);
 
@@ -283,6 +383,11 @@ internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    private static long MicrosecondsToTicks(long microseconds)
+    {
+        if (microseconds <= 0) return 0;
+        return (long)((decimal)microseconds * Stopwatch.Frequency / 1_000_000m);
+    }
     private static long TicksToMicroseconds(long ticks)
     {
         if (ticks <= 0) return 0;

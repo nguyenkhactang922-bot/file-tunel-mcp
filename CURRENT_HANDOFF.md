@@ -2,8 +2,8 @@
 
 STATUS: IMPLEMENTATION ACTIVE
 BRANCH: chatgpt/OBS-001-observability-foundation
-COMPLETED: FMR-001, OBS-001, OBS-002, OBS-003
-NEXT TASK: OBS-004 - Historical queries + retention + timezone ranges
+COMPLETED: FMR-001, OBS-001, OBS-002, OBS-003, OBS-004
+ACTIVE: OBS-005 - LocalMcpServer instrumentation
 
 NEXT_EXACT_ACTION:
-Implement minute/hour/day query selection for Today/Yesterday/7d/30d using user-local UTC boundaries, plus retention cleanup tests. Do not instrument LocalMcpServer until OBS-004 is committed.
+Instrument accepted MCP request bytes, response bytes, tool classification/error/latency through WorkspaceUsageMeter without changing auth, validation, JSON-RPC response bytes, or tool behavior. Add protocol regression assertions comparing metered vs unmetered semantics.

@@ -6,8 +6,8 @@
 | OBS-001 | PASS | FMR-001 | Usage contracts, bytes_div_4_v1 estimator, tool classifier, semantics tests |
 | OBS-002 | PASS | OBS-001 | Interlocked hot counters, exact concurrent increments, immutable snapshot + atomic delta drain tests |
 | OBS-003 | PASS | OBS-002 | Microsoft.Data.Sqlite integration, WAL schema/versioning, pending-delta writer, failed-flush retry tests |
-| OBS-004 | ACTIVE | OBS-003 | minute/hour/day period queries, Today/Yesterday/7d/30d local-boundary and retention tests |
-| OBS-005 | READY | OBS-003 | LocalMcpServer request/response/tool/error/latency hooks with unchanged protocol/security behavior |
+| OBS-004 | PASS | OBS-003 | minute/hour/day period queries, Today/Yesterday/7d/30d local-boundary and retention tests |
+| OBS-005 | ACTIVE | OBS-003 | LocalMcpServer request/response/tool/error/latency hooks with unchanged protocol/security behavior |
 | OBS-006 | BLOCKED | OBS-005 | process-wide hub, C/D/E/F aggregation, app/runtime uptime tests |
 | OBS-007 | BLOCKED | OBS-005 | filemcp_observability_connect, optional _filemcp_chat facade metadata, no authority semantics |
 | OBS-008 | BLOCKED | OBS-007 | live logical/unbound session registry, active/idle/stale state machine, hashed durable id |
@@ -17,4 +17,4 @@
 | OBS-012 | BLOCKED | OBS-011 | privacy DB inspection, load/concurrency, DB failure/corruption/migration/security regression suite |
 | OBS-013 | BLOCKED | OBS-012 | self-contained win-x64 publish, native SQLite smoke, one live ChatGPT correlation proof, final acceptance |
 
-NEXT_EXACT_ACTION: CLAIM OBS-004.
+NEXT_EXACT_ACTION: COMPLETE OBS-005.

@@ -30,6 +30,7 @@ internal static class Program
             TestObservabilityContracts();
             await TestWorkspaceUsageMeterAsync();
             await TestTelemetryPersistenceAsync(root);
+            await TestUsagePeriodsAndRetentionAsync(root);
             await TestSettingsAndCredentialsAsync(root);
             await TestProcessRunnerAsync(root);
             await TestFilesystemAndToolsAsync(root);
@@ -298,6 +299,74 @@ internal static class Program
         var newerStore = new TelemetrySqliteStore(newer);
         await AssertThrowsAsync(() => newerStore.InitializeAsync(), "newer than supported", "telemetry rejects newer schema");
         Console.WriteLine("windows-observability-sqlite: ok");
+    }
+    private static async Task TestUsagePeriodsAndRetentionAsync(string root)
+    {
+        var quarterHour = TimeZoneInfo.CreateCustomTimeZone(
+            "FileMCP-Test-UTC+05:45",
+            TimeSpan.FromMinutes(345),
+            "FileMCP Test UTC+05:45",
+            "FileMCP Test UTC+05:45");
+        var now = new DateTimeOffset(2026, 9, 22, 0, 7, 30, TimeSpan.Zero);
+        var today = UsagePeriodResolver.Resolve(UsagePeriodPreset.Today, now, quarterHour);
+        var yesterday = UsagePeriodResolver.Resolve(UsagePeriodPreset.Yesterday, now, quarterHour);
+        var seven = UsagePeriodResolver.Resolve(UsagePeriodPreset.SevenDays, now, quarterHour);
+        var thirty = UsagePeriodResolver.Resolve(UsagePeriodPreset.ThirtyDays, now, quarterHour);
+        Assert(today.FromUtc == new DateTimeOffset(2026, 9, 21, 18, 15, 0, TimeSpan.Zero) && today.ToUtc == now, "period today quarter-hour timezone boundary");
+        Assert(yesterday.FromUtc == new DateTimeOffset(2026, 9, 20, 18, 15, 0, TimeSpan.Zero) && yesterday.ToUtc == today.FromUtc, "period yesterday quarter-hour timezone boundary");
+        Assert(seven.FromUtc == new DateTimeOffset(2026, 9, 15, 18, 15, 0, TimeSpan.Zero), "period seven-day local boundary");
+        Assert(thirty.FromUtc == new DateTimeOffset(2026, 8, 23, 18, 15, 0, TimeSpan.Zero), "period thirty-day local boundary");
+
+        var eastern = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+        var afterFallback = new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);
+        var fallbackYesterday = UsagePeriodResolver.Resolve(UsagePeriodPreset.Yesterday, afterFallback, eastern);
+        Assert(fallbackYesterday.FromUtc == new DateTimeOffset(2026, 11, 1, 4, 0, 0, TimeSpan.Zero), "period DST yesterday start");
+        Assert(fallbackYesterday.ToUtc == new DateTimeOffset(2026, 11, 2, 5, 0, 0, TimeSpan.Zero), "period DST yesterday end");
+        Assert(fallbackYesterday.Duration == TimeSpan.FromHours(25), "period DST 25-hour local day");
+
+        var database = Path.Combine(root, "telemetry-periods", "periods.sqlite3");
+        var store = new TelemetrySqliteStore(database);
+        await store.InitializeAsync();
+        var one = new UsageCounters(1, 1, 0, 4, 8, 1, 2, 0, 1, 0, 0, 0, 0, 0, 1, 1);
+        await store.UpsertDeltasAsync(today.FromUtc.AddMinutes(-1), new Dictionary<string, UsageCounters> { ["D"] = one });
+        await store.UpsertDeltasAsync(today.FromUtc, new Dictionary<string, UsageCounters> { ["D"] = one, ["E"] = one });
+        await store.UpsertDeltasAsync(now.AddMinutes(-1), new Dictionary<string, UsageCounters> { ["D"] = one });
+
+        var dToday = await store.QueryExactPeriodAsync(today, "D");
+        var globalToday = await store.QueryExactPeriodAsync(today);
+        Assert(dToday.McpRequests == 2 && dToday.RequestBytes == 8 && dToday.ResponseBytes == 16, "period exact workspace query excludes previous local day");
+        Assert(globalToday.McpRequests == 3 && globalToday.ReadCalls == 3, "period exact global query aggregates workspaces");
+        await AssertThrowsAsync(
+            () => store.QueryExactPeriodAsync(new UsagePeriodRange(today.FromUtc.AddSeconds(1), today.ToUtc), "D"),
+            "minute-aligned",
+            "period query rejects unrepresentable sub-minute start");
+
+        var retentionNow = new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero);
+        await store.UpsertDeltasAsync(retentionNow.AddDays(-10), new Dictionary<string, UsageCounters> { ["D"] = one });
+        await store.UpsertDeltasAsync(retentionNow.AddDays(-40), new Dictionary<string, UsageCounters> { ["D"] = one });
+        await store.UpsertDeltasAsync(retentionNow.AddDays(-100), new Dictionary<string, UsageCounters> { ["D"] = one });
+        var oldDayEpoch = TelemetrySqliteStore.FloorBucket(retentionNow.AddDays(-100).ToUnixTimeSeconds(), 86_400);
+        await store.CleanupRetentionAsync(retentionNow);
+
+        await using (var connection = new SqliteConnection($"Data Source={database}"))
+        {
+            await connection.OpenAsync();
+            var minuteCutoff = TelemetrySqliteStore.FloorBucket(retentionNow.AddDays(-35).ToUnixTimeSeconds(), 60);
+            var hourCutoff = TelemetrySqliteStore.FloorBucket(retentionNow.AddDays(-90).ToUnixTimeSeconds(), 3_600);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM usage_minute WHERE bucket_epoch < $cutoff;";
+            command.Parameters.AddWithValue("$cutoff", minuteCutoff);
+            Assert((long)(await command.ExecuteScalarAsync() ?? -1L) == 0, "retention removes minute rows older than 35 days");
+            command.Parameters.Clear();
+            command.CommandText = "SELECT COUNT(*) FROM usage_hour WHERE bucket_epoch < $cutoff;";
+            command.Parameters.AddWithValue("$cutoff", hourCutoff);
+            Assert((long)(await command.ExecuteScalarAsync() ?? -1L) == 0, "retention removes hour rows older than 90 days");
+            command.Parameters.Clear();
+            command.CommandText = "SELECT COUNT(*) FROM usage_day WHERE workspace_key='D' AND bucket_epoch=$bucket;";
+            command.Parameters.AddWithValue("$bucket", oldDayEpoch);
+            Assert((long)(await command.ExecuteScalarAsync() ?? 0L) == 1, "retention preserves long-term day row");
+        }
+        Console.WriteLine("windows-observability-periods: ok");
     }
     private static Task TestSettingsAndCredentialsAsync(string root)
     {
