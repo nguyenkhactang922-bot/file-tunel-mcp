@@ -95,3 +95,24 @@ GitHub auth recheck (2026-09-22):
 - PR #2 remains open, clean and mergeable.
 - Attempt to switch `gh` to account `dongttfd` failed because that account is not logged in on this machine.
 - No technical blocker remains; only an upstream WRITE/MAINTAIN-authenticated account can perform the final merge.
+
+
+## FINAL PRODUCT AUDIT OVERRIDE - 2026-09-22
+
+Whole-repository independent audit found blockers outside the already-passed Windows OBS/V11 core gates.
+
+Authoritative audit report: `docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`
+Fix queue: `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`
+
+Current audit result:
+- Windows Release build: PASS, 0 warnings / 0 errors.
+- Windows runtime suite: PASS, 414 assertions.
+- NuGet vulnerable audit: PASS, no vulnerable packages reported.
+- NuGet direct outdated audit: PASS, no direct updates reported.
+- Confirmed P1: GitHub Windows release-resource workflow checks obsolete `FileMCP` staging path while build uses `FileMCP-release`.
+- Confirmed P1: macOS MCP surface lacks `filemcp_observability_connect` while README claims equivalent MCP surface.
+- Confirmed P1: macOS tunnel crash path lacks Windows bounded restart/backoff/cooldown supervisor.
+- Public-market P1: production signing/notarization pipeline is not implemented.
+
+Do not treat V11-009 as the only remaining whole-app gate.
+AUTHORITATIVE NEXT_EXACT_ACTION: CLAIM FPA-001 from `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`.

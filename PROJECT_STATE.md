@@ -47,3 +47,10 @@ GitHub auth recheck (2026-09-22):
 - PR #2 remains open, clean and mergeable.
 - Attempt to switch `gh` to account `dongttfd` failed because that account is not logged in on this machine.
 - No technical blocker remains; only an upstream WRITE/MAINTAIN-authenticated account can perform the final merge.
+
+
+## Final product audit - 2026-09-22
+
+Whole-app status is NOT release-ready yet despite Windows OBS/V11 core gates passing. See `docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`. The dependency-aware remediation queue is `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`.
+
+Next implementation action: FPA-001 CI staging-path parity. No feature fix has been started by this audit.
