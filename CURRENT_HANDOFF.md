@@ -118,3 +118,10 @@ FPA-003 final acceptance:
 - Local x64 compatibility smoke, release contract, ARM64 assurance contract, Release build and 414 runtime assertions PASS.
 - Candidate evidence: `docs/evidence/FPA-005_WINDOWS_ARM64_NATIVE_ASSURANCE_CANDIDATE.md`.
 - FPA-005 remains ACTIVE until GitHub verify-windows-arm64 succeeds on a real ARM64 hosted runner.
+
+
+FPA-005 final acceptance:
+- GitHub Actions run 35726514963: verify-macos SUCCESS, verify-windows SUCCESS, verify-windows-arm64 SUCCESS.
+- Native ARM64 WPF/tray/tunnel-client/SQLite/OTLP smoke PASS.
+- Evidence: docs/evidence/FPA-005_WINDOWS_ARM64_NATIVE_ASSURANCE_EVIDENCE.md.
+- AUTHORITATIVE NEXT_EXACT_ACTION is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md: CLAIM FPA-007 design gate.
