@@ -63,6 +63,7 @@ jobs:
     timeout-minutes: 20
     env:
       MCP_HTTP_FUZZ_ITERATIONS: "40"
+      FILEMCP_WINDOWS_STAGING_NAME: FileMCP-release
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -89,17 +90,21 @@ jobs:
         shell: pwsh
         run: dotnet build windows/FileMCP.Windows.sln -c Release -warnaserror
 
+      - name: Verify Windows release contract
+        shell: pwsh
+        run: ./tests/test_windows_release_contract.ps1
+
       - name: Windows integration tests
         shell: pwsh
         run: ./tests/test_windows_runtime.ps1
 
       - name: Build Windows x64 release
         shell: pwsh
-        run: ./build_windows_app.ps1 -Architecture x64
+        run: ./build_windows_app.ps1 -Architecture x64 -StagingName $env:FILEMCP_WINDOWS_STAGING_NAME
 
       - name: Build Windows arm64 release
         shell: pwsh
-        run: ./build_windows_app.ps1 -Architecture arm64
+        run: ./build_windows_app.ps1 -Architecture arm64 -StagingName $env:FILEMCP_WINDOWS_STAGING_NAME
 
       - name: Windows app smoke test
         shell: pwsh
@@ -115,7 +120,7 @@ jobs:
             }
           }
           foreach ($arch in @("x64", "arm64")) {
-            $root = "dist/windows-$arch/FileMCP"
+            $root = "dist/windows-$arch/$env:FILEMCP_WINDOWS_STAGING_NAME"
             if (-not (Test-Path "$root/FileMCP.exe" -PathType Leaf)) { throw "Missing FileMCP.exe for $arch." }
             if (-not (Test-Path "$root/tunnel-client.exe" -PathType Leaf)) { throw "Missing tunnel-client.exe for $arch." }
             Assert-SameFile LICENSE "$root/FileMCP-LICENSE.txt"

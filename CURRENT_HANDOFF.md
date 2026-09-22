@@ -116,3 +116,11 @@ Current audit result:
 
 Do not treat V11-009 as the only remaining whole-app gate.
 AUTHORITATIVE NEXT_EXACT_ACTION: CLAIM FPA-001 from `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`.
+
+
+FPA-001 PASS (2026-09-22):
+- Windows GitHub Actions now uses the same canonical FileMCP-release staging contract as build_windows_app.ps1.
+- Added tests/test_windows_release_contract.ps1 and wired it into verify-windows.
+- Local isolated x64 + ARM64 package/resource checks PASS; x64 packaged app smoke PASS.
+- Evidence: docs/evidence/FPA-001_CI_STAGING_PARITY_EVIDENCE.md.
+- AUTHORITATIVE NEXT_EXACT_ACTION: CLAIM FPA-006 state normalization.

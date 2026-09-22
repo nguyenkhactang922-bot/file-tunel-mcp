@@ -6,7 +6,7 @@ Status: AUDIT COMPLETE  -  FIXES NOT STARTED
 
 | ID | Severity | State | Depends | Acceptance |
 |---|---|---|---|---|
-| FPA-001 | P1 | READY | - | GitHub Windows workflow verifies the actual `FileMCP-release` staging path for x64/ARM64; clean workflow path gate passes |
+| FPA-001 | P1 | PASS | - | GitHub Windows workflow verifies the actual `FileMCP-release` staging path for x64/ARM64; clean workflow path gate passes |
 | FPA-002 | P1 | READY | - | macOS logical-chat/tool surface matches Windows, or product scope/docs explicitly freeze a Windows-only observability delta |
 | FPA-003 | P1 | BLOCKED | FPA-002 scope decision | macOS has bounded tunnel crash restart/backoff/jitter/budget/cooldown parity, or cross-platform tunnel-parity claim is explicitly removed |
 | FPA-004 | P1 market | BLOCKED | release-scope decision | production Windows artifacts are Authenticode-signed and macOS artifacts signed/notarized/stapled without secrets in repo/logs |
@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-**CLAIM FPA-001** and fix the deterministic Windows CI staging-path mismatch first.
+**CLAIM FPA-006** and normalize project/handoff/task state before the next implementation task.
 
 Do not resume V11-009 as the only remaining whole-app gate until the P1 product/release scope is resolved.
