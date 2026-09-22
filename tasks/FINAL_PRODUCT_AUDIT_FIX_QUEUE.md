@@ -2,14 +2,14 @@
 
 Source audit: `docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`
 
-Status: AUDIT COMPLETE  -  FIXES NOT STARTED
+Status: REMEDIATION ACTIVE - FPA-004 FINAL MARKET GATE
 
 | ID | Severity | State | Depends | Acceptance |
 |---|---|---|---|---|
 | FPA-001 | P1 | PASS | - | GitHub Windows workflow verifies the actual `FileMCP-release` staging path for x64/ARM64; clean workflow path gate passes |
 | FPA-002 | P1 | PASS | - | macOS logical-chat/tool surface matches Windows, or product scope/docs explicitly freeze a Windows-only observability delta |
 | FPA-003 | P1 | PASS | FPA-002 | macOS has bounded tunnel crash restart/backoff/jitter/budget/cooldown parity, or cross-platform tunnel-parity claim is explicitly removed |
-| FPA-004 | P1 market | BLOCKED | release-scope decision | production Windows artifacts are Authenticode-signed and macOS artifacts signed/notarized/stapled without secrets in repo/logs |
+| FPA-004 | P1 market | ACTIVE | release-scope decided | production Windows artifacts are Authenticode-signed and macOS artifacts signed/notarized/stapled without secrets in repo/logs |
 | FPA-005 | P2 | PASS | FPA-001 | Windows ARM64 gets native runtime smoke where available, or an explicit architecture-assurance gate and documented limitation |
 | FPA-006 | P2 | PASS | - | handoff/project/task state match real Git HEAD/status and expose exactly one current NEXT_EXACT_ACTION |
 | FPA-007 | P2 | PASS | - | duplicate desktop-process behavior is intentionally supported/documented or app-wide single-instance behavior is implemented/tested |
@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: CLAIM FPA-004 public-market signing/notarization design gate and close all non-secret release plumbing before V11-009.
+AUTHORITATIVE NEXT_EXACT_ACTION: obtain native GitHub macOS/Windows x64/Windows ARM64 Verify evidence for the FPA-004 production-signing plumbing candidate.
 
 Do not resume V11-009 as the only remaining whole-app gate until the P1 product/release scope is resolved.

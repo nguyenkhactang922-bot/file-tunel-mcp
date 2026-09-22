@@ -170,3 +170,13 @@ FPA-009 final acceptance:
 - GitHub Actions run 35748443822: macOS, Windows x64 and Windows ARM64 all SUCCESS.
 - Evidence: docs/evidence/FPA-009_DYNAMIC_HEALTH_DISCOVERY_EVIDENCE.md.
 - Next: FPA-004 public-market signing/notarization design gate.
+
+
+## FPA-004 plumbing candidate
+
+- Frozen architecture: commit 968e05a.
+- Release workflow/scripts + secret-hygiene contract implemented locally.
+- Windows Release build PASS 0/0; runtime PASS 444 assertions; x64 packaged smoke PASS; x64/ARM64 candidate packages build PASS.
+- Candidate evidence: docs/evidence/FPA-004_PRODUCTION_SIGNING_PLUMBING_CANDIDATE.md.
+- Connected fork currently has no production-release environment and no release secrets.
+- FPA-004 remains ACTIVE until native Verify succeeds; after that it becomes EXTERNAL-BLOCKED unless real signing/notarization credentials are provisioned and the Production Release workflow succeeds.

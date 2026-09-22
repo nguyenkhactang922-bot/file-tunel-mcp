@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          bash -n build_macos_app.sh build_macos_icon.sh create_source_archive.sh run_macos_dev.sh tests/test_swift_runtime.sh
+          bash -n build_macos_app.sh build_macos_icon.sh create_source_archive.sh run_macos_dev.sh tests/test_swift_runtime.sh release/sign_notarize_macos.sh
           plutil -lint macos/Info.plist
           swiftc -warnings-as-errors -typecheck \
             -framework AppKit \
@@ -119,6 +119,10 @@ jobs:
       - name: Verify Windows single-instance contract
         shell: pwsh
         run: ./tests/test_windows_single_instance_contract.ps1
+
+      - name: Verify production release signing contract
+        shell: pwsh
+        run: ./tests/test_release_signing_contract.ps1
 
       - name: Windows integration tests
         shell: pwsh
@@ -209,6 +213,10 @@ jobs:
       - name: Verify Windows single-instance contract
         shell: pwsh
         run: ./tests/test_windows_single_instance_contract.ps1
+
+      - name: Verify production release signing contract
+        shell: pwsh
+        run: ./tests/test_release_signing_contract.ps1
 
       - name: Build Windows ARM64 release
         shell: pwsh

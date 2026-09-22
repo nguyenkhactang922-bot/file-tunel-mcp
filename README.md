@@ -399,6 +399,26 @@ Do not create public release archives by zipping the entire working directory.
 
 Platform release builds are intentionally separate because signing/notarization requirements differ between macOS and Windows.
 
+### Production signing / notarization
+
+Ordinary local builds and the Verify workflow intentionally remain unsigned. Public distribution uses the separate manual Production Release workflow in .github/workflows/release.yml and the protected GitHub Environment production-release.
+
+Configure these Environment secrets before running the production workflow:
+
+| Platform | Secret | Purpose |
+| --- | --- | --- |
+| Windows | WINDOWS_CODESIGN_PFX_BASE64 | Base64 PKCS#12/PFX containing the public code-signing certificate and private key. |
+| Windows | WINDOWS_CODESIGN_PFX_PASSWORD | Password for the PFX. |
+| macOS | MACOS_DEVELOPER_ID_P12_BASE64 | Base64 Developer ID Application PKCS#12/P12. |
+| macOS | MACOS_DEVELOPER_ID_P12_PASSWORD | Password for the Developer ID P12. |
+| macOS | APPLE_NOTARY_KEY_P8_BASE64 | Base64 App Store Connect API private key (.p8) used by notarytool. |
+| macOS | APPLE_NOTARY_KEY_ID | App Store Connect API key ID. |
+| macOS | APPLE_NOTARY_ISSUER_ID | App Store Connect API issuer ID. |
+
+The release workflow is workflow_dispatch-only. It materializes credential files only under the ephemeral runner temp directory and cleans them after the job. Windows artifacts are Authenticode signed, RFC3161 timestamped, repackaged, then verified again from inside the ZIP. macOS artifacts are Developer ID signed with the hardened runtime, notarized, stapled, assessed by Gatekeeper, packaged after stapling, then reverified from the final ZIP.
+
+Do not add PFX/P12/P8 files to the repository. A syntactically complete release workflow is not itself proof of public-market signing: FPA-004 is complete only after a real credentialed production-release run succeeds and the uploaded artifacts pass the post-package signature/notarization checks.
+
 ## Contributing
 
 - Development guidelines: [`CONTRIBUTING.md`](CONTRIBUTING.md)

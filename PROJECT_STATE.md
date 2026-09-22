@@ -35,7 +35,7 @@ V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 ## Verified quality baseline
 
 - Windows Release build: PASS, 0 warnings / 0 errors.
-- Full Windows runtime suite: PASS, 414 assertions.
+- Full Windows runtime suite: PASS, 444 assertions.
 - x64 packaged app smoke: PASS.
 - x64 + ARM64 release-resource packaging: PASS under FPA-001 isolated staging verification.
 - NuGet vulnerable-package audit: no vulnerable packages reported.
@@ -46,7 +46,7 @@ V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 
 - FPA-002 PASS: macOS logical-chat/tool-surface parity, native CI verified.
 - FPA-003 PASS: macOS bounded tunnel supervisor parity, native CI verified.
-- FPA-004 P1 market: production signing/notarization.
+- FPA-004 ACTIVE: production signing/notarization plumbing implemented locally; native Verify and real release credentials/run remain.
 - FPA-005 PASS: native Windows ARM64 runtime assurance verified by GitHub hosted ARM64 runner.
 - FPA-007 PASS: per-user Windows desktop single-instance activation verified on x64 and ARM64.
 - FPA-008 PASS: cross-platform HTTP connection cap plus idle/header deadlines, native CI verified.
@@ -74,3 +74,6 @@ FPA-008 native CI PASS: run 35745850301 succeeded on verify-macos, verify-window
 
 
 FPA-009 native CI PASS: run 35748443822 succeeded on verify-macos, verify-windows and verify-windows-arm64. Remaining whole-app market gate is FPA-004 signing/notarization.
+
+
+FPA-004 plumbing candidate: release-only Windows Authenticode and macOS Developer ID/notarization/stapling automation is implemented locally. Local contracts/build/runtime/package smoke PASS. Native Verify is the next gate; real production credentials are not configured on the connected fork and remain required for FPA-004 PASS.
