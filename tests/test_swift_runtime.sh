@@ -601,7 +601,7 @@ cooldownRuntime.onLog = { text in
 }
 let cooldownConfig = LocalMCPConfiguration(
     tunnelID: "tunnel_0123456789abcdef0123456789abcdef", apiKey: "test-key",
-    profile: "cooldown-runtime-(UUID().uuidString)", port: 18079,
+    profile: "cooldown-runtime-test", port: 18079,
     allowedDirectory: root.path, healthAddress: "127.0.0.1:0",
     gitUserName: "", gitUserEmail: "", enableCommands: false
 )
