@@ -1,4 +1,4 @@
-# CURRENT HANDOFF
+﻿# CURRENT HANDOFF
 
 STATUS: BLOCKED ON ONE LIVE ACCEPTANCE GATE
 BRANCH: chatgpt/OBS-001-observability-foundation
@@ -16,3 +16,8 @@ RELEASE EVIDENCE:
 
 NEXT_EXACT_ACTION:
 Reconnect ChatGPT to the new FileMCP release build so connector schema refreshes. Confirm `filemcp_observability_connect`, call it once, propagate its returned handle in `_filemcp_chat` on normal FileMCP calls, verify a bound observed session plus SHA-256-only durable identity, then mark OBS-013 PASS. Do not enable exact AI-chat wording before this proof.
+POST-OBS-013 APPROVED WORK:
+- User approved implementation of the frozen Observability V1.1 OSS-strengthening plan.
+- Do not repeat discovery/audit after OBS-013.
+- After OBS-013 PASS, immediately CLAIM V11-001 from tasks/OBSERVABILITY_V1_1_CANDIDATE_QUEUE.md and execute through V11-009 by dependency order.
+- Reuse mature OSS directly when technically appropriate and license-compatible; prefer official native .NET packages when available; preserve license/provenance for copied/adapted source; keep security/privacy boundaries unchanged.

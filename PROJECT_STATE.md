@@ -1,4 +1,4 @@
-# PROJECT STATE
+﻿# PROJECT STATE
 
 Project: FileMCP
 Baseline main HEAD: dd9df8effb5b8ebdf221bcd0cfc88a5b4cec4be3
@@ -21,3 +21,8 @@ Remaining blocker:
 
 Next exact action:
 - Reconnect ChatGPT to the new packaged FileMCP binary, refresh schema, call filemcp_observability_connect, propagate _filemcp_chat through normal calls, verify bound session + hash-only persistence, then mark OBS-013 PASS and proceed to final review/merge.
+Approved next initiative:
+- FILEMCP OBSERVABILITY V1.1 OSS STRENGTHENING is user-approved and architecture-frozen.
+- Source audit and independent multi-round review are complete.
+- Implementation remains dependency-blocked solely by OBS-013 live acceptance.
+- Once OBS-013 passes, start V11-001 immediately; no repeated discovery/audit is required.
