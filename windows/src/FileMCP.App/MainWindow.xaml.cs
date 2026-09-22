@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using FileMCP.Core;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
@@ -19,6 +20,7 @@ public partial class MainWindow : Window
     private readonly WindowsCredentialStore _credentialStore = new();
     private readonly Dictionary<string, LocalMcpRuntime> _runtimes = new(StringComparer.OrdinalIgnoreCase);
     private readonly ObservabilityHub _observability;
+    private readonly DispatcherTimer _overviewTimer;
     private readonly Forms.NotifyIcon _trayIcon;
     private FileMcpSettings _settings;
     private bool _quitting;
@@ -29,6 +31,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _observability = new ObservabilityHub(WorkspaceKeys, log: text => Dispatcher.BeginInvoke(new Action(() => AppendLog(text))));
+        _overviewTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromSeconds(1) };
+        _overviewTimer.Tick += (_, _) => RefreshOverviewUi();
         _settings = LoadSettingsSafely();
         ApplySettings(_settings);
         UpdateApiKeyStatus();
@@ -61,6 +65,8 @@ public partial class MainWindow : Window
 
         RefreshRuntimeUi();
         _ = StartObservabilityAsync();
+        RefreshOverviewUi();
+        _overviewTimer.Start();
     }
 
     private async Task StartObservabilityAsync()
@@ -74,6 +80,98 @@ public partial class MainWindow : Window
         {
             AppendLog($"[Telemetry] Persistent observability unavailable; MCP remains operational: {ex.Message}\n");
         }
+    }
+    private void RefreshOverviewUi()
+    {
+        if (_quitting) return;
+        ObservabilitySnapshot snapshot;
+        try { snapshot = _observability.Snapshot(); }
+        catch (ObjectDisposedException) { return; }
+
+        var usage = snapshot.GlobalUsage;
+        OverviewClockText.Text = DateTimeOffset.Now.ToString("ddd, dd/MM/yyyy  HH:mm:ss");
+        OverviewAppUptimeText.Text = "App uptime: " + FormatDuration(snapshot.AppUptime);
+        OverviewTokenInText.Text = FormatCount(usage.TokensInEst);
+        OverviewTokenOutText.Text = FormatCount(usage.TokensOutEst);
+        OverviewTokenTotalText.Text = FormatCount(usage.TotalTokensEst);
+        OverviewInputBytesText.Text = FormatBytes(usage.RequestBytes);
+        OverviewOutputBytesText.Text = FormatBytes(usage.ResponseBytes);
+        OverviewTotalBytesText.Text = FormatBytes(usage.TotalPayloadBytes);
+        OverviewToolCallsText.Text = FormatCount(usage.ToolCalls);
+        OverviewExecutionTasksText.Text = FormatCount(usage.ExecutionTasks);
+        OverviewReadCallsText.Text = FormatCount(usage.ReadCalls);
+        OverviewWriteCallsText.Text = FormatCount(usage.WriteCalls);
+        OverviewCommandCallsText.Text = FormatCount(usage.CommandCalls);
+        OverviewGitCallsText.Text = FormatCount(usage.GitCalls);
+        OverviewSkillCallsText.Text = FormatCount(usage.SkillCalls);
+        OverviewErrorsText.Text = FormatCount(usage.Errors);
+
+        foreach (var key in WorkspaceKeys)
+            if (snapshot.Workspaces.TryGetValue(key, out var workspace)) UpdateOverviewWorkspace(key, workspace);
+    }
+
+    private void UpdateOverviewWorkspace(string key, WorkspaceObservabilitySnapshot workspace)
+    {
+        var status = OverviewStatusText(key);
+        status.Text = workspace.RuntimeRunning ? "Connected" : "Stopped";
+        status.Foreground = workspace.RuntimeRunning ? System.Windows.Media.Brushes.ForestGreen : System.Windows.Media.Brushes.Gray;
+        OverviewUptimeText(key).Text = workspace.RuntimeRunning ? "Uptime: " + FormatDuration(workspace.RuntimeUptime) : "Uptime: —";
+        OverviewCallsText(key).Text = "Calls: " + FormatCount(workspace.LifetimeUsage.ToolCalls);
+        OverviewTokensText(key).Text = "MCP tokens (est.): " + FormatCount(workspace.LifetimeUsage.TotalTokensEst);
+    }
+
+    private TextBlock OverviewStatusText(string key) => key switch
+    {
+        "C" => COverviewStatusText,
+        "D" => DOverviewStatusText,
+        "E" => EOverviewStatusText,
+        "F" => FOverviewStatusText,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private TextBlock OverviewUptimeText(string key) => key switch
+    {
+        "C" => COverviewUptimeText,
+        "D" => DOverviewUptimeText,
+        "E" => EOverviewUptimeText,
+        "F" => FOverviewUptimeText,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private TextBlock OverviewCallsText(string key) => key switch
+    {
+        "C" => COverviewCallsText,
+        "D" => DOverviewCallsText,
+        "E" => EOverviewCallsText,
+        "F" => FOverviewCallsText,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private TextBlock OverviewTokensText(string key) => key switch
+    {
+        "C" => COverviewTokensText,
+        "D" => DOverviewTokensText,
+        "E" => EOverviewTokensText,
+        "F" => FOverviewTokensText,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
+
+    private static string FormatCount(long value) => value.ToString("N0");
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1_024) return $"{bytes:N0} B";
+        if (bytes < 1_048_576) return $"{bytes / 1_024d:N1} KB";
+        if (bytes < 1_073_741_824) return $"{bytes / 1_048_576d:N1} MB";
+        return $"{bytes / 1_073_741_824d:N2} GB";
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration < TimeSpan.Zero) duration = TimeSpan.Zero;
+        if (duration.TotalDays >= 1) return $"{(int)duration.TotalDays}d {duration.Hours:D2}h {duration.Minutes:D2}m";
+        if (duration.TotalHours >= 1) return $"{(int)duration.TotalHours}h {duration.Minutes:D2}m {duration.Seconds:D2}s";
+        return $"{duration.Minutes:D2}m {duration.Seconds:D2}s";
     }
     private FileMcpSettings LoadSettingsSafely()
     {
@@ -617,6 +715,7 @@ public partial class MainWindow : Window
 
         try { _observability.DisposeAsync().AsTask().GetAwaiter().GetResult(); } catch { }
 
+        _overviewTimer.Stop();
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
     }
@@ -632,6 +731,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            _overviewTimer.Stop();
             _trayIcon.Visible = false;
             _trayIcon.Dispose();
 

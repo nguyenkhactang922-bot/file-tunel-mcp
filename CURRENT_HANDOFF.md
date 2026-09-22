@@ -2,8 +2,8 @@
 
 STATUS: IMPLEMENTATION ACTIVE
 BRANCH: chatgpt/OBS-001-observability-foundation
-COMPLETED: FMR-001 through OBS-008
-NEXT TASK: OBS-009 - WPF Overview core cards
+COMPLETED: FMR-001 through OBS-009
+NEXT TASK: OBS-010 - period controls + live observed session table/detail
 
 NEXT_EXACT_ACTION:
-Add the first Overview tab before Connection. Bind only to ObservabilityHub/Core snapshots: app uptime, global MCP token estimates and bytes, tool/activity counters, C/D/E/F status/uptime/usage. Refresh at 1 second. Keep labels truthful: estimated MCP tokens, not ChatGPT account/model usage. Do not add exact AI-chat label or session detail until OBS-010/OBS-013 gates.
+Add Today/Yesterday/7d/30d period selector backed by ObservabilityHub exact queries, plus live `Observed MCP sessions` and unbound activity table/detail sourced from LogicalSessionRegistry. Never label exact AI chats until OBS-013 live ChatGPT correlation proof. Keep 1-second hot refresh and throttle historical queries.

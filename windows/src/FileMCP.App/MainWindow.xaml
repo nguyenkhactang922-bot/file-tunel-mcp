@@ -1,7 +1,7 @@
 <Window x:Class="FileMCP.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FileMCP" Width="820" Height="650" MinWidth="760" MinHeight="600"
+        Title="FileMCP" Width="980" Height="760" MinWidth="860" MinHeight="650"
         WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip"
         Icon="Assets/filemcp.ico">
     <Window.Resources>
@@ -22,6 +22,23 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
+        <Style x:Key="OverviewCardStyle" TargetType="Border">
+            <Setter Property="BorderBrush" Value="#D8D8D8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="0,0,10,10"/>
+        </Style>
+        <Style x:Key="OverviewLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#666666"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="OverviewValueStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -31,6 +48,126 @@
         </Grid.RowDefinitions>
 
         <TabControl x:Name="MainTabs" Grid.Row="0" Margin="0,0,0,12">
+            <TabItem Header="Overview" x:Name="OverviewTab">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16">
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock FontSize="26" FontWeight="SemiBold" Text="Overview"/>
+                                <TextBlock Margin="0,3,0,0" Foreground="Gray" Text="Local FileMCP observability — current app session"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                <TextBlock x:Name="OverviewClockText" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                <TextBlock x:Name="OverviewAppUptimeText" Margin="0,3,0,0" Foreground="Gray" HorizontalAlignment="Right"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource OverviewLabelStyle}" Text="MCP tokens in (est.)"/>
+                                    <TextBlock x:Name="OverviewTokenInText" Style="{StaticResource OverviewValueStyle}" Text="0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource OverviewLabelStyle}" Text="MCP tokens out (est.)"/>
+                                    <TextBlock x:Name="OverviewTokenOutText" Style="{StaticResource OverviewValueStyle}" Text="0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Total MCP tokens (est.)"/>
+                                    <TextBlock x:Name="OverviewTokenTotalText" Style="{StaticResource OverviewValueStyle}" Text="0"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Style="{StaticResource OverviewCardStyle}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Input payload"/>
+                                    <TextBlock x:Name="OverviewInputBytesText" Style="{StaticResource OverviewValueStyle}" Text="0 B"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Style="{StaticResource OverviewCardStyle}">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Output payload"/>
+                                    <TextBlock x:Name="OverviewOutputBytesText" Style="{StaticResource OverviewValueStyle}" Text="0 B"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Total payload"/>
+                                    <TextBlock x:Name="OverviewTotalBytesText" Style="{StaticResource OverviewValueStyle}" Text="0 B"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <TextBlock Margin="0,4,0,8" FontWeight="SemiBold" Text="Tool activity"/>
+                        <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0"><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Calls"/><TextBlock x:Name="OverviewToolCallsText" Style="{StaticResource OverviewValueStyle}" Text="0"/></StackPanel>
+                                <StackPanel Grid.Column="1"><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Tasks"/><TextBlock x:Name="OverviewExecutionTasksText" Style="{StaticResource OverviewValueStyle}" Text="0"/></StackPanel>
+                                <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Read"/><TextBlock x:Name="OverviewReadCallsText" Style="{StaticResource OverviewValueStyle}" Text="0"/></StackPanel>
+                                <StackPanel Grid.Column="3"><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Write"/><TextBlock x:Name="OverviewWriteCallsText" Style="{StaticResource OverviewValueStyle}" Text="0"/></StackPanel>
+                                <StackPanel Grid.Column="4"><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Command"/><TextBlock x:Name="OverviewCommandCallsText" Style="{StaticResource OverviewValueStyle}" Text="0"/></StackPanel>
+                                <StackPanel Grid.Column="5"><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Git"/><TextBlock x:Name="OverviewGitCallsText" Style="{StaticResource OverviewValueStyle}" Text="0"/></StackPanel>
+                                <StackPanel Grid.Column="6"><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Skill"/><TextBlock x:Name="OverviewSkillCallsText" Style="{StaticResource OverviewValueStyle}" Text="0"/></StackPanel>
+                                <StackPanel Grid.Column="7"><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Errors"/><TextBlock x:Name="OverviewErrorsText" Style="{StaticResource OverviewValueStyle}" Text="0"/></StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Margin="0,4,0,8" FontWeight="SemiBold" Text="Workspaces"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource OverviewCardStyle}">
+                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive C"/><TextBlock x:Name="COverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="COverviewUptimeText" Foreground="Gray" Text="Uptime: —"/><TextBlock x:Name="COverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="COverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
+                            </Border>
+                            <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,10">
+                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive D"/><TextBlock x:Name="DOverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="DOverviewUptimeText" Foreground="Gray" Text="Uptime: —"/><TextBlock x:Name="DOverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="DOverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
+                            </Border>
+                            <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource OverviewCardStyle}">
+                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive E"/><TextBlock x:Name="EOverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="EOverviewUptimeText" Foreground="Gray" Text="Uptime: —"/><TextBlock x:Name="EOverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="EOverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
+                            </Border>
+                            <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,10">
+                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive F"/><TextBlock x:Name="FOverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="FOverviewUptimeText" Foreground="Gray" Text="Uptime: —"/><TextBlock x:Name="FOverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="FOverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <TextBlock Margin="0,4,0,0" Foreground="Gray" TextWrapping="Wrap"
+                                   Text="* Token values are deterministic estimates from accepted MCP JSON payload bytes (bytes_div_4_v1). They are not ChatGPT account/model token usage."/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
             <TabItem Header="Connection" x:Name="ConnectionTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
