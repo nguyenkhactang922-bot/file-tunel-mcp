@@ -42,6 +42,7 @@ internal static class Program
             await TestObservabilityHardeningAsync(root);
             await TestV11HardeningAsync(root);
             await TestSettingsAndCredentialsAsync(root);
+            await TestDesktopSingleInstanceCoordinatorAsync();
             await TestProcessRunnerAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
@@ -1511,6 +1512,45 @@ internal static class Program
         finally { try { credentials.DeleteApiKey(); } catch { } }
         Console.WriteLine("windows-settings-credentials: ok");
         return Task.CompletedTask;
+    }
+
+    private static async Task TestDesktopSingleInstanceCoordinatorAsync()
+    {
+        var instanceKey = "filemcp-single-instance-test-" + Guid.NewGuid().ToString("N");
+        using var primary = new DesktopSingleInstanceCoordinator(instanceKey);
+        Assert(primary.IsPrimary, "desktop first instance becomes primary");
+
+        var activationCount = 0;
+        var firstActivation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        primary.StartActivationListener(() =>
+        {
+            if (Interlocked.Increment(ref activationCount) == 1)
+                firstActivation.TrySetResult(true);
+        });
+
+        using var secondary = new DesktopSingleInstanceCoordinator(instanceKey);
+        Assert(!secondary.IsPrimary, "desktop second instance is secondary");
+        Assert(await secondary.SignalPrimaryAsync(TimeSpan.FromSeconds(2)), "desktop secondary signals primary");
+        await firstActivation.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert(Volatile.Read(ref activationCount) == 1, "desktop primary receives activation signal");
+
+        _ = await secondary.SendCommandForTestAsync("unknown\n", TimeSpan.FromSeconds(2));
+        await Task.Delay(100);
+        Assert(Volatile.Read(ref activationCount) == 1, "desktop unknown command does not activate");
+
+        _ = await secondary.SendCommandForTestAsync(new string('x', 80) + "\n", TimeSpan.FromSeconds(2));
+        await Task.Delay(100);
+        Assert(Volatile.Read(ref activationCount) == 1, "desktop oversized command does not activate");
+
+        Assert(await secondary.SignalPrimaryAsync(TimeSpan.FromSeconds(2)), "desktop repeated activation signal sent");
+        Assert(await WaitUntilAsync(() => Volatile.Read(ref activationCount) >= 2, TimeSpan.FromSeconds(2)), "desktop repeated activation received");
+
+        primary.Dispose();
+        await Task.Delay(50);
+        using var replacement = new DesktopSingleInstanceCoordinator(instanceKey);
+        Assert(replacement.IsPrimary, "desktop primary ownership recovers after dispose");
+
+        Console.WriteLine("windows-desktop-single-instance: ok");
     }
 
     private static async Task TestProcessRunnerAsync(string root)

@@ -108,6 +108,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_windows_arm64_assurance_contract.ps1
 
+      - name: Verify Windows single-instance contract
+        shell: pwsh
+        run: ./tests/test_windows_single_instance_contract.ps1
+
       - name: Windows integration tests
         shell: pwsh
         run: ./tests/test_windows_runtime.ps1
@@ -189,6 +193,10 @@ jobs:
       - name: Verify Windows ARM64 assurance contract
         shell: pwsh
         run: ./tests/test_windows_arm64_assurance_contract.ps1
+
+      - name: Verify Windows single-instance contract
+        shell: pwsh
+        run: ./tests/test_windows_single_instance_contract.ps1
 
       - name: Build Windows ARM64 release
         shell: pwsh

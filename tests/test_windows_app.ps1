@@ -41,12 +41,15 @@ if (-not (Test-Path -LiteralPath $TunnelClient -PathType Leaf)) {
 $SmokeDatabase = Join-Path $SmokeRoot "observability-package-smoke.sqlite3"
 $SmokeMarker = Join-Path $SmokeRoot "observability-package-smoke.txt"
 $OtlpSmokeMarker = Join-Path $SmokeRoot "otlp-package-smoke.txt"
+$SingleInstanceSmokeMarker = Join-Path $SmokeRoot "single-instance-activation-smoke.txt"
+$PreviousSingleInstanceMarker = $env:FILEMCP_SINGLE_INSTANCE_SMOKE_MARKER
 $PreviousOtlpMarker = $env:FILEMCP_OTLP_SMOKE_MARKER
 $PreviousOtlpEndpoint = $env:FILEMCP_OTLP_SMOKE_ENDPOINT
 $PreviousObservabilityDb = $env:FILEMCP_OBSERVABILITY_DB
 $PreviousObservabilityMarker = $env:FILEMCP_OBSERVABILITY_SMOKE_MARKER
 $env:FILEMCP_OBSERVABILITY_DB = $SmokeDatabase
 $env:FILEMCP_OBSERVABILITY_SMOKE_MARKER = $SmokeMarker
+$env:FILEMCP_SINGLE_INSTANCE_SMOKE_MARKER = $SingleInstanceSmokeMarker
 $env:FILEMCP_OTLP_SMOKE_MARKER = $OtlpSmokeMarker
 $env:FILEMCP_OTLP_SMOKE_ENDPOINT = "http://127.0.0.1:1"
 $TunnelVersion = & $TunnelClient --version
@@ -135,9 +138,50 @@ try {
         throw "FileMCP.exe exited after closing the main window instead of remaining active in the system tray."
     }
 
+    $SecondaryProcess = Start-Process -FilePath $Exe -PassThru
+    try {
+        $SecondaryDeadline = (Get-Date).AddSeconds(6)
+        while ((Get-Date) -lt $SecondaryDeadline) {
+            Start-Sleep -Milliseconds 100
+            $SecondaryProcess.Refresh()
+            if ($SecondaryProcess.HasExited) { break }
+        }
+        $SecondaryProcess.Refresh()
+        if (-not $SecondaryProcess.HasExited) {
+            throw "Second FileMCP launch did not exit after signaling the primary instance."
+        }
+        if ($SecondaryProcess.ExitCode -ne 0) {
+            throw "Second FileMCP launch exited with unexpected code $($SecondaryProcess.ExitCode)."
+        }
+    }
+    finally {
+        if (-not $SecondaryProcess.HasExited) {
+            Stop-Process -Id $SecondaryProcess.Id -Force -ErrorAction SilentlyContinue
+            Wait-Process -Id $SecondaryProcess.Id -Timeout 5 -ErrorAction SilentlyContinue
+        }
+        $SecondaryProcess.Dispose()
+    }
+
+    $ActivationDeadline = (Get-Date).AddSeconds(6)
+    while ((Get-Date) -lt $ActivationDeadline -and -not (Test-Path -LiteralPath $SingleInstanceSmokeMarker -PathType Leaf)) {
+        Start-Sleep -Milliseconds 100
+    }
+    if (-not (Test-Path -LiteralPath $SingleInstanceSmokeMarker -PathType Leaf)) {
+        throw "Primary FileMCP instance did not receive the second-launch activation signal."
+    }
+    $ActivationResult = (Get-Content -LiteralPath $SingleInstanceSmokeMarker -Raw).Trim()
+    if ($ActivationResult -ne "PASS pid=$($Process.Id)") {
+        throw "Unexpected single-instance activation marker: $ActivationResult"
+    }
+    $Process.Refresh()
+    if ($Process.HasExited) {
+        throw "Primary FileMCP exited during second-launch activation."
+    }
+
     Write-Host "windows-app-startup-${Architecture}: ok"
     Write-Host "windows-close-to-tray-${Architecture}: ok"
     Write-Host "windows-packaged-tunnel-client-${Architecture}: ok"
+    Write-Host "windows-single-instance-activation-${Architecture}: ok"
     Write-Host "windows-packaged-sqlite-write-read: ok ($SmokeResult)"
     Write-Host "windows-packaged-otlp-provider: ok ($OtlpSmokeResult)"
     Write-Host "windows-packaged-opentelemetry-notices: ok"
@@ -145,6 +189,7 @@ try {
 finally {
     if ($null -eq $PreviousObservabilityDb) { Remove-Item Env:FILEMCP_OBSERVABILITY_DB -ErrorAction SilentlyContinue } else { $env:FILEMCP_OBSERVABILITY_DB = $PreviousObservabilityDb }
     if ($null -eq $PreviousObservabilityMarker) { Remove-Item Env:FILEMCP_OBSERVABILITY_SMOKE_MARKER -ErrorAction SilentlyContinue } else { $env:FILEMCP_OBSERVABILITY_SMOKE_MARKER = $PreviousObservabilityMarker }
+    if ($null -eq $PreviousSingleInstanceMarker) { Remove-Item Env:FILEMCP_SINGLE_INSTANCE_SMOKE_MARKER -ErrorAction SilentlyContinue } else { $env:FILEMCP_SINGLE_INSTANCE_SMOKE_MARKER = $PreviousSingleInstanceMarker }
     if ($null -eq $PreviousOtlpMarker) { Remove-Item Env:FILEMCP_OTLP_SMOKE_MARKER -ErrorAction SilentlyContinue } else { $env:FILEMCP_OTLP_SMOKE_MARKER = $PreviousOtlpMarker }
     if ($null -eq $PreviousOtlpEndpoint) { Remove-Item Env:FILEMCP_OTLP_SMOKE_ENDPOINT -ErrorAction SilentlyContinue } else { $env:FILEMCP_OTLP_SMOKE_ENDPOINT = $PreviousOtlpEndpoint }
     if (-not $Process.HasExited) {

@@ -62,3 +62,6 @@ FPA-005 candidate: native Windows ARM64 job + parameterized packaged smoke are i
 
 
 FPA-005 native CI PASS: run 35726514963 succeeded on verify-macos, verify-windows and verify-windows-arm64. Current remediation advances to FPA-007.
+
+
+FPA-007 candidate: per-user named-pipe single-instance activation is implemented; core 423 assertions and packaged x64 duplicate-launch activation smoke PASS. Native CI remains the final acceptance gate.

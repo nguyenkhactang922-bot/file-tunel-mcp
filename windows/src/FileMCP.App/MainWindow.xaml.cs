@@ -1100,6 +1100,24 @@ public partial class MainWindow : Window
         Topmost = false;
     }
 
+    internal void ActivateFromSecondaryLaunch()
+    {
+        ShowFromTray();
+
+        var markerPath = Environment.GetEnvironmentVariable("FILEMCP_SINGLE_INSTANCE_SMOKE_MARKER");
+        if (string.IsNullOrWhiteSpace(markerPath)) return;
+        try
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(markerPath));
+            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+            File.WriteAllText(markerPath, $"PASS pid={Environment.ProcessId}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Desktop] Could not write single-instance smoke marker: {ex.Message}\n");
+        }
+    }
+
     public void ShutdownForSystemSession()
     {
         if (_quitting) return;

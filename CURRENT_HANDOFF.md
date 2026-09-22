@@ -125,3 +125,12 @@ FPA-005 final acceptance:
 - Native ARM64 WPF/tray/tunnel-client/SQLite/OTLP smoke PASS.
 - Evidence: docs/evidence/FPA-005_WINDOWS_ARM64_NATIVE_ASSURANCE_EVIDENCE.md.
 - AUTHORITATIVE NEXT_EXACT_ACTION is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md: CLAIM FPA-007 design gate.
+
+
+## FPA-007 candidate
+
+- Windows desktop single-instance named-pipe architecture is implemented locally.
+- Core suite PASS at 423 assertions.
+- Packaged x64 duplicate-launch activation smoke PASS.
+- Candidate evidence: `docs/evidence/FPA-007_WINDOWS_SINGLE_INSTANCE_CANDIDATE.md`.
+- FPA-007 remains ACTIVE until native GitHub macOS/x64/ARM64 jobs succeed.
