@@ -902,16 +902,10 @@ time.sleep(0.15)
 
 body = b'{"jsonrpc":"2.0","id":900,"method":"tools/list","params":{}}'
 request = (
-    f"POST /mcp HTTP/1.1
-Host: 127.0.0.1:{PORT}
-"
-    "Content-Type: application/json
-"
-    f"X-FileMCP-Local-Token: {TOKEN}
-"
-    f"Content-Length: {len(body)}
-
-"
+    f"POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{PORT}\r\n"
+    "Content-Type: application/json\r\n"
+    f"X-FileMCP-Local-Token: {TOKEN}\r\n"
+    f"Content-Length: {len(body)}\r\n\r\n"
 ).encode() + body
 valid = connect()
 valid.sendall(request)
