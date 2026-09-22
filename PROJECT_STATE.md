@@ -14,8 +14,9 @@ Completed:
 - OBS-003 PASS - SQLite WAL persistence.
 - OBS-004 PASS - exact local-period queries/retention.
 - OBS-005 PASS - LocalMcpServer instrumentation.
-- OBS-006 PASS - multi-drive ObservabilityHub + app/runtime uptime; suite 220 assertions.
+- OBS-006 PASS - multi-drive ObservabilityHub + app/runtime uptime.
+- OBS-007 PASS - logical chat correlation facade; 245 assertions PASS.
 
 Current evidence: Release build PASS, 0 warnings/errors.
-Ready tasks: OBS-007, OBS-009.
-Next task: OBS-007 - Logical chat connect/correlation facade.
+Ready tasks: OBS-008, OBS-009.
+Next task: OBS-008 - live logical/unbound session registry/state machine + hashed durable identity.

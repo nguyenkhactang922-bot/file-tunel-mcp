@@ -28,6 +28,7 @@ internal static class Program
         try
         {
             TestObservabilityContracts();
+            TestLogicalChatCorrelation();
             await TestWorkspaceUsageMeterAsync();
             await TestTelemetryPersistenceAsync(root);
             await TestUsagePeriodsAndRetentionAsync(root);
@@ -95,6 +96,7 @@ internal static class Program
             ("git_push", ToolUsageCategory.Git, true),
             ("list_codex_skills", ToolUsageCategory.Skill, false),
             ("load_codex_skill", ToolUsageCategory.Skill, false),
+            ("filemcp_observability_connect", ToolUsageCategory.Other, false),
         };
         foreach (var item in cases)
         {
@@ -112,6 +114,34 @@ internal static class Program
         Assert(counters.TotalPayloadBytes == 30, "usage counters total bytes");
         Assert(counters.TotalTokensEst == 8, "usage counters total token estimate");
         Console.WriteLine("windows-observability-contracts: ok");
+    }
+    private static void TestLogicalChatCorrelation()
+    {
+        var service = new LogicalChatCorrelationService();
+        var first = service.Connect();
+        Assert(!first.Resumed && LogicalChatCorrelationService.IsValidHandle(first.ChatInstanceId), "logical chat creates valid opaque handle");
+        Assert(first.ChatInstanceId.StartsWith(LogicalChatCorrelationService.HandlePrefix, StringComparison.Ordinal), "logical chat handle prefix");
+        Assert(service.TryResolve(first.ChatInstanceId, out var firstHash), "logical chat resolves known handle");
+        Assert(firstHash.Length == 64 && !firstHash.Contains(first.ChatInstanceId, StringComparison.Ordinal), "logical chat persistence hash is opaque");
+        Assert(LogicalChatCorrelationService.HashForPersistence(first.ChatInstanceId) == firstHash, "logical chat persistence hash deterministic");
+
+        var resumed = service.Connect(first.ChatInstanceId);
+        Assert(resumed.Resumed && resumed.ChatInstanceId == first.ChatInstanceId, "logical chat resumes known handle");
+        var second = service.Connect();
+        Assert(second.ChatInstanceId != first.ChatInstanceId, "logical chat creates unique handles");
+        Assert(!service.TryResolve("chat_invalid", out _), "logical chat invalid handle remains unbound");
+
+        var otherProcess = new LogicalChatCorrelationService();
+        try
+        {
+            _ = otherProcess.Connect(first.ChatInstanceId);
+            throw new Exception("Assertion failed: logical chat unknown resume rejected");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains("Unknown FileMCP chat correlation handle", StringComparison.Ordinal))
+        {
+            Assert(true, "logical chat unknown resume rejected");
+        }
+        Console.WriteLine("windows-logical-chat-correlation: ok");
     }
     private static async Task TestWorkspaceUsageMeterAsync()
     {
@@ -694,6 +724,125 @@ internal static class Program
         Assert(meteredSnapshot.RequestBytes == expectedRequestBytes && meteredSnapshot.ResponseBytes == expectedResponseBytes, "telemetry counts MCP JSON payload bytes only");
         Assert(meteredSnapshot.TokensInEst == expectedTokensIn && meteredSnapshot.TokensOutEst == expectedTokensOut, "telemetry estimates each MCP payload independently");
         Assert(meteredSnapshot.TotalLatencyTicks > 0 && meteredSnapshot.MaxLatencyTicks > 0, "telemetry captures tool latency");
+        var correlatedPort = FreePort();
+        var correlatedMeter = new WorkspaceUsageMeter("D");
+        var chatCorrelation = new LogicalChatCorrelationService();
+        await using var correlatedServer = new LocalMcpServer((ushort)correlatedPort, workspace, "", "", false, token, _ => { }, correlatedMeter, chatCorrelation);
+        await correlatedServer.StartAsync();
+
+        var correlatedList = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), meteredListBody);
+        var correlatedListJson = JsonNode.Parse(HttpBody(correlatedList))!.AsObject();
+        var correlatedTools = correlatedListJson["result"]!["tools"]!.AsArray();
+        Assert(correlatedTools.Count == 18, "logical correlation facade adds one connect tool");
+        var connectDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "filemcp_observability_connect")!.AsObject();
+        Assert(connectDefinition["annotations"]!["readOnlyHint"]!.GetValue<bool>(), "logical correlation connect tool is read-only metadata");
+        var readDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "read_file")!.AsObject();
+        Assert(readDefinition["inputSchema"]!["properties"]!["_filemcp_chat"]!["type"]!.GetValue<string>() == "string", "logical correlation metadata is exposed on normal tool facade schema");
+
+        const string connectBody = "{\"jsonrpc\":\"2.0\",\"id\":40,\"method\":\"tools/call\",\"params\":{\"name\":\"filemcp_observability_connect\",\"arguments\":{}}}";
+        var connectResponse = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), connectBody);
+        var connectJson = JsonNode.Parse(HttpBody(connectResponse))!.AsObject();
+        Assert(!connectJson["result"]!["isError"]!.GetValue<bool>(), "logical correlation connect succeeds");
+        var chatId = connectJson["result"]!["structuredContent"]!["chat_instance_id"]!.GetValue<string>();
+        Assert(LogicalChatCorrelationService.IsValidHandle(chatId), "logical correlation connect returns valid handle");
+        Assert(!connectJson["result"]!["structuredContent"]!["resumed"]!.GetValue<bool>(), "logical correlation first connect is new");
+
+        var resumeBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 41,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "filemcp_observability_connect",
+                ["arguments"] = new JsonObject { ["chat_instance_id"] = chatId },
+            },
+        }.ToJsonString();
+        var resumeResponse = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), resumeBody);
+        var resumeJson = JsonNode.Parse(HttpBody(resumeResponse))!.AsObject();
+        Assert(resumeJson["result"]!["structuredContent"]!["resumed"]!.GetValue<bool>(), "logical correlation resumes known handle");
+        Assert(resumeJson["result"]!["structuredContent"]!["chat_instance_id"]!.GetValue<string>() == chatId, "logical correlation resume preserves handle");
+
+        var boundReadBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 31,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "read_file",
+                ["arguments"] = new JsonObject { ["relative_path"] = "hello.txt", ["_filemcp_chat"] = chatId },
+            },
+        }.ToJsonString();
+        var boundRead = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), boundReadBody);
+        Assert(HttpBody(boundRead) == HttpBody(unmeteredRead), "logical correlation metadata is stripped before strict tool validation and preserves tool result");
+
+        var foreignHandle = new LogicalChatCorrelationService().Connect().ChatInstanceId;
+        var foreignReadBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 31,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "read_file",
+                ["arguments"] = new JsonObject { ["relative_path"] = "hello.txt", ["_filemcp_chat"] = foreignHandle },
+            },
+        }.ToJsonString();
+        var foreignRead = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), foreignReadBody);
+        Assert(HttpBody(foreignRead) == HttpBody(unmeteredRead), "unknown correlation handle remains unbound without changing tool behavior");
+
+        var traversalBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 42,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "read_file",
+                ["arguments"] = new JsonObject { ["relative_path"] = "../outside.txt", ["_filemcp_chat"] = chatId },
+            },
+        }.ToJsonString();
+        var traversalResponse = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), traversalBody);
+        var traversalJson = JsonNode.Parse(HttpBody(traversalResponse))!.AsObject();
+        Assert(traversalJson["result"]!["isError"]!.GetValue<bool>(), "logical correlation handle cannot bypass path containment");
+
+        var commandBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 43,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "run_command",
+                ["arguments"] = new JsonObject { ["command"] = "Write-Output should-not-run", ["_filemcp_chat"] = chatId },
+            },
+        }.ToJsonString();
+        var commandResponse = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), commandBody);
+        var commandJson = JsonNode.Parse(HttpBody(commandResponse))!.AsObject();
+        Assert(commandJson["error"]!["message"]!.GetValue<string>().Contains("Unknown tool: run_command", StringComparison.Ordinal), "logical correlation handle cannot enable disabled commands");
+
+        var correlatedModernHeaders = AuthHeaders(token);
+        correlatedModernHeaders["MCP-Protocol-Version"] = FileMcpConstants.ModernProtocolVersion;
+        correlatedModernHeaders["Mcp-Method"] = "server/discover";
+        var discoverBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 44,
+            ["method"] = "server/discover",
+            ["params"] = new JsonObject
+            {
+                ["_meta"] = new JsonObject
+                {
+                    ["io.modelcontextprotocol/protocolVersion"] = FileMcpConstants.ModernProtocolVersion,
+                    ["io.modelcontextprotocol/clientCapabilities"] = new JsonObject(),
+                    ["io.modelcontextprotocol/clientInfo"] = new JsonObject { ["name"] = "test", ["version"] = "1" },
+                },
+            },
+        }.ToJsonString();
+        var discoverResponse = await SendHttpAsync(correlatedPort, "POST", "/mcp", correlatedModernHeaders, discoverBody);
+        var discoverJson = JsonNode.Parse(HttpBody(discoverResponse))!.AsObject();
+        Assert(discoverJson["result"]!["instructions"]!.GetValue<string>().Contains("filemcp_observability_connect", StringComparison.Ordinal), "modern discovery instructs logical correlation handshake");
         var badHost = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), "", host: "evil.example");
         Assert(badHost.StartsWith("HTTP/1.1 403 Forbidden", StringComparison.Ordinal), "host validation");
         Console.WriteLine("windows-http-mcp: ok");

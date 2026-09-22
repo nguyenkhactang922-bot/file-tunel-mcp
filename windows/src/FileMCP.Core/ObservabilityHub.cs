@@ -25,6 +25,8 @@ public sealed class ObservabilityHub : IAsyncDisposable
     private bool _started;
     private bool _disposed;
 
+    public LogicalChatCorrelationService ChatCorrelation { get; } = new();
+
     public ObservabilityHub(
         IEnumerable<string> workspaceKeys,
         string? databasePath = null,

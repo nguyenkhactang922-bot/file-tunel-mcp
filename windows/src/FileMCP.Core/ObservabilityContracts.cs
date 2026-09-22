@@ -48,6 +48,9 @@ public static class ToolUsageClassifier
         "list_codex_skills" or "load_codex_skill"
             => new(ToolUsageCategory.Skill, false, true),
 
+        "filemcp_observability_connect"
+            => new(ToolUsageCategory.Other, false, true),
+
         _ => new(ToolUsageCategory.Other, false, false),
     };
 }
