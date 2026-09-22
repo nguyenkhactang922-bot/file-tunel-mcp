@@ -8,8 +8,9 @@ $WorkflowPath = ".github/workflows/release.yml"
 $WindowsScriptPath = "release/sign_windows_release.ps1"
 $MacScriptPath = "release/sign_notarize_macos.sh"
 $VerifyPath = ".github/workflows/verify.yml"
+$ReadinessPath = "release/check_production_release_readiness.ps1"
 
-foreach ($Path in @($WorkflowPath, $WindowsScriptPath, $MacScriptPath, $VerifyPath)) {
+foreach ($Path in @($WorkflowPath, $WindowsScriptPath, $MacScriptPath, $VerifyPath, $ReadinessPath)) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "Production release contract file is missing: $Path"
     }
@@ -19,6 +20,7 @@ $Workflow = Get-Content $WorkflowPath -Raw
 $WindowsScript = Get-Content $WindowsScriptPath -Raw
 $MacScript = Get-Content $MacScriptPath -Raw
 $Verify = Get-Content $VerifyPath -Raw
+$Readiness = Get-Content $ReadinessPath -Raw
 $GitIgnore = Get-Content ".gitignore" -Raw
 $WindowsBuild = Get-Content "build_windows_app.ps1" -Raw
 $MacBuild = Get-Content "build_macos_app.sh" -Raw
@@ -134,6 +136,24 @@ $parseErrors = $null
 ) | Out-Null
 if ($parseErrors.Count -gt 0) {
     throw "Windows release signing script has PowerShell syntax errors: $($parseErrors[0].Message)"
+}
+
+foreach ($Marker in @(
+    "Production Release workflow: active",
+    "Configured required Environment secrets:",
+    "production-release-readiness: READY",
+    "gh workflow run release.yml",
+    "WINDOWS_CODESIGN_PFX_BASE64",
+    "WINDOWS_CODESIGN_PFX_PASSWORD",
+    "MACOS_DEVELOPER_ID_P12_BASE64",
+    "MACOS_DEVELOPER_ID_P12_PASSWORD",
+    "APPLE_NOTARY_KEY_P8_BASE64",
+    "APPLE_NOTARY_KEY_ID",
+    "APPLE_NOTARY_ISSUER_ID"
+)) {
+    if ($Readiness.IndexOf($Marker, [StringComparison]::Ordinal) -lt 0) {
+        throw "Production release readiness checker marker missing: $Marker"
+    }
 }
 
 Write-Host "production-release-signing-contract: ok"

@@ -116,3 +116,32 @@ Results:
 - GitHub production-release Environment secrets present: 0/7.
 
 Therefore FPA-004 cannot advance to a real public-trust release without external credential provisioning.
+
+## Real default-branch Production Release boundary proof
+
+Production Release was dispatched manually from fork main for version 0.4.0.
+
+Run: 35762454809.
+
+All three jobs reached the intended credential preflight and failed only because real production credentials are not configured:
+
+- release-windows-x64: WINDOWS_CODESIGN_PFX_BASE64 is not configured.
+- release-windows-arm64: WINDOWS_CODESIGN_PFX_BASE64 is not configured.
+- release-macos-arm64: MACOS_DEVELOPER_ID_P12_BASE64 is not configured.
+
+This proves default-branch workflow registration and dispatch are working. The remaining blocker is real release identity material, not workflow registration or repository code.
+
+A non-secret readiness helper exists at release/check_production_release_readiness.ps1; it checks workflow registration and the seven required Environment secret names, and can dispatch only after all names are present.
+
+## Readiness checker live result
+
+release/check_production_release_readiness.ps1 was executed against the canonical fork.
+
+Result:
+- Production Release workflow: active
+- default branch: main
+- version: 0.4.0
+- configured required Environment secrets: 0/7
+- exit code: 2, intentionally indicating not ready
+
+No secret values were read or printed.

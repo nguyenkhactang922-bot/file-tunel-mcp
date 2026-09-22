@@ -419,6 +419,8 @@ The release workflow is workflow_dispatch-only. It materializes credential files
 
 Do not add PFX/P12/P8 files to the repository. A syntactically complete release workflow is not itself proof of public-market signing: FPA-004 is complete only after a real credentialed production-release run succeeds and the uploaded artifacts pass the post-package signature/notarization checks.
 
+After the seven Environment secrets are configured in GitHub, run release/check_production_release_readiness.ps1. It prints only workflow and secret-name readiness. Add -Dispatch to dispatch Production Release version 0.4.0 after all seven required secret names are present.
+
 ## Contributing
 
 - Development guidelines: [`CONTRIBUTING.md`](CONTRIBUTING.md)

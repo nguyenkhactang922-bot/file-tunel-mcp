@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: provision the seven real production-release Environment secrets on the canonical fork main, dispatch Production Release version 0.4.0, and capture signed/notarized artifact evidence.
+AUTHORITATIVE NEXT_EXACT_ACTION: configure the seven real production-release Environment secrets in GitHub, run release/check_production_release_readiness.ps1, then dispatch Production Release 0.4.0 and capture signed/notarized artifact evidence.
 
 Do not resume V11-009 as the only remaining whole-app gate until the P1 product/release scope is resolved.

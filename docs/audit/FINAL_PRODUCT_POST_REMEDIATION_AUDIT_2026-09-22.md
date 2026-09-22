@@ -173,3 +173,7 @@ Results:
 - GitHub production-release Environment secrets present: 0/7.
 
 Therefore FPA-004 cannot advance to a real public-trust release without external credential provisioning.
+
+## Real Production Release credential-boundary run
+
+Default-branch Production Release run 35762454809 was dispatched for version 0.4.0. Windows x64, Windows ARM64 and macOS all entered the intended signing-material validation step and failed only because the corresponding real production Environment secrets were absent. This removes workflow registration and dispatch from the blocker list. The sole remaining FPA-004 blocker is provision of the real release identity credentials followed by one successful signed/notarized run.
