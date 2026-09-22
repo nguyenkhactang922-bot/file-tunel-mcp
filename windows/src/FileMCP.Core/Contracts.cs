@@ -48,6 +48,8 @@ public enum LocalMcpRuntimeStatus
     Stopped,
     Starting,
     Running,
+    Restarting,
+    Cooldown,
     Stopping,
     Failed,
 }
@@ -57,6 +59,8 @@ public sealed record LocalMcpRuntimeState(LocalMcpRuntimeStatus Status, string? 
     public static LocalMcpRuntimeState Stopped { get; } = new(LocalMcpRuntimeStatus.Stopped);
     public static LocalMcpRuntimeState Starting { get; } = new(LocalMcpRuntimeStatus.Starting);
     public static LocalMcpRuntimeState Running { get; } = new(LocalMcpRuntimeStatus.Running);
+    public static LocalMcpRuntimeState Restarting(string message) => new(LocalMcpRuntimeStatus.Restarting, message);
+    public static LocalMcpRuntimeState Cooldown(string message) => new(LocalMcpRuntimeStatus.Cooldown, message);
     public static LocalMcpRuntimeState Stopping { get; } = new(LocalMcpRuntimeStatus.Stopping);
     public static LocalMcpRuntimeState Failed(string message) => new(LocalMcpRuntimeStatus.Failed, message);
 }

@@ -37,6 +37,7 @@ internal static class Program
             await TestObservabilityHardeningAsync(root);
             await TestSettingsAndCredentialsAsync(root);
             await TestProcessRunnerAsync(root);
+            TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
             await TestHttpAndMcpAsync(root);
@@ -1311,6 +1312,37 @@ internal static class Program
         Console.WriteLine("windows-http-mcp: ok");
     }
 
+    private static void TestTunnelRestartPolicy()
+    {
+        var options = new TunnelSupervisorOptions(
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromMilliseconds(800),
+            TimeSpan.FromSeconds(10),
+            2,
+            TimeSpan.FromSeconds(5),
+            0);
+        var policy = new TunnelRestartPolicy(options);
+        var t0 = new DateTimeOffset(2026, 9, 22, 0, 0, 0, TimeSpan.Zero);
+
+        var first = policy.Next(t0, t0, () => 0.5);
+        Assert(!first.IsCooldown && first.AttemptNumber == 1 && first.Delay == TimeSpan.FromMilliseconds(100), "tunnel supervisor first restart uses initial backoff");
+        var second = policy.Next(t0.AddMilliseconds(100), t0.AddMilliseconds(200), () => 0.5);
+        Assert(!second.IsCooldown && second.AttemptNumber == 2 && second.Delay == TimeSpan.FromMilliseconds(200), "tunnel supervisor backoff doubles for consecutive crash");
+        var cooldown = policy.Next(t0.AddMilliseconds(200), t0.AddMilliseconds(300), () => 0.5);
+        Assert(cooldown.IsCooldown && cooldown.Delay > TimeSpan.Zero && cooldown.ResumeAtUtc.HasValue, "tunnel supervisor enforces restart budget with cooldown");
+
+        policy.Reset();
+        _ = policy.Next(t0, t0, () => 0.5);
+        var afterStable = policy.Next(t0, t0.AddSeconds(6), () => 0.5);
+        Assert(!afterStable.IsCooldown && afterStable.AttemptNumber == 1 && afterStable.Delay == TimeSpan.FromMilliseconds(100), "tunnel supervisor stable run resets consecutive backoff and budget");
+
+        var jitterPolicy = new TunnelRestartPolicy(options with { JitterRatio = 0.20 });
+        var lowJitter = jitterPolicy.Next(t0, t0, () => 0);
+        jitterPolicy.Reset();
+        var highJitter = jitterPolicy.Next(t0, t0, () => 1);
+        Assert(lowJitter.Delay == TimeSpan.FromMilliseconds(80) && highJitter.Delay == TimeSpan.FromMilliseconds(120), "tunnel supervisor jitter is bounded around base delay");
+        Console.WriteLine("windows-tunnel-restart-policy: ok");
+    }
     private static async Task TestRuntimeAsync(string root)
     {
         var workspace = Path.Combine(root, "runtime-workspace"); Directory.CreateDirectory(workspace);
@@ -1341,12 +1373,87 @@ internal static class Program
             Assert(runtime.State.Status == LocalMcpRuntimeStatus.Stopped, "runtime stopped");
             var stoppedObservation = observability.Snapshot().Workspaces["D"];
             Assert(!stoppedObservation.RuntimeRunning && stoppedObservation.RuntimeUptime == TimeSpan.Zero, "runtime clears connected uptime when stopped");
+
+            var restartCounter = Path.Combine(root, "runtime-restart-counter.txt");
+            Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_RUN_COUNTER", restartCounter);
+            Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_FAIL_RUNS", "2");
+            var fastSupervisor = new TunnelSupervisorOptions(
+                TimeSpan.FromMilliseconds(10),
+                TimeSpan.FromMilliseconds(40),
+                TimeSpan.FromMilliseconds(500),
+                5,
+                TimeSpan.FromMilliseconds(200),
+                0);
+            var restartLogs = new StringBuilder();
+            await using (var restartingRuntime = new LocalMcpRuntime("D", observability, profiles, fastSupervisor, jitter: () => 0.5))
+            {
+                restartingRuntime.Log += text => restartLogs.Append(text);
+                var restartConfig = new LocalMcpConfiguration("tunnel_" + new string('c', 32), "sk-runtime-restart-secret", "runtime-restart-test", (ushort)FreePort(), workspace, "127.0.0.1:0", "", "", false);
+                await restartingRuntime.StartAsync(restartConfig);
+                Assert(await WaitUntilAsync(() => ReadCounter(restartCounter) >= 3 && restartingRuntime.State.Status == LocalMcpRuntimeStatus.Running, TimeSpan.FromSeconds(3)), "runtime auto-restarts crashed tunnel until it stays running");
+                var supervisor = restartingRuntime.SupervisorSnapshot;
+                Assert(supervisor.TotalRestarts >= 2 && supervisor.LastExitCode == 23 && !supervisor.RestartPending, "runtime supervisor records real restart evidence");
+                Assert(restartLogs.ToString().Contains("Tunnel restart succeeded", StringComparison.Ordinal), "runtime logs successful supervised restart");
+                await restartingRuntime.StopAsync();
+                Assert(restartingRuntime.State.Status == LocalMcpRuntimeStatus.Stopped, "runtime supervised tunnel stops explicitly");
+            }
+
+            var cancelCounter = Path.Combine(root, "runtime-restart-cancel-counter.txt");
+            Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_RUN_COUNTER", cancelCounter);
+            Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_FAIL_RUNS", "100");
+            var slowSupervisor = new TunnelSupervisorOptions(
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(30),
+                5,
+                TimeSpan.FromMinutes(1),
+                0);
+                        await using (var pendingRuntime = new LocalMcpRuntime("D", observability, profiles, slowSupervisor, jitter: () => 0.5))
+            {
+                var pendingConfig = new LocalMcpConfiguration("tunnel_" + new string('d', 32), "sk-runtime-cancel-secret", "runtime-cancel-test", (ushort)FreePort(), workspace, "127.0.0.1:0", "", "", false);
+                await pendingRuntime.StartAsync(pendingConfig);
+                Assert(await WaitUntilAsync(() => pendingRuntime.State.Status == LocalMcpRuntimeStatus.Restarting, TimeSpan.FromSeconds(2)), "runtime enters restarting state after unexpected tunnel exit");
+                var stopTimer = Stopwatch.StartNew();
+                await pendingRuntime.StopAsync();
+                stopTimer.Stop();
+                Assert(stopTimer.Elapsed < TimeSpan.FromSeconds(1), "user stop cancels pending tunnel backoff immediately");
+                Assert(pendingRuntime.State.Status == LocalMcpRuntimeStatus.Stopped && !pendingRuntime.SupervisorSnapshot.RestartPending, "user stop leaves no pending tunnel restart");
+            }
+            var cooldownCounter = Path.Combine(root, "runtime-restart-cooldown-counter.txt");
+            Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_RUN_COUNTER", cooldownCounter);
+            Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_FAIL_RUNS", "100");
+            var cooldownSupervisor = new TunnelSupervisorOptions(
+                TimeSpan.FromMilliseconds(1),
+                TimeSpan.FromMilliseconds(1),
+                TimeSpan.FromSeconds(30),
+                1,
+                TimeSpan.FromMinutes(1),
+                0);
+            static async Task ControlledRestartDelay(TimeSpan delay, CancellationToken token)
+            {
+                if (delay >= TimeSpan.FromSeconds(1))
+                    await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            await using (var cooldownRuntime = new LocalMcpRuntime("D", observability, profiles, cooldownSupervisor, ControlledRestartDelay, jitter: () => 0.5))
+            {
+                var cooldownConfig = new LocalMcpConfiguration("tunnel_" + new string('e', 32), "sk-runtime-cooldown-secret", "runtime-cooldown-test", (ushort)FreePort(), workspace, "127.0.0.1:0", "", "", false);
+                await cooldownRuntime.StartAsync(cooldownConfig);
+                Assert(await WaitUntilAsync(() => cooldownRuntime.State.Status == LocalMcpRuntimeStatus.Cooldown, TimeSpan.FromSeconds(2)), "runtime enters cooldown after restart budget is exhausted");
+                var cooldownSnapshot = cooldownRuntime.SupervisorSnapshot;
+                Assert(cooldownSnapshot.CooldownEntries >= 1 && cooldownSnapshot.RestartPending && cooldownSnapshot.NextRestartUtc.HasValue, "runtime cooldown exposes pending resume evidence");
+                var cooldownStopTimer = Stopwatch.StartNew();
+                await cooldownRuntime.StopAsync();
+                cooldownStopTimer.Stop();
+                Assert(cooldownStopTimer.Elapsed < TimeSpan.FromSeconds(1), "user stop cancels cooldown wait immediately");
+                Assert(cooldownRuntime.State.Status == LocalMcpRuntimeStatus.Stopped && !cooldownRuntime.SupervisorSnapshot.RestartPending, "runtime cooldown cancellation leaves no restart pending");
+            }
         }
         finally
         {
             await runtime.DisposeAsync();
             Environment.SetEnvironmentVariable("MCP_TUNNEL_CLIENT", null); Environment.SetEnvironmentVariable("MCP_TEST_ENV_CAPTURE", null);
             Environment.SetEnvironmentVariable("LOG_HTTP_RAW_UNSAFE", null); Environment.SetEnvironmentVariable("MCP_SERVER_URL", null);
+            Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_RUN_COUNTER", null); Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_FAIL_RUNS", null);
         }
         Console.WriteLine("windows-runtime-lifecycle: ok");
     }
@@ -1374,10 +1481,40 @@ internal static class Program
             Console.WriteLine("init-ok " + apiKey + " " + token); return 0;
         }
         if (args[0] == "doctor") { Console.WriteLine("doctor-ok " + apiKey + " " + token); return 0; }
+        var counterPath = Environment.GetEnvironmentVariable("MCP_TEST_TUNNEL_RUN_COUNTER");
+        if (!string.IsNullOrWhiteSpace(counterPath))
+        {
+            var count = 0;
+            if (File.Exists(counterPath)) int.TryParse(File.ReadAllText(counterPath), out count);
+            count++;
+            File.WriteAllText(counterPath, count.ToString());
+            _ = int.TryParse(Environment.GetEnvironmentVariable("MCP_TEST_TUNNEL_FAIL_RUNS"), out var failRuns);
+            if (count <= failRuns)
+            {
+                Console.Error.WriteLine($"run-crash-{count}");
+                return 23;
+            }
+        }
         Console.WriteLine("run-ok " + apiKey + " " + token);
         await Task.Delay(Timeout.InfiniteTimeSpan); return 0;
     }
 
+    private static int ReadCounter(string path)
+    {
+        if (!File.Exists(path)) return 0;
+        return int.TryParse(File.ReadAllText(path), out var value) ? value : 0;
+    }
+
+    private static async Task<bool> WaitUntilAsync(Func<bool> predicate, TimeSpan timeout)
+    {
+        var started = Stopwatch.StartNew();
+        while (started.Elapsed < timeout)
+        {
+            if (predicate()) return true;
+            await Task.Delay(10);
+        }
+        return predicate();
+    }
     private static string ValueAfter(string[] args, string key) { var index = Array.IndexOf(args, key); return index >= 0 && index + 1 < args.Length ? args[index + 1] : throw new InvalidOperationException("missing " + key); }
     private static async Task GitCli(string repo, string[] args) { var all = new List<string> { "-C", repo }; all.AddRange(args); var result = await ProcessRunner.RunAsync("git.exe", all, timeoutSeconds: 20); if (result.ExitCode != 0) throw new Exception("git fixture failed: " + result.Stderr); }
     private static JsonObject Obj(params (string Key, object Value)[] values) { var obj = new JsonObject(); foreach (var (key, value) in values) obj[key] = JsonValue.Create(value); return obj; }

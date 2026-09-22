@@ -39,36 +39,118 @@ internal sealed class ProfileLock : IDisposable
 
 public sealed class LocalMcpRuntime : IAsyncDisposable
 {
+    private sealed record TunnelLaunchContext(
+        string Executable,
+        string[] Arguments,
+        IReadOnlyDictionary<string, string> Environment,
+        string[] Sensitive);
+
     private readonly SemaphoreSlim _serial = new(1, 1);
     private readonly object _stateGate = new();
     private readonly string? _profileDirectoryOverride;
     private readonly string? _workspaceKey;
     private readonly ObservabilityHub? _observability;
     private readonly WorkspaceUsageMeter? _usageMeter;
+    private readonly TunnelRestartPolicy _restartPolicy;
+    private readonly Func<TimeSpan, CancellationToken, Task> _restartDelay;
+    private readonly Func<DateTimeOffset> _clock;
+    private readonly Func<double> _jitter;
     private LocalMcpRuntimeState _state = LocalMcpRuntimeState.Stopped;
     private CancellationTokenSource? _startupCts;
+    private CancellationTokenSource? _restartCts;
+    private Task? _restartTask;
     private LocalMcpServer? _server;
     private ManagedProcess? _tunnelProcess;
     private ProfileLock? _profileLock;
+    private TunnelLaunchContext? _tunnelLaunch;
+    private DateTimeOffset? _tunnelStartedUtc;
+    private int _tunnelGeneration;
     private bool _requestedStop;
 
-    public LocalMcpRuntime(string? profileDirectory = null) => _profileDirectoryOverride = profileDirectory;
+    private long _totalRestarts;
+    private long _cooldownEntries;
+    private int _supervisorConsecutiveRestarts;
+    private int _supervisorAttemptsInWindow;
+    private bool _restartPending;
+    private DateTimeOffset? _nextRestartUtc;
+    private DateTimeOffset? _lastTunnelStartedUtc;
+    private DateTimeOffset? _lastTunnelExitUtc;
+    private int? _lastExitCode;
+
+    public LocalMcpRuntime(string? profileDirectory = null)
+        : this(null, null, profileDirectory, TunnelSupervisorOptions.Default, null, null, null, true)
+    {
+    }
 
     public LocalMcpRuntime(string workspaceKey, ObservabilityHub observability, string? profileDirectory = null)
+        : this(workspaceKey, observability, profileDirectory, TunnelSupervisorOptions.Default, null, null, null, true)
     {
-        ArgumentNullException.ThrowIfNull(observability);
-        _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey)
-            ? throw new ArgumentException("Workspace key cannot be empty.", nameof(workspaceKey))
-            : workspaceKey.Trim().ToUpperInvariant();
-        _observability = observability;
-        _usageMeter = observability.MeterFor(_workspaceKey);
+    }
+
+    internal LocalMcpRuntime(
+        string workspaceKey,
+        ObservabilityHub observability,
+        string? profileDirectory,
+        TunnelSupervisorOptions supervisorOptions,
+        Func<TimeSpan, CancellationToken, Task>? restartDelay = null,
+        Func<DateTimeOffset>? clock = null,
+        Func<double>? jitter = null)
+        : this(workspaceKey, observability, profileDirectory, supervisorOptions, restartDelay, clock, jitter, true)
+    {
+    }
+
+    private LocalMcpRuntime(
+        string? workspaceKey,
+        ObservabilityHub? observability,
+        string? profileDirectory,
+        TunnelSupervisorOptions supervisorOptions,
+        Func<TimeSpan, CancellationToken, Task>? restartDelay,
+        Func<DateTimeOffset>? clock,
+        Func<double>? jitter,
+        bool initialize)
+    {
+        _ = initialize;
+        supervisorOptions.Validate();
+        _restartPolicy = new TunnelRestartPolicy(supervisorOptions);
+        _restartDelay = restartDelay ?? ((delay, token) => Task.Delay(delay, token));
+        _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _jitter = jitter ?? Random.Shared.NextDouble;
         _profileDirectoryOverride = profileDirectory;
+
+        if (observability is not null)
+        {
+            _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey)
+                ? throw new ArgumentException("Workspace key cannot be empty.", nameof(workspaceKey))
+                : workspaceKey.Trim().ToUpperInvariant();
+            _observability = observability;
+            _usageMeter = observability.MeterFor(_workspaceKey);
+        }
     }
 
     public event Action<LocalMcpRuntimeState>? StateChanged;
     public event Action<string>? Log;
 
     public LocalMcpRuntimeState State { get { lock (_stateGate) return _state; } }
+
+    public TunnelSupervisorSnapshot SupervisorSnapshot
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                return new TunnelSupervisorSnapshot(
+                    _totalRestarts,
+                    _cooldownEntries,
+                    _supervisorConsecutiveRestarts,
+                    _supervisorAttemptsInWindow,
+                    _restartPending,
+                    _nextRestartUtc,
+                    _lastTunnelStartedUtc,
+                    _lastTunnelExitUtc,
+                    _lastExitCode);
+            }
+        }
+    }
 
     public async Task StartAsync(LocalMcpConfiguration configuration)
     {
@@ -77,41 +159,71 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         {
             if (State.Status is not (LocalMcpRuntimeStatus.Stopped or LocalMcpRuntimeStatus.Failed)) return;
             if (_requestedStop) { _requestedStop = false; SetState(LocalMcpRuntimeState.Stopped); return; }
+            CancelRestartUnsafe();
+            _restartPolicy.Reset();
+            UpdatePolicyCountersUnsafe();
+            ResetSupervisorLifecycleUnsafe();
             SetState(LocalMcpRuntimeState.Starting);
             EmitLog("[Runtime] Starting FileMCP...\n");
-            _startupCts?.Dispose(); _startupCts = new CancellationTokenSource();
+            _startupCts?.Dispose();
+            _startupCts = new CancellationTokenSource();
             var cancellationToken = _startupCts.Token;
             try
             {
                 var healthAddress = ValidateConfiguration(configuration);
-                _profileLock = new ProfileLock(configuration.Profile); _profileLock.Acquire();
+                _profileLock = new ProfileLock(configuration.Profile);
+                _profileLock.Acquire();
                 var localAuthToken = MakeLocalAuthToken();
-                _server = new LocalMcpServer(configuration.Port, configuration.AllowedDirectory, configuration.GitUserName, configuration.GitUserEmail, configuration.EnableCommands, localAuthToken, EmitLog, _usageMeter, _observability?.ChatCorrelation, _observability?.Sessions, _workspaceKey);
+                _server = new LocalMcpServer(
+                    configuration.Port,
+                    configuration.AllowedDirectory,
+                    configuration.GitUserName,
+                    configuration.GitUserEmail,
+                    configuration.EnableCommands,
+                    localAuthToken,
+                    EmitLog,
+                    _usageMeter,
+                    _observability?.ChatCorrelation,
+                    _observability?.Sessions,
+                    _workspaceKey);
                 await _server.StartAsync(cancellationToken).ConfigureAwait(false);
 
-                var tunnelClient = TunnelClientPath(); var profileDirectory = TunnelProfileDirectory();
+                var tunnelClient = TunnelClientPath();
+                var profileDirectory = TunnelProfileDirectory();
                 var environment = TunnelClientEnvironment(configuration.ApiKey, localAuthToken);
                 var localAuthHeader = $"{FileMcpConstants.LocalAuthHeaderName}: env:FILEMCP_LOCAL_AUTH_TOKEN";
-                environment["MCP_EXTRA_HEADERS"] = localAuthHeader; environment["MCP_DISCOVERY_EXTRA_HEADERS"] = localAuthHeader;
+                environment["MCP_EXTRA_HEADERS"] = localAuthHeader;
+                environment["MCP_DISCOVERY_EXTRA_HEADERS"] = localAuthHeader;
                 string[] sensitive = [configuration.ApiKey, localAuthToken];
 
-                EmitLog("[Tunnel] Configuring Secure MCP Tunnel…\n");
-                var initResult = await ProcessRunner.RunAsync(tunnelClient,
+                EmitLog("[Tunnel] Configuring Secure MCP Tunnel...\n");
+                var initResult = await ProcessRunner.RunAsync(
+                    tunnelClient,
                     ["init", "--sample", "sample_mcp_remote_no_auth", "--profile", configuration.Profile, "--profile-dir", profileDirectory, "--force", "--tunnel-id", configuration.TunnelId, "--mcp-server-url", $"http://127.0.0.1:{configuration.Port}/mcp", "--health-listen-addr", healthAddress],
-                    environment: environment, timeoutSeconds: 30, outputLimitBytes: 250_000, cancellationToken: cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested(); RequireSuccess(initResult, "tunnel-client init", sensitive);
+                    environment: environment,
+                    timeoutSeconds: 30,
+                    outputLimitBytes: 250_000,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                RequireSuccess(initResult, "tunnel-client init", sensitive);
 
-                EmitLog("[Tunnel] Checking tunnel configuration…\n");
-                var doctorResult = await ProcessRunner.RunAsync(tunnelClient,
+                EmitLog("[Tunnel] Checking tunnel configuration...\n");
+                var doctorResult = await ProcessRunner.RunAsync(
+                    tunnelClient,
                     ["doctor", "--profile", configuration.Profile, "--profile-dir", profileDirectory, "--health-listen-addr", healthAddress, "--explain"],
-                    environment: environment, timeoutSeconds: 30, outputLimitBytes: 250_000, cancellationToken: cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested(); RequireSuccess(doctorResult, "tunnel-client doctor", sensitive);
+                    environment: environment,
+                    timeoutSeconds: 30,
+                    outputLimitBytes: 250_000,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                RequireSuccess(doctorResult, "tunnel-client doctor", sensitive);
 
-                _tunnelProcess = ProcessRunner.StartManaged(tunnelClient,
+                _tunnelLaunch = new TunnelLaunchContext(
+                    tunnelClient,
                     ["run", "--profile", configuration.Profile, "--profile-dir", profileDirectory, "--health-listen-addr", healthAddress],
-                    null, environment,
-                    text => EmitLog("[Tunnel] " + Redact(text, sensitive)),
-                    exitCode => _ = Task.Run(() => TunnelDidExitAsync(exitCode)));
+                    environment,
+                    sensitive);
+                StartTunnelProcessUnsafe(_tunnelLaunch, countAsRestart: false);
                 SetState(LocalMcpRuntimeState.Running);
                 EmitLog($"[Runtime] OpenAI Secure MCP Tunnel started. Command execution: {(configuration.EnableCommands ? "enabled" : "disabled")}.\n");
             }
@@ -131,49 +243,274 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
 
     public async Task StopAsync()
     {
-        _requestedStop = true; _startupCts?.Cancel();
+        _requestedStop = true;
+        _startupCts?.Cancel();
+        CancelRestartSignal();
+        Task? restartTask;
         await _serial.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (State.Status == LocalMcpRuntimeStatus.Stopped) { _requestedStop = false; return; }
-            if (State.Status != LocalMcpRuntimeStatus.Stopping) SetState(LocalMcpRuntimeState.Stopping);
-            EmitLog("[Runtime] Disconnecting...\n");
-            if (_tunnelProcess is not null) await _tunnelProcess.StopAsync().ConfigureAwait(false);
-            FinishStop();
+            if (State.Status == LocalMcpRuntimeStatus.Stopped)
+            {
+                _requestedStop = false;
+                restartTask = _restartTask;
+            }
+            else
+            {
+                if (State.Status != LocalMcpRuntimeStatus.Stopping) SetState(LocalMcpRuntimeState.Stopping);
+                EmitLog("[Runtime] Disconnecting...\n");
+                if (_tunnelProcess is not null) await _tunnelProcess.StopAsync().ConfigureAwait(false);
+                restartTask = _restartTask;
+                FinishStop();
+            }
         }
         finally { _serial.Release(); }
+        await AwaitRestartTaskAsync(restartTask).ConfigureAwait(false);
     }
 
     public async Task ShutdownAsync()
     {
-        _requestedStop = true; _startupCts?.Cancel();
+        _requestedStop = true;
+        _startupCts?.Cancel();
+        CancelRestartSignal();
+        Task? restartTask;
         await _serial.WaitAsync().ConfigureAwait(false);
-        try { _tunnelProcess?.StopSynchronously(); FinishStop(); }
+        try
+        {
+            _tunnelProcess?.StopSynchronously();
+            restartTask = _restartTask;
+            FinishStop();
+        }
         finally { _serial.Release(); }
+        await AwaitRestartTaskAsync(restartTask).ConfigureAwait(false);
     }
 
-    private async Task TunnelDidExitAsync(int exitCode)
+    private async Task TunnelDidExitAsync(int generation, int exitCode)
     {
         await _serial.WaitAsync().ConfigureAwait(false);
         try
         {
+            if (generation != _tunnelGeneration) return;
             if (_tunnelProcess is null && State.Status == LocalMcpRuntimeStatus.Stopped) return;
-            _tunnelProcess?.Dispose(); _tunnelProcess = null; _server?.Stop(); _server = null; _profileLock?.Dispose(); _profileLock = null;
-            if (_requestedStop) { _requestedStop = false; SetState(LocalMcpRuntimeState.Stopped); EmitLog("[Runtime] Tunnel stopped.\n"); }
-            else if (exitCode == 0) { SetState(LocalMcpRuntimeState.Stopped); EmitLog("[Runtime] Tunnel stopped.\n"); }
-            else { var message = $"Tunnel stopped unexpectedly (exit status {exitCode})."; SetState(LocalMcpRuntimeState.Failed(message)); EmitLog("[Runtime] " + message + "\n"); }
+
+            _tunnelProcess?.Dispose();
+            _tunnelProcess = null;
+            var now = _clock().ToUniversalTime();
+            RecordTunnelExitUnsafe(now, exitCode);
+
+            if (_requestedStop || State.Status == LocalMcpRuntimeStatus.Stopping)
+            {
+                FinishStop();
+                return;
+            }
+
+            if (_tunnelLaunch is null)
+            {
+                var missing = "Tunnel stopped and restart context is unavailable.";
+                SetState(LocalMcpRuntimeState.Failed(missing));
+                EmitLog("[Runtime] " + missing + "\n");
+                return;
+            }
+
+            var started = _tunnelStartedUtc ?? now;
+            var decision = _restartPolicy.Next(started, now, _jitter);
+            UpdatePolicyCountersUnsafe();
+            ScheduleRestartUnsafe(decision, exitCode, now);
         }
         finally { _serial.Release(); }
     }
 
+    private void ScheduleRestartUnsafe(TunnelRestartDecision decision, int exitCode, DateTimeOffset now)
+    {
+        CancelRestartUnsafe();
+        _restartCts = new CancellationTokenSource();
+        var token = _restartCts.Token;
+        SetRestartPendingUnsafe(decision, now);
+        if (decision.IsCooldown)
+        {
+            lock (_stateGate) _cooldownEntries++;
+            SetState(LocalMcpRuntimeState.Cooldown($"Tunnel exited with status {exitCode}; restart budget exhausted."));
+            EmitLog($"[Runtime] Tunnel exited unexpectedly (status {exitCode}). Restart budget exhausted; cooldown {decision.Delay.TotalMilliseconds:0} ms.\n");
+        }
+        else
+        {
+            SetState(LocalMcpRuntimeState.Restarting($"Tunnel exited with status {exitCode}; restart attempt {decision.AttemptNumber} pending."));
+            EmitLog($"[Runtime] Tunnel exited unexpectedly (status {exitCode}). Restart attempt {decision.AttemptNumber} in {decision.Delay.TotalMilliseconds:0} ms.\n");
+        }
+        _restartTask = Task.Run(() => RestartLoopAsync(decision, token), CancellationToken.None);
+    }
+
+    private async Task RestartLoopAsync(TunnelRestartDecision initialDecision, CancellationToken cancellationToken)
+    {
+        var decision = initialDecision;
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                if (decision.Delay > TimeSpan.Zero)
+                    await _restartDelay(decision.Delay, cancellationToken).ConfigureAwait(false);
+
+                if (decision.IsCooldown)
+                {
+                    await _serial.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    try
+                    {
+                        if (_requestedStop || _tunnelLaunch is null) return;
+                        _restartPolicy.Reset();
+                        UpdatePolicyCountersUnsafe();
+                        var now = _clock().ToUniversalTime();
+                        decision = _restartPolicy.Next(now, now, _jitter);
+                        UpdatePolicyCountersUnsafe();
+                        SetRestartPendingUnsafe(decision, now);
+                        SetState(LocalMcpRuntimeState.Restarting($"Tunnel cooldown ended; restart attempt {decision.AttemptNumber} pending."));
+                    }
+                    finally { _serial.Release(); }
+                    continue;
+                }
+
+                await _serial.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    if (_requestedStop || _tunnelLaunch is null) return;
+                    try
+                    {
+                        StartTunnelProcessUnsafe(_tunnelLaunch, countAsRestart: true);
+                        SetState(LocalMcpRuntimeState.Running);
+                        EmitLog("[Runtime] Tunnel restart succeeded.\n");
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        var now = _clock().ToUniversalTime();
+                        EmitLog($"[Runtime] Tunnel restart launch failed: {ex.Message}\n");
+                        decision = _restartPolicy.Next(now, now, _jitter);
+                        UpdatePolicyCountersUnsafe();
+                        SetRestartPendingUnsafe(decision, now);
+                        if (decision.IsCooldown)
+                        {
+                            lock (_stateGate) _cooldownEntries++;
+                            SetState(LocalMcpRuntimeState.Cooldown("Tunnel restart budget exhausted after launch failures."));
+                        }
+                        else
+                        {
+                            SetState(LocalMcpRuntimeState.Restarting($"Tunnel restart attempt {decision.AttemptNumber} pending."));
+                        }
+                    }
+                }
+                finally { _serial.Release(); }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private void StartTunnelProcessUnsafe(TunnelLaunchContext launch, bool countAsRestart)
+    {
+        var generation = ++_tunnelGeneration;
+        _tunnelProcess = ProcessRunner.StartManaged(
+            launch.Executable,
+            launch.Arguments,
+            null,
+            launch.Environment,
+            text => EmitLog("[Tunnel] " + Redact(text, launch.Sensitive)),
+            exitCode => _ = Task.Run(() => TunnelDidExitAsync(generation, exitCode)));
+        var now = _clock().ToUniversalTime();
+        _tunnelStartedUtc = now;
+        lock (_stateGate)
+        {
+            _lastTunnelStartedUtc = now;
+            _restartPending = false;
+            _nextRestartUtc = null;
+            if (countAsRestart) _totalRestarts++;
+        }
+    }
+
+    private void RecordTunnelExitUnsafe(DateTimeOffset now, int exitCode)
+    {
+        lock (_stateGate)
+        {
+            _lastTunnelExitUtc = now;
+            _lastExitCode = exitCode;
+        }
+    }
+
+    private void SetRestartPendingUnsafe(TunnelRestartDecision decision, DateTimeOffset now)
+    {
+        lock (_stateGate)
+        {
+            _restartPending = true;
+            _nextRestartUtc = now + decision.Delay;
+        }
+    }
+
+    private void UpdatePolicyCountersUnsafe()
+    {
+        lock (_stateGate)
+        {
+            _supervisorConsecutiveRestarts = _restartPolicy.ConsecutiveRestarts;
+            _supervisorAttemptsInWindow = _restartPolicy.AttemptsInWindow;
+        }
+    }
+
+    private void ResetSupervisorLifecycleUnsafe()
+    {
+        lock (_stateGate)
+        {
+            _restartPending = false;
+            _nextRestartUtc = null;
+            _lastTunnelStartedUtc = null;
+            _lastTunnelExitUtc = null;
+            _lastExitCode = null;
+        }
+    }
+
+    private void CancelRestartSignal()
+    {
+        CancellationTokenSource? cts;
+        lock (_stateGate) cts = _restartCts;
+        try { cts?.Cancel(); } catch (ObjectDisposedException) { }
+    }
+
+    private void CancelRestartUnsafe()
+    {
+        try { _restartCts?.Cancel(); } catch (ObjectDisposedException) { }
+        _restartCts?.Dispose();
+        _restartCts = null;
+        lock (_stateGate)
+        {
+            _restartPending = false;
+            _nextRestartUtc = null;
+        }
+    }
+
+    private static async Task AwaitRestartTaskAsync(Task? restartTask)
+    {
+        if (restartTask is null) return;
+        try { await restartTask.ConfigureAwait(false); }
+        catch (OperationCanceledException) { }
+    }
+
     private void FinishStop()
     {
-        CleanupRuntime(); _requestedStop = false; SetState(LocalMcpRuntimeState.Stopped); EmitLog("[Runtime] Tunnel stopped.\n");
+        CancelRestartUnsafe();
+        CleanupRuntime();
+        _restartPolicy.Reset();
+        UpdatePolicyCountersUnsafe();
+        _requestedStop = false;
+        SetState(LocalMcpRuntimeState.Stopped);
+        EmitLog("[Runtime] Tunnel stopped.\n");
     }
 
     private void CleanupRuntime()
     {
-        _server?.Stop(); _server = null; _tunnelProcess?.Dispose(); _tunnelProcess = null; _profileLock?.Dispose(); _profileLock = null;
+        _tunnelGeneration++;
+        _server?.Stop();
+        _server = null;
+        _tunnelProcess?.Dispose();
+        _tunnelProcess = null;
+        _profileLock?.Dispose();
+        _profileLock = null;
+        _tunnelLaunch = null;
+        _tunnelStartedUtc = null;
     }
 
     public static string ValidateConfiguration(LocalMcpConfiguration configuration)
@@ -191,9 +528,18 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
 
     public static string? NormalizeHealthAddress(string value)
     {
-        var trimmed = value.Trim(); if (trimmed.Length == 0) return "127.0.0.1:0";
-        if (trimmed.StartsWith('[')) { var close = trimmed.IndexOf(']'); if (close < 0 || trimmed[1..close].ToLowerInvariant() != "::1") return null; var rest = trimmed[(close + 1)..]; if (!rest.StartsWith(':') || !ValidHealthPort(rest[1..])) return null; return "[::1]:" + rest[1..]; }
-        var parts = trimmed.Split(':', 2); if (parts.Length != 2 || (parts[0].ToLowerInvariant() is not ("127.0.0.1" or "localhost")) || !ValidHealthPort(parts[1])) return null;
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0) return "127.0.0.1:0";
+        if (trimmed.StartsWith('['))
+        {
+            var close = trimmed.IndexOf(']');
+            if (close < 0 || trimmed[1..close].ToLowerInvariant() != "::1") return null;
+            var rest = trimmed[(close + 1)..];
+            if (!rest.StartsWith(':') || !ValidHealthPort(rest[1..])) return null;
+            return "[::1]:" + rest[1..];
+        }
+        var parts = trimmed.Split(':', 2);
+        if (parts.Length != 2 || (parts[0].ToLowerInvariant() is not ("127.0.0.1" or "localhost")) || !ValidHealthPort(parts[1])) return null;
         return parts[0].ToLowerInvariant() + ":" + parts[1];
     }
 
@@ -202,26 +548,31 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
     private Dictionary<string, string> TunnelClientEnvironment(string apiKey, string localAuthToken)
     {
         var inherited = Environment.GetEnvironmentVariables().Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => (string?)e.Value ?? "", StringComparer.OrdinalIgnoreCase);
-        string[] pass = ["PATH","USERPROFILE","HOMEDRIVE","HOMEPATH","APPDATA","LOCALAPPDATA","TEMP","TMP","SystemRoot","WINDIR","LANG","LC_ALL","LC_CTYPE","HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","http_proxy","https_proxy","all_proxy"];
+        string[] pass = ["PATH", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "SystemRoot", "WINDIR", "LANG", "LC_ALL", "LC_CTYPE", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"];
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in pass) if (inherited.TryGetValue(key, out var value) && value.Length > 0) result[key] = value;
         foreach (var pair in inherited.Where(pair => pair.Key.StartsWith("MCP_TEST_", StringComparison.OrdinalIgnoreCase))) result[pair.Key] = pair.Value;
         var noProxy = (inherited.GetValueOrDefault("NO_PROXY") ?? inherited.GetValueOrDefault("no_proxy") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         foreach (var loopback in new[] { "127.0.0.1", "localhost", "::1" }) if (!noProxy.Contains(loopback, StringComparer.OrdinalIgnoreCase)) noProxy.Add(loopback);
-        result["NO_PROXY"] = result["no_proxy"] = string.Join(',', noProxy); result["CONTROL_PLANE_API_KEY"] = apiKey; result["FILEMCP_LOCAL_AUTH_TOKEN"] = localAuthToken;
+        result["NO_PROXY"] = result["no_proxy"] = string.Join(',', noProxy);
+        result["CONTROL_PLANE_API_KEY"] = apiKey;
+        result["FILEMCP_LOCAL_AUTH_TOKEN"] = localAuthToken;
         return result;
     }
 
     private string TunnelProfileDirectory()
     {
         var directory = _profileDirectoryOverride ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FileMCP", "tunnel-profiles");
-        Directory.CreateDirectory(directory); return directory;
+        Directory.CreateDirectory(directory);
+        return directory;
     }
 
     private static string TunnelClientPath()
     {
-        var sibling = Path.Combine(AppContext.BaseDirectory, "tunnel-client.exe"); if (File.Exists(sibling)) return sibling;
-        var overridePath = Environment.GetEnvironmentVariable("MCP_TUNNEL_CLIENT"); if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath)) return overridePath;
+        var sibling = Path.Combine(AppContext.BaseDirectory, "tunnel-client.exe");
+        if (File.Exists(sibling)) return sibling;
+        var overridePath = Environment.GetEnvironmentVariable("MCP_TUNNEL_CLIENT");
+        if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath)) return overridePath;
         throw new FileMcpException("tunnel-client.exe was not found beside FileMCP.exe.");
     }
 
@@ -235,8 +586,14 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         if (result.Stderr.Length > 0) EmitLog("[Tunnel] " + Redact(result.Stderr, sensitive) + (result.Stderr.EndsWith('\n') ? "" : "\n"));
     }
 
-    private static string Redact(string text, IReadOnlyList<string> sensitive) { foreach (var secret in sensitive.Where(s => s.Length > 0)) text = text.Replace(secret, "[REDACTED]", StringComparison.Ordinal); return text; }
+    private static string Redact(string text, IReadOnlyList<string> sensitive)
+    {
+        foreach (var secret in sensitive.Where(s => s.Length > 0)) text = text.Replace(secret, "[REDACTED]", StringComparison.Ordinal);
+        return text;
+    }
+
     private void EmitLog(string text) => Log?.Invoke(text);
+
     private void SetState(LocalMcpRuntimeState state)
     {
         LocalMcpRuntimeState previous;
@@ -264,5 +621,11 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         StateChanged?.Invoke(state);
     }
 
-    public async ValueTask DisposeAsync() { await ShutdownAsync().ConfigureAwait(false); _serial.Dispose(); _startupCts?.Dispose(); }
+    public async ValueTask DisposeAsync()
+    {
+        await ShutdownAsync().ConfigureAwait(false);
+        _serial.Dispose();
+        _startupCts?.Dispose();
+        _restartCts?.Dispose();
+    }
 }

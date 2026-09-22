@@ -474,7 +474,7 @@ public partial class MainWindow : Window
 
     private async void Connect_Click(object sender, RoutedEventArgs e)
     {
-        if (_runtimes.Values.Any(runtime => runtime.State.Status is LocalMcpRuntimeStatus.Running or LocalMcpRuntimeStatus.Starting or LocalMcpRuntimeStatus.Stopping))
+        if (_runtimes.Values.Any(runtime => runtime.State.Status is LocalMcpRuntimeStatus.Running or LocalMcpRuntimeStatus.Restarting or LocalMcpRuntimeStatus.Cooldown or LocalMcpRuntimeStatus.Starting or LocalMcpRuntimeStatus.Stopping))
         {
             await StopAllAsync();
             return;
@@ -827,6 +827,14 @@ public partial class MainWindow : Window
                 status.Text = "Connected";
                 status.Foreground = System.Windows.Media.Brushes.ForestGreen;
                 break;
+            case LocalMcpRuntimeStatus.Restarting:
+                status.Text = "Reconnecting...";
+                status.Foreground = System.Windows.Media.Brushes.DarkOrange;
+                break;
+            case LocalMcpRuntimeStatus.Cooldown:
+                status.Text = "Reconnect cooldown";
+                status.Foreground = System.Windows.Media.Brushes.DarkOrange;
+                break;
             case LocalMcpRuntimeStatus.Stopping:
                 status.Text = "Disconnecting...";
                 status.Foreground = System.Windows.Media.Brushes.DarkOrange;
@@ -849,7 +857,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (states.Any(status => status == LocalMcpRuntimeStatus.Running))
+        if (states.Any(status => status is LocalMcpRuntimeStatus.Running or LocalMcpRuntimeStatus.Restarting or LocalMcpRuntimeStatus.Cooldown))
         {
             ConnectButton.Content = "Disconnect all";
             ConnectButton.IsEnabled = true;
