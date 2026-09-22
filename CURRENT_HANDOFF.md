@@ -64,3 +64,12 @@ Do NOT terminate the currently connected bridge from inside this chat; doing so 
 9. CLAIM V11-009: final review -> final package gate -> merge to main -> checkout/pull main -> Release build/runtime tests on main -> MAIN VERIFIED -> DONE.
 
 Do not enable exact AI-chat wording before step 7 proves the real ChatGPT connector propagates the handle reliably.
+
+LIVE DESKTOP RECONNECT CHECK (2026-09-22):
+- Old FileMCP processes are gone.
+- Exactly one upgraded process is running: D:\Tools\FileMCP\dist\windows-x64\FileMCP-release\FileMCP.exe (PID 3352 at verification time).
+- Its bundled tunnel-client is running as its child process.
+- The upgraded process owns 127.0.0.1:8008.
+- Verified release ZIP SHA-256 remains 5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E.
+- This existing ChatGPT conversation still exposes the old 18-tool FileMCP connector schema; filemcp_observability_connect is not present.
+- NEXT_EXACT_ACTION: open a fresh ChatGPT conversation while the upgraded FileMCP-release process is running, confirm filemcp_observability_connect appears, then execute OBS-013 live proof. No code/audit work should be repeated.

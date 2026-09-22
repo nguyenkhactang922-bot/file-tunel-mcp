@@ -36,3 +36,9 @@ Final acceptance: BLOCKED ONLY ON OBS-013 LIVE CHATGPT CONNECTOR PROOF
 OBS-013 is the only acceptance blocker. The current chat is attached to the legacy connector schema and the running desktop bridge is the old deployed binary. A desktop restart/reconnect to the upgraded release is required before the real ChatGPT logical-correlation proof can be executed.
 
 After OBS-013 PASS, V11-009 performs final review, merge, main verification and release closure. No V11-010/OBS-014 exists in the frozen plan.
+
+Live reconnect progress:
+- Upgraded FileMCP-release is now the sole running bridge and owns port 8008.
+- Desktop/runtime migration is complete.
+- Remaining OBS-013 blocker is only ChatGPT conversation schema caching: this existing chat still has the legacy 18-tool registry.
+- Fresh-chat connector registration is required for the final live proof.
