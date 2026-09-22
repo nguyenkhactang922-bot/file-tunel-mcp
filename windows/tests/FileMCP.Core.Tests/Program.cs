@@ -48,6 +48,7 @@ internal static class Program
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
             await TestHttpAndMcpAsync(root);
+            await TestHttpConnectionBoundsAsync(root);
             await TestRuntimeAsync(root);
             Console.WriteLine($"windows-core-tests: ok ({_assertions} assertions)");
             return 0;
@@ -1923,6 +1924,94 @@ internal static class Program
         Console.WriteLine("windows-http-mcp: ok");
     }
 
+    private static async Task TestHttpConnectionBoundsAsync(string root)
+    {
+        var workspace = Path.Combine(root, "http-bounds");
+        Directory.CreateDirectory(workspace);
+        var token = new string('b', 64);
+
+        var saturationPort = FreePort();
+        var saturationLimits = new LocalMcpServerLimits(2, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+        await using (var saturationServer = new LocalMcpServer(
+            (ushort)saturationPort, workspace, "", "", false, token, _ => { },
+            null, null, null, null, null, saturationLimits))
+        {
+            await saturationServer.StartAsync();
+            using var first = new TcpClient();
+            using var second = new TcpClient();
+            await first.ConnectAsync(IPAddress.Loopback, saturationPort);
+            await second.ConnectAsync(IPAddress.Loopback, saturationPort);
+            await first.GetStream().WriteAsync("G"u8.ToArray());
+            await second.GetStream().WriteAsync("G"u8.ToArray());
+            await Task.Delay(150);
+
+            using var excess = new TcpClient();
+            await excess.ConnectAsync(IPAddress.Loopback, saturationPort);
+            Assert(await WaitForSocketCloseAsync(excess, TimeSpan.FromSeconds(1)), "HTTP connection cap rejects excess client");
+
+            first.Dispose();
+            await Task.Delay(150);
+            var response = await SendHttpAsync(
+                saturationPort,
+                "POST",
+                "/mcp",
+                AuthHeaders(token),
+                "{\"jsonrpc\":\"2.0\",\"id\":90,\"method\":\"tools/list\",\"params\":{}}");
+            Assert(response.StartsWith("HTTP/1.1 200 OK", StringComparison.Ordinal), "HTTP connection slot is reusable after release");
+        }
+
+        var idlePort = FreePort();
+        var idleLimits = new LocalMcpServerLimits(4, TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(2));
+        await using (var idleServer = new LocalMcpServer(
+            (ushort)idlePort, workspace, "", "", false, token, _ => { },
+            null, null, null, null, null, idleLimits))
+        {
+            await idleServer.StartAsync();
+            using var idle = new TcpClient();
+            await idle.ConnectAsync(IPAddress.Loopback, idlePort);
+            Assert(await WaitForSocketCloseAsync(idle, TimeSpan.FromSeconds(2)), "HTTP idle connection times out");
+        }
+
+        var tricklePort = FreePort();
+        var trickleLimits = new LocalMcpServerLimits(4, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(650));
+        await using (var trickleServer = new LocalMcpServer(
+            (ushort)tricklePort, workspace, "", "", false, token, _ => { },
+            null, null, null, null, null, trickleLimits))
+        {
+            await trickleServer.StartAsync();
+            using var trickle = new TcpClient();
+            await trickle.ConnectAsync(IPAddress.Loopback, tricklePort);
+            var stream = trickle.GetStream();
+            var writeFailed = false;
+            for (var index = 0; index < 12; index++)
+            {
+                try { await stream.WriteAsync(new byte[] { (byte)'G' }); }
+                catch (IOException) { writeFailed = true; break; }
+                catch (SocketException) { writeFailed = true; break; }
+                await Task.Delay(100);
+            }
+            var closed = writeFailed || await WaitForSocketCloseAsync(trickle, TimeSpan.FromSeconds(1));
+            Assert(closed, "HTTP absolute header deadline stops trickle client");
+        }
+
+        var stopPort = FreePort();
+        var stopLimits = new LocalMcpServerLimits(4, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        await using (var stopServer = new LocalMcpServer(
+            (ushort)stopPort, workspace, "", "", false, token, _ => { },
+            null, null, null, null, null, stopLimits))
+        {
+            await stopServer.StartAsync();
+            using var blocked = new TcpClient();
+            await blocked.ConnectAsync(IPAddress.Loopback, stopPort);
+            await blocked.GetStream().WriteAsync("G"u8.ToArray());
+            await Task.Delay(100);
+            stopServer.Stop();
+            Assert(await WaitForSocketCloseAsync(blocked, TimeSpan.FromSeconds(1)), "HTTP server stop cancels blocked read");
+        }
+
+        Console.WriteLine("windows-http-connection-bounds: ok");
+    }
+
     private static void TestTunnelRestartPolicy()
     {
         var options = new TunnelSupervisorOptions(
@@ -2166,6 +2255,32 @@ internal static class Program
         var builder = new StringBuilder($"{method} {path} HTTP/1.1\r\nHost: {host ?? $"127.0.0.1:{port}"}\r\n"); foreach (var pair in headers) builder.Append(pair.Key).Append(": ").Append(pair.Value).Append("\r\n"); builder.Append("Content-Length: ").Append(bytes.Length).Append("\r\n\r\n");
         var head = Encoding.UTF8.GetBytes(builder.ToString()); await stream.WriteAsync(head); await stream.WriteAsync(bytes); client.Client.Shutdown(SocketShutdown.Send);
         using var memory = new MemoryStream(); var buffer = new byte[8192]; int read; while ((read = await stream.ReadAsync(buffer)) > 0) memory.Write(buffer, 0, read); return Encoding.UTF8.GetString(memory.ToArray());
+    }
+    private static async Task<bool> WaitForSocketCloseAsync(TcpClient client, TimeSpan timeout)
+    {
+        using var cts = new CancellationTokenSource(timeout);
+        var buffer = new byte[1];
+        try
+        {
+            var read = await client.GetStream().ReadAsync(buffer, cts.Token);
+            return read == 0;
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch (SocketException)
+        {
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return true;
+        }
     }
     private static string HttpBody(string response) { var index = response.IndexOf("\r\n\r\n", StringComparison.Ordinal); return index >= 0 ? response[(index + 4)..] : response; }
 }

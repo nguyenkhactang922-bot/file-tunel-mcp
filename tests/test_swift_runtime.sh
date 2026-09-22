@@ -823,8 +823,23 @@ let server = try LocalMCPServer(
     localAuthToken: localAuthToken,
     log: { _ in }
 )
+let boundedServer = try LocalMCPServer(
+    port: 18090,
+    allowedDirectory: root.path,
+    gitUserName: "Test User",
+    gitUserEmail: "test@example.com",
+    enableCommands: false,
+    localAuthToken: localAuthToken,
+    log: { _ in },
+    limits: LocalMCPServerLimits(
+        maxConcurrentConnections: 2,
+        readIdleTimeout: 0.5,
+        headerReadTimeout: 1.0
+    )
+)
 try safeGitServer.start()
 try server.start()
+try boundedServer.start()
 // The shell harness owns this process lifetime and terminates it after all
 // transport tests. Do not use a wall-clock timer here: as the suite grows, a
 // fixed lifetime turns later parser/fuzz checks into false crash reports.
@@ -848,6 +863,97 @@ BASE_URL="http://127.0.0.1:18088/mcp"
 SAFE_BASE_URL="http://127.0.0.1:18089/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+python3 - <<'PY'
+import socket
+import time
+
+HOST = "127.0.0.1"
+PORT = 18090
+TOKEN = "a" * 64
+
+def connect():
+    sock = socket.create_connection((HOST, PORT), timeout=2)
+    sock.settimeout(2)
+    return sock
+
+def closed(sock, timeout=1.5):
+    sock.settimeout(timeout)
+    try:
+        return sock.recv(1) == b""
+    except (ConnectionResetError, BrokenPipeError, OSError):
+        return True
+    except socket.timeout:
+        return False
+
+first = connect()
+second = connect()
+first.sendall(b"G")
+second.sendall(b"G")
+time.sleep(0.10)
+
+excess = connect()
+if not closed(excess):
+    raise SystemExit("macOS connection cap did not reject excess client")
+excess.close()
+
+first.close()
+time.sleep(0.15)
+
+body = b'{"jsonrpc":"2.0","id":900,"method":"tools/list","params":{}}'
+request = (
+    f"POST /mcp HTTP/1.1
+Host: 127.0.0.1:{PORT}
+"
+    "Content-Type: application/json
+"
+    f"X-FileMCP-Local-Token: {TOKEN}
+"
+    f"Content-Length: {len(body)}
+
+"
+).encode() + body
+valid = connect()
+valid.sendall(request)
+valid.shutdown(socket.SHUT_WR)
+response = b""
+while True:
+    chunk = valid.recv(8192)
+    if not chunk:
+        break
+    response += chunk
+valid.close()
+if b"HTTP/1.1 200 OK" not in response:
+    raise SystemExit("macOS connection slot was not reusable after release")
+second.close()
+time.sleep(0.10)
+
+idle = connect()
+time.sleep(0.80)
+if not closed(idle):
+    raise SystemExit("macOS idle connection did not time out")
+idle.close()
+
+trickle = connect()
+trickle_closed = False
+started = time.monotonic()
+for _ in range(20):
+    try:
+        trickle.sendall(b"G")
+    except (BrokenPipeError, ConnectionResetError, OSError):
+        trickle_closed = True
+        break
+    time.sleep(0.10)
+    if time.monotonic() - started > 1.6:
+        break
+if not trickle_closed:
+    trickle_closed = closed(trickle, timeout=0.8)
+trickle.close()
+if not trickle_closed:
+    raise SystemExit("macOS absolute header deadline did not stop trickle client")
+
+print("macos-http-connection-bounds: ok")
+PY
 
 UNAUTHENTICATED="$(command curl -sS -i -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \

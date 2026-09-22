@@ -1512,6 +1512,61 @@ private enum HTTPRequestParseResult {
     case failure(status: Int, message: String)
 }
 
+struct LocalMCPServerLimits {
+    let maxConcurrentConnections: Int
+    let readIdleTimeout: TimeInterval
+    let headerReadTimeout: TimeInterval
+
+    static let standard = LocalMCPServerLimits(
+        maxConcurrentConnections: 64,
+        readIdleTimeout: 15,
+        headerReadTimeout: 30
+    )
+
+    func validate() throws {
+        guard maxConcurrentConnections > 0 else {
+            throw MCPServerError.invalidArguments("maxConcurrentConnections must be positive")
+        }
+        guard readIdleTimeout > 0 else {
+            throw MCPServerError.invalidArguments("readIdleTimeout must be positive")
+        }
+        guard headerReadTimeout > 0 else {
+            throw MCPServerError.invalidArguments("headerReadTimeout must be positive")
+        }
+    }
+}
+
+private final class MCPConnectionLease {
+    let connection: NWConnection
+    private let slot: DispatchSemaphore
+    private let onFinish: () -> Void
+    private let lock = NSLock()
+    private var finished = false
+
+    init(connection: NWConnection, slot: DispatchSemaphore, onFinish: @escaping () -> Void) {
+        self.connection = connection
+        self.slot = slot
+        self.onFinish = onFinish
+    }
+
+    var isFinished: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return finished
+    }
+
+    func finish() {
+        lock.lock()
+        let shouldFinish = !finished
+        if shouldFinish { finished = true }
+        lock.unlock()
+        guard shouldFinish else { return }
+        connection.cancel()
+        onFinish()
+        slot.signal()
+    }
+}
+
 final class LocalMCPServer {
     private let port: UInt16
     private let localAuthToken: String
@@ -1521,8 +1576,11 @@ final class LocalMCPServer {
     private let log: (String) -> Void
     private let listenerQueue = DispatchQueue(label: "com.filemcp.http-listener", qos: .userInitiated)
     private let workQueue = DispatchQueue(label: "com.filemcp.http-workers", qos: .userInitiated, attributes: .concurrent)
+    private let limits: LocalMCPServerLimits
+    private let connectionSlots: DispatchSemaphore
     private var listener: NWListener?
     private let stateLock = NSLock()
+    private var activeConnections: [ObjectIdentifier: MCPConnectionLease] = [:]
     private var ready = false
 
     init(
@@ -1532,14 +1590,18 @@ final class LocalMCPServer {
         gitUserEmail: String,
         enableCommands: Bool,
         localAuthToken: String,
-        log: @escaping (String) -> Void
+        log: @escaping (String) -> Void,
+        limits: LocalMCPServerLimits = .standard
     ) throws {
         guard localAuthToken.utf8.count >= 32 else {
             throw MCPServerError.invalidArguments("Local MCP authentication token is too short")
         }
+        try limits.validate()
         self.port = port
         self.localAuthToken = localAuthToken
         self.log = log
+        self.limits = limits
+        self.connectionSlots = DispatchSemaphore(value: limits.maxConcurrentConnections)
         let resolver = try SafePathResolver(rootPath: allowedDirectory)
         self.tools = LocalTools(
             resolver: resolver,
@@ -1604,31 +1666,85 @@ final class LocalMCPServer {
         listener = nil
         stateLock.lock()
         ready = false
+        let leases = Array(activeConnections.values)
+        activeConnections.removeAll()
         stateLock.unlock()
+        for lease in leases { lease.finish() }
     }
 
     private func handle(_ connection: NWConnection) {
+        guard connectionSlots.wait(timeout: .now()) == .success else {
+            connection.cancel()
+            return
+        }
+
+        let connectionID = ObjectIdentifier(connection)
+        let lease = MCPConnectionLease(
+            connection: connection,
+            slot: connectionSlots,
+            onFinish: { [weak self] in
+                guard let self else { return }
+                self.stateLock.lock()
+                self.activeConnections.removeValue(forKey: connectionID)
+                self.stateLock.unlock()
+            }
+        )
+        stateLock.lock()
+        activeConnections[connectionID] = lease
+        stateLock.unlock()
+
         connection.start(queue: listenerQueue)
-        receiveRequest(on: connection, accumulated: Data())
+        receiveRequest(
+            lease: lease,
+            accumulated: Data(),
+            headerDeadline: Date().addingTimeInterval(limits.headerReadTimeout)
+        )
     }
 
-    private func receiveRequest(on connection: NWConnection, accumulated: Data) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, isComplete, error in
-            guard let self else { return }
+    private func receiveRequest(lease: MCPConnectionLease, accumulated: Data, headerDeadline: Date) {
+        guard !lease.isFinished else { return }
+
+        let separator = Data("
+
+".utf8)
+        let headerComplete = accumulated.range(of: separator) != nil
+        let now = Date()
+        let idleDeadline = now.addingTimeInterval(limits.readIdleTimeout)
+        let effectiveDeadline = headerComplete ? idleDeadline : min(idleDeadline, headerDeadline)
+        let remaining = effectiveDeadline.timeIntervalSince(now)
+        if remaining <= 0 {
+            lease.finish()
+            return
+        }
+
+        let timeoutItem = DispatchWorkItem { [weak lease] in
+            lease?.finish()
+        }
+        listenerQueue.asyncAfter(deadline: .now() + remaining, execute: timeoutItem)
+
+        lease.connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self, weak lease] data, _, isComplete, error in
+            timeoutItem.cancel()
+            guard let lease, !lease.isFinished else { return }
+            guard let self else {
+                lease.finish()
+                return
+            }
+
             var buffer = accumulated
             if let data { buffer.append(data) }
 
             switch self.parseHTTPRequest(buffer) {
             case let .request(request):
                 self.workQueue.async {
+                    guard !lease.isFinished else { return }
                     let response = self.process(request)
-                    self.send(response, on: connection)
+                    self.send(response, lease: lease)
                 }
                 return
             case let .failure(status, message):
                 self.send(
                     self.httpResponse(status: status, body: Data(message.utf8), contentType: "text/plain"),
-                    on: connection
+                    lease: lease
                 )
                 return
             case .incomplete:
@@ -1636,15 +1752,18 @@ final class LocalMCPServer {
             }
 
             if buffer.count > maxHTTPRequestHeaderBytes + maxHTTPRequestBodyBytes {
-                self.send(self.httpResponse(status: 413, body: Data("Payload too large".utf8), contentType: "text/plain"), on: connection)
+                self.send(
+                    self.httpResponse(status: 413, body: Data("Payload too large".utf8), contentType: "text/plain"),
+                    lease: lease
+                )
                 return
             }
 
             if isComplete || error != nil {
-                connection.cancel()
+                lease.finish()
                 return
             }
-            self.receiveRequest(on: connection, accumulated: buffer)
+            self.receiveRequest(lease: lease, accumulated: buffer, headerDeadline: headerDeadline)
         }
     }
 
@@ -2281,9 +2400,10 @@ final class LocalMCPServer {
         return response
     }
 
-    private func send(_ data: Data, on connection: NWConnection) {
-        connection.send(content: data, completion: .contentProcessed { _ in
-            connection.cancel()
+    private func send(_ data: Data, lease: MCPConnectionLease) {
+        guard !lease.isFinished else { return }
+        lease.connection.send(content: data, completion: .contentProcessed { _ in
+            lease.finish()
         })
     }
 }

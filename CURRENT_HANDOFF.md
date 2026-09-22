@@ -141,3 +141,12 @@ FPA-007 final acceptance:
 - Native x64 + ARM64 second-launch activation smoke PASS.
 - Evidence: docs/evidence/FPA-007_WINDOWS_SINGLE_INSTANCE_EVIDENCE.md.
 - AUTHORITATIVE NEXT_EXACT_ACTION is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md: CLAIM FPA-008 design gate.
+
+
+## FPA-008 candidate
+
+- Cross-platform local MCP connection cap + idle/header timeout implementation is complete locally.
+- Windows Release build and runtime suite PASS at 428 assertions.
+- Static cross-platform contracts PASS.
+- Candidate evidence: `docs/evidence/FPA-008_CONNECTION_BOUNDS_CANDIDATE.md`.
+- FPA-008 remains ACTIVE until native macOS/Windows x64/Windows ARM64 GitHub jobs succeed.

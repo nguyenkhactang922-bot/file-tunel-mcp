@@ -104,6 +104,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_macos_supervisor_contract.ps1
 
+      - name: Verify HTTP connection bounds contract
+        shell: pwsh
+        run: ./tests/test_http_connection_bounds_contract.ps1
+
       - name: Verify Windows ARM64 assurance contract
         shell: pwsh
         run: ./tests/test_windows_arm64_assurance_contract.ps1

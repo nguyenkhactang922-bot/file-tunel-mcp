@@ -13,7 +13,7 @@ Status: AUDIT COMPLETE  -  FIXES NOT STARTED
 | FPA-005 | P2 | PASS | FPA-001 | Windows ARM64 gets native runtime smoke where available, or an explicit architecture-assurance gate and documented limitation |
 | FPA-006 | P2 | PASS | - | handoff/project/task state match real Git HEAD/status and expose exactly one current NEXT_EXACT_ACTION |
 | FPA-007 | P2 | PASS | - | duplicate desktop-process behavior is intentionally supported/documented or app-wide single-instance behavior is implemented/tested |
-| FPA-008 | P2 | READY | - | local MCP server has bounded concurrent connections and bounded idle/header read time with regression tests |
+| FPA-008 | P2 | ACTIVE | - | local MCP server has bounded concurrent connections and bounded idle/header read time with regression tests |
 | FPA-009 | P3 optional | DEFER-CANDIDATE | FPA-003/health scope | dynamic `:0` health endpoint is discoverable/probed or limitation remains explicitly documented |
 
 ## Dependency graph
@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: CLAIM FPA-008 design gate for bounded local MCP concurrent connections and idle/header read time.
+AUTHORITATIVE NEXT_EXACT_ACTION: obtain native GitHub macOS/Windows x64/Windows ARM64 CI evidence for the FPA-008 connection-bounds candidate.
 
 Do not resume V11-009 as the only remaining whole-app gate until the P1 product/release scope is resolved.
