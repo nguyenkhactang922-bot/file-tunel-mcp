@@ -11,7 +11,7 @@ Status: AUDIT COMPLETE  -  FIXES NOT STARTED
 | FPA-003 | P1 | BLOCKED | FPA-002 scope decision | macOS has bounded tunnel crash restart/backoff/jitter/budget/cooldown parity, or cross-platform tunnel-parity claim is explicitly removed |
 | FPA-004 | P1 market | BLOCKED | release-scope decision | production Windows artifacts are Authenticode-signed and macOS artifacts signed/notarized/stapled without secrets in repo/logs |
 | FPA-005 | P2 | READY | FPA-001 | Windows ARM64 gets native runtime smoke where available, or an explicit architecture-assurance gate and documented limitation |
-| FPA-006 | P2 | READY | - | handoff/project/task state match real Git HEAD/status and expose exactly one current NEXT_EXACT_ACTION |
+| FPA-006 | P2 | PASS | - | handoff/project/task state match real Git HEAD/status and expose exactly one current NEXT_EXACT_ACTION |
 | FPA-007 | P2 | READY | - | duplicate desktop-process behavior is intentionally supported/documented or app-wide single-instance behavior is implemented/tested |
 | FPA-008 | P2 | READY | - | local MCP server has bounded concurrent connections and bounded idle/header read time with regression tests |
 | FPA-009 | P3 optional | DEFER-CANDIDATE | FPA-003/health scope | dynamic `:0` health endpoint is discoverable/probed or limitation remains explicitly documented |
@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-**CLAIM FPA-006** and normalize project/handoff/task state before the next implementation task.
+AUTHORITATIVE NEXT_EXACT_ACTION: CLAIM FPA-002 design gate and preserve cross-platform logical-chat / MCP tool-surface parity.
 
 Do not resume V11-009 as the only remaining whole-app gate until the P1 product/release scope is resolved.

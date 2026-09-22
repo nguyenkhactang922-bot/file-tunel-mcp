@@ -1,56 +1,55 @@
 # PROJECT STATE
 
 Project: FileMCP
-Baseline main HEAD: dd9df8effb5b8ebdf221bcd0cfc88a5b4cec4be3
-Active branch: chatgpt/OBS-001-observability-foundation
-Current branch HEAD: 3033084
-Initiative: FileMCP Observability V1 + V1.1 OSS Strengthening
-Architecture: FROZEN
-Implementation: COMPLETE THROUGH V11-008 + OBS-013 LIVE ACCEPTANCE
-Final acceptance: V11-009 ACTIVE — FINAL REVIEW / PACKAGE / MERGE / MAIN VERIFICATION
+Active branch: `chatgpt/OBS-001-observability-foundation`
+Git SHA source of truth: resolve dynamically with `git rev-parse HEAD`.
+Architecture law: `docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md`
+Execution law: `docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md`
 
-## Verified implementation
+## Completed initiatives
 
-- FMR-001 PASS
-- OBS-001..OBS-012 PASS
-- V11-001 bounded logical session/correlation lifecycle PASS
-- V11-002 automatic observability retention maintenance PASS
-- V11-003 tunnel supervision/backoff/cooldown PASS
-- V11-004 component health/dashboard PASS
-- V11-005 native .NET ActivitySource/Meter MCP telemetry PASS
-- V11-006 MCP `_meta` + HTTP W3C trace-context propagation PASS
-- V11-007 optional official OpenTelemetry .NET OTLP exporter PASS
-- V11-008 independent long-lived hardening PASS
+- FMR-001 PASS.
+- Observability V1: OBS-001 through OBS-013 PASS.
+- Observability V1.1 strengthening: V11-001 through V11-008 PASS.
+- Real ChatGPT connector logical-chat correlation acceptance PASS.
+- FPA-001 Windows CI staging parity PASS.
 
-## Current release candidate
+## Current final-product program
 
-- `dist/FileMCP-v0.4.0-windows-x64.zip`
-- SHA-256 `5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E`
-- build 0 warnings / 0 errors
-- Windows runtime suite 414 assertions PASS
-- WPF/package/SQLite/tunnel-client/OTLP/notices smoke PASS
-- dependency vulnerability/outdated audit PASS
+Whole-app independent audit found additional blockers outside the already-verified Windows observability core.
 
-## Remaining work
+Audit report:
+`docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`
 
-V11-009 is ACTIVE. Execute final review, final package gate, PR/review/merge, then checkout/pull `main` and rerun Release build/runtime verification until `MAIN VERIFIED`.
+Task graph:
+`tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`
 
-OBS-013 PASS: real ChatGPT connector schema, handle creation/resume, cross-turn propagation, bound durable SHA-256 identity and raw-handle privacy all verified. Exact correlated AI-chat wording is enabled. V11-009 is ACTIVE for final closure.
+Current decision:
 
-Final pre-merge package SHA-256: `3C23BEE2198543CFE6D3C51FB134E31A82034B15FDDAC1FC9785F44603C17F23`. Isolated staging is supported so packaging can run while the current release bridge remains connected.
+```text
+Windows core / Observability V1+V1.1   VERIFIED
+Whole-repository release readiness     REMEDIATION ACTIVE
+V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
+```
 
-V11-009 merge status: PR #2 is clean/mergeable. A local merge candidate from `origin/main` passed build, 414 runtime assertions and packaged app smoke. Upstream merge is blocked only because the authenticated bot has READ permission.
+## Verified quality baseline
 
-GitHub auth recheck (2026-09-22):
-- Active CLI account remains `nguyenkhactang922-bot`.
-- Upstream permission remains `READ`.
-- PR #2 remains open, clean and mergeable.
-- Attempt to switch `gh` to account `dongttfd` failed because that account is not logged in on this machine.
-- No technical blocker remains; only an upstream WRITE/MAINTAIN-authenticated account can perform the final merge.
+- Windows Release build: PASS, 0 warnings / 0 errors.
+- Full Windows runtime suite: PASS, 414 assertions.
+- x64 packaged app smoke: PASS.
+- x64 + ARM64 release-resource packaging: PASS under FPA-001 isolated staging verification.
+- NuGet vulnerable-package audit: no vulnerable packages reported.
+- Direct-package outdated audit: no updates reported.
+- OBS-013 live ChatGPT cross-turn correlation and raw-handle privacy: PASS.
 
+## Current open product findings
 
-## Final product audit - 2026-09-22
+- FPA-002 P1: macOS logical-chat/tool-surface parity.
+- FPA-003 P1: macOS bounded tunnel supervisor parity.
+- FPA-004 P1 market: production signing/notarization.
+- FPA-005 P2: Windows ARM64 runtime assurance.
+- FPA-007 P2: single-instance/duplicate-process UX.
+- FPA-008 P2: HTTP connection/idle bounds.
+- FPA-009 P3 optional: dynamic health endpoint discovery.
 
-Whole-app status is NOT release-ready yet despite Windows OBS/V11 core gates passing. See `docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`. The dependency-aware remediation queue is `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`.
-
-Next implementation action: FPA-001 CI staging-path parity. No feature fix has been started by this audit.
+FPA-006 is the state-normalization task that produced this normalized state model. After it passes, the remediation queue advances to FPA-002.

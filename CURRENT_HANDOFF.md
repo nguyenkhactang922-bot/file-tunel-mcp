@@ -1,126 +1,80 @@
 # CURRENT HANDOFF
 
-STATUS: V11-009 ACTIVE — FINAL REVIEW / PACKAGE / MERGE / MAIN VERIFICATION
-BRANCH: chatgpt/OBS-001-observability-foundation
-HEAD: 3033084
-WORKTREE: CLEAN at handoff
+## Current status
 
-## Completed
+Project: FileMCP
+Branch: `chatgpt/OBS-001-observability-foundation`
+Worktree expectation at handoff: CLEAN
+Git SHA source of truth: run `git rev-parse HEAD`; do not hardcode a self-invalidating HEAD in this file.
+
+Initiative status:
 
 - FMR-001 PASS.
 - OBS-001 through OBS-013 PASS.
 - V11-001 through V11-008 PASS.
-- Observability V1.1 OSS strengthening implementation and independent hardening are complete.
+- FPA-001 PASS.
+- Final-product remediation is ACTIVE.
+- V11-009 / MAIN VERIFIED remains deferred until final-product P1 blockers are closed.
 
-## Latest verified build
+## Verified Windows baseline
 
-- Release ZIP: `dist/FileMCP-v0.4.0-windows-x64.zip`
-- SHA-256: `5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E`
-- Release build: PASS, 0 warnings / 0 errors
-- Full Windows runtime suite: PASS, 414 assertions
-- Packaged WPF startup: PASS
-- Close-to-tray: PASS
-- Packaged tunnel-client: PASS
-- Packaged native SQLite create/write/read: PASS
-- Packaged optional OTLP provider: PASS
-- Packaged OpenTelemetry license/notices: PASS
-- NuGet vulnerability audit: PASS, no vulnerable packages reported
-- Direct-package outdated audit: PASS, no direct updates reported
+Latest independent audit baseline:
 
-## V1.1 hardening result
-
-The independent V11-008 audit found and fixed one real leak-class bug: connect-only logical sessions could become stale without ever becoming evictable because they had no workspace row. The fixed build passed:
-
-- 24h-style correlation churn
-- 24h-style connect-only session churn
-- capacity pressure
-- bulk SQLite retention (12k expired minute rows + 4k expired hour rows)
-- 10k restart-storm decisions
-- OTLP collector outage isolation
-- raw OTLP protobuf privacy scan
-- durable SQLite/WAL privacy regression
-- full runtime/package regression
-
-## OBS-013 historical blocker (RESOLVED)
-
-The current ChatGPT conversation still exposes only the 18 legacy FileMCP tools. `filemcp_observability_connect` is not present in this conversation's connector schema.
-
-The currently running FileMCP processes are also from the old deployed path:
-
-`D:\Tools\FileMCP\dist\windows-x64\FileMCP\FileMCP.exe`
-
-Do NOT terminate the currently connected bridge from inside this chat; doing so can sever FileMCP tool access mid-handoff.
-
-## NEXT_EXACT_ACTION
-
-V11-009 is ACTIVE: final review -> final package gate -> push branch -> PR/review -> merge main -> checkout/pull main -> Release build/runtime tests on main -> MAIN VERIFIED -> DONE.
-
-
-LIVE DESKTOP RECONNECT CHECK (2026-09-22):
-- Old FileMCP processes are gone.
-- Exactly one upgraded process is running: D:\Tools\FileMCP\dist\windows-x64\FileMCP-release\FileMCP.exe (PID 3352 at verification time).
-- Its bundled tunnel-client is running as its child process.
-- The upgraded process owns 127.0.0.1:8008.
-- Verified release ZIP SHA-256 remains 5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E.
-- This existing ChatGPT conversation still exposes the old 18-tool FileMCP connector schema; filemcp_observability_connect is not present.
-- NEXT_EXACT_ACTION: open a fresh ChatGPT conversation while the upgraded FileMCP-release process is running, confirm filemcp_observability_connect appears, then execute OBS-013 live proof. No code/audit work should be repeated.
-
-OBS-013 LIVE PROOF STAGE A (2026-09-22):
-- Fresh ChatGPT connector schema now exposes 19 tools including filemcp_observability_connect.
-- Real ChatGPT handle creation/resume and _filemcp_chat propagation through read_file/git_status/run_command PASS.
-- Durable bound session hash verified; raw handle absent from DB/WAL/SHM.
-- Remaining frozen-spec gate: one subsequent user turn must reuse the same handle and remain bound to the same durable session before OBS-013 can be marked PASS / exact AI-chat wording enabled.
-
-OBS-013 PASS (cross-turn live ChatGPT proof complete):
-- Same logical handle resumed successfully on a later user turn.
-- Normal FileMCP call remained bound to the same durable SHA-256 session.
-- Raw handle remained absent from DB/WAL/SHM.
-- Exact correlated AI-chat wording is now enabled; unbound traffic remains separate and is never counted as a chat.
-- NEXT_EXACT_ACTION: V11-009 final review/package/PR/merge/main verification.
-
-FINAL PRE-MERGE PACKAGE CANDIDATE:
-- Built using isolated staging `FileMCP-final` so the currently connected release bridge is not overwritten.
-- ZIP SHA-256: 3C23BEE2198543CFE6D3C51FB134E31A82034B15FDDAC1FC9785F44603C17F23.
-- Packaged WPF/SQLite/tunnel-client/OTLP/notices smoke: PASS.
-
-UPSTREAM MERGE PERMISSION BLOCKER:
-- PR #2 is open, clean and mergeable.
-- `nguyenkhactang922-bot` has READ permission on `dongttfd/file-tunel-mcp`; push returned 403 and merge API is unavailable.
-- Local merged-main candidate is VERIFIED: build 0/0, 414 assertions, package/app smoke PASS.
-- NEXT_EXACT_ACTION: merge PR #2 using an upstream account with WRITE/MAINTAIN permission, then checkout/pull `main` and rerun main gates before marking V11-009 PASS / MAIN VERIFIED.
-
-GitHub auth recheck (2026-09-22):
-- Active CLI account remains `nguyenkhactang922-bot`.
-- Upstream permission remains `READ`.
-- PR #2 remains open, clean and mergeable.
-- Attempt to switch `gh` to account `dongttfd` failed because that account is not logged in on this machine.
-- No technical blocker remains; only an upstream WRITE/MAINTAIN-authenticated account can perform the final merge.
-
-
-## FINAL PRODUCT AUDIT OVERRIDE - 2026-09-22
-
-Whole-repository independent audit found blockers outside the already-passed Windows OBS/V11 core gates.
-
-Authoritative audit report: `docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`
-Fix queue: `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`
-
-Current audit result:
-- Windows Release build: PASS, 0 warnings / 0 errors.
+- Release build with warnings-as-errors: PASS, 0 warnings / 0 errors.
 - Windows runtime suite: PASS, 414 assertions.
-- NuGet vulnerable audit: PASS, no vulnerable packages reported.
-- NuGet direct outdated audit: PASS, no direct updates reported.
-- Confirmed P1: GitHub Windows release-resource workflow checks obsolete `FileMCP` staging path while build uses `FileMCP-release`.
-- Confirmed P1: macOS MCP surface lacks `filemcp_observability_connect` while README claims equivalent MCP surface.
-- Confirmed P1: macOS tunnel crash path lacks Windows bounded restart/backoff/cooldown supervisor.
-- Public-market P1: production signing/notarization pipeline is not implemented.
+- OBS-013 real ChatGPT cross-turn correlation proof: PASS.
+- NuGet vulnerable-package audit: PASS.
+- NuGet direct outdated audit: PASS.
+- Packaged x64 WPF / tray / tunnel-client / SQLite / OTLP / notices smoke: PASS.
 
-Do not treat V11-009 as the only remaining whole-app gate.
-AUTHORITATIVE NEXT_EXACT_ACTION: CLAIM FPA-001 from `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`.
+## FPA-001 completed
 
+Windows CI release staging is now canonicalized:
 
-FPA-001 PASS (2026-09-22):
-- Windows GitHub Actions now uses the same canonical FileMCP-release staging contract as build_windows_app.ps1.
-- Added tests/test_windows_release_contract.ps1 and wired it into verify-windows.
-- Local isolated x64 + ARM64 package/resource checks PASS; x64 packaged app smoke PASS.
-- Evidence: docs/evidence/FPA-001_CI_STAGING_PARITY_EVIDENCE.md.
-- AUTHORITATIVE NEXT_EXACT_ACTION: CLAIM FPA-006 state normalization.
+- build default: `FileMCP-release`;
+- GitHub Actions job variable: `FILEMCP_WINDOWS_STAGING_NAME=FileMCP-release`;
+- x64 and ARM64 workflow builds pass the canonical staging name;
+- release-resource verification uses the same staging variable;
+- regression test: `tests/test_windows_release_contract.ps1`.
+
+Evidence:
+`docs/evidence/FPA-001_CI_STAGING_PARITY_EVIDENCE.md`
+
+## Remaining final-product findings
+
+Authoritative report:
+`docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`
+
+Authoritative remediation queue:
+`tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`
+
+Open findings:
+
+- FPA-002 P1: macOS logical-chat / MCP tool-surface parity.
+- FPA-003 P1: macOS tunnel restart/backoff/cooldown parity.
+- FPA-004 P1 for public-market release: signing/notarization release gate.
+- FPA-005 P2: Windows ARM64 runtime assurance.
+- FPA-007 P2: duplicate desktop instance UX.
+- FPA-008 P2: local MCP connection bounds.
+- FPA-009 P3 optional: dynamic health endpoint discovery.
+
+## GitHub merge status
+
+- Upstream: `dongttfd/file-tunel-mcp`.
+- PR #2 exists on the upstream repo.
+- Authenticated bot account has READ permission upstream.
+- Feature branch is pushed to the bot fork.
+- Upstream merge remains a permission boundary, not a technical merge/test blocker.
+
+## Resume law
+
+On a new chat:
+
+1. confirm git root / branch / HEAD / status;
+2. read `AGENTS.md`;
+3. read `docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md`;
+4. read this file;
+5. read `PROJECT_STATE.md`;
+6. read `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`;
+7. resume the single authoritative next action;
+8. do not repeat completed OBS/V11/FPA tasks.
