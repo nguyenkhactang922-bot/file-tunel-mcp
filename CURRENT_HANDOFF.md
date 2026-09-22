@@ -110,3 +110,11 @@ FPA-002 final acceptance:
 FPA-003 final acceptance:
 - GitHub Actions run 35723605790: verify-macos SUCCESS, verify-windows SUCCESS.
 - Evidence: docs/evidence/FPA-003_MAC_TUNNEL_SUPERVISOR_EVIDENCE.md.
+
+
+## FPA-005 candidate
+
+- Native Windows ARM64 assurance architecture is frozen and implemented locally.
+- Local x64 compatibility smoke, release contract, ARM64 assurance contract, Release build and 414 runtime assertions PASS.
+- Candidate evidence: `docs/evidence/FPA-005_WINDOWS_ARM64_NATIVE_ASSURANCE_CANDIDATE.md`.
+- FPA-005 remains ACTIVE until GitHub verify-windows-arm64 succeeds on a real ARM64 hosted runner.

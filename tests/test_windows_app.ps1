@@ -1,3 +1,8 @@
+param(
+    [ValidateSet("x64", "arm64")]
+    [string]$Architecture = "x64"
+)
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
@@ -17,21 +22,21 @@ if ($env:OS -ne "Windows_NT") {
     throw "Windows app smoke test must run on Windows."
 }
 
-$Archive = Join-Path $Root "dist/FileMCP-v0.4.0-windows-x64.zip"
+$Archive = Join-Path $Root "dist/FileMCP-v0.4.0-windows-$Architecture.zip"
 if (-not (Test-Path -LiteralPath $Archive -PathType Leaf)) {
-    throw "Windows x64 release archive is missing: $Archive"
+    throw "Windows $Architecture release archive is missing: $Archive"
 }
 
-$SmokeRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("filemcp-windows-app-smoke-" + [Guid]::NewGuid().ToString("N"))
+$SmokeRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("filemcp-windows-app-smoke-$Architecture-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force $SmokeRoot | Out-Null
 Expand-Archive -LiteralPath $Archive -DestinationPath $SmokeRoot -Force
 $Exe = Join-Path $SmokeRoot "FileMCP.exe"
 $TunnelClient = Join-Path $SmokeRoot "tunnel-client.exe"
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
-    throw "FileMCP.exe is missing from the Windows x64 release archive."
+    throw "FileMCP.exe is missing from the Windows $Architecture release archive."
 }
 if (-not (Test-Path -LiteralPath $TunnelClient -PathType Leaf)) {
-    throw "tunnel-client.exe is missing from the Windows x64 release archive."
+    throw "tunnel-client.exe is missing from the Windows $Architecture release archive."
 }
 $SmokeDatabase = Join-Path $SmokeRoot "observability-package-smoke.sqlite3"
 $SmokeMarker = Join-Path $SmokeRoot "observability-package-smoke.txt"
@@ -130,9 +135,9 @@ try {
         throw "FileMCP.exe exited after closing the main window instead of remaining active in the system tray."
     }
 
-    Write-Host "windows-app-startup: ok"
-    Write-Host "windows-close-to-tray: ok"
-    Write-Host "windows-packaged-tunnel-client: ok"
+    Write-Host "windows-app-startup-${Architecture}: ok"
+    Write-Host "windows-close-to-tray-${Architecture}: ok"
+    Write-Host "windows-packaged-tunnel-client-${Architecture}: ok"
     Write-Host "windows-packaged-sqlite-write-read: ok ($SmokeResult)"
     Write-Host "windows-packaged-otlp-provider: ok ($OtlpSmokeResult)"
     Write-Host "windows-packaged-opentelemetry-notices: ok"

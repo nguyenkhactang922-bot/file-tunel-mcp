@@ -56,3 +56,6 @@ FPA-006 PASS. FPA-002 PASS with native macOS/Windows CI. Current remediation adv
 
 
 FPA-003 native CI PASS: run 35723605790 succeeded on both verify-macos and verify-windows. Current remediation advances to FPA-005.
+
+
+FPA-005 candidate: native Windows ARM64 job + parameterized packaged smoke are implemented; local contracts and Windows regression PASS. Native ARM64 GitHub execution is the remaining acceptance gate.
