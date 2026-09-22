@@ -31,3 +31,5 @@ EXECUTION ORDER AMENDMENT (user-approved, 2026-09-22):
 
 
 V11-001 PASS: bounded logical session/correlation lifecycle verified by Release build + 305 assertions. NEXT_EXACT_ACTION: V11-002 maintenance worker.
+
+V11-002 PASS: automatic process-wide retention maintenance verified by Release build + 316 assertions. NEXT_EXACT_ACTION: V11-003 tunnel supervisor.

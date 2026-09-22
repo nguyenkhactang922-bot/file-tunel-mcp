@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 
 namespace FileMCP.Core;
 
@@ -30,6 +30,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
     private readonly TelemetrySqliteStore _store;
     private readonly TelemetryWriter _writer;
     private readonly LogicalSessionWriter _sessionWriter;
+    private readonly ObservabilityMaintenanceWorker _maintenance;
     private readonly SemaphoreSlim _startGate = new(1, 1);
     private UsageCounters _lastRealtimeUsage;
     private bool _hasRealtimeBaseline;
@@ -43,7 +44,8 @@ public sealed class ObservabilityHub : IAsyncDisposable
         IEnumerable<string> workspaceKeys,
         string? databasePath = null,
         TimeSpan? writerInterval = null,
-        Action<string>? log = null)
+        Action<string>? log = null,
+        TimeSpan? maintenanceInterval = null)
     {
         var keys = workspaceKeys
             .Where(key => !string.IsNullOrWhiteSpace(key))
@@ -57,6 +59,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
         _store = new TelemetrySqliteStore(databasePath);
         _writer = new TelemetryWriter(_meters.Values, _store, writerInterval, log);
         _sessionWriter = new LogicalSessionWriter(Sessions, _store, writerInterval, log);
+        _maintenance = new ObservabilityMaintenanceWorker(_store, Sessions, ChatCorrelation, maintenanceInterval, log);
     }
 
     public WorkspaceUsageMeter MeterFor(string workspaceKey)
@@ -77,6 +80,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
             if (_started) return;
             await _writer.StartAsync(cancellationToken).ConfigureAwait(false);
             await _sessionWriter.StartAsync(cancellationToken).ConfigureAwait(false);
+            await _maintenance.StartAsync(cancellationToken).ConfigureAwait(false);
             _started = true;
         }
         finally
@@ -171,6 +175,10 @@ public sealed class ObservabilityHub : IAsyncDisposable
         return _store.CleanupRetentionAsync(nowUtc, cancellationToken);
     }
 
+    internal Task RunMaintenanceOnceForTestsAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default) =>
+        _maintenance.RunOnceAsync(nowUtc, cancellationToken);
+
+    internal ObservabilityMaintenanceSnapshot MaintenanceSnapshotForTests() => _maintenance.Snapshot();
     internal async Task FlushOnceForTestsAsync(DateTimeOffset capturedAtUtc, CancellationToken cancellationToken = default)
     {
         await _writer.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
@@ -210,6 +218,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        await _maintenance.DisposeAsync().ConfigureAwait(false);
         await _writer.DisposeAsync().ConfigureAwait(false);
         await _sessionWriter.DisposeAsync().ConfigureAwait(false);
         _startGate.Dispose();

@@ -411,6 +411,16 @@ internal static class Program
         }
     }
 
+    private sealed class FailingRetentionStore : ITelemetryRetentionStore
+    {
+        public int Calls { get; private set; }
+
+        public Task CleanupRetentionAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            throw new IOException("intentional retention store failure");
+        }
+    }
     private static async Task TestTelemetryPersistenceAsync(string root)
     {
         var directory = Path.Combine(root, "telemetry");
@@ -549,6 +559,33 @@ internal static class Program
         await store.UpsertDeltasAsync(retentionNow.AddDays(-40), new Dictionary<string, UsageCounters> { ["D"] = one });
         await store.UpsertDeltasAsync(retentionNow.AddDays(-100), new Dictionary<string, UsageCounters> { ["D"] = one });
         var oldDayEpoch = TelemetrySqliteStore.FloorBucket(retentionNow.AddDays(-100).ToUnixTimeSeconds(), 86_400);
+        await using (var connection = new SqliteConnection($"Data Source={database}"))
+        {
+            await connection.OpenAsync();
+            var oldStaleHash = new string('a', 64);
+            var recentStaleHash = new string('b', 64);
+            var oldActiveHash = new string('c', 64);
+            await using var seed = connection.CreateCommand();
+            seed.CommandText = """
+                INSERT INTO logical_sessions(session_hash,created_epoch,last_seen_epoch,client_name,state) VALUES
+                  ($oldStale,$oldCreated,$oldSeen,NULL,'stale'),
+                  ($recentStale,$recentCreated,$recentSeen,NULL,'stale'),
+                  ($oldActive,$oldCreated,$oldSeen,NULL,'active');
+                INSERT INTO logical_session_workspace(session_hash,workspace_key,first_seen_epoch,last_seen_epoch)
+                  VALUES($oldStale,'D',$oldCreated,$oldSeen);
+                INSERT INTO unbound_session_workspace(workspace_key,first_seen_epoch,last_seen_epoch,state)
+                  VALUES('Z',$oldCreated,$oldSeen,'stale');
+                """;
+            seed.Parameters.AddWithValue("$oldStale", oldStaleHash);
+            seed.Parameters.AddWithValue("$recentStale", recentStaleHash);
+            seed.Parameters.AddWithValue("$oldActive", oldActiveHash);
+            seed.Parameters.AddWithValue("$oldCreated", retentionNow.AddDays(-50).ToUnixTimeSeconds());
+            seed.Parameters.AddWithValue("$oldSeen", retentionNow.AddDays(-40).ToUnixTimeSeconds());
+            seed.Parameters.AddWithValue("$recentCreated", retentionNow.AddDays(-20).ToUnixTimeSeconds());
+            seed.Parameters.AddWithValue("$recentSeen", retentionNow.AddDays(-10).ToUnixTimeSeconds());
+            await seed.ExecuteNonQueryAsync();
+        }
+
         await store.CleanupRetentionAsync(retentionNow);
 
         await using (var connection = new SqliteConnection($"Data Source={database}"))
@@ -568,6 +605,22 @@ internal static class Program
             command.CommandText = "SELECT COUNT(*) FROM usage_day WHERE workspace_key='D' AND bucket_epoch=$bucket;";
             command.Parameters.AddWithValue("$bucket", oldDayEpoch);
             Assert((long)(await command.ExecuteScalarAsync() ?? 0L) == 1, "retention preserves long-term day row");
+            command.Parameters.Clear();
+            command.CommandText = "SELECT COUNT(*) FROM logical_sessions WHERE session_hash=$hash;";
+            command.Parameters.AddWithValue("$hash", new string('a', 64));
+            Assert((long)(await command.ExecuteScalarAsync() ?? -1L) == 0, "retention removes durable stale logical session older than 35 days");
+            command.Parameters.Clear();
+            command.CommandText = "SELECT COUNT(*) FROM logical_session_workspace WHERE session_hash=$hash;";
+            command.Parameters.AddWithValue("$hash", new string('a', 64));
+            Assert((long)(await command.ExecuteScalarAsync() ?? -1L) == 0, "retention cascade removes durable stale session workspace rows");
+            command.Parameters.Clear();
+            command.CommandText = "SELECT COUNT(*) FROM logical_sessions WHERE session_hash IN ($recent,$active);";
+            command.Parameters.AddWithValue("$recent", new string('b', 64));
+            command.Parameters.AddWithValue("$active", new string('c', 64));
+            Assert((long)(await command.ExecuteScalarAsync() ?? -1L) == 2, "retention preserves recent stale and old non-stale durable sessions");
+            command.Parameters.Clear();
+            command.CommandText = "SELECT COUNT(*) FROM unbound_session_workspace WHERE workspace_key='Z';";
+            Assert((long)(await command.ExecuteScalarAsync() ?? -1L) == 0, "retention removes old durable stale unbound row");
         }
         Console.WriteLine("windows-observability-periods: ok");
     }
@@ -612,6 +665,54 @@ internal static class Program
         var globalPersisted = await hub.QueryExactPeriodAsync(range);
         Assert(dPersisted.McpRequests == 1 && dPersisted.WriteCalls == 1, "observability hub persists/query D usage");
         Assert(globalPersisted.McpRequests == 2 && globalPersisted.ReadCalls == 1 && globalPersisted.WriteCalls == 1, "observability hub global persisted query");
+
+        await hub.RunMaintenanceOnceForTestsAsync(captured.AddDays(1));
+        Assert(hub.MaintenanceSnapshotForTests().Runs >= 1, "observability hub wires process-wide maintenance worker");
+
+        var maintenanceNow = new DateTimeOffset(2026, 9, 22, 8, 0, 0, TimeSpan.Zero);
+        var maintenanceBase = maintenanceNow.AddHours(-3);
+        var maintenanceCorrelation = new LogicalChatCorrelationService(maxKnownHandles: 2, retention: TimeSpan.FromHours(1));
+        var maintenanceHandle = maintenanceCorrelation.Connect(nowUtc: maintenanceBase).ChatInstanceId;
+        var maintenanceHash = LogicalChatCorrelationService.HashForPersistence(maintenanceHandle);
+        var maintenanceSessions = new LogicalSessionRegistry(maxSessions: 2, retention: TimeSpan.FromHours(1));
+        maintenanceSessions.RegisterSession(maintenanceHash, maintenanceBase);
+        var maintenanceCall = maintenanceSessions.BeginToolCall("D", maintenanceHash, 1, "read_file", maintenanceBase.AddSeconds(1));
+        maintenanceSessions.CompleteToolCall(maintenanceCall, 1, false, 1, maintenanceBase.AddSeconds(2));
+        var maintenanceBatch = maintenanceSessions.DrainPersistence(maintenanceBase.AddMinutes(31));
+        maintenanceSessions.MarkPersisted(maintenanceBatch);
+        var failingRetentionStore = new FailingRetentionStore();
+        var maintenanceLogs = new StringBuilder();
+        await using (var maintenance = new ObservabilityMaintenanceWorker(
+            failingRetentionStore,
+            maintenanceSessions,
+            maintenanceCorrelation,
+            TimeSpan.FromMilliseconds(10),
+            text => maintenanceLogs.Append(text),
+            () => maintenanceNow))
+        {
+            await maintenance.RunOnceAsync(maintenanceNow);
+            var maintenanceSnapshot = maintenance.Snapshot();
+            Assert(failingRetentionStore.Calls == 1 && maintenanceSnapshot.Runs == 1 && maintenanceSnapshot.FailureRuns == 1, "maintenance records retention-store failure without throwing");
+            Assert(maintenanceSessions.RetentionSnapshot().SessionCount == 0, "maintenance still cleans in-memory sessions after SQLite retention failure");
+            Assert(!maintenanceCorrelation.TryResolve(maintenanceHandle, out _, maintenanceNow), "maintenance still cleans correlation handles after SQLite retention failure");
+            Assert(maintenanceLogs.ToString().Contains("retention maintenance failed", StringComparison.Ordinal), "maintenance failure is surfaced through telemetry log");
+        }
+
+        var periodicStore = new FailingRetentionStore();
+        var periodicWorker = new ObservabilityMaintenanceWorker(
+            periodicStore,
+            new LogicalSessionRegistry(),
+            new LogicalChatCorrelationService(),
+            TimeSpan.FromMilliseconds(5),
+            clock: () => maintenanceNow);
+        await periodicWorker.StartAsync();
+        await Task.Delay(30);
+        var periodicSnapshot = periodicWorker.Snapshot();
+        var disposeTimer = Stopwatch.StartNew();
+        await periodicWorker.DisposeAsync();
+        disposeTimer.Stop();
+        Assert(periodicSnapshot.Runs >= 1 && periodicStore.Calls >= 1, "maintenance PeriodicTimer runs automatically despite isolated failures");
+        Assert(disposeTimer.Elapsed < TimeSpan.FromSeconds(1), "maintenance cancellation stops PeriodicTimer promptly");
 
         try
         {

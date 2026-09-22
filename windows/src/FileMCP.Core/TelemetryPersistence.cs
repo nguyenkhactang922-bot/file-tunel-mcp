@@ -3,15 +3,21 @@ using Microsoft.Data.Sqlite;
 
 namespace FileMCP.Core;
 
+internal interface ITelemetryRetentionStore
+{
+    Task CleanupRetentionAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default);
+}
+
 internal interface ITelemetryDeltaStore
 {
     Task InitializeAsync(CancellationToken cancellationToken = default);
     Task UpsertDeltasAsync(DateTimeOffset capturedAtUtc, IReadOnlyDictionary<string, UsageCounters> deltas, CancellationToken cancellationToken = default);
 }
 
-internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
+internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore, ITelemetryRetentionStore
 {
     public const int SchemaVersion = 2;
+    public static readonly TimeSpan DurableSessionRetention = TimeSpan.FromDays(35);
     private readonly string _databasePath;
     private readonly SemaphoreSlim _initializeGate = new(1, 1);
     private volatile bool _initialized;
@@ -253,6 +259,8 @@ internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
         {
             await DeleteOlderThanAsync(connection, transaction, "usage_minute", FloorBucket(nowUtc.ToUniversalTime().AddDays(-35).ToUnixTimeSeconds(), 60), cancellationToken).ConfigureAwait(false);
             await DeleteOlderThanAsync(connection, transaction, "usage_hour", FloorBucket(nowUtc.ToUniversalTime().AddDays(-90).ToUnixTimeSeconds(), 3_600), cancellationToken).ConfigureAwait(false);
+            var sessionCutoff = nowUtc.ToUniversalTime().Subtract(DurableSessionRetention).ToUnixTimeSeconds();
+            await DeleteStaleSessionsOlderThanAsync(connection, transaction, sessionCutoff, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch
@@ -262,6 +270,27 @@ internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
         }
     }
 
+    private static async Task DeleteStaleSessionsOlderThanAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        long cutoffEpoch,
+        CancellationToken cancellationToken)
+    {
+        await using (var sessions = connection.CreateCommand())
+        {
+            sessions.Transaction = (SqliteTransaction)transaction;
+            sessions.CommandText = "DELETE FROM logical_sessions WHERE state='stale' AND last_seen_epoch < $cutoff;";
+            sessions.Parameters.AddWithValue("$cutoff", cutoffEpoch);
+            await sessions.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        await using (var unbound = connection.CreateCommand())
+        {
+            unbound.Transaction = (SqliteTransaction)transaction;
+            unbound.CommandText = "DELETE FROM unbound_session_workspace WHERE state='stale' AND last_seen_epoch < $cutoff;";
+            unbound.Parameters.AddWithValue("$cutoff", cutoffEpoch);
+            await unbound.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
     private static async Task DeleteOlderThanAsync(
         SqliteConnection connection,
         System.Data.Common.DbTransaction transaction,

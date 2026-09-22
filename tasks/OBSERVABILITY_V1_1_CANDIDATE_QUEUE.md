@@ -1,4 +1,4 @@
-# OBSERVABILITY V1.1 â€” CANDIDATE TASK QUEUE
+# OBSERVABILITY V1.1 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â CANDIDATE TASK QUEUE
 
 Status: USER-APPROVED + ARCHITECTURE FROZEN FOR IMPLEMENTATION BEFORE OBS-013
 Rule: USER APPROVED IMPLEMENTATION. Execute V11-001 through V11-008 first; run OBS-013 live connector acceptance against the upgraded build afterwards; then close V11-009.
@@ -6,7 +6,7 @@ Rule: USER APPROVED IMPLEMENTATION. Execute V11-001 through V11-008 first; run O
 | ID | State | Depends | Purpose / acceptance |
 |---|---|---|---|
 | V11-001 | PASS | - | Bounded logical session/correlation lifecycle: TTL, cap, cleanup, never evict in-flight, pressure metrics, concurrency tests |
-| V11-002 | READY | V11-001 | Process-wide maintenance worker: invoke SQLite retention, durable session cleanup, in-memory cleanup; cancellation/failure-isolation tests |
+| V11-002 | PASS | V11-001 | Process-wide maintenance worker: invoke SQLite retention, durable session cleanup, in-memory cleanup; cancellation/failure-isolation tests |
 | V11-003 | READY | - | Tunnel supervisor: exponential backoff+jitter, restart budget, stable reset, cooldown, user-stop cancellation; no tool replay |
 | V11-004 | BLOCKED | V11-003 | Component health model: server/tunnel/persistence/restart/backoff/tunnel-health signals; dashboard integration |
 | V11-005 | READY | - | Native .NET telemetry contracts: ActivitySource + Meter, versioned MCP attribute adapter, privacy/cardinality policy |
@@ -19,4 +19,4 @@ Rule: USER APPROVED IMPLEMENTATION. Execute V11-001 through V11-008 first; run O
 
 No LiveCharts2/ScottPlot migration, no Prometheus server, no full proxy circuit-breaker/hedging, no distributed session store, no payload trace persistence.
 
-NEXT_EXACT_ACTION: claim V11-002. OBS-013 runs after V11-008.
+NEXT_EXACT_ACTION: claim V11-003. OBS-013 runs after V11-008.
