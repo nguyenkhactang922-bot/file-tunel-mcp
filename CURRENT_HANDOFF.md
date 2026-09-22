@@ -50,7 +50,7 @@ Authoritative remediation queue:
 
 Open findings:
 
-- FPA-002 P1: macOS logical-chat / MCP tool-surface parity.
+- FPA-002 PASS: macOS logical-chat / MCP tool-surface parity; native macOS + Windows CI run 35718764133 succeeded.
 - FPA-003 P1: macOS tunnel restart/backoff/cooldown parity.
 - FPA-004 P1 for public-market release: signing/notarization release gate.
 - FPA-005 P2: Windows ARM64 runtime assurance.
@@ -80,7 +80,7 @@ On a new chat:
 8. do not repeat completed OBS/V11/FPA tasks.
 
 
-## FPA-002 candidate
+## FPA-002 completed
 
 Design is frozen and implementation candidate is ready for native macOS verification.
 
@@ -91,4 +91,9 @@ Local Windows-side gates:
 - Windows runtime: PASS 414 assertions;
 - diff check: PASS.
 
-AUTHORITATIVE NEXT_EXACT_ACTION is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md: obtain real macOS CI evidence for FPA-002.
+AUTHORITATIVE NEXT_EXACT_ACTION is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md: CLAIM FPA-003 design gate.
+
+
+FPA-002 final acceptance:
+- GitHub Actions run 35718764133: verify-macos SUCCESS, verify-windows SUCCESS.
+- Evidence: docs/evidence/FPA-002_MAC_LOGICAL_CHAT_PARITY_EVIDENCE.md.

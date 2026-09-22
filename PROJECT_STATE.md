@@ -44,7 +44,7 @@ V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 
 ## Current open product findings
 
-- FPA-002 P1: macOS logical-chat/tool-surface parity.
+- FPA-002 PASS: macOS logical-chat/tool-surface parity, native CI verified.
 - FPA-003 P1: macOS bounded tunnel supervisor parity.
 - FPA-004 P1 market: production signing/notarization.
 - FPA-005 P2: Windows ARM64 runtime assurance.
@@ -52,4 +52,4 @@ V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 - FPA-008 P2: HTTP connection/idle bounds.
 - FPA-009 P3 optional: dynamic health endpoint discovery.
 
-FPA-006 is the state-normalization task that produced this normalized state model. After it passes, the remediation queue advances to FPA-002.
+FPA-006 PASS. FPA-002 PASS with native macOS/Windows CI. Current remediation advances to FPA-003.
