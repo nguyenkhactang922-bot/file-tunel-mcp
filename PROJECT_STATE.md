@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/OBS-001-observability-foundation`
+Active branch: `main`
 Git SHA source of truth: resolve dynamically with `git rev-parse HEAD`.
 Architecture law: `docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md`
 Execution law: `docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md`

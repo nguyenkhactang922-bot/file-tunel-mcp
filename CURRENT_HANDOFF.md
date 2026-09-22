@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/OBS-001-observability-foundation`
+Branch: `main`
 Worktree expectation at handoff: CLEAN
 Git SHA source of truth: run `git rev-parse HEAD`; do not hardcode a self-invalidating HEAD in this file.
 
