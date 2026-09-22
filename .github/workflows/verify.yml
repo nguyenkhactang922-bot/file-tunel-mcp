@@ -23,7 +23,7 @@ jobs:
           set -Eeuo pipefail
           test "$(cat vendor/tunnel-client/VERSION)" = "0.0.12"
           test "$(shasum -a 256 vendor/tunnel-client/darwin-arm64/tunnel-client | awk '{print $1}')" = "b1757220cf4722cec9085ee4a908cf0ee4c1a499a33bd99979b9a9c7669e29b1"
-          vendor/tunnel-client/darwin-arm64/tunnel-client --version | grep -q '^0\.0\.12\+881c9a8fed7cccbe6607cd419863bbca506b8215 '
+          vendor/tunnel-client/darwin-arm64/tunnel-client --version | grep -Fq '0.0.12+881c9a8fed7cccbe6607cd419863bbca506b8215 '
           test -s vendor/tunnel-client/NOTICE
           test -s vendor/tunnel-client/darwin-arm64/THIRD-PARTY-LICENSES.txt
 
