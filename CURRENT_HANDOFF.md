@@ -82,3 +82,9 @@ FINAL PRE-MERGE PACKAGE CANDIDATE:
 - Built using isolated staging `FileMCP-final` so the currently connected release bridge is not overwritten.
 - ZIP SHA-256: 3C23BEE2198543CFE6D3C51FB134E31A82034B15FDDAC1FC9785F44603C17F23.
 - Packaged WPF/SQLite/tunnel-client/OTLP/notices smoke: PASS.
+
+UPSTREAM MERGE PERMISSION BLOCKER:
+- PR #2 is open, clean and mergeable.
+- `nguyenkhactang922-bot` has READ permission on `dongttfd/file-tunel-mcp`; push returned 403 and merge API is unavailable.
+- Local merged-main candidate is VERIFIED: build 0/0, 414 assertions, package/app smoke PASS.
+- NEXT_EXACT_ACTION: merge PR #2 using an upstream account with WRITE/MAINTAIN permission, then checkout/pull `main` and rerun main gates before marking V11-009 PASS / MAIN VERIFIED.

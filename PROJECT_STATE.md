@@ -38,3 +38,5 @@ V11-009 is ACTIVE. Execute final review, final package gate, PR/review/merge, th
 OBS-013 PASS: real ChatGPT connector schema, handle creation/resume, cross-turn propagation, bound durable SHA-256 identity and raw-handle privacy all verified. Exact correlated AI-chat wording is enabled. V11-009 is ACTIVE for final closure.
 
 Final pre-merge package SHA-256: `3C23BEE2198543CFE6D3C51FB134E31A82034B15FDDAC1FC9785F44603C17F23`. Isolated staging is supported so packaging can run while the current release bridge remains connected.
+
+V11-009 merge status: PR #2 is clean/mergeable. A local merge candidate from `origin/main` passed build, 414 runtime assertions and packaged app smoke. Upstream merge is blocked only because the authenticated bot has READ permission.

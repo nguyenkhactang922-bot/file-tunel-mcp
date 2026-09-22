@@ -68,3 +68,29 @@ Packaged smoke PASS:
 - PR file set: 59 files, matching the reviewed Observability V1/V1.1 implementation/evidence scope.
 - GitHub check-runs: none configured/reported for the PR head; local mandatory gates are therefore the authoritative verification for this repository.
 - Final local review found no new production blocker after the staging-path packaging fix.
+
+## Local merged-main candidate verification
+
+Because the authenticated GitHub account has only READ permission on `dongttfd/file-tunel-mcp`, the upstream merge endpoint cannot be executed from this session. Before stopping at that permission boundary, V11-009 constructed a local merge candidate directly from `origin/main` and merged the feature branch with Git's `ort` strategy.
+
+Merge candidate commit: `053153185dfb46ce63ade76d5a1ce9ea3bc8cd47`.
+
+Verification on that merged state:
+
+- Release build: PASS, 0 warnings / 0 errors.
+- Full Windows runtime suite: PASS, 414 assertions.
+- Isolated package staging `FileMCP-main-verify`: PASS.
+- Packaged WPF startup / tray / tunnel-client / SQLite / OTLP / notices smoke: PASS.
+- Merged-state ZIP SHA-256: `3DFED36D609ED3BB30AC4B9DC902FD04426C108DD889A922354A3C3BB17E70FA`.
+
+## Upstream merge permission blocker
+
+- PR: `dongttfd/file-tunel-mcp#2`.
+- GitHub reports the PR mergeable and clean.
+- Authenticated CLI account: `nguyenkhactang922-bot`.
+- Upstream viewer permission: READ.
+- Direct push to upstream returned HTTP 403.
+- Merge API returned HTTP 404 (permission-hidden merge endpoint).
+- A bot fork was created and the feature branch is pushed there; PR #2 targets upstream `main`.
+
+No technical test or merge-conflict blocker remains. The only remaining action is an upstream account with write/maintain permission merging PR #2. After that, checkout/pull upstream `main`, rerun the same main verification gates, and record V11-009 PASS / MAIN VERIFIED.
