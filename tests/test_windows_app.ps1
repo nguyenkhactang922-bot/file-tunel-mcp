@@ -33,6 +33,17 @@ if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $TunnelClient -PathType Leaf)) {
     throw "tunnel-client.exe is missing from the Windows x64 release archive."
 }
+$SmokeDatabase = Join-Path $SmokeRoot "observability-package-smoke.sqlite3"
+$SmokeMarker = Join-Path $SmokeRoot "observability-package-smoke.txt"
+$OtlpSmokeMarker = Join-Path $SmokeRoot "otlp-package-smoke.txt"
+$PreviousOtlpMarker = $env:FILEMCP_OTLP_SMOKE_MARKER
+$PreviousOtlpEndpoint = $env:FILEMCP_OTLP_SMOKE_ENDPOINT
+$PreviousObservabilityDb = $env:FILEMCP_OBSERVABILITY_DB
+$PreviousObservabilityMarker = $env:FILEMCP_OBSERVABILITY_SMOKE_MARKER
+$env:FILEMCP_OBSERVABILITY_DB = $SmokeDatabase
+$env:FILEMCP_OBSERVABILITY_SMOKE_MARKER = $SmokeMarker
+$env:FILEMCP_OTLP_SMOKE_MARKER = $OtlpSmokeMarker
+$env:FILEMCP_OTLP_SMOKE_ENDPOINT = "http://127.0.0.1:1"
 $TunnelVersion = & $TunnelClient --version
 if ($LASTEXITCODE -ne 0 -or $TunnelVersion -notmatch '^0\.0\.12\+881c9a8fed7cccbe6607cd419863bbca506b8215 ') {
     throw "Unexpected packaged tunnel-client version: $TunnelVersion"
@@ -65,6 +76,47 @@ try {
             break
         }
     }
+    $SqliteDeadline = (Get-Date).AddSeconds(12)
+    while ((Get-Date) -lt $SqliteDeadline -and -not (Test-Path -LiteralPath $SmokeMarker -PathType Leaf)) {
+        Start-Sleep -Milliseconds 250
+    }
+    if (-not (Test-Path -LiteralPath $SmokeMarker -PathType Leaf)) {
+        throw "Packaged FileMCP did not complete the native SQLite write/read smoke within 12 seconds."
+    }
+    $SmokeResult = (Get-Content -LiteralPath $SmokeMarker -Raw).Trim()
+    if (-not $SmokeResult.StartsWith("PASS ", [StringComparison]::Ordinal)) {
+        throw "Packaged FileMCP SQLite smoke failed: $SmokeResult"
+    }
+    $OtlpDeadline = (Get-Date).AddSeconds(12)
+    while ((Get-Date) -lt $OtlpDeadline -and -not (Test-Path -LiteralPath $OtlpSmokeMarker -PathType Leaf)) {
+        Start-Sleep -Milliseconds 250
+    }
+    if (-not (Test-Path -LiteralPath $OtlpSmokeMarker -PathType Leaf)) {
+        throw "Packaged FileMCP did not complete the OTLP provider smoke within 12 seconds."
+    }
+    $OtlpSmokeResult = (Get-Content -LiteralPath $OtlpSmokeMarker -Raw).Trim()
+    if (-not $OtlpSmokeResult.StartsWith("PASS status=Configured", [StringComparison]::Ordinal)) {
+        throw "Packaged FileMCP OTLP smoke failed: $OtlpSmokeResult"
+    }
+    foreach ($Notice in @("OpenTelemetry-LICENSE.txt", "OpenTelemetry-THIRD-PARTY-NOTICES.txt")) {
+        if (-not (Test-Path -LiteralPath (Join-Path $SmokeRoot $Notice) -PathType Leaf)) {
+            throw "Packaged FileMCP is missing OpenTelemetry redistribution notice: $Notice"
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $SmokeDatabase -PathType Leaf)) {
+        throw "Packaged FileMCP did not create the requested telemetry SQLite database."
+    }
+    $DatabaseStream = [System.IO.FileStream]::new($SmokeDatabase, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))
+    try {
+        $DatabaseBytes = New-Object byte[] 16
+        $DatabaseRead = $DatabaseStream.Read($DatabaseBytes, 0, $DatabaseBytes.Length)
+    } finally {
+        $DatabaseStream.Dispose()
+    }
+    if ($DatabaseRead -lt 16 -or [System.Text.Encoding]::ASCII.GetString($DatabaseBytes, 0, 16) -ne "SQLite format 3`0") {
+        throw "Packaged FileMCP telemetry output is not a valid SQLite database header."
+    }
     if (-not $WindowReady) {
         throw "FileMCP.exe stayed alive but did not create the FileMCP main window within 12 seconds."
     }
@@ -81,8 +133,15 @@ try {
     Write-Host "windows-app-startup: ok"
     Write-Host "windows-close-to-tray: ok"
     Write-Host "windows-packaged-tunnel-client: ok"
+    Write-Host "windows-packaged-sqlite-write-read: ok ($SmokeResult)"
+    Write-Host "windows-packaged-otlp-provider: ok ($OtlpSmokeResult)"
+    Write-Host "windows-packaged-opentelemetry-notices: ok"
 }
 finally {
+    if ($null -eq $PreviousObservabilityDb) { Remove-Item Env:FILEMCP_OBSERVABILITY_DB -ErrorAction SilentlyContinue } else { $env:FILEMCP_OBSERVABILITY_DB = $PreviousObservabilityDb }
+    if ($null -eq $PreviousObservabilityMarker) { Remove-Item Env:FILEMCP_OBSERVABILITY_SMOKE_MARKER -ErrorAction SilentlyContinue } else { $env:FILEMCP_OBSERVABILITY_SMOKE_MARKER = $PreviousObservabilityMarker }
+    if ($null -eq $PreviousOtlpMarker) { Remove-Item Env:FILEMCP_OTLP_SMOKE_MARKER -ErrorAction SilentlyContinue } else { $env:FILEMCP_OTLP_SMOKE_MARKER = $PreviousOtlpMarker }
+    if ($null -eq $PreviousOtlpEndpoint) { Remove-Item Env:FILEMCP_OTLP_SMOKE_ENDPOINT -ErrorAction SilentlyContinue } else { $env:FILEMCP_OTLP_SMOKE_ENDPOINT = $PreviousOtlpEndpoint }
     if (-not $Process.HasExited) {
         Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
         Wait-Process -Id $Process.Id -Timeout 10 -ErrorAction SilentlyContinue
