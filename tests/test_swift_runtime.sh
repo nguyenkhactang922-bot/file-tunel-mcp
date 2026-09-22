@@ -582,9 +582,9 @@ setenv("MCP_TEST_RUN_EXIT_CODE", "23", 1)
 let cooldownOptions = TunnelSupervisorOptions(
     initialBackoff: 0.05,
     maxBackoff: 0.05,
-    restartWindow: 2,
-    maxRestartsInWindow: 2,
-    stableRunReset: 30,
+    restartWindow: 30,
+    maxRestartsInWindow: 1,
+    stableRunReset: 60,
     jitterRatio: 0
 )
 let cooldownRuntime = LocalMCPRuntime(
@@ -603,7 +603,7 @@ waitFor({
     if case .cooldown = cooldownRuntime.state { return true }
     return false
 }, timeout: 5, label: "restart budget cooldown")
-precondition(runLaunchCount(cooldownCountFile) == 3, "cooldown should occur after initial launch plus two bounded restart attempts")
+precondition(runLaunchCount(cooldownCountFile) == 2, "cooldown should occur after initial launch plus one bounded restart attempt")
 cooldownRuntime.stop()
 waitFor({ cooldownRuntime.state == .stopped }, timeout: 5, label: "cooldown stop")
 let cooldownLaunchCountAtStop = runLaunchCount(cooldownCountFile)
