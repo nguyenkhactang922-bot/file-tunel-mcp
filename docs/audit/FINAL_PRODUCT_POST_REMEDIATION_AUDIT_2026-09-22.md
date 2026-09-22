@@ -177,3 +177,7 @@ Therefore FPA-004 cannot advance to a real public-trust release without external
 ## Real Production Release credential-boundary run
 
 Default-branch Production Release run 35762454809 was dispatched for version 0.4.0. Windows x64, Windows ARM64 and macOS all entered the intended signing-material validation step and failed only because the corresponding real production Environment secrets were absent. This removes workflow registration and dispatch from the blocker list. The sole remaining FPA-004 blocker is provision of the real release identity credentials followed by one successful signed/notarized run.
+
+## Final fail-fast release-boundary verification
+
+Production Release run 35764732944 on default-branch main used the new credential preflight. The preflight failed because all seven required Environment secret names are absent; Windows x64, Windows ARM64 and macOS release jobs were skipped. The implementation commit passed normal Verify run 35764406983 on all three native platform jobs. No further repository-internal release defect is open.

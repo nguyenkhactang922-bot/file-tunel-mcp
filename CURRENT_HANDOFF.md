@@ -46,7 +46,9 @@ Current readiness result:
 - workflow active: YES;
 - default branch: main;
 - required production Environment secret names present: 0/7;
-- usable local Windows code-signing certificate with private key: none found.
+- usable local Windows code-signing certificate with private key: none found;
+- fail-fast Production Release run 35764732944: preflight FAILED on 7 missing secret names, all three platform release jobs SKIPPED;
+- preflight implementation Verify run 35764406983: macOS / Windows x64 / Windows ARM64 SUCCESS.
 
 Required real Environment secrets:
 1. WINDOWS_CODESIGN_PFX_BASE64

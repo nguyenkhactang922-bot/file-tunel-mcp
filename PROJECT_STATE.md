@@ -43,7 +43,7 @@ Production Release workflow is active on fork main.
 production-release Environment exists and is main-only.
 Real boundary run 35762454809 proved all jobs reach the intended credential gate.
 
-Current Environment secret-name readiness: 0/7.
+Current Environment secret-name readiness: 0/7. Fail-fast Production Release run 35764732944 correctly failed in release-preflight and skipped all three platform release jobs. Preflight implementation Verify run 35764406983 succeeded on macOS, Windows x64 and Windows ARM64.
 
 Remaining acceptance requires real public release identity material and one successful Production Release run producing:
 - trusted-timestamped Windows x64 Authenticode artifact;

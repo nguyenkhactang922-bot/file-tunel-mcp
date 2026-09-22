@@ -145,3 +145,19 @@ Result:
 - exit code: 2, intentionally indicating not ready
 
 No secret values were read or printed.
+
+## Fail-fast production credential preflight proof
+
+After adding a dedicated release-preflight job, Production Release was dispatched again from main for version 0.4.0.
+
+Run: 35764732944.
+
+Result:
+- release-preflight: FAILURE because all seven required production-release Environment secrets are absent;
+- release-windows-x64: SKIPPED;
+- release-windows-arm64: SKIPPED;
+- release-macos-arm64: SKIPPED.
+
+The preflight log listed exactly the seven expected missing secret names and no secret values. This proves the workflow now fails early without consuming platform build/signing runners when credentials are not configured.
+
+The preflight implementation commit 277e52c passed Verify run 35764406983 on macOS, Windows x64 and Windows ARM64.
