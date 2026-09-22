@@ -1,4 +1,4 @@
-# OBSERVABILITY V1.1 Ã¢â‚¬â€ TASK QUEUE
+# OBSERVABILITY V1.1 - TASK QUEUE
 
 Status: IMPLEMENTATION + HARDENING COMPLETE THROUGH V11-008
 Rule: OBS-013 live connector proof now runs against the fully upgraded build; V11-009 closes final merge/main verification.

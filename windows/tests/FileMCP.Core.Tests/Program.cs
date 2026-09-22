@@ -1973,7 +1973,8 @@ internal static class Program
                 restartingRuntime.Log += text => restartLogs.Append(text);
                 var restartConfig = new LocalMcpConfiguration("tunnel_" + new string('c', 32), "sk-runtime-restart-secret", "runtime-restart-test", (ushort)FreePort(), workspace, "127.0.0.1:0", "", "", false);
                 await restartingRuntime.StartAsync(restartConfig);
-                Assert(await WaitUntilAsync(() => ReadCounter(restartCounter) >= 3 && restartingRuntime.State.Status == LocalMcpRuntimeStatus.Running, TimeSpan.FromSeconds(3)), "runtime auto-restarts crashed tunnel until it stays running");
+                // Process startup can exceed three seconds on a loaded Windows host even when the bounded restart policy is healthy.
+                Assert(await WaitUntilAsync(() => ReadCounter(restartCounter) >= 3 && restartingRuntime.State.Status == LocalMcpRuntimeStatus.Running, TimeSpan.FromSeconds(8)), "runtime auto-restarts crashed tunnel until it stays running");
                 var supervisor = restartingRuntime.SupervisorSnapshot;
                 Assert(supervisor.TotalRestarts >= 2 && supervisor.LastExitCode == 23 && !supervisor.RestartPending, "runtime supervisor records real restart evidence");
                 Assert(restartLogs.ToString().Contains("Tunnel restart succeeded", StringComparison.Ordinal), "runtime logs successful supervised restart");

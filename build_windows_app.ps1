@@ -1,6 +1,9 @@
 param(
     [ValidateSet("x64", "arm64")]
-    [string]$Architecture = "x64"
+    [string]$Architecture = "x64",
+
+    [ValidatePattern("^[A-Za-z0-9._-]+$")]
+    [string]$StagingName = "FileMCP-release"
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,7 +20,7 @@ $Rid = if ($Architecture -eq "arm64") { "win-arm64" } else { "win-x64" }
 $VendorTag = if ($Architecture -eq "arm64") { "windows-arm64" } else { "windows-amd64" }
 $TunnelClient = Join-Path $Root "vendor/tunnel-client/$VendorTag/tunnel-client.exe"
 $ThirdParty = Join-Path $Root "vendor/tunnel-client/$VendorTag/THIRD-PARTY-LICENSES.txt"
-$PublishDir = Join-Path $Root "dist/windows-$Architecture/FileMCP-release"
+$PublishDir = Join-Path $Root "dist/windows-$Architecture/$StagingName"
 $ZipPath = Join-Path $Root "dist/FileMCP-v0.4.0-windows-$Architecture.zip"
 
 foreach ($Required in @(

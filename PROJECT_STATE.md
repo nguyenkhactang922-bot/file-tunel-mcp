@@ -3,11 +3,11 @@
 Project: FileMCP
 Baseline main HEAD: dd9df8effb5b8ebdf221bcd0cfc88a5b4cec4be3
 Active branch: chatgpt/OBS-001-observability-foundation
-Current branch HEAD: fdd7de1
+Current branch HEAD: 3033084
 Initiative: FileMCP Observability V1 + V1.1 OSS Strengthening
 Architecture: FROZEN
-Implementation: COMPLETE THROUGH V11-008
-Final acceptance: BLOCKED ONLY ON OBS-013 LIVE CHATGPT CONNECTOR PROOF
+Implementation: COMPLETE THROUGH V11-008 + OBS-013 LIVE ACCEPTANCE
+Final acceptance: V11-009 ACTIVE — FINAL REVIEW / PACKAGE / MERGE / MAIN VERIFICATION
 
 ## Verified implementation
 
@@ -33,14 +33,8 @@ Final acceptance: BLOCKED ONLY ON OBS-013 LIVE CHATGPT CONNECTOR PROOF
 
 ## Remaining work
 
-OBS-013 is the only acceptance blocker. The current chat is attached to the legacy connector schema and the running desktop bridge is the old deployed binary. A desktop restart/reconnect to the upgraded release is required before the real ChatGPT logical-correlation proof can be executed.
-
-After OBS-013 PASS, V11-009 performs final review, merge, main verification and release closure. No V11-010/OBS-014 exists in the frozen plan.
-
-Live reconnect progress:
-- Upgraded FileMCP-release is now the sole running bridge and owns port 8008.
-- Desktop/runtime migration is complete.
-- Remaining OBS-013 blocker is only ChatGPT conversation schema caching: this existing chat still has the legacy 18-tool registry.
-- Fresh-chat connector registration is required for the final live proof.
+V11-009 is ACTIVE. Execute final review, final package gate, PR/review/merge, then checkout/pull `main` and rerun Release build/runtime verification until `MAIN VERIFIED`.
 
 OBS-013 PASS: real ChatGPT connector schema, handle creation/resume, cross-turn propagation, bound durable SHA-256 identity and raw-handle privacy all verified. Exact correlated AI-chat wording is enabled. V11-009 is ACTIVE for final closure.
+
+Final pre-merge package SHA-256: `3C23BEE2198543CFE6D3C51FB134E31A82034B15FDDAC1FC9785F44603C17F23`. Isolated staging is supported so packaging can run while the current release bridge remains connected.

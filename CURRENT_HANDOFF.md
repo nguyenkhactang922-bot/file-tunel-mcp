@@ -1,14 +1,14 @@
 # CURRENT HANDOFF
 
-STATUS: BLOCKED ON OBS-013 LIVE CHATGPT CONNECTOR PROOF
+STATUS: V11-009 ACTIVE — FINAL REVIEW / PACKAGE / MERGE / MAIN VERIFICATION
 BRANCH: chatgpt/OBS-001-observability-foundation
-HEAD: fdd7de1
+HEAD: 3033084
 WORKTREE: CLEAN at handoff
 
 ## Completed
 
 - FMR-001 PASS.
-- OBS-001 through OBS-012 PASS.
+- OBS-001 through OBS-013 PASS.
 - V11-001 through V11-008 PASS.
 - Observability V1.1 OSS strengthening implementation and independent hardening are complete.
 
@@ -41,7 +41,7 @@ The independent V11-008 audit found and fixed one real leak-class bug: connect-o
 - durable SQLite/WAL privacy regression
 - full runtime/package regression
 
-## Current live blocker
+## OBS-013 historical blocker (RESOLVED)
 
 The current ChatGPT conversation still exposes only the 18 legacy FileMCP tools. `filemcp_observability_connect` is not present in this conversation's connector schema.
 
@@ -53,17 +53,8 @@ Do NOT terminate the currently connected bridge from inside this chat; doing so 
 
 ## NEXT_EXACT_ACTION
 
-1. On the Windows desktop, exit the old FileMCP instance(s) from the tray.
-2. Start the upgraded build: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-release\FileMCP.exe` (or the executable extracted from the verified ZIP above).
-3. Reconnect/refresh the ChatGPT FileMCP connector; if the existing chat keeps its old registered schema, open a fresh chat after the upgraded bridge is running.
-4. Confirm the connector tool registry contains `filemcp_observability_connect`.
-5. Call `filemcp_observability_connect` once without an id to obtain a logical chat handle.
-6. Perform normal FileMCP calls while propagating that handle in `_filemcp_chat`.
-7. Verify the dashboard shows one bound observed session and that durable SQLite identity is SHA-256 only (no raw handle).
-8. Mark OBS-013 PASS.
-9. CLAIM V11-009: final review -> final package gate -> merge to main -> checkout/pull main -> Release build/runtime tests on main -> MAIN VERIFIED -> DONE.
+V11-009 is ACTIVE: final review -> final package gate -> push branch -> PR/review -> merge main -> checkout/pull main -> Release build/runtime tests on main -> MAIN VERIFIED -> DONE.
 
-Do not enable exact AI-chat wording before step 7 proves the real ChatGPT connector propagates the handle reliably.
 
 LIVE DESKTOP RECONNECT CHECK (2026-09-22):
 - Old FileMCP processes are gone.
@@ -86,3 +77,8 @@ OBS-013 PASS (cross-turn live ChatGPT proof complete):
 - Raw handle remained absent from DB/WAL/SHM.
 - Exact correlated AI-chat wording is now enabled; unbound traffic remains separate and is never counted as a chat.
 - NEXT_EXACT_ACTION: V11-009 final review/package/PR/merge/main verification.
+
+FINAL PRE-MERGE PACKAGE CANDIDATE:
+- Built using isolated staging `FileMCP-final` so the currently connected release bridge is not overwritten.
+- ZIP SHA-256: 3C23BEE2198543CFE6D3C51FB134E31A82034B15FDDAC1FC9785F44603C17F23.
+- Packaged WPF/SQLite/tunnel-client/OTLP/notices smoke: PASS.

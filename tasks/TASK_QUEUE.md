@@ -1,4 +1,4 @@
-# TASK QUEUE Ã¢â‚¬â€ FileMCP Observability V1
+# TASK QUEUE - FileMCP Observability V1
 
 | ID | State | Depends | Acceptance |
 |---|---|---|---|
