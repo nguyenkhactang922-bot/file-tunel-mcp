@@ -97,3 +97,11 @@ AUTHORITATIVE NEXT_EXACT_ACTION is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.
 FPA-002 final acceptance:
 - GitHub Actions run 35718764133: verify-macos SUCCESS, verify-windows SUCCESS.
 - Evidence: docs/evidence/FPA-002_MAC_LOGICAL_CHAT_PARITY_EVIDENCE.md.
+
+
+## FPA-003 candidate
+
+- Frozen macOS tunnel-supervisor architecture is implemented locally.
+- Local static contracts and Windows regression are PASS.
+- Candidate evidence: `docs/evidence/FPA-003_MAC_TUNNEL_SUPERVISOR_CANDIDATE.md`.
+- FPA-003 remains ACTIVE until native GitHub verify-macos + verify-windows succeed.

@@ -40,6 +40,7 @@ jobs:
             macos/ProcessRunner.swift \
             macos/LogicalChatCorrelation.swift \
             macos/LocalMCPServer.swift \
+            macos/TunnelSupervisor.swift \
             macos/LocalMCPRuntime.swift \
             macos/FileMCPApp.swift \
             macos/main.swift
@@ -98,6 +99,10 @@ jobs:
       - name: Verify cross-platform tool surface
         shell: pwsh
         run: ./tests/test_tool_surface_parity.ps1
+
+      - name: Verify macOS supervisor contract
+        shell: pwsh
+        run: ./tests/test_macos_supervisor_contract.ps1
 
       - name: Windows integration tests
         shell: pwsh

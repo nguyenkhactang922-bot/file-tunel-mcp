@@ -247,6 +247,98 @@ swiftc -framework Security -o "$TMP_DIR/correlation-test" \
     "$TMP_DIR/main.swift"
 "$TMP_DIR/correlation-test"
 
+cat >"$TMP_DIR/supervisor.swift" <<'SWIFT'
+import Foundation
+
+func approx(_ lhs: TimeInterval, _ rhs: TimeInterval, tolerance: TimeInterval = 0.0001) -> Bool {
+    abs(lhs - rhs) <= tolerance
+}
+
+let base = Date(timeIntervalSince1970: 10_000)
+let options = TunnelSupervisorOptions(
+    initialBackoff: 1,
+    maxBackoff: 4,
+    restartWindow: 10,
+    maxRestartsInWindow: 3,
+    stableRunReset: 5,
+    jitterRatio: 0.20
+)
+let policy = TunnelRestartPolicy(options: options)
+let first = policy.next(processStarted: base, now: base, random: { 0.5 })
+precondition(!first.isCooldown && first.attemptNumber == 1 && approx(first.delay, 1), "first backoff")
+let second = policy.next(processStarted: base, now: base.addingTimeInterval(1), random: { 0.5 })
+precondition(!second.isCooldown && second.attemptNumber == 2 && approx(second.delay, 2), "second backoff")
+let third = policy.next(processStarted: base, now: base.addingTimeInterval(2), random: { 0.5 })
+precondition(!third.isCooldown && third.attemptNumber == 3 && approx(third.delay, 4), "third backoff")
+let cooldown = policy.next(processStarted: base, now: base.addingTimeInterval(3), random: { 0.5 })
+precondition(cooldown.isCooldown, "restart budget must enter cooldown")
+precondition(approx(cooldown.delay, 7), "cooldown delay must reach oldest-attempt window expiry")
+precondition(cooldown.resumeAt == base.addingTimeInterval(10), "cooldown resume time")
+
+let jitterOptions = TunnelSupervisorOptions(
+    initialBackoff: 10,
+    maxBackoff: 30,
+    restartWindow: 100,
+    maxRestartsInWindow: 10,
+    stableRunReset: 50,
+    jitterRatio: 0.20
+)
+let lowJitter = TunnelRestartPolicy(options: jitterOptions)
+precondition(approx(lowJitter.next(processStarted: base, now: base, random: { 0 }).delay, 8), "low jitter bound")
+let highJitter = TunnelRestartPolicy(options: jitterOptions)
+precondition(approx(highJitter.next(processStarted: base, now: base, random: { 1 }).delay, 12), "high jitter bound")
+
+let clampOptions = TunnelSupervisorOptions(
+    initialBackoff: 1,
+    maxBackoff: 4,
+    restartWindow: 100,
+    maxRestartsInWindow: 20,
+    stableRunReset: 50,
+    jitterRatio: 0
+)
+let clamp = TunnelRestartPolicy(options: clampOptions)
+_ = clamp.next(processStarted: base, now: base, random: { 0.5 })
+_ = clamp.next(processStarted: base, now: base.addingTimeInterval(1), random: { 0.5 })
+_ = clamp.next(processStarted: base, now: base.addingTimeInterval(2), random: { 0.5 })
+let clamped = clamp.next(processStarted: base, now: base.addingTimeInterval(3), random: { 0.5 })
+precondition(approx(clamped.delay, 4), "max backoff clamp")
+
+let stable = TunnelRestartPolicy(options: options)
+_ = stable.next(processStarted: base, now: base, random: { 0.5 })
+_ = stable.next(processStarted: base, now: base.addingTimeInterval(1), random: { 0.5 })
+let afterStableRun = stable.next(processStarted: base, now: base.addingTimeInterval(6), random: { 0.5 })
+precondition(afterStableRun.attemptNumber == 1 && approx(afterStableRun.delay, 1), "stable run must reset history")
+stable.reset()
+precondition(stable.consecutiveRestarts == 0 && stable.attemptsInWindow == 0, "explicit reset")
+
+let stressOptions = TunnelSupervisorOptions(
+    initialBackoff: 0.001,
+    maxBackoff: 0.01,
+    restartWindow: 1,
+    maxRestartsInWindow: 5,
+    stableRunReset: 10_000,
+    jitterRatio: 0.20
+)
+let stress = TunnelRestartPolicy(options: stressOptions)
+var stressNow = base
+for _ in 0..<10_000 {
+    let decision = stress.next(processStarted: stressNow, now: stressNow, random: { 0.5 })
+    precondition(stress.attemptsInWindow <= 5, "restart window state must stay bounded")
+    if decision.isCooldown {
+        stressNow = decision.resumeAt ?? stressNow.addingTimeInterval(decision.delay)
+        stress.reset()
+    } else {
+        stressNow = stressNow.addingTimeInterval(0.0001)
+    }
+}
+print("tunnel-supervisor-policy: ok")
+SWIFT
+
+swiftc -o "$TMP_DIR/supervisor-test" \
+    macos/TunnelSupervisor.swift \
+    "$TMP_DIR/supervisor.swift"
+"$TMP_DIR/supervisor-test"
+
 cat >"$TMP_DIR/tunnel-client" <<'SH'
 #!/bin/sh
 profile_dir=
@@ -287,7 +379,21 @@ case "$1" in
         exit 0
         ;;
     doctor) echo "doctor-ok ${CONTROL_PLANE_API_KEY:-} ${FILEMCP_LOCAL_AUTH_TOKEN:-}"; exit 0 ;;
-    run) echo "run-ok ${CONTROL_PLANE_API_KEY:-} ${FILEMCP_LOCAL_AUTH_TOKEN:-}"; trap 'exit 0' TERM INT; while :; do sleep 1; done ;;
+    run)
+        if [ -n "${MCP_TEST_RUN_COUNT_FILE:-}" ]; then printf 'run\n' >> "$MCP_TEST_RUN_COUNT_FILE"; fi
+        if [ -n "${MCP_TEST_RUN_EXIT_ONCE_MARKER:-}" ] && [ ! -e "$MCP_TEST_RUN_EXIT_ONCE_MARKER" ]; then
+            : > "$MCP_TEST_RUN_EXIT_ONCE_MARKER"
+            echo "run-crash-once"
+            exit "${MCP_TEST_RUN_EXIT_CODE:-17}"
+        fi
+        if [ "${MCP_TEST_RUN_ALWAYS_EXIT:-0}" = "1" ]; then
+            echo "run-crash"
+            exit "${MCP_TEST_RUN_EXIT_CODE:-17}"
+        fi
+        echo "run-ok ${CONTROL_PLANE_API_KEY:-} ${FILEMCP_LOCAL_AUTH_TOKEN:-}"
+        trap 'exit 0' TERM INT
+        while :; do sleep 1; done
+        ;;
     *) echo unsupported-subcommand >&2; exit 2 ;;
 esac
 SH
@@ -372,6 +478,142 @@ first.shutdownImmediately()
 waitFor({ first.state == .stopped }, timeout: 5, label: "shutdown")
 print("runtime-lifecycle-profile-lock: ok")
 
+func runLaunchCount(_ url: URL) -> Int {
+    guard let text = try? String(contentsOf: url, encoding: .utf8) else { return 0 }
+    return text.split(whereSeparator: { $0.isNewline }).count
+}
+
+let supervisorOptions = TunnelSupervisorOptions(
+    initialBackoff: 0.8,
+    maxBackoff: 0.8,
+    restartWindow: 5,
+    maxRestartsInWindow: 3,
+    stableRunReset: 3,
+    jitterRatio: 0
+)
+
+let crashOnceMarker = root.appendingPathComponent("crash-once.marker")
+let restartCountFile = root.appendingPathComponent("restart-count.txt")
+setenv("MCP_TEST_RUN_EXIT_ONCE_MARKER", crashOnceMarker.path, 1)
+setenv("MCP_TEST_RUN_COUNT_FILE", restartCountFile.path, 1)
+setenv("MCP_TEST_RUN_EXIT_CODE", "17", 1)
+let restartProfile = "restart-runtime-\(UUID().uuidString)"
+let restartRuntime = LocalMCPRuntime(
+    profileDirectory: profileDirectory,
+    supervisorOptions: supervisorOptions,
+    jitterProvider: { 0.5 }
+)
+let restartLogLock = NSLock()
+var restartLog = ""
+restartRuntime.onLog = { text in
+    restartLogLock.lock()
+    restartLog += text
+    restartLogLock.unlock()
+}
+let restartConfig = LocalMCPConfiguration(
+    tunnelID: "tunnel_0123456789abcdef0123456789abcdef", apiKey: "test-key", profile: restartProfile, port: 18082,
+    allowedDirectory: root.path, healthAddress: "127.0.0.1:0",
+    gitUserName: "", gitUserEmail: "", enableCommands: false
+)
+restartRuntime.start(restartConfig)
+waitFor({ FileManager.default.fileExists(atPath: crashOnceMarker.path) }, timeout: 5, label: "first tunnel crash")
+waitFor({
+    if case .restarting = restartRuntime.state { return true }
+    return false
+}, timeout: 5, label: "restart pending")
+
+let lockContender = LocalMCPRuntime(profileDirectory: profileDirectory)
+let contenderConfig = LocalMCPConfiguration(
+    tunnelID: restartConfig.tunnelID, apiKey: restartConfig.apiKey, profile: restartProfile, port: 18081,
+    allowedDirectory: root.path, healthAddress: "127.0.0.1:0",
+    gitUserName: "", gitUserEmail: "", enableCommands: false
+)
+lockContender.start(contenderConfig)
+waitFor({ isFailed(lockContender.state) }, timeout: 3, label: "profile lock retained during restart")
+lockContender.shutdownImmediately()
+
+waitFor({ restartRuntime.state == .running && runLaunchCount(restartCountFile) >= 2 }, timeout: 5, label: "automatic tunnel restart")
+restartLogLock.lock()
+let restartLogSnapshot = restartLog
+restartLogLock.unlock()
+precondition(restartLogSnapshot.contains("Tunnel restart succeeded."), "runtime did not report successful restart")
+precondition(runLaunchCount(restartCountFile) == 2, "crash-once runtime should launch tunnel exactly twice")
+unsetenv("MCP_TEST_RUN_EXIT_ONCE_MARKER")
+unsetenv("MCP_TEST_RUN_COUNT_FILE")
+unsetenv("MCP_TEST_RUN_EXIT_CODE")
+restartRuntime.stop()
+waitFor({ restartRuntime.state == .stopped }, timeout: 5, label: "restarted runtime stop")
+print("runtime-tunnel-auto-restart: ok")
+
+let cancelCountFile = root.appendingPathComponent("cancel-restart-count.txt")
+setenv("MCP_TEST_RUN_ALWAYS_EXIT", "1", 1)
+setenv("MCP_TEST_RUN_COUNT_FILE", cancelCountFile.path, 1)
+setenv("MCP_TEST_RUN_EXIT_CODE", "19", 1)
+let cancelRuntime = LocalMCPRuntime(
+    profileDirectory: profileDirectory,
+    supervisorOptions: supervisorOptions,
+    jitterProvider: { 0.5 }
+)
+let cancelConfig = LocalMCPConfiguration(
+    tunnelID: "tunnel_0123456789abcdef0123456789abcdef", apiKey: "test-key", profile: "cancel-runtime-\(UUID().uuidString)", port: 18080,
+    allowedDirectory: root.path, healthAddress: "127.0.0.1:0",
+    gitUserName: "", gitUserEmail: "", enableCommands: false
+)
+cancelRuntime.start(cancelConfig)
+waitFor({ runLaunchCount(cancelCountFile) >= 1 }, timeout: 5, label: "cancel test first launch")
+waitFor({
+    if case .restarting = cancelRuntime.state { return true }
+    return false
+}, timeout: 5, label: "cancel test restart pending")
+cancelRuntime.stop()
+waitFor({ cancelRuntime.state == .stopped }, timeout: 5, label: "cancel test stopped")
+let launchCountAtStop = runLaunchCount(cancelCountFile)
+Thread.sleep(forTimeInterval: 1.2)
+precondition(runLaunchCount(cancelCountFile) == launchCountAtStop, "tunnel relaunched after user stop canceled pending restart")
+unsetenv("MCP_TEST_RUN_ALWAYS_EXIT")
+unsetenv("MCP_TEST_RUN_COUNT_FILE")
+unsetenv("MCP_TEST_RUN_EXIT_CODE")
+print("runtime-tunnel-restart-cancel: ok")
+
+let cooldownCountFile = root.appendingPathComponent("cooldown-restart-count.txt")
+setenv("MCP_TEST_RUN_ALWAYS_EXIT", "1", 1)
+setenv("MCP_TEST_RUN_COUNT_FILE", cooldownCountFile.path, 1)
+setenv("MCP_TEST_RUN_EXIT_CODE", "23", 1)
+let cooldownOptions = TunnelSupervisorOptions(
+    initialBackoff: 0.05,
+    maxBackoff: 0.05,
+    restartWindow: 2,
+    maxRestartsInWindow: 2,
+    stableRunReset: 30,
+    jitterRatio: 0
+)
+let cooldownRuntime = LocalMCPRuntime(
+    profileDirectory: profileDirectory,
+    supervisorOptions: cooldownOptions,
+    jitterProvider: { 0.5 }
+)
+let cooldownConfig = LocalMCPConfiguration(
+    tunnelID: "tunnel_0123456789abcdef0123456789abcdef", apiKey: "test-key",
+    profile: "cooldown-runtime-(UUID().uuidString)", port: 18079,
+    allowedDirectory: root.path, healthAddress: "127.0.0.1:0",
+    gitUserName: "", gitUserEmail: "", enableCommands: false
+)
+cooldownRuntime.start(cooldownConfig)
+waitFor({
+    if case .cooldown = cooldownRuntime.state { return true }
+    return false
+}, timeout: 5, label: "restart budget cooldown")
+precondition(runLaunchCount(cooldownCountFile) == 3, "cooldown should occur after initial launch plus two bounded restart attempts")
+cooldownRuntime.stop()
+waitFor({ cooldownRuntime.state == .stopped }, timeout: 5, label: "cooldown stop")
+let cooldownLaunchCountAtStop = runLaunchCount(cooldownCountFile)
+Thread.sleep(forTimeInterval: 0.3)
+precondition(runLaunchCount(cooldownCountFile) == cooldownLaunchCountAtStop, "cooldown stop must cancel pending recovery")
+unsetenv("MCP_TEST_RUN_ALWAYS_EXIT")
+unsetenv("MCP_TEST_RUN_COUNT_FILE")
+unsetenv("MCP_TEST_RUN_EXIT_CODE")
+print("runtime-tunnel-restart-cooldown: ok")
+
 let invalidHealthRuntime = LocalMCPRuntime(profileDirectory: profileDirectory)
 let invalidHealthConfig = LocalMCPConfiguration(
     tunnelID: "tunnel_0123456789abcdef0123456789abcdef", apiKey: "test-key", profile: "invalid-health-\(UUID().uuidString)", port: 18083,
@@ -449,6 +691,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ProcessRunner.swift \
     macos/LogicalChatCorrelation.swift \
     macos/LocalMCPServer.swift \
+    macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
     "$TMP_DIR/main.swift"
 "$TMP_DIR/runtime-test"
