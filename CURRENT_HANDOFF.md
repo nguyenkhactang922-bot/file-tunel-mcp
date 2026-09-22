@@ -78,3 +78,17 @@ On a new chat:
 6. read `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`;
 7. resume the single authoritative next action;
 8. do not repeat completed OBS/V11/FPA tasks.
+
+
+## FPA-002 candidate
+
+Design is frozen and implementation candidate is ready for native macOS verification.
+
+Local Windows-side gates:
+- cross-platform tool-surface parity: PASS (19 required public tool names);
+- shell syntax via Git Bash: PASS;
+- Windows Release build: PASS 0/0;
+- Windows runtime: PASS 414 assertions;
+- diff check: PASS.
+
+AUTHORITATIVE NEXT_EXACT_ACTION is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md: obtain real macOS CI evidence for FPA-002.

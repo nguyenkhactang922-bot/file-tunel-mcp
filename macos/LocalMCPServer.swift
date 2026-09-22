@@ -1517,6 +1517,7 @@ final class LocalMCPServer {
     private let localAuthToken: String
     private let tools: LocalTools
     private let skills: CodexSkillRegistry
+    private let chatCorrelation = LogicalChatCorrelationService()
     private let log: (String) -> Void
     private let listenerQueue = DispatchQueue(label: "com.filemcp.http-listener", qos: .userInitiated)
     private let workQueue = DispatchQueue(label: "com.filemcp.http-workers", qos: .userInitiated, attributes: .concurrent)
@@ -1858,7 +1859,57 @@ final class LocalMCPServer {
     }
 
     private func allToolDefinitions() -> [[String: Any]] {
-        tools.toolDefinitions + skills.toolDefinitions
+        var result = tools.toolDefinitions.map(withCorrelationFacadeMetadata)
+        result.append(contentsOf: skills.toolDefinitions.map(withCorrelationFacadeMetadata))
+        result.append(observabilityConnectToolDefinition())
+        return result
+    }
+
+    private func withCorrelationFacadeMetadata(_ source: [String: Any]) -> [String: Any] {
+        var tool = source
+        guard var inputSchema = tool["inputSchema"] as? [String: Any],
+              var properties = inputSchema["properties"] as? [String: Any] else {
+            return tool
+        }
+        properties["_filemcp_chat"] = [
+            "type": "string",
+            "description": "Optional opaque FileMCP correlation handle returned by filemcp_observability_connect. It is observability metadata only and grants no additional authority.",
+        ]
+        inputSchema["properties"] = properties
+        tool["inputSchema"] = inputSchema
+        return tool
+    }
+
+    private func observabilityConnectToolDefinition() -> [String: Any] {
+        [
+            "name": "filemcp_observability_connect",
+            "description": "Establish or resume an opaque FileMCP logical-chat correlation handle for local observability. This handle is metadata only and never grants file, Git, or command permissions.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "chat_instance_id": [
+                        "type": "string",
+                        "description": "Optional prior FileMCP chat correlation handle to resume within this FileMCP process.",
+                    ],
+                ],
+                "required": [],
+                "additionalProperties": false,
+            ] as [String: Any],
+            "outputSchema": [
+                "type": "object",
+                "properties": [
+                    "chat_instance_id": ["type": "string"],
+                    "resumed": ["type": "boolean"],
+                ],
+                "required": ["chat_instance_id", "resumed"],
+                "additionalProperties": false,
+            ] as [String: Any],
+            "annotations": [
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "openWorldHint": false,
+            ],
+        ]
     }
 
     private func processLegacyRequest(id: Any, method: String, params: [String: Any]) -> Data {
@@ -1890,7 +1941,7 @@ final class LocalMCPServer {
             var result = modernCompleteResult([
                 "supportedVersions": [mcpModernProtocolVersion],
                 "capabilities": serverCapabilities(),
-                "instructions": "Read and manage files, Git repositories, Codex project skills, and optionally local commands inside the configured shared directory. When a user message begins with '/<skill-name>', call load_codex_skill with that exact name before answering and follow the returned SKILL.md instructions.",
+                "instructions": "Read and manage files, Git repositories, Codex project skills, and optionally local commands inside the configured shared directory. When a user message begins with '/<skill-name>', call load_codex_skill with that exact name before answering and follow the returned SKILL.md instructions. For local observability, call filemcp_observability_connect once for this chat context, then include the returned chat_instance_id as _filemcp_chat on later FileMCP tool calls. The handle is correlation metadata only and grants no additional authority.",
             ])
             addCacheMetadata(to: &result, ttlMs: 60_000)
             return jsonRPCResult(id: id, result: result)
@@ -1921,10 +1972,13 @@ final class LocalMCPServer {
                 status: modern ? 400 : 200
             )
         }
-        guard tools.hasTool(named: toolName) || skills.hasTool(named: toolName) else {
+
+        let isObservabilityConnect = toolName == "filemcp_observability_connect"
+        guard tools.hasTool(named: toolName) || skills.hasTool(named: toolName) || isObservabilityConnect else {
             return jsonRPCError(id: id, code: -32602, message: "Unknown tool: \(toolName)")
         }
-        let arguments: [String: Any]
+
+        var arguments: [String: Any]
         if let rawArguments = params["arguments"] {
             guard let typedArguments = rawArguments as? [String: Any] else {
                 var result: [String: Any] = [
@@ -1938,7 +1992,43 @@ final class LocalMCPServer {
         } else {
             arguments = [:]
         }
+
         do {
+            if isObservabilityConnect {
+                for key in arguments.keys where key != "chat_instance_id" {
+                    throw MCPServerError.invalidArguments("Unknown argument: \(key)")
+                }
+
+                let requested: String?
+                if let rawRequested = arguments["chat_instance_id"] {
+                    guard let typedRequested = rawRequested as? String else {
+                        throw MCPServerError.invalidArguments("Argument chat_instance_id must be a string")
+                    }
+                    requested = typedRequested
+                } else {
+                    requested = nil
+                }
+
+                let connection = try chatCorrelation.connect(chatInstanceID: requested)
+                let structuredContent: [String: Any] = [
+                    "chat_instance_id": connection.chatInstanceID,
+                    "resumed": connection.resumed,
+                ]
+                let textData = try JSONSerialization.data(withJSONObject: structuredContent, options: [.sortedKeys])
+                let text = String(data: textData, encoding: .utf8) ?? "{}"
+                var result: [String: Any] = [
+                    "content": [["type": "text", "text": text]],
+                    "structuredContent": structuredContent,
+                    "isError": false,
+                ]
+                if modern { result = modernCompleteResult(result) }
+                return jsonRPCResult(id: id, result: result)
+            }
+
+            let correlationValue = arguments.removeValue(forKey: "_filemcp_chat")
+            let correlationHandle = correlationValue as? String
+            _ = chatCorrelation.tryResolve(correlationHandle)
+
             let content: [[String: Any]]
             let structuredContent: [String: Any]
             if skills.hasTool(named: toolName) {

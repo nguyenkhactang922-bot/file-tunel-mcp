@@ -160,7 +160,91 @@ SWIFT
 swiftc -o "$TMP_DIR/process-test" \
     macos/ProcessRunner.swift \
     "$TMP_DIR/main.swift"
+
 "$TMP_DIR/process-test"
+
+cat >"$TMP_DIR/correlation.swift" <<'SWIFT'
+import Foundation
+
+var now = Date(timeIntervalSince1970: 1_000)
+var randomSeed: UInt8 = 1
+let service = LogicalChatCorrelationService(
+    maxKnownHandles: 4,
+    retention: 60,
+    nowProvider: { now },
+    randomBytesProvider: { count in
+        let value = randomSeed
+        randomSeed &+= 1
+        return [UInt8](repeating: value, count: count)
+    }
+)
+
+let first = try service.connect()
+precondition(!first.resumed, "new correlation handle must not be resumed")
+precondition(LogicalChatCorrelationService.isValidHandle(first.chatInstanceID), "generated handle format")
+precondition(first.chatInstanceID.hasPrefix("chat_"), "generated handle prefix")
+precondition(first.chatInstanceID.count == 48, "generated handle total length")
+
+let firstHash = service.tryResolve(first.chatInstanceID)
+precondition(firstHash?.count == 64, "known handle resolves to SHA-256 hash")
+precondition((try LogicalChatCorrelationService.hashForPersistence(first.chatInstanceID)) == firstHash, "persistence hash parity")
+
+let resumed = try service.connect(chatInstanceID: first.chatInstanceID)
+precondition(resumed.resumed && resumed.chatInstanceID == first.chatInstanceID, "known handle resumes")
+
+do {
+    _ = try service.connect(chatInstanceID: "bad")
+    preconditionFailure("malformed handle must be rejected")
+} catch {
+    precondition(error.localizedDescription.contains("Invalid FileMCP chat correlation handle"), "unexpected malformed-handle error")
+}
+
+let unknown = "chat_" + String(repeating: "A", count: 43)
+precondition(LogicalChatCorrelationService.isValidHandle(unknown), "unknown test handle must be syntactically valid")
+do {
+    _ = try service.connect(chatInstanceID: unknown)
+    preconditionFailure("unknown valid handle must be rejected")
+} catch {
+    precondition(error.localizedDescription.contains("Unknown FileMCP chat correlation handle"), "unexpected unknown-handle error")
+}
+
+now = now.addingTimeInterval(61)
+precondition(service.tryResolve(first.chatInstanceID) == nil, "expired handle must not resolve")
+let expiredSnapshot = service.retentionSnapshot()
+precondition(expiredSnapshot.knownHandles == 0, "expired handle must be removed")
+precondition(expiredSnapshot.expiredEvictions >= 1, "expiry counter must advance")
+
+var pressureNow = Date(timeIntervalSince1970: 2_000)
+var pressureSeed: UInt8 = 20
+let pressure = LogicalChatCorrelationService(
+    maxKnownHandles: 2,
+    retention: 3_600,
+    nowProvider: { pressureNow },
+    randomBytesProvider: { count in
+        let value = pressureSeed
+        pressureSeed &+= 1
+        return [UInt8](repeating: value, count: count)
+    }
+)
+let p1 = try pressure.connect()
+pressureNow = pressureNow.addingTimeInterval(1)
+let p2 = try pressure.connect()
+pressureNow = pressureNow.addingTimeInterval(1)
+_ = try pressure.connect()
+let pressureSnapshot = pressure.retentionSnapshot()
+precondition(pressureSnapshot.knownHandles == 2, "pressure registry must remain bounded")
+precondition(pressureSnapshot.capacityPressureEvents >= 1, "pressure event counter must advance")
+precondition(pressureSnapshot.pressureEvictions >= 1, "pressure eviction counter must advance")
+precondition(pressure.tryResolve(p1.chatInstanceID) == nil, "oldest handle must be pressure-evicted")
+precondition(pressure.tryResolve(p2.chatInstanceID) != nil, "newer handle must remain")
+
+print("logical-chat-correlation: ok")
+SWIFT
+
+swiftc -framework Security -o "$TMP_DIR/correlation-test" \
+    macos/LogicalChatCorrelation.swift \
+    "$TMP_DIR/correlation.swift"
+"$TMP_DIR/correlation-test"
 
 cat >"$TMP_DIR/tunnel-client" <<'SH'
 #!/bin/sh
@@ -362,6 +446,7 @@ SWIFT
 
 swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ProcessRunner.swift \
+    macos/LogicalChatCorrelation.swift \
     macos/LocalMCPServer.swift \
     macos/LocalMCPRuntime.swift \
     "$TMP_DIR/main.swift"
@@ -486,8 +571,9 @@ while true {
 }
 SWIFT
 
-swiftc -framework Network -o "$TMP_DIR/server-test" \
+swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ProcessRunner.swift \
+    macos/LogicalChatCorrelation.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"
@@ -545,6 +631,41 @@ if printf '%s' "$SAFE_TOOLS" | grep -q '"name":"run_command"'; then
     echo "run_command must not be exposed while command execution is disabled" >&2
     exit 1
 fi
+
+printf '%s' "$SAFE_TOOLS" | grep -q '"name":"filemcp_observability_connect"'
+printf '%s' "$SAFE_TOOLS" | grep -q '"_filemcp_chat"'
+
+CHAT_CONNECT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":391,"method":"tools/call","params":{"name":"filemcp_observability_connect","arguments":{}}}')"
+CHAT_HANDLE="$(printf '%s' "$CHAT_CONNECT" | plutil -extract result.structuredContent.chat_instance_id raw -expect string -o - -)"
+printf '%s' "$CHAT_HANDLE" | grep -Eq '^chat_[A-Za-z0-9_-]{43}$'
+printf '%s' "$CHAT_CONNECT" | plutil -extract result.structuredContent.resumed raw -expect bool -o - - | grep -qx 'false'
+
+CHAT_RESUME="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":392,\"method\":\"tools/call\",\"params\":{\"name\":\"filemcp_observability_connect\",\"arguments\":{\"chat_instance_id\":\"$CHAT_HANDLE\"}}}")"
+printf '%s' "$CHAT_RESUME" | plutil -extract result.structuredContent.resumed raw -expect bool -o - - | grep -qx 'true'
+
+CHAT_BAD_ARG="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":393,"method":"tools/call","params":{"name":"filemcp_observability_connect","arguments":{"unexpected":true}}}')"
+printf '%s' "$CHAT_BAD_ARG" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$CHAT_BAD_ARG" | grep -q 'Unknown argument'
+
+CORRELATED_READ="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":394,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"relative_path\":\"hello.txt\",\"_filemcp_chat\":\"$CHAT_HANDLE\"}}}")"
+printf '%s' "$CORRELATED_READ" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$CORRELATED_READ" | plutil -extract result.structuredContent.result raw -expect string -o - - | grep -qx 'hello swift'
+
+UNKNOWN_CHAT_HANDLE="chat_$(printf 'A%.0s' {1..43})"
+UNBOUND_READ="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":395,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"relative_path\":\"hello.txt\",\"_filemcp_chat\":\"$UNKNOWN_CHAT_HANDLE\"}}}")"
+printf '%s' "$UNBOUND_READ" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$UNBOUND_READ" | plutil -extract result.structuredContent.result raw -expect string -o - - | grep -qx 'hello swift'
+echo "logical-chat-facade-legacy: ok"
 
 NEGATIVE_LENGTH="$(printf 'POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:18088\r\nContent-Type: application/json\r\nContent-Length: -1\r\n\r\n' | nc 127.0.0.1 18088)"
 printf '%s' "$NEGATIVE_LENGTH" | grep -q 'HTTP/1.1 400 Bad Request'
@@ -1259,6 +1380,20 @@ printf '%s' "$TOOLS" | grep -q '"name":"read_file"'
 printf '%s' "$TOOLS" | grep -q '"name":"read_file_range"'
 printf '%s' "$TOOLS" | grep -q '"name":"search_content"'
 printf '%s' "$TOOLS" | grep -q '"outputSchema"'
+printf '%s' "$TOOLS" | grep -q '"name":"filemcp_observability_connect"'
+printf '%s' "$TOOLS" | grep -q '"_filemcp_chat"'
+printf '%s' "$DISCOVER" | grep -q 'filemcp_observability_connect'
+printf '%s' "$DISCOVER" | grep -q '_filemcp_chat'
+
+MODERN_CHAT_RESUME="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H 'MCP-Protocol-Version: 2026-07-28' \
+    -H 'Mcp-Method: tools/call' \
+    -H 'Mcp-Name: filemcp_observability_connect' \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":111,\"method\":\"tools/call\",\"params\":{\"name\":\"filemcp_observability_connect\",\"arguments\":{\"chat_instance_id\":\"$CHAT_HANDLE\"},\"_meta\":$MODERN_META}}")"
+printf '%s' "$MODERN_CHAT_RESUME" | grep -q '"resultType":"complete"'
+printf '%s' "$MODERN_CHAT_RESUME" | plutil -extract result.structuredContent.resumed raw -expect bool -o - - | grep -qx 'true'
+echo "logical-chat-facade-modern: ok"
 printf '%s' "$TOOLS" | plutil -extract result.tools.0.outputSchema.properties.result.type raw -expect string -o - - | grep -qx 'array'
 printf '%s' "$TOOLS" | plutil -extract result.tools.1.outputSchema.properties.result.type raw -expect string -o - - | grep -qx 'string'
 printf '%s' "$TOOLS" | plutil -extract result.tools.2.outputSchema.properties.content.type raw -expect string -o - - | grep -qx 'string'
