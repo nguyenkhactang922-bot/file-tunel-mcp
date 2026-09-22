@@ -40,3 +40,10 @@ OBS-013 PASS: real ChatGPT connector schema, handle creation/resume, cross-turn 
 Final pre-merge package SHA-256: `3C23BEE2198543CFE6D3C51FB134E31A82034B15FDDAC1FC9785F44603C17F23`. Isolated staging is supported so packaging can run while the current release bridge remains connected.
 
 V11-009 merge status: PR #2 is clean/mergeable. A local merge candidate from `origin/main` passed build, 414 runtime assertions and packaged app smoke. Upstream merge is blocked only because the authenticated bot has READ permission.
+
+GitHub auth recheck (2026-09-22):
+- Active CLI account remains `nguyenkhactang922-bot`.
+- Upstream permission remains `READ`.
+- PR #2 remains open, clean and mergeable.
+- Attempt to switch `gh` to account `dongttfd` failed because that account is not logged in on this machine.
+- No technical blocker remains; only an upstream WRITE/MAINTAIN-authenticated account can perform the final merge.

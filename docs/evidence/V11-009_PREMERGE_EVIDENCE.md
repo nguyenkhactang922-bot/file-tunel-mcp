@@ -94,3 +94,10 @@ Verification on that merged state:
 - A bot fork was created and the feature branch is pushed there; PR #2 targets upstream `main`.
 
 No technical test or merge-conflict blocker remains. The only remaining action is an upstream account with write/maintain permission merging PR #2. After that, checkout/pull upstream `main`, rerun the same main verification gates, and record V11-009 PASS / MAIN VERIFIED.
+
+GitHub auth recheck (2026-09-22):
+- Active CLI account remains `nguyenkhactang922-bot`.
+- Upstream permission remains `READ`.
+- PR #2 remains open, clean and mergeable.
+- Attempt to switch `gh` to account `dongttfd` failed because that account is not logged in on this machine.
+- No technical blocker remains; only an upstream WRITE/MAINTAIN-authenticated account can perform the final merge.

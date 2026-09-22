@@ -88,3 +88,10 @@ UPSTREAM MERGE PERMISSION BLOCKER:
 - `nguyenkhactang922-bot` has READ permission on `dongttfd/file-tunel-mcp`; push returned 403 and merge API is unavailable.
 - Local merged-main candidate is VERIFIED: build 0/0, 414 assertions, package/app smoke PASS.
 - NEXT_EXACT_ACTION: merge PR #2 using an upstream account with WRITE/MAINTAIN permission, then checkout/pull `main` and rerun main gates before marking V11-009 PASS / MAIN VERIFIED.
+
+GitHub auth recheck (2026-09-22):
+- Active CLI account remains `nguyenkhactang922-bot`.
+- Upstream permission remains `READ`.
+- PR #2 remains open, clean and mergeable.
+- Attempt to switch `gh` to account `dongttfd` failed because that account is not logged in on this machine.
+- No technical blocker remains; only an upstream WRITE/MAINTAIN-authenticated account can perform the final merge.
