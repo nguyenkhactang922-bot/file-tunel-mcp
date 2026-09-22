@@ -14,7 +14,7 @@ Initiative status:
 - V11-001 through V11-008 PASS.
 - FPA-001 PASS.
 - Final-product remediation is ACTIVE.
-- V11-009 / MAIN VERIFIED remains deferred until final-product P1 blockers are closed.
+- V11-009 technical fork-main verification PASS; final V11-009 remains EXTERNAL-BLOCKED on upstream merge authority and FPA-004 real production-signing evidence.
 
 ## Verified Windows baseline
 
@@ -203,3 +203,9 @@ Default-branch Production Release registration VERIFIED:
 - production-release environment restricted to main
 - 0/7 real release secrets configured
 - Remaining blocker: real credentials + one real Production Release run.
+
+
+V11-009 technical fork-main verification PASS:
+- exact fork main: 1d3e14d23a089bf36d36c1a3c2eb315005136793
+- native Verify run 35756276412: macOS / Windows x64 / Windows ARM64 SUCCESS
+- final V11-009 remains EXTERNAL-BLOCKED; do not repeat technical main gates unless code changes.

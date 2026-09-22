@@ -29,7 +29,7 @@ Current decision:
 ```text
 Windows core / Observability V1+V1.1   VERIFIED
 Whole-repository release readiness     EXTERNAL-BLOCKED ON FPA-004 REAL RELEASE TRUST
-V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
+V11-009 technical fork-main verify      PASS; FINAL PASS EXTERNAL-BLOCKED
 ```
 
 ## Verified quality baseline
@@ -86,3 +86,6 @@ Final post-remediation audit: docs/audit/FINAL_PRODUCT_POST_REMEDIATION_AUDIT_20
 
 
 Default-branch release registration: VERIFIED. Fork main commit 884e9a89 passed native Verify run 35755705022 on macOS, Windows x64 and Windows ARM64. Production Release is active on the default branch and production-release permits main. FPA-004 is now blocked only by absent real release credentials and the required real signed/notarized release run.
+
+
+V11-009 technical main verification: PASS on fork main commit 1d3e14d with native Verify run 35756276412 succeeding on macOS, Windows x64 and Windows ARM64. Final V11-009 remains EXTERNAL-BLOCKED on upstream merge authority and FPA-004 real production-signing evidence.

@@ -13,7 +13,7 @@ Rule: OBS-013 live connector proof now runs against the fully upgraded build; V1
 | V11-006 | PASS | V11-005 | W3C trace-context extraction from MCP `_meta` with HTTP fallback and identity separation |
 | V11-007 | PASS | V11-005,V11-006 | Optional official OpenTelemetry .NET OTLP exporter/settings, failure isolation, package proof |
 | V11-008 | PASS | V11-002,V11-004,V11-007 | 24h-style churn, memory-cardinality/disk-row bounds, restart storm, exporter failure, privacy audit |
-| V11-009 | BLOCKED | V11-008,OBS-013 | Final review/package/live E2E/merge/main verification |
+| V11-009 | EXTERNAL-BLOCKED | V11-008,OBS-013 | Final review/package/live E2E/merge/main verification |
 
 ## Dependency graph
 
@@ -27,4 +27,4 @@ V11-005 --> V11-006 --> V11-007+
 
 No LiveCharts2/ScottPlot migration, no Prometheus server, no full proxy circuit-breaker/hedging, no distributed session store, no payload trace persistence.
 
-NEXT_EXACT_ACTION: merge upstream PR #2 with WRITE/MAINTAIN permission, then verify origin/main and close V11-009.
+NEXT_EXACT_ACTION: final PASS requires upstream PR #2 merge under WRITE/MAINTAIN authority and FPA-004 real signed/notarized release evidence; fork main technical verification is already PASS.

@@ -1,7 +1,7 @@
 # V11-009 - PRE-MERGE FINAL ACCEPTANCE EVIDENCE
 
 Date: 2026-09-22
-Status: ACTIVE - pre-merge gates complete; PR/merge/main verification pending
+Status: TECHNICAL MAIN VERIFIED ON FORK / FINAL PASS EXTERNAL-BLOCKED
 
 ## OBS-013 prerequisite
 
@@ -101,3 +101,32 @@ GitHub auth recheck (2026-09-22):
 - PR #2 remains open, clean and mergeable.
 - Attempt to switch `gh` to account `dongttfd` failed because that account is not logged in on this machine.
 - No technical blocker remains; only an upstream WRITE/MAINTAIN-authenticated account can perform the final merge.
+
+
+## Fork default-branch technical main verification
+
+The complete remediation + release-plumbing tree was merged into fork default branch main without conflict.
+
+Exact fork main commit: 1d3e14d23a089bf36d36c1a3c2eb315005136793.
+
+Local merged-main gates:
+- project-state-contract PASS;
+- tool-surface-parity PASS;
+- macos-supervisor-contract PASS;
+- http-connection-bounds-contract PASS;
+- dynamic-health-discovery-contract PASS;
+- windows-arm64-assurance-contract PASS;
+- windows-single-instance-contract PASS;
+- windows-release-contract PASS;
+- production-release-signing-contract PASS;
+- Windows Release build PASS, 0 warnings / 0 errors;
+- Windows runtime PASS, 444 assertions.
+
+Native GitHub Verify run 35756276412 on exact fork main commit 1d3e14d:
+- verify-macos SUCCESS;
+- verify-windows SUCCESS;
+- verify-windows-arm64 SUCCESS.
+
+Production Release workflow is registered and active on fork default branch main.
+
+This closes the technical main-verification portion of V11-009 on the canonical fork. V11-009 must remain EXTERNAL-BLOCKED rather than PASS because upstream dongttfd/file-tunel-mcp PR #2 is still unmerged under a READ-only credential and FPA-004 still lacks the seven real production release credentials plus one real signed/notarized release run.
