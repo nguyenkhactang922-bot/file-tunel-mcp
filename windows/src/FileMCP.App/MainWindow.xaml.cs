@@ -36,7 +36,11 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        _observability = new ObservabilityHub(WorkspaceKeys, log: text => Dispatcher.BeginInvoke(new Action(() => AppendLog(text))));
+        var observabilityDatabaseOverride = Environment.GetEnvironmentVariable("FILEMCP_OBSERVABILITY_DB");
+        _observability = new ObservabilityHub(
+            WorkspaceKeys,
+            string.IsNullOrWhiteSpace(observabilityDatabaseOverride) ? null : observabilityDatabaseOverride,
+            log: text => Dispatcher.BeginInvoke(new Action(() => AppendLog(text))));
         _overviewTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromSeconds(1) };
         _overviewTimer.Tick += OverviewTimer_Tick;
         OverviewPeriodCombo.SelectionChanged += OverviewPeriodCombo_SelectionChanged;
@@ -83,12 +87,47 @@ public partial class MainWindow : Window
         {
             await _observability.StartAsync();
             _observabilityStoreReady = true;
+            await RunObservabilityPackageSmokeIfRequestedAsync();
             AppendLog("[Telemetry] Observability store ready.\n");
         }
         catch (Exception ex)
         {
             _observabilityStoreReady = false;
             AppendLog($"[Telemetry] Persistent observability unavailable; MCP remains operational: {ex.Message}\n");
+        }
+    }
+    private async Task RunObservabilityPackageSmokeIfRequestedAsync()
+    {
+        var markerPath = Environment.GetEnvironmentVariable("FILEMCP_OBSERVABILITY_SMOKE_MARKER");
+        if (string.IsNullOrWhiteSpace(markerPath)) return;
+
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var meter = _observability.MeterFor("C");
+            meter.RecordRequest(4);
+            meter.RecordResponse(4);
+            meter.RecordToolCall("read_file", isError: false, latencyTicks: 1);
+            await _observability.FlushAsync(now);
+
+            var unix = now.ToUnixTimeSeconds();
+            var minuteStart = DateTimeOffset.FromUnixTimeSeconds(unix - unix % 60);
+            var persisted = await _observability.QueryExactPeriodAsync(
+                new UsagePeriodRange(minuteStart, now.AddMinutes(1)),
+                "C");
+            if (persisted.ToolCalls < 1 || persisted.ReadCalls < 1 || persisted.RequestBytes < 4 || persisted.ResponseBytes < 4)
+                throw new InvalidOperationException("Packaged SQLite telemetry write/read verification returned incomplete counters.");
+
+            var directory = Path.GetDirectoryName(Path.GetFullPath(markerPath));
+            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+            await File.WriteAllTextAsync(
+                markerPath,
+                $"PASS tool_calls={persisted.ToolCalls} read_calls={persisted.ReadCalls}");
+        }
+        catch (Exception ex)
+        {
+            try { await File.WriteAllTextAsync(markerPath, "FAIL " + ex.Message); } catch { }
+            throw;
         }
     }
     private async void OverviewTimer_Tick(object? sender, EventArgs e)

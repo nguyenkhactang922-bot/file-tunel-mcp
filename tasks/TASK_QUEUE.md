@@ -15,6 +15,6 @@
 | OBS-010 | PASS | OBS-008,OBS-009 | period controls, live session table/detail, exact-chat label feature gate |
 | OBS-011 | PASS | OBS-010 | bounded realtime graph + exact measurable health surfaces |
 | OBS-012 | PASS | OBS-011 | privacy DB inspection, load/concurrency, DB failure/corruption/migration/security regression suite |
-| OBS-013 | READY | OBS-012 | self-contained win-x64 publish, native SQLite smoke, one live ChatGPT correlation proof, final acceptance |
+| OBS-013 | BLOCKED | OBS-012 | self-contained win-x64 publish, native SQLite smoke, one live ChatGPT correlation proof, final acceptance |
 
-NEXT_EXACT_ACTION: CLAIM OBS-013.
+NEXT_EXACT_ACTION: Reconnect ChatGPT to the new FileMCP release binary, refresh connector schema, then execute the live filemcp_observability_connect + _filemcp_chat proof before marking OBS-013 PASS.

@@ -98,9 +98,11 @@ For Windows ARM64:
 Release outputs are created under:
 
 ```text
-dist/windows-x64/FileMCP/
-dist/windows-arm64/FileMCP/
+dist/windows-x64/FileMCP-release/
+dist/windows-arm64/FileMCP-release/
 ```
+
+Build output uses a release staging directory so packaging does not overwrite a FileMCP executable that may currently be running from an older build.
 
 and packaged as:
 
