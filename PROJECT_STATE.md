@@ -26,3 +26,9 @@ Approved next initiative:
 - Source audit and independent multi-round review are complete.
 - Implementation remains dependency-blocked solely by OBS-013 live acceptance.
 - Once OBS-013 passes, start V11-001 immediately; no repeated discovery/audit is required.
+
+Execution-order amendment:
+- User explicitly requested OBS-013 be deferred.
+- V1.1 implementation now precedes OBS-013.
+- Previous OBS-013 automated/package evidence remains historical evidence only; final package evidence must be regenerated after V1.1 changes.
+

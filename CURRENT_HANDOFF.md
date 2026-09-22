@@ -21,3 +21,11 @@ POST-OBS-013 APPROVED WORK:
 - Do not repeat discovery/audit after OBS-013.
 - After OBS-013 PASS, immediately CLAIM V11-001 from tasks/OBSERVABILITY_V1_1_CANDIDATE_QUEUE.md and execute through V11-009 by dependency order.
 - Reuse mature OSS directly when technically appropriate and license-compatible; prefer official native .NET packages when available; preserve license/provenance for copied/adapted source; keep security/privacy boundaries unchanged.
+
+EXECUTION ORDER AMENDMENT (user-approved, 2026-09-22):
+- Defer OBS-013 until after V11-008.
+- Implement V11-001..V11-008 first so the live connector proof exercises the final upgraded build.
+- OBS-013 then proves live ChatGPT correlation on that build.
+- V11-009 closes final package/review/merge/main verification after OBS-013 PASS.
+- NEXT_EXACT_ACTION is V11-001.
+
