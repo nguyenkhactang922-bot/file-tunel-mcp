@@ -79,3 +79,10 @@ OBS-013 LIVE PROOF STAGE A (2026-09-22):
 - Real ChatGPT handle creation/resume and _filemcp_chat propagation through read_file/git_status/run_command PASS.
 - Durable bound session hash verified; raw handle absent from DB/WAL/SHM.
 - Remaining frozen-spec gate: one subsequent user turn must reuse the same handle and remain bound to the same durable session before OBS-013 can be marked PASS / exact AI-chat wording enabled.
+
+OBS-013 PASS (cross-turn live ChatGPT proof complete):
+- Same logical handle resumed successfully on a later user turn.
+- Normal FileMCP call remained bound to the same durable SHA-256 session.
+- Raw handle remained absent from DB/WAL/SHM.
+- Exact correlated AI-chat wording is now enabled; unbound traffic remains separate and is never counted as a chat.
+- NEXT_EXACT_ACTION: V11-009 final review/package/PR/merge/main verification.

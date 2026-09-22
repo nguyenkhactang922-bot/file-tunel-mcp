@@ -217,8 +217,8 @@
                             </Border>
                         </Grid>
 
-                        <TextBlock Margin="0,6,0,8" FontWeight="SemiBold" Text="Observed MCP sessions"/>
-                        <TextBlock x:Name="OverviewSessionSummaryText" Margin="0,0,0,8" Foreground="Gray" Text="No observed sessions yet."/>
+                        <TextBlock Margin="0,6,0,8" FontWeight="SemiBold" Text="AI chats"/>
+                        <TextBlock x:Name="OverviewSessionSummaryText" Margin="0,0,0,8" Foreground="Gray" Text="No correlated AI chats yet."/>
                         <DataGrid x:Name="OverviewSessionsGrid" Height="190" Margin="0,0,0,10"
                                   AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
                                   HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="OverviewSessionsGrid_SelectionChanged">
@@ -236,7 +236,7 @@
                         <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock FontWeight="SemiBold" Text="Selected session detail"/>
-                                <TextBlock x:Name="OverviewSessionDetailText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#444444" Text="Select an observed session row."/>
+                                <TextBlock x:Name="OverviewSessionDetailText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#444444" Text="Select an AI chat or unbound activity row."/>
                             </StackPanel>
                         </Border>
                         <TextBlock Margin="0,4,0,0" Foreground="Gray" TextWrapping="Wrap"

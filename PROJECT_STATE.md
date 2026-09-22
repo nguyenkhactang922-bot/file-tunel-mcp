@@ -42,3 +42,5 @@ Live reconnect progress:
 - Desktop/runtime migration is complete.
 - Remaining OBS-013 blocker is only ChatGPT conversation schema caching: this existing chat still has the legacy 18-tool registry.
 - Fresh-chat connector registration is required for the final live proof.
+
+OBS-013 PASS: real ChatGPT connector schema, handle creation/resume, cross-turn propagation, bound durable SHA-256 identity and raw-handle privacy all verified. Exact correlated AI-chat wording is enabled. V11-009 is ACTIVE for final closure.

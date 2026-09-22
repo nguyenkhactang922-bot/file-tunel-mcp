@@ -433,8 +433,8 @@ public partial class MainWindow : Window
             .ToList();
 
         OverviewSessionSummaryText.Text = rows.Count == 0
-            ? "No observed sessions yet. Unbound MCP traffic remains separate from correlated sessions."
-            : $"{rows.Count(row => row.Kind == "Bound")} correlated context(s), {rows.Count(row => row.Kind == "Unbound")} unbound activity bucket(s). Exact AI-chat labeling remains disabled pending live proof.";
+            ? "No correlated AI chats yet. Unbound MCP traffic remains separate and is never counted as a chat."
+            : $"{rows.Count(row => row.Kind == "Bound")} AI chat(s), {rows.Count(row => row.Kind == "Unbound")} unbound MCP activity bucket(s).";
         OverviewSessionsGrid.ItemsSource = rows;
         if (selectedKey is not null)
         {
@@ -447,7 +447,7 @@ public partial class MainWindow : Window
     {
         if (OverviewSessionsGrid.SelectedItem is not ObservedSessionRow row)
         {
-            OverviewSessionDetailText.Text = "Select an observed session row.";
+            OverviewSessionDetailText.Text = "Select an AI chat or unbound activity row.";
             return;
         }
         OverviewSessionDetailText.Text =

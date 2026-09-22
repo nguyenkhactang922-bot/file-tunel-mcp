@@ -1,4 +1,4 @@
-# TASK QUEUE — FileMCP Observability V1
+# TASK QUEUE Ã¢â‚¬â€ FileMCP Observability V1
 
 | ID | State | Depends | Acceptance |
 |---|---|---|---|
@@ -15,6 +15,6 @@
 | OBS-010 | PASS | OBS-008,OBS-009 | period controls/session detail/exact-chat feature gate |
 | OBS-011 | PASS | OBS-010 | bounded realtime graph + measurable health |
 | OBS-012 | PASS | OBS-011 | privacy/concurrency/corruption/migration/security regression |
-| OBS-013 | BLOCKED | OBS-012,V11-008 | live ChatGPT connector correlation proof, then final acceptance |
+| OBS-013 | PASS | OBS-012,V11-008 | live ChatGPT connector correlation proof, then final acceptance |
 
-NEXT_EXACT_ACTION: restart/reconnect ChatGPT to the fully upgraded V1.1 release (SHA-256 `5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E`) until `filemcp_observability_connect` is present, then execute the live handle propagation/hash-only persistence proof.
+NEXT_EXACT_ACTION: CLAIM V11-009 for final review, package gate, PR/merge, main verification and release closure.
