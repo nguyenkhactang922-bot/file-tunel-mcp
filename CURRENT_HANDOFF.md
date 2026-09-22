@@ -150,3 +150,9 @@ FPA-007 final acceptance:
 - Static cross-platform contracts PASS.
 - Candidate evidence: `docs/evidence/FPA-008_CONNECTION_BOUNDS_CANDIDATE.md`.
 - FPA-008 remains ACTIVE until native macOS/Windows x64/Windows ARM64 GitHub jobs succeed.
+
+
+FPA-008 final acceptance:
+- GitHub Actions run 35745850301: macOS, Windows x64 and Windows ARM64 all SUCCESS.
+- Evidence: docs/evidence/FPA-008_CONNECTION_BOUNDS_EVIDENCE.md.
+- Next: FPA-009 design gate, then FPA-004 release signing scope.
