@@ -48,7 +48,7 @@ V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 - FPA-003 PASS: macOS bounded tunnel supervisor parity, native CI verified.
 - FPA-004 P1 market: production signing/notarization.
 - FPA-005 PASS: native Windows ARM64 runtime assurance verified by GitHub hosted ARM64 runner.
-- FPA-007 P2: single-instance/duplicate-process UX.
+- FPA-007 PASS: per-user Windows desktop single-instance activation verified on x64 and ARM64.
 - FPA-008 P2: HTTP connection/idle bounds.
 - FPA-009 P3 optional: dynamic health endpoint discovery.
 
@@ -65,3 +65,6 @@ FPA-005 native CI PASS: run 35726514963 succeeded on verify-macos, verify-window
 
 
 FPA-007 candidate: per-user named-pipe single-instance activation is implemented; core 423 assertions and packaged x64 duplicate-launch activation smoke PASS. Native CI remains the final acceptance gate.
+
+
+FPA-007 native CI PASS: run 35728230159 succeeded on macOS, Windows x64 and Windows ARM64 with second-launch activation smoke. Current remediation advances to FPA-008.

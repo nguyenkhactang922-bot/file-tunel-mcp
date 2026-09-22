@@ -134,3 +134,10 @@ FPA-005 final acceptance:
 - Packaged x64 duplicate-launch activation smoke PASS.
 - Candidate evidence: `docs/evidence/FPA-007_WINDOWS_SINGLE_INSTANCE_CANDIDATE.md`.
 - FPA-007 remains ACTIVE until native GitHub macOS/x64/ARM64 jobs succeed.
+
+
+FPA-007 final acceptance:
+- GitHub Actions run 35728230159: verify-macos SUCCESS, verify-windows SUCCESS, verify-windows-arm64 SUCCESS.
+- Native x64 + ARM64 second-launch activation smoke PASS.
+- Evidence: docs/evidence/FPA-007_WINDOWS_SINGLE_INSTANCE_EVIDENCE.md.
+- AUTHORITATIVE NEXT_EXACT_ACTION is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md: CLAIM FPA-008 design gate.
