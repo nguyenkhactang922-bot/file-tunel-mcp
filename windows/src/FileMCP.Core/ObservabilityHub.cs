@@ -41,6 +41,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
 
     public LogicalChatCorrelationService ChatCorrelation { get; } = new();
     public LogicalSessionRegistry Sessions { get; } = new();
+    public McpStandardTelemetry StandardTelemetry { get; } = new();
 
     public ObservabilityHub(
         IEnumerable<string> workspaceKeys,
@@ -242,6 +243,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
         await _maintenance.DisposeAsync().ConfigureAwait(false);
         await _writer.DisposeAsync().ConfigureAwait(false);
         await _sessionWriter.DisposeAsync().ConfigureAwait(false);
+        StandardTelemetry.Dispose();
         _startGate.Dispose();
     }
 }

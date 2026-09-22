@@ -1,4 +1,4 @@
-﻿# CURRENT HANDOFF
+# CURRENT HANDOFF
 
 STATUS: BLOCKED ON ONE LIVE ACCEPTANCE GATE
 BRANCH: chatgpt/OBS-001-observability-foundation
@@ -37,3 +37,5 @@ V11-002 PASS: automatic process-wide retention maintenance verified by Release b
 V11-003 PASS: supervised tunnel restart/backoff/cooldown verified by full runtime gate + 332 assertions. NEXT_EXACT_ACTION: V11-004 component health model.
 
 V11-004 PASS: component health + dashboard verified by Release build, 343 assertions and packaged WPF smoke. NEXT_EXACT_ACTION: V11-005 native .NET OpenTelemetry contracts.
+
+V11-005 PASS: native .NET ActivitySource/Meter MCP telemetry + bounded semantic adapter verified by full runtime gate + 362 assertions. NEXT_EXACT_ACTION: V11-006 W3C trace-context extraction.

@@ -33,14 +33,15 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private readonly LogicalChatCorrelationService? _chatCorrelation;
     private readonly LogicalSessionRegistry? _sessions;
     private readonly string? _workspaceKey;
+    private readonly McpStandardTelemetry? _standardTelemetry;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _acceptLoop;
 
-    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null, LogicalSessionRegistry? sessions = null, string? workspaceKey = null)
+    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null, LogicalSessionRegistry? sessions = null, string? workspaceKey = null, McpStandardTelemetry? standardTelemetry = null)
     {
         if (Encoding.UTF8.GetByteCount(localAuthToken) < 32) throw new FileMcpException("Local MCP authentication token is too short");
-        _port = port; _localAuthToken = localAuthToken; _log = log; _usageMeter = usageMeter; _chatCorrelation = chatCorrelation; _sessions = sessions; _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey) ? null : workspaceKey.Trim().ToUpperInvariant();
+        _port = port; _localAuthToken = localAuthToken; _log = log; _usageMeter = usageMeter; _chatCorrelation = chatCorrelation; _sessions = sessions; _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey) ? null : workspaceKey.Trim().ToUpperInvariant(); _standardTelemetry = standardTelemetry;
         _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, enableCommands);
         _skills = new CodexSkillRegistry(allowedDirectory, log);
     }
@@ -212,16 +213,34 @@ public sealed class LocalMcpServer : IAsyncDisposable
         else return MeterResponse(JsonRpcError(id, -32602, "Invalid params: expected an object", status: headerModern ? 400 : 200));
         var meta = parameters["_meta"] as JsonObject; var bodyVersion = meta?["io.modelcontextprotocol/protocolVersion"]?.GetValue<string>();
         var bodyModern = bodyVersion is not null && !FileMcpConstants.LegacySupportedVersions.Contains(bodyVersion); var modernIntent = headerModern || bodyModern;
-        if (modernIntent && headerVersion is not null && bodyVersion is not null && headerVersion != bodyVersion) return MeterResponse(HeaderMismatch(id, $"MCP-Protocol-Version header '{headerVersion}' does not match body protocol version '{bodyVersion}'"));
-        if (headerVersion is not null && headerVersion != FileMcpConstants.ModernProtocolVersion && !FileMcpConstants.LegacySupportedVersions.Contains(headerVersion)) return MeterResponse(UnsupportedProtocol(id, headerVersion));
+        string? requestedLegacyVersion = null;
+        if (parameters["protocolVersion"] is JsonValue requestedProtocol && requestedProtocol.TryGetValue<string>(out var requestedProtocolText))
+            requestedLegacyVersion = requestedProtocolText;
+        string? telemetryToolName = null;
+        if (method == "tools/call" && parameters["name"] is JsonValue telemetryToolNode && telemetryToolNode.TryGetValue<string>(out var telemetryToolText))
+            telemetryToolName = telemetryToolText;
+        using var standardOperation = BeginStandardTelemetrySafely(
+            headerVersion ?? bodyVersion ?? requestedLegacyVersion,
+            method,
+            telemetryToolName,
+            request.Body.LongLength);
+
+        byte[] FinishStandard(byte[] response)
+        {
+            CompleteStandardTelemetrySafely(standardOperation, response);
+            return response;
+        }
+
+        if (modernIntent && headerVersion is not null && bodyVersion is not null && headerVersion != bodyVersion) return FinishStandard(MeterResponse(HeaderMismatch(id, $"MCP-Protocol-Version header '{headerVersion}' does not match body protocol version '{bodyVersion}'")));
+        if (headerVersion is not null && headerVersion != FileMcpConstants.ModernProtocolVersion && !FileMcpConstants.LegacySupportedVersions.Contains(headerVersion)) return FinishStandard(MeterResponse(UnsupportedProtocol(id, headerVersion)));
         if (modernIntent)
         {
-            var error = ValidateModernRequest(request, method, parameters, id); if (error is not null) return MeterResponse(error);
-            if (message["id"] is null) return MeterResponse(HttpResponse(202, [], "application/json"));
-            return MeterResponse(await ProcessModernRequestAsync(id, method, parameters, request.Body.LongLength, cancellationToken).ConfigureAwait(false));
+            var error = ValidateModernRequest(request, method, parameters, id); if (error is not null) return FinishStandard(MeterResponse(error));
+            if (message["id"] is null) return FinishStandard(MeterResponse(HttpResponse(202, [], "application/json")));
+            return FinishStandard(MeterResponse(await ProcessModernRequestAsync(id, method, parameters, request.Body.LongLength, cancellationToken).ConfigureAwait(false)));
         }
-        if (message["id"] is null) return MeterResponse(HttpResponse(202, [], "application/json"));
-        return MeterResponse(await ProcessLegacyRequestAsync(id, method, parameters, request.Body.LongLength, cancellationToken).ConfigureAwait(false));
+        if (message["id"] is null) return FinishStandard(MeterResponse(HttpResponse(202, [], "application/json")));
+        return FinishStandard(MeterResponse(await ProcessLegacyRequestAsync(id, method, parameters, request.Body.LongLength, cancellationToken).ConfigureAwait(false)));
     }
     private async Task<byte[]> ProcessLegacyRequestAsync(JsonNode? id, string method, JsonObject parameters, long requestBytes, CancellationToken cancellationToken) => method switch
     {
@@ -499,6 +518,45 @@ public sealed class LocalMcpServer : IAsyncDisposable
             _log($"[Telemetry] response metric ignored: {ex.Message}\n");
         }
         return response;
+    }
+
+    private McpStandardTelemetryOperation? BeginStandardTelemetrySafely(string? protocolVersion, string? method, string? toolName, long requestBytes)
+    {
+        try { return _standardTelemetry?.BeginOperation(protocolVersion, method, toolName, _workspaceKey, requestBytes); }
+        catch (Exception ex) { _log($"[Telemetry] standard operation start ignored: {ex.Message}\n"); return null; }
+    }
+
+    private void CompleteStandardTelemetrySafely(McpStandardTelemetryOperation? operation, byte[] response)
+    {
+        if (operation is null) return;
+        try { operation.Complete(HttpBodyByteLength(response), IsMcpErrorResponse(response)); }
+        catch (Exception ex) { _log($"[Telemetry] standard operation metric ignored: {ex.Message}\n"); }
+    }
+
+    private static bool IsMcpErrorResponse(byte[] response)
+    {
+        var separator = Encoding.ASCII.GetBytes("\r\n\r\n");
+        var bodyIndex = IndexOf(response, separator);
+        if (bodyIndex < 0) return true;
+        var firstLineEnd = IndexOf(response, Encoding.ASCII.GetBytes("\r\n"));
+        if (firstLineEnd > 0)
+        {
+            var firstLine = Encoding.ASCII.GetString(response, 0, firstLineEnd);
+            var parts = firstLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2 && int.TryParse(parts[1], out var status) && status >= 400) return true;
+        }
+        try
+        {
+            var bodyStart = bodyIndex + separator.Length;
+            if (bodyStart >= response.Length) return false;
+            var node = JsonNode.Parse(response.AsSpan(bodyStart));
+            if (node is not JsonObject root) return false;
+            if (root["error"] is not null) return true;
+            if (root["result"] is JsonObject result && result["isError"] is JsonValue value && value.TryGetValue<bool>(out var isError))
+                return isError;
+        }
+        catch { }
+        return false;
     }
 
     private void RecordRequestSafely(long requestBytes)

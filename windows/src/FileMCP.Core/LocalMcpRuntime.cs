@@ -277,7 +277,8 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
                     _usageMeter,
                     _observability?.ChatCorrelation,
                     _observability?.Sessions,
-                    _workspaceKey);
+                    _workspaceKey,
+                    _observability?.StandardTelemetry);
                 await _server.StartAsync(cancellationToken).ConfigureAwait(false);
                 lock (_stateGate) _localServerReady = true;
 

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -28,6 +29,7 @@ internal static class Program
         try
         {
             TestObservabilityContracts();
+            await TestMcpStandardTelemetryAsync(root);
             TestLogicalChatCorrelation();
             await TestLogicalSessionRegistryAsync(root);
             await TestWorkspaceUsageMeterAsync();
@@ -117,6 +119,95 @@ internal static class Program
         Assert(counters.TotalPayloadBytes == 30, "usage counters total bytes");
         Assert(counters.TotalTokensEst == 8, "usage counters total token estimate");
         Console.WriteLine("windows-observability-contracts: ok");
+    }
+    private sealed record CapturedMetric(string Name, double Value, IReadOnlyDictionary<string, object?> Tags);
+
+    private static async Task TestMcpStandardTelemetryAsync(string root)
+    {
+        Assert(McpTelemetryAttributeAdapter.SemanticProfileId == "filemcp.mcp.compat/2026-07-28/v1", "standard telemetry semantic profile is versioned for MCP 2026 compatibility");
+        Assert(McpTelemetryAttributeAdapter.NormalizeProtocolVersion(FileMcpConstants.ModernProtocolVersion) == FileMcpConstants.ModernProtocolVersion, "standard telemetry preserves supported modern protocol version");
+        Assert(McpTelemetryAttributeAdapter.NormalizeProtocolVersion("attacker-version") == "other", "standard telemetry bounds protocol-version cardinality");
+        Assert(McpTelemetryAttributeAdapter.NormalizeMethod("tools/call") == "tools/call" && McpTelemetryAttributeAdapter.NormalizeMethod("private-method") == "other", "standard telemetry method dimensions are allowlisted");
+        Assert(McpTelemetryAttributeAdapter.NormalizeToolName("read_file") == "read_file" && McpTelemetryAttributeAdapter.NormalizeToolName("private-tool-name") == "unknown", "standard telemetry tool dimensions are allowlisted");
+        Assert(McpTelemetryAttributeAdapter.NormalizeWorkspace("d") == "D" && McpTelemetryAttributeAdapter.NormalizeWorkspace("private-workspace") == "other", "standard telemetry workspace dimensions are bounded");
+        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("Ã¢â€šÂ¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
+        Assert(Encoding.UTF8.GetByteCount(boundedUtf8) <= McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes, "standard telemetry UTF-8 attribute bound never splits beyond byte cap");
+
+        const string privateMarker = "PRIVATE_OTEL_MARKER_8A2DF991";
+        var hostileTags = McpTelemetryAttributeAdapter.BuildTags(privateMarker, "tools/call", privateMarker, privateMarker);
+        var hostileTagText = string.Join('|', hostileTags.Select(tag => $"{tag.Key}={tag.Value}"));
+        Assert(!hostileTagText.Contains(privateMarker, StringComparison.Ordinal), "standard telemetry strips arbitrary client-controlled values from exported dimensions");
+        Assert(hostileTags.Any(tag => tag.Key == "mcp.protocol.version" && Equals(tag.Value, "other")) && hostileTags.Any(tag => tag.Key == "mcp.tool.name" && Equals(tag.Value, "unknown")), "standard telemetry maps unbounded dimensions to fixed buckets");
+
+        var activities = new List<Activity>();
+        using var activityListener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == McpStandardTelemetry.ActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            SampleUsingParentId = (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity => activities.Add(activity),
+        };
+        ActivitySource.AddActivityListener(activityListener);
+
+        var measurements = new List<CapturedMetric>();
+        using var meterListener = new MeterListener();
+        meterListener.InstrumentPublished = (instrument, listener) =>
+        {
+            if (instrument.Meter.Name == McpStandardTelemetry.MeterName)
+                listener.EnableMeasurementEvents(instrument);
+        };
+        meterListener.SetMeasurementEventCallback<long>((instrument, measurement, tags, _) =>
+        {
+            lock (measurements)
+                measurements.Add(new CapturedMetric(instrument.Name, measurement, tags.ToArray().ToDictionary(pair => pair.Key, pair => pair.Value)));
+        });
+        meterListener.SetMeasurementEventCallback<double>((instrument, measurement, tags, _) =>
+        {
+            lock (measurements)
+                measurements.Add(new CapturedMetric(instrument.Name, measurement, tags.ToArray().ToDictionary(pair => pair.Key, pair => pair.Value)));
+        });
+        meterListener.Start();
+
+        using var telemetry = new McpStandardTelemetry();
+        using (var operation = telemetry.BeginOperation(FileMcpConstants.ModernProtocolVersion, "tools/call", "read_file", "D", 11))
+            operation.Complete(13, isError: true);
+
+        var directActivity = activities.Single(activity => activity.DisplayName == "mcp tools/call read_file");
+        var directActivityTags = directActivity.TagObjects.ToDictionary(tag => tag.Key, tag => tag.Value);
+        Assert(directActivity.Kind == ActivityKind.Server && directActivity.Status == ActivityStatusCode.Error, "standard telemetry emits server Activity span with error status");
+        Assert(Equals(directActivityTags["rpc.system.name"], "jsonrpc") && Equals(directActivityTags["jsonrpc.protocol.version"], "2.0") && Equals(directActivityTags["mcp.tool.name"], "read_file") && Equals(directActivityTags["gen_ai.operation.name"], "execute_tool") && Equals(directActivityTags["gen_ai.tool.name"], "read_file") && Equals(directActivityTags["filemcp.workspace"], "D"), "standard telemetry Activity uses bounded MCP/JSON-RPC/gen_ai semantic tags");
+        Assert(!directActivityTags.Keys.Any(key => key.Contains("argument", StringComparison.OrdinalIgnoreCase) || key.Contains("content", StringComparison.OrdinalIgnoreCase) || key.Contains("chat", StringComparison.OrdinalIgnoreCase) || key.Contains("path", StringComparison.OrdinalIgnoreCase)), "standard telemetry Activity schema contains no argument/content/chat/path fields");
+
+        var workspace = Path.Combine(root, "standard-telemetry-http");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "hello.txt"), "hello");
+        var port = FreePort();
+        var token = new string('t', 64);
+        await using var server = new LocalMcpServer((ushort)port, workspace, "", "", false, token, _ => { }, workspaceKey: "D", standardTelemetry: telemetry);
+        await server.StartAsync();
+
+        var beforeHttpMeasurements = measurements.Count;
+        _ = await SendHttpAsync(port, "POST", "/mcp", new Dictionary<string, string> { ["Content-Type"] = "application/json" }, "");
+        _ = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), "{");
+        Assert(measurements.Count == beforeHttpMeasurements, "standard telemetry ignores unauthenticated and malformed traffic");
+
+        const string listBody = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}";
+        const string readBody = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"relative_path\":\"hello.txt\"}}}";
+        const string unknownBody = "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"private-tool-name\",\"arguments\":{\"secret\":\"PRIVATE_OTEL_MARKER_8A2DF991\"}}}";
+        _ = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), listBody);
+        _ = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), readBody);
+        _ = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), unknownBody);
+
+        CapturedMetric[] metricSnapshot;
+        lock (measurements) metricSnapshot = measurements.ToArray();
+        Assert(metricSnapshot.Where(metric => metric.Name == "mcp.server.requests").Sum(metric => metric.Value) == 4, "standard telemetry request counter includes direct operation plus three accepted MCP requests");
+        Assert(metricSnapshot.Where(metric => metric.Name == "mcp.server.tool.calls").Sum(metric => metric.Value) == 3, "standard telemetry tool-call counter tracks direct/read/error calls");
+        Assert(metricSnapshot.Where(metric => metric.Name == "mcp.server.errors").Sum(metric => metric.Value) == 2, "standard telemetry error counter tracks direct error and MCP tool error");
+        Assert(metricSnapshot.Any(metric => metric.Name == "mcp.server.operation.duration") && metricSnapshot.Any(metric => metric.Name == "mcp.server.request.size") && metricSnapshot.Any(metric => metric.Name == "mcp.server.response.size"), "standard telemetry emits duration and payload-size histograms");
+        var exportedText = string.Join('\n', metricSnapshot.SelectMany(metric => metric.Tags).Select(tag => $"{tag.Key}={tag.Value}"));
+        Assert(!exportedText.Contains(privateMarker, StringComparison.Ordinal), "standard telemetry metric tags never export private tool arguments or marker values");
+        Assert(metricSnapshot.Where(metric => metric.Name == "mcp.server.tool.calls").Any(metric => metric.Tags.TryGetValue("mcp.tool.name", out var value) && Equals(value, "unknown")), "standard telemetry unknown tool metric uses bounded unknown bucket");
+        Console.WriteLine("windows-standard-mcp-telemetry: ok");
     }
     private static void TestLogicalChatCorrelation()
     {
