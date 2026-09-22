@@ -1,7 +1,7 @@
 # FPA-004 - Production Signing / Notarization Plumbing Evidence
 
 Date: 2026-09-22
-Status: PLUMBING VERIFIED / EXTERNAL-BLOCKED FOR REAL PUBLIC-MARKET SIGNING
+Status: PLUMBING + DEFAULT-BRANCH REGISTRATION VERIFIED / EXTERNAL-BLOCKED ONLY ON REAL RELEASE CREDENTIALS + REAL SIGNED RELEASE RUN
 
 ## Implementation commits
 
@@ -88,3 +88,19 @@ FPA-004 PASS requires all of:
 10. final signed/notarized artifacts uploaded without secret leakage.
 
 Until those real credentialed checks exist, FPA-004 is EXTERNAL-BLOCKED, not PASS.
+
+
+## Default-branch registration closure
+
+Fork default branch main now contains the complete remediation/release tree.
+
+Exact verified main commit: 884e9a89a98ddd5343bb4d3e6aef8b4499f810cb.
+
+GitHub Actions run 35755705022 on that exact default-branch commit:
+- verify-macos: SUCCESS
+- verify-windows: SUCCESS
+- verify-windows-arm64: SUCCESS
+
+Workflow registry now exposes Production Release as active. Environment production-release is restricted to branch main. Configured production-release Environment secrets: none.
+
+The previous default-branch/workflow-registration blocker is CLOSED. The only remaining FPA-004 acceptance blocker is real production trust material plus one real credentialed Production Release run.

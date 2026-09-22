@@ -154,3 +154,10 @@ Only after those external release-trust actions succeed may FPA-004, V11-009 and
 No additional repository-internal feature/security/runtime bug is opened by this post-remediation audit.
 
 The project is technically verified up to the external public-distribution trust boundary. The remaining blocker is not another code bug; it is real release identity/credential ownership plus canonical default-branch release execution.
+
+
+## Default-branch registration addendum
+
+After the initial post-remediation audit, the full verified remediation/release tree was merged into the fork default branch main without conflict. Exact main commit 884e9a89a98ddd5343bb4d3e6aef8b4499f810cb passed GitHub Actions run 35755705022 on verify-macos, verify-windows and verify-windows-arm64. GitHub now registers the Production Release workflow on the default branch. The production-release Environment exists and is restricted to branch main.
+
+Accordingly, default-branch workflow registration is no longer an external blocker. The sole remaining public-market blocker is the absence of the seven real production release secrets and the resulting absence of a real signed/notarized release execution.

@@ -83,3 +83,6 @@ FPA-004 plumbing VERIFIED: GitHub Actions run 35752248896 succeeded on verify-ma
 
 
 Final post-remediation audit: docs/audit/FINAL_PRODUCT_POST_REMEDIATION_AUDIT_2026-09-22.md. No additional repo-internal bug was opened; remaining blocker is FPA-004 real release trust credentials/default-branch execution.
+
+
+Default-branch release registration: VERIFIED. Fork main commit 884e9a89 passed native Verify run 35755705022 on macOS, Windows x64 and Windows ARM64. Production Release is active on the default branch and production-release permits main. FPA-004 is now blocked only by absent real release credentials and the required real signed/notarized release run.

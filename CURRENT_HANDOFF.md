@@ -195,3 +195,11 @@ FPA-009 final acceptance:
 
 
 Final post-remediation note:\n- production-release environment is created on the fork with a main-only deployment branch policy.\n- final audit: docs/audit/FINAL_PRODUCT_POST_REMEDIATION_AUDIT_2026-09-22.md.\n- no new repo-internal technical blocker found.\n
+
+Default-branch Production Release registration VERIFIED:
+- fork main: 884e9a89a98ddd5343bb4d3e6aef8b4499f810cb
+- native Verify run 35755705022: macOS / Windows x64 / Windows ARM64 SUCCESS
+- Production Release workflow active on default branch
+- production-release environment restricted to main
+- 0/7 real release secrets configured
+- Remaining blocker: real credentials + one real Production Release run.
