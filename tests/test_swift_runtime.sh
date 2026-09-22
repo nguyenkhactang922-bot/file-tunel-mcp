@@ -592,6 +592,13 @@ let cooldownRuntime = LocalMCPRuntime(
     supervisorOptions: cooldownOptions,
     jitterProvider: { 0.5 }
 )
+let cooldownLogLock = NSLock()
+var cooldownLog = ""
+cooldownRuntime.onLog = { text in
+    cooldownLogLock.lock()
+    cooldownLog += text
+    cooldownLogLock.unlock()
+}
 let cooldownConfig = LocalMCPConfiguration(
     tunnelID: "tunnel_0123456789abcdef0123456789abcdef", apiKey: "test-key",
     profile: "cooldown-runtime-(UUID().uuidString)", port: 18079,
@@ -599,10 +606,21 @@ let cooldownConfig = LocalMCPConfiguration(
     gitUserName: "", gitUserEmail: "", enableCommands: false
 )
 cooldownRuntime.start(cooldownConfig)
-waitFor({
-    if case .cooldown = cooldownRuntime.state { return true }
-    return false
-}, timeout: 5, label: "restart budget cooldown")
+let cooldownDeadline = Date().addingTimeInterval(8)
+var observedCooldown = false
+while Date() < cooldownDeadline {
+    if case .cooldown = cooldownRuntime.state {
+        observedCooldown = true
+        break
+    }
+    Thread.sleep(forTimeInterval: 0.05)
+}
+if !observedCooldown {
+    cooldownLogLock.lock()
+    let cooldownLogSnapshot = cooldownLog
+    cooldownLogLock.unlock()
+    fatalError("timed out waiting for restart budget cooldown; state=\(cooldownRuntime.state); launches=\(runLaunchCount(cooldownCountFile)); log=\(cooldownLogSnapshot)")
+}
 precondition(runLaunchCount(cooldownCountFile) == 2, "cooldown should occur after initial launch plus one bounded restart attempt")
 cooldownRuntime.stop()
 waitFor({ cooldownRuntime.state == .stopped }, timeout: 5, label: "cooldown stop")
