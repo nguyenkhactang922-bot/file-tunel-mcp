@@ -34,6 +34,7 @@ internal static class Program
             await TestTelemetryPersistenceAsync(root);
             await TestUsagePeriodsAndRetentionAsync(root);
             await TestObservabilityHubAsync(root);
+            await TestObservabilityHardeningAsync(root);
             await TestSettingsAndCredentialsAsync(root);
             await TestProcessRunnerAsync(root);
             await TestFilesystemAndToolsAsync(root);
@@ -578,6 +579,175 @@ internal static class Program
         Assert(realtimeSamples.Count == 900, "observability realtime ring bounded to 15 minutes");
         Assert(realtimeSamples[^1].CapturedUtc == rt0.AddSeconds(909), "observability realtime ring keeps newest sample");
         Console.WriteLine("windows-observability-hub: ok");
+    }
+    private static async Task TestObservabilityHardeningAsync(string root)
+    {
+        var workspace = Path.Combine(root, "observability-hardening-workspace");
+        var databaseDirectory = Path.Combine(root, "observability-hardening-db");
+        Directory.CreateDirectory(workspace);
+        Directory.CreateDirectory(databaseDirectory);
+        File.WriteAllText(Path.Combine(workspace, "parallel.txt"), "parallel-safe-content", new UTF8Encoding(false));
+
+        var database = Path.Combine(databaseDirectory, "observability.sqlite3");
+        await using (var hub = new ObservabilityHub(["D"], database, TimeSpan.FromHours(1)))
+        {
+            await hub.StartAsync();
+            var port = FreePort();
+            var token = new string('h', 64);
+            await using var server = new LocalMcpServer(
+                (ushort)port,
+                workspace,
+                "",
+                "",
+                false,
+                token,
+                _ => { },
+                hub.MeterFor("D"),
+                hub.ChatCorrelation,
+                hub.Sessions,
+                "D");
+            await server.StartAsync();
+
+            const string privatePayload = "FILEMCP_PRIVATE_PAYLOAD_6D572D44_DO_NOT_PERSIST";
+            const string privatePath = "private-marker-8b59e4.txt";
+            const string privateSearch = "PRIVATE_SEARCH_TERM_AE4218";
+
+            const string connectBody = "{\"jsonrpc\":\"2.0\",\"id\":700,\"method\":\"tools/call\",\"params\":{\"name\":\"filemcp_observability_connect\",\"arguments\":{}}}";
+            var connectResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), connectBody);
+            var connectJson = JsonNode.Parse(HttpBody(connectResponse))!.AsObject();
+            var rawHandle = connectJson["result"]!["structuredContent"]!["chat_instance_id"]!.GetValue<string>();
+
+            var writeBody = new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = 701,
+                ["method"] = "tools/call",
+                ["params"] = new JsonObject
+                {
+                    ["name"] = "write_file",
+                    ["arguments"] = new JsonObject
+                    {
+                        ["relative_path"] = privatePath,
+                        ["content"] = privatePayload + " " + privateSearch,
+                        ["_filemcp_chat"] = rawHandle,
+                    },
+                },
+            }.ToJsonString();
+            var writeResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), writeBody);
+            Assert(!JsonNode.Parse(HttpBody(writeResponse))!.AsObject()["result"]!["isError"]!.GetValue<bool>(), "hardening private payload write succeeds");
+
+            var readBody = new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = 702,
+                ["method"] = "tools/call",
+                ["params"] = new JsonObject
+                {
+                    ["name"] = "read_file",
+                    ["arguments"] = new JsonObject { ["relative_path"] = privatePath, ["_filemcp_chat"] = rawHandle },
+                },
+            }.ToJsonString();
+            var readResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), readBody);
+            Assert(HttpBody(readResponse).Contains(privatePayload, StringComparison.Ordinal), "hardening private response really contains sensitive fixture");
+
+            var searchBody = new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = 703,
+                ["method"] = "tools/call",
+                ["params"] = new JsonObject
+                {
+                    ["name"] = "search_content",
+                    ["arguments"] = new JsonObject { ["query"] = privateSearch, ["_filemcp_chat"] = rawHandle },
+                },
+            }.ToJsonString();
+            var searchResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), searchBody);
+            Assert(HttpBody(searchResponse).Contains(privateSearch, StringComparison.Ordinal), "hardening search response really contains sensitive query fixture");
+
+            var beforeParallel = hub.Snapshot().GlobalUsage;
+            const int parallelCalls = 64;
+            var parallelRequests = Enumerable.Range(0, parallelCalls).Select(index =>
+            {
+                var body = new JsonObject
+                {
+                    ["jsonrpc"] = "2.0",
+                    ["id"] = 800 + index,
+                    ["method"] = "tools/call",
+                    ["params"] = new JsonObject
+                    {
+                        ["name"] = "read_file",
+                        ["arguments"] = new JsonObject { ["relative_path"] = "parallel.txt", ["_filemcp_chat"] = rawHandle },
+                    },
+                }.ToJsonString();
+                return SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), body);
+            }).ToArray();
+            var parallelResponses = await Task.WhenAll(parallelRequests);
+            Assert(parallelResponses.All(response => HttpBody(response).Contains("parallel-safe-content", StringComparison.Ordinal)), "hardening parallel server calls all succeed");
+            var afterParallel = hub.Snapshot().GlobalUsage;
+            Assert(afterParallel.ToolCalls - beforeParallel.ToolCalls == parallelCalls, "hardening parallel server telemetry loses no tool calls");
+            Assert(afterParallel.ReadCalls - beforeParallel.ReadCalls == parallelCalls, "hardening parallel server telemetry preserves categories");
+            var boundSession = hub.Sessions.Snapshot(includeStale: true).Single();
+            Assert(boundSession.Workspaces["D"].Usage.ReadCalls >= parallelCalls + 1, "hardening parallel bound-session attribution loses no read calls");
+
+            await hub.FlushAsync(DateTimeOffset.UtcNow);
+            SqliteConnection.ClearAllPools();
+            foreach (var file in Directory.GetFiles(databaseDirectory, "observability.sqlite3*"))
+            {
+                await using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var memory = new MemoryStream();
+                await stream.CopyToAsync(memory);
+                var persisted = Encoding.UTF8.GetString(memory.ToArray());
+                Assert(!persisted.Contains(privatePayload, StringComparison.Ordinal), $"hardening telemetry DB excludes response/request content ({Path.GetFileName(file)})");
+                Assert(!persisted.Contains(privatePath, StringComparison.Ordinal), $"hardening telemetry DB excludes file arguments ({Path.GetFileName(file)})");
+                Assert(!persisted.Contains(privateSearch, StringComparison.Ordinal), $"hardening telemetry DB excludes search arguments ({Path.GetFileName(file)})");
+                Assert(!persisted.Contains(rawHandle, StringComparison.Ordinal), $"hardening telemetry DB excludes raw correlation handle ({Path.GetFileName(file)})");
+            }
+        }
+
+        var corruptDirectory = Path.Combine(root, "observability-corrupt");
+        Directory.CreateDirectory(corruptDirectory);
+        var corruptDatabase = Path.Combine(corruptDirectory, "observability.sqlite3");
+        await File.WriteAllBytesAsync(corruptDatabase, Encoding.ASCII.GetBytes("NOT_A_SQLITE_DATABASE_FILEMCP_CORRUPT_FIXTURE"));
+        await using (var corruptHub = new ObservabilityHub(["D"], corruptDatabase, TimeSpan.FromHours(1)))
+        {
+            var initializationFailed = false;
+            try { await corruptHub.StartAsync(); }
+            catch (Exception) { initializationFailed = true; }
+            Assert(initializationFailed, "hardening corrupt telemetry database is detected");
+
+            var port = FreePort();
+            var token = new string('r', 64);
+            await using var server = new LocalMcpServer(
+                (ushort)port,
+                workspace,
+                "",
+                "",
+                false,
+                token,
+                _ => { },
+                corruptHub.MeterFor("D"),
+                corruptHub.ChatCorrelation,
+                corruptHub.Sessions,
+                "D");
+            await server.StartAsync();
+            const string body = "{\"jsonrpc\":\"2.0\",\"id\":950,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"relative_path\":\"parallel.txt\"}}}";
+            var response = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), body);
+            Assert(HttpBody(response).Contains("parallel-safe-content", StringComparison.Ordinal), "hardening corrupt telemetry cannot fail valid MCP operation");
+            Assert(corruptHub.Snapshot().GlobalUsage.ToolCalls == 1, "hardening in-memory telemetry remains available while DB is corrupt");
+
+            SqliteConnection.ClearAllPools();
+            File.Delete(corruptDatabase);
+            await corruptHub.StartAsync();
+            await corruptHub.FlushAsync(DateTimeOffset.UtcNow);
+            Assert(File.Exists(corruptDatabase), "hardening telemetry can recover after corrupt DB is removed");
+            await using var recovered = new SqliteConnection($"Data Source={corruptDatabase}");
+            await recovered.OpenAsync();
+            await using var version = recovered.CreateCommand();
+            version.CommandText = "SELECT value FROM telemetry_meta WHERE key='schema_version';";
+            Assert((string?)await version.ExecuteScalarAsync() == TelemetrySqliteStore.SchemaVersion.ToString(), "hardening recovered telemetry DB has current schema");
+        }
+
+        Console.WriteLine("windows-observability-hardening: ok");
     }
     private static Task TestSettingsAndCredentialsAsync(string root)
     {

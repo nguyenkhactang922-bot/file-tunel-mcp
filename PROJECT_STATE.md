@@ -9,7 +9,7 @@ Implementation: ACTIVE
 
 Completed:
 - FMR-001 PASS.
-- OBS-001 through OBS-010 PASS.
-- OBS-011 PASS - 15-minute bounded realtime ring, WPF calls/token-estimate graph, measurable runtime/tool-latency/persistent-telemetry health only; Release build PASS; Windows integration 277 assertions PASS; WPF realtime smoke PASS.
+- OBS-001 through OBS-011 PASS.
+- OBS-012 PASS - adversarial privacy, 64-call server concurrency, corrupt DB isolation/recovery, 2,000 malformed HTTP fuzz, legacy security suite and app harness all PASS; integration 293 assertions.
 
-Next task: OBS-012 - security/privacy/load/recovery hardening audit.
+Next task: OBS-013 - self-contained win-x64 package, native SQLite smoke, live ChatGPT correlation proof, final acceptance.

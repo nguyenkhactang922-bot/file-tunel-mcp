@@ -2,8 +2,8 @@
 
 STATUS: IMPLEMENTATION ACTIVE
 BRANCH: chatgpt/OBS-001-observability-foundation
-COMPLETED: FMR-001 through OBS-011
-NEXT TASK: OBS-012 - security/privacy/load/recovery hardening audit
+COMPLETED: FMR-001 through OBS-012
+NEXT TASK: OBS-013 - package/release final acceptance
 
 NEXT_EXACT_ACTION:
-Run and extend the hardening gates: high-concurrency meter/server traffic, SQLite failure/corruption/reopen behavior, schema migration and retention, DB privacy inspection for forbidden content/arguments/secrets/raw chat handles, and all legacy filesystem/Git/HTTP/runtime security regressions. Fix any real defect found before advancing to packaging.
+Build the self-contained win-x64 package, verify native SQLite create/write/read in the published artifact, run packaged desktop smoke, inspect release contents/dependencies, then attempt one live ChatGPT MCP correlation proof. Exact AI-chat label remains disabled unless that live proof succeeds.
