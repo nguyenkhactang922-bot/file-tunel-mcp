@@ -164,3 +164,9 @@ FPA-008 final acceptance:
 - Local contracts/build/runtime PASS at 444 assertions.
 - Candidate evidence: docs/evidence/FPA-009_DYNAMIC_HEALTH_DISCOVERY_CANDIDATE.md.
 - FPA-009 remains ACTIVE until native macOS/Windows x64/Windows ARM64 CI succeeds.
+
+
+FPA-009 final acceptance:
+- GitHub Actions run 35748443822: macOS, Windows x64 and Windows ARM64 all SUCCESS.
+- Evidence: docs/evidence/FPA-009_DYNAMIC_HEALTH_DISCOVERY_EVIDENCE.md.
+- Next: FPA-004 public-market signing/notarization design gate.

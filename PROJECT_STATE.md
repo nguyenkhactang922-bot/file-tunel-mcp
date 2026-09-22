@@ -50,7 +50,7 @@ V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 - FPA-005 PASS: native Windows ARM64 runtime assurance verified by GitHub hosted ARM64 runner.
 - FPA-007 PASS: per-user Windows desktop single-instance activation verified on x64 and ARM64.
 - FPA-008 PASS: cross-platform HTTP connection cap plus idle/header deadlines, native CI verified.
-- FPA-009 P3 optional: dynamic health endpoint discovery.
+- FPA-009 PASS: dynamic health endpoint discovery via official tunnel-client URL file, native CI verified.
 
 FPA-006 PASS. FPA-002 PASS with native macOS/Windows CI. Current remediation advances to FPA-003.
 
@@ -71,3 +71,6 @@ FPA-007 native CI PASS: run 35728230159 succeeded on macOS, Windows x64 and Wind
 
 
 FPA-008 native CI PASS: run 35745850301 succeeded on verify-macos, verify-windows and verify-windows-arm64. Current technical remediation advances to FPA-009 before the remaining public-market signing gate.
+
+
+FPA-009 native CI PASS: run 35748443822 succeeded on verify-macos, verify-windows and verify-windows-arm64. Remaining whole-app market gate is FPA-004 signing/notarization.
