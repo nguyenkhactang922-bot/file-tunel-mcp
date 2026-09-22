@@ -645,6 +645,7 @@ internal static class Program
         Assert(initial.Workspaces["D"].LifetimeUsage.McpRequests == 1 && initial.Workspaces["E"].LifetimeUsage.McpRequests == 1, "observability hub per-workspace usage");
         Assert(initial.GlobalUsage == initial.Workspaces.Values.Select(item => item.LifetimeUsage).Aggregate(default(UsageCounters), (sum, value) => sum + value), "observability hub global usage equals workspace sum");
         Assert(initial.GlobalUsage.McpRequests == 2 && initial.GlobalUsage.ToolCalls == 2 && initial.GlobalUsage.Errors == 1, "observability hub global counters");
+        Assert(initial.Persistence.Status == TelemetryPersistenceStatus.Ready && initial.Persistence.LastSuccessUtc.HasValue, "observability hub reports persistence ready after successful initialization");
 
         hub.MarkRuntimeRunning("D");
         await Task.Delay(20);
@@ -874,6 +875,8 @@ internal static class Program
             try { await corruptHub.StartAsync(); }
             catch (Exception) { initializationFailed = true; }
             Assert(initializationFailed, "hardening corrupt telemetry database is detected");
+            var degradedPersistence = corruptHub.Snapshot().Persistence;
+            Assert(degradedPersistence.Status == TelemetryPersistenceStatus.Degraded && degradedPersistence.FailureCount >= 1, "persistence health degrades after corrupt database failure");
 
             var port = FreePort();
             var token = new string('r', 64);
@@ -900,6 +903,7 @@ internal static class Program
             await corruptHub.StartAsync();
             await corruptHub.FlushAsync(DateTimeOffset.UtcNow);
             Assert(File.Exists(corruptDatabase), "hardening telemetry can recover after corrupt DB is removed");
+            Assert(corruptHub.Snapshot().Persistence.Status == TelemetryPersistenceStatus.Ready, "persistence health recovers after successful database reinitialization");
             await using var recovered = new SqliteConnection($"Data Source={corruptDatabase}");
             await recovered.OpenAsync();
             await using var version = recovered.CreateCommand();
@@ -1341,12 +1345,17 @@ internal static class Program
         jitterPolicy.Reset();
         var highJitter = jitterPolicy.Next(t0, t0, () => 1);
         Assert(lowJitter.Delay == TimeSpan.FromMilliseconds(80) && highJitter.Delay == TimeSpan.FromMilliseconds(120), "tunnel supervisor jitter is bounded around base delay");
+        Assert(!LocalMcpRuntime.TryParseProbeEndpoint("127.0.0.1:0", out _, out _), "dynamic tunnel health port is intentionally not probed");
+        Assert(LocalMcpRuntime.TryParseProbeEndpoint("[::1]:12345", out var probeHost, out var probePort) && probeHost == "::1" && probePort == 12345, "fixed loopback tunnel health endpoint parses for probing");
         Console.WriteLine("windows-tunnel-restart-policy: ok");
     }
     private static async Task TestRuntimeAsync(string root)
     {
         var workspace = Path.Combine(root, "runtime-workspace"); Directory.CreateDirectory(workspace);
         var profiles = Path.Combine(root, "runtime-profiles"); var capture = Path.Combine(root, "tunnel-env.txt");
+        var healthPort = FreePort();
+        using var healthListener = new TcpListener(IPAddress.Loopback, healthPort);
+        healthListener.Start();
         Environment.SetEnvironmentVariable("MCP_TUNNEL_CLIENT", Environment.ProcessPath);
         Environment.SetEnvironmentVariable("MCP_TEST_ENV_CAPTURE", capture);
         Environment.SetEnvironmentVariable("LOG_HTTP_RAW_UNSAFE", "true");
@@ -1356,7 +1365,7 @@ internal static class Program
         var runtime = new LocalMcpRuntime("D", observability, profiles); var logs = new StringBuilder(); runtime.Log += text => logs.Append(text);
         try
         {
-            var config = new LocalMcpConfiguration("tunnel_" + new string('b', 32), "sk-runtime-test-secret", "runtime-test", (ushort)FreePort(), workspace, "127.0.0.1:0", "", "", false);
+            var config = new LocalMcpConfiguration("tunnel_" + new string('b', 32), "sk-runtime-test-secret", "runtime-test", (ushort)FreePort(), workspace, $"127.0.0.1:{healthPort}", "", "", false);
             await runtime.StartAsync(config);
             Assert(runtime.State.Status == LocalMcpRuntimeStatus.Running, "runtime running");
             await Task.Delay(10);
@@ -1369,8 +1378,15 @@ internal static class Program
             Assert(!logs.ToString().Contains("sk-runtime-test-secret", StringComparison.Ordinal), "api key redacted");
             Assert(!System.Text.RegularExpressions.Regex.IsMatch(logs.ToString(), "[0-9a-f]{64}"), "local token redacted");
             Assert(logs.ToString().Contains("[Skills]", StringComparison.Ordinal), "skill scan logged on connect");
+            var runtimeHealth = await runtime.RefreshHealthAsync();
+            Assert(runtimeHealth.LocalServerReady && runtimeHealth.TunnelProcessRunning, "runtime component health reports local MCP server and tunnel process ready");
+            Assert(runtimeHealth.TunnelHealth == TunnelHealthProbeState.Reachable && runtimeHealth.LastTunnelHealthSuccessUtc.HasValue, "runtime fixed loopback tunnel health endpoint is reachable");
+            healthListener.Stop();
+            runtimeHealth = await runtime.RefreshHealthAsync();
+            Assert(runtimeHealth.TunnelHealth == TunnelHealthProbeState.Unreachable && runtimeHealth.LastTunnelHealthSuccessUtc.HasValue, "runtime health records tunnel-health failure while preserving last success");
             await runtime.StopAsync();
             Assert(runtime.State.Status == LocalMcpRuntimeStatus.Stopped, "runtime stopped");
+            Assert(!runtime.HealthSnapshot.LocalServerReady && !runtime.HealthSnapshot.TunnelProcessRunning, "runtime component health clears server/process readiness after stop");
             var stoppedObservation = observability.Snapshot().Workspaces["D"];
             Assert(!stoppedObservation.RuntimeRunning && stoppedObservation.RuntimeUptime == TimeSpan.Zero, "runtime clears connected uptime when stopped");
 
@@ -1413,6 +1429,8 @@ internal static class Program
                 var pendingConfig = new LocalMcpConfiguration("tunnel_" + new string('d', 32), "sk-runtime-cancel-secret", "runtime-cancel-test", (ushort)FreePort(), workspace, "127.0.0.1:0", "", "", false);
                 await pendingRuntime.StartAsync(pendingConfig);
                 Assert(await WaitUntilAsync(() => pendingRuntime.State.Status == LocalMcpRuntimeStatus.Restarting, TimeSpan.FromSeconds(2)), "runtime enters restarting state after unexpected tunnel exit");
+                var restartingHealth = pendingRuntime.HealthSnapshot;
+                Assert(restartingHealth.LocalServerReady && !restartingHealth.TunnelProcessRunning && restartingHealth.RestartPending, "runtime health keeps local MCP ready while tunnel restart is pending");
                 var stopTimer = Stopwatch.StartNew();
                 await pendingRuntime.StopAsync();
                 stopTimer.Stop();
@@ -1439,6 +1457,8 @@ internal static class Program
                 var cooldownConfig = new LocalMcpConfiguration("tunnel_" + new string('e', 32), "sk-runtime-cooldown-secret", "runtime-cooldown-test", (ushort)FreePort(), workspace, "127.0.0.1:0", "", "", false);
                 await cooldownRuntime.StartAsync(cooldownConfig);
                 Assert(await WaitUntilAsync(() => cooldownRuntime.State.Status == LocalMcpRuntimeStatus.Cooldown, TimeSpan.FromSeconds(2)), "runtime enters cooldown after restart budget is exhausted");
+                var cooldownHealth = cooldownRuntime.HealthSnapshot;
+                Assert(cooldownHealth.LocalServerReady && !cooldownHealth.TunnelProcessRunning && cooldownHealth.RestartPending, "runtime health exposes local-server availability during tunnel cooldown");
                 var cooldownSnapshot = cooldownRuntime.SupervisorSnapshot;
                 Assert(cooldownSnapshot.CooldownEntries >= 1 && cooldownSnapshot.RestartPending && cooldownSnapshot.NextRestartUtc.HasValue, "runtime cooldown exposes pending resume evidence");
                 var cooldownStopTimer = Stopwatch.StartNew();

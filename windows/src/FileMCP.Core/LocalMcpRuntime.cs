@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -55,6 +56,13 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
     private readonly Func<TimeSpan, CancellationToken, Task> _restartDelay;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Func<double> _jitter;
+    private readonly SemaphoreSlim _healthProbeGate = new(1, 1);
+    private string? _configuredHealthAddress;
+    private bool _localServerReady;
+    private bool _tunnelProcessRunning;
+    private TunnelHealthProbeState _tunnelHealth = TunnelHealthProbeState.NotConfigured;
+    private DateTimeOffset? _lastTunnelHealthCheckUtc;
+    private DateTimeOffset? _lastTunnelHealthSuccessUtc;
     private LocalMcpRuntimeState _state = LocalMcpRuntimeState.Stopped;
     private CancellationTokenSource? _startupCts;
     private CancellationTokenSource? _restartCts;
@@ -152,6 +160,89 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         }
     }
 
+    public LocalMcpRuntimeHealthSnapshot HealthSnapshot
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                return new LocalMcpRuntimeHealthSnapshot(
+                    _workspaceKey,
+                    _state.Status,
+                    _localServerReady,
+                    _tunnelProcessRunning,
+                    _tunnelHealth,
+                    _lastTunnelHealthCheckUtc,
+                    _lastTunnelHealthSuccessUtc,
+                    _restartPending,
+                    _nextRestartUtc,
+                    _supervisorConsecutiveRestarts,
+                    _supervisorAttemptsInWindow,
+                    _totalRestarts,
+                    _cooldownEntries);
+            }
+        }
+    }
+
+    public async Task<LocalMcpRuntimeHealthSnapshot> RefreshHealthAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await _healthProbeGate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return HealthSnapshot;
+        try
+        {
+            string? address;
+            bool processRunning;
+            lock (_stateGate)
+            {
+                address = _configuredHealthAddress;
+                processRunning = _tunnelProcessRunning;
+            }
+
+            var now = _clock().ToUniversalTime();
+            if (!TryParseProbeEndpoint(address, out var host, out var port))
+            {
+                lock (_stateGate)
+                {
+                    _tunnelHealth = TunnelHealthProbeState.NotConfigured;
+                    _lastTunnelHealthCheckUtc = now;
+                }
+                return HealthSnapshot;
+            }
+
+            if (!processRunning)
+            {
+                lock (_stateGate)
+                {
+                    _tunnelHealth = TunnelHealthProbeState.Unreachable;
+                    _lastTunnelHealthCheckUtc = now;
+                }
+                return HealthSnapshot;
+            }
+
+            var reachable = false;
+            try
+            {
+                using var client = new TcpClient();
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(TimeSpan.FromMilliseconds(300));
+                await client.ConnectAsync(host, port, timeout.Token).ConfigureAwait(false);
+                reachable = client.Connected;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+            catch (SocketException) { }
+
+            lock (_stateGate)
+            {
+                _lastTunnelHealthCheckUtc = now;
+                _tunnelHealth = reachable ? TunnelHealthProbeState.Reachable : TunnelHealthProbeState.Unreachable;
+                if (reachable) _lastTunnelHealthSuccessUtc = now;
+            }
+            return HealthSnapshot;
+        }
+        finally
+        {
+            _healthProbeGate.Release();
+        }
+    }
     public async Task StartAsync(LocalMcpConfiguration configuration)
     {
         await _serial.WaitAsync().ConfigureAwait(false);
@@ -171,6 +262,7 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
             try
             {
                 var healthAddress = ValidateConfiguration(configuration);
+                SetConfiguredHealthAddress(healthAddress);
                 _profileLock = new ProfileLock(configuration.Profile);
                 _profileLock.Acquire();
                 var localAuthToken = MakeLocalAuthToken();
@@ -187,6 +279,7 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
                     _observability?.Sessions,
                     _workspaceKey);
                 await _server.StartAsync(cancellationToken).ConfigureAwait(false);
+                lock (_stateGate) _localServerReady = true;
 
                 var tunnelClient = TunnelClientPath();
                 var profileDirectory = TunnelProfileDirectory();
@@ -296,6 +389,15 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
             _tunnelProcess?.Dispose();
             _tunnelProcess = null;
             var now = _clock().ToUniversalTime();
+            lock (_stateGate)
+            {
+                _tunnelProcessRunning = false;
+                if (TryParseProbeEndpoint(_configuredHealthAddress, out _, out _))
+                {
+                    _tunnelHealth = TunnelHealthProbeState.Unreachable;
+                    _lastTunnelHealthCheckUtc = now;
+                }
+            }
             RecordTunnelExitUnsafe(now, exitCode);
 
             if (_requestedStop || State.Status == LocalMcpRuntimeStatus.Stopping)
@@ -418,6 +520,10 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         lock (_stateGate)
         {
             _lastTunnelStartedUtc = now;
+            _tunnelProcessRunning = true;
+            _tunnelHealth = TryParseProbeEndpoint(_configuredHealthAddress, out _, out _)
+                ? TunnelHealthProbeState.Unknown
+                : TunnelHealthProbeState.NotConfigured;
             _restartPending = false;
             _nextRestartUtc = null;
             if (countAsRestart) _totalRestarts++;
@@ -511,8 +617,52 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         _profileLock = null;
         _tunnelLaunch = null;
         _tunnelStartedUtc = null;
+        lock (_stateGate)
+        {
+            _localServerReady = false;
+            _tunnelProcessRunning = false;
+            _tunnelHealth = TryParseProbeEndpoint(_configuredHealthAddress, out _, out _)
+                ? TunnelHealthProbeState.Unknown
+                : TunnelHealthProbeState.NotConfigured;
+        }
     }
 
+    private void SetConfiguredHealthAddress(string healthAddress)
+    {
+        lock (_stateGate)
+        {
+            _configuredHealthAddress = healthAddress;
+            _tunnelHealth = TryParseProbeEndpoint(healthAddress, out _, out _)
+                ? TunnelHealthProbeState.Unknown
+                : TunnelHealthProbeState.NotConfigured;
+            _lastTunnelHealthCheckUtc = null;
+            _lastTunnelHealthSuccessUtc = null;
+        }
+    }
+
+    internal static bool TryParseProbeEndpoint(string? normalizedHealthAddress, out string host, out int port)
+    {
+        host = "";
+        port = 0;
+        if (string.IsNullOrWhiteSpace(normalizedHealthAddress)) return false;
+        var value = normalizedHealthAddress.Trim();
+        string portText;
+        if (value.StartsWith('['))
+        {
+            var close = value.IndexOf(']');
+            if (close <= 1 || close + 2 > value.Length || value[close + 1] != ':') return false;
+            host = value[1..close];
+            portText = value[(close + 2)..];
+        }
+        else
+        {
+            var colon = value.LastIndexOf(':');
+            if (colon <= 0 || colon == value.Length - 1) return false;
+            host = value[..colon];
+            portText = value[(colon + 1)..];
+        }
+        return int.TryParse(portText, out port) && port is > 0 and <= 65535;
+    }
     public static string ValidateConfiguration(LocalMcpConfiguration configuration)
     {
         foreach (var (label, value) in new[] { ("Tunnel ID", configuration.TunnelId), ("Runtime API key", configuration.ApiKey), ("Profile", configuration.Profile), ("Shared directory", configuration.AllowedDirectory) })
@@ -627,5 +777,8 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         _serial.Dispose();
         _startupCts?.Dispose();
         _restartCts?.Dispose();
+        await _healthProbeGate.WaitAsync().ConfigureAwait(false);
+        _healthProbeGate.Release();
+        _healthProbeGate.Dispose();
     }
 }

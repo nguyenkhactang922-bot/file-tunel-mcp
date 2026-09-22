@@ -6,6 +6,7 @@ internal sealed class LogicalSessionWriter : IAsyncDisposable
     private readonly TelemetrySqliteStore _store;
     private readonly TimeSpan _interval;
     private readonly Action<string>? _log;
+    private readonly TelemetryPersistenceHealthTracker? _health;
     private readonly SemaphoreSlim _flushGate = new(1, 1);
     private LogicalSessionPersistenceBatch _pending = new([], []);
     private CancellationTokenSource? _cts;
@@ -15,19 +16,30 @@ internal sealed class LogicalSessionWriter : IAsyncDisposable
         LogicalSessionRegistry registry,
         TelemetrySqliteStore store,
         TimeSpan? interval = null,
-        Action<string>? log = null)
+        Action<string>? log = null,
+        TelemetryPersistenceHealthTracker? health = null)
     {
         _registry = registry;
         _store = store;
         _interval = interval ?? TimeSpan.FromSeconds(1);
         if (_interval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval));
         _log = log;
+        _health = health;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (_loop is not null) return;
-        await _store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+            _health?.RecordSuccess();
+        }
+        catch
+        {
+            _health?.RecordFailure();
+            throw;
+        }
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _loop = RunAsync(_cts.Token);
     }
@@ -40,9 +52,18 @@ internal sealed class LogicalSessionWriter : IAsyncDisposable
             var drained = _registry.DrainPersistence(capturedAtUtc);
             _pending = Merge(_pending, drained);
             if (_pending.IsEmpty) return;
-            await _store.UpsertSessionDeltasAsync(_pending, cancellationToken).ConfigureAwait(false);
-            _registry.MarkPersisted(_pending);
-            _pending = new([], []);
+            try
+            {
+                await _store.UpsertSessionDeltasAsync(_pending, cancellationToken).ConfigureAwait(false);
+                _registry.MarkPersisted(_pending);
+                _pending = new([], []);
+                _health?.RecordSuccess(capturedAtUtc);
+            }
+            catch
+            {
+                _health?.RecordFailure(capturedAtUtc);
+                throw;
+            }
         }
         finally
         {

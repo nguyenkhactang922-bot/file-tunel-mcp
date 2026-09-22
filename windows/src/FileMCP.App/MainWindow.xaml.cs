@@ -29,7 +29,6 @@ public partial class MainWindow : Window
     private DateTimeOffset _lastOverviewPeriodRefreshUtc = DateTimeOffset.MinValue;
     private int _overviewPeriodQueryGeneration;
     private bool _overviewPeriodQueryRunning;
-    private bool _observabilityStoreReady;
     private string _logBuffer = "";
     private const int MaxLogCharacters = 500_000;
 
@@ -86,13 +85,11 @@ public partial class MainWindow : Window
         try
         {
             await _observability.StartAsync();
-            _observabilityStoreReady = true;
             await RunObservabilityPackageSmokeIfRequestedAsync();
             AppendLog("[Telemetry] Observability store ready.\n");
         }
         catch (Exception ex)
         {
-            _observabilityStoreReady = false;
             AppendLog($"[Telemetry] Persistent observability unavailable; MCP remains operational: {ex.Message}\n");
         }
     }
@@ -132,9 +129,20 @@ public partial class MainWindow : Window
     }
     private async void OverviewTimer_Tick(object? sender, EventArgs e)
     {
+        await RefreshRuntimeHealthAsync();
         RefreshOverviewLiveUi();
         if (DateTimeOffset.UtcNow - _lastOverviewPeriodRefreshUtc >= TimeSpan.FromSeconds(5))
             await RefreshOverviewPeriodAsync(force: false);
+    }
+
+    private async Task RefreshRuntimeHealthAsync()
+    {
+        if (_quitting) return;
+        try
+        {
+            await Task.WhenAll(_runtimes.Values.Select(runtime => runtime.RefreshHealthAsync()));
+        }
+        catch (ObjectDisposedException) when (_quitting) { }
     }
 
     private void OverviewPeriodCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -159,7 +167,7 @@ public partial class MainWindow : Window
         OverviewClockText.Text = DateTimeOffset.Now.ToString("ddd, dd/MM/yyyy  HH:mm:ss");
         OverviewAppUptimeText.Text = "App uptime: " + FormatDuration(snapshot.AppUptime);
         foreach (var key in WorkspaceKeys)
-            if (snapshot.Workspaces.TryGetValue(key, out var workspace)) UpdateOverviewWorkspaceLive(key, workspace);
+            if (snapshot.Workspaces.TryGetValue(key, out var workspace)) UpdateOverviewWorkspaceLive(key, workspace, _runtimes[key].HealthSnapshot);
 
         var realtime = _observability.CaptureRealtimeSample();
         UpdateOverviewHealth(snapshot);
@@ -181,10 +189,18 @@ public partial class MainWindow : Window
         OverviewConnectedRuntimesText.Text = $"{connected} / {WorkspaceKeys.Length}";
         OverviewAverageLatencyText.Text = $"{averageMs:N1} ms";
         OverviewMaxLatencyText.Text = $"{maxMs:N1} ms";
-        OverviewTelemetryHealthText.Text = _observabilityStoreReady ? "Ready" : "Degraded";
-        OverviewTelemetryHealthText.Foreground = _observabilityStoreReady
-            ? System.Windows.Media.Brushes.ForestGreen
-            : System.Windows.Media.Brushes.DarkOrange;
+        OverviewTelemetryHealthText.Text = snapshot.Persistence.Status switch
+        {
+            TelemetryPersistenceStatus.Ready => "Ready",
+            TelemetryPersistenceStatus.Degraded => $"Degraded ({snapshot.Persistence.FailureCount:N0})",
+            _ => "Starting",
+        };
+        OverviewTelemetryHealthText.Foreground = snapshot.Persistence.Status switch
+        {
+            TelemetryPersistenceStatus.Ready => System.Windows.Media.Brushes.ForestGreen,
+            TelemetryPersistenceStatus.Degraded => System.Windows.Media.Brushes.DarkOrange,
+            _ => System.Windows.Media.Brushes.Gray,
+        };
     }
 
     private void UpdateRealtimeGraph(RealtimeUsageSample current)
@@ -284,13 +300,45 @@ public partial class MainWindow : Window
         OverviewErrorsText.Text = FormatCount(usage.Errors);
     }
 
-    private void UpdateOverviewWorkspaceLive(string key, WorkspaceObservabilitySnapshot workspace)
+    private void UpdateOverviewWorkspaceLive(string key, WorkspaceObservabilitySnapshot workspace, LocalMcpRuntimeHealthSnapshot health)
     {
         var status = OverviewStatusText(key);
-        status.Text = workspace.RuntimeRunning ? "Connected" : "Stopped";
-        status.Foreground = workspace.RuntimeRunning ? System.Windows.Media.Brushes.ForestGreen : System.Windows.Media.Brushes.Gray;
+        status.Text = health.RuntimeStatus switch
+        {
+            LocalMcpRuntimeStatus.Running => "Connected",
+            LocalMcpRuntimeStatus.Restarting => "Reconnecting...",
+            LocalMcpRuntimeStatus.Cooldown => "Reconnect cooldown",
+            LocalMcpRuntimeStatus.Starting => "Connecting...",
+            LocalMcpRuntimeStatus.Stopping => "Disconnecting...",
+            LocalMcpRuntimeStatus.Failed => "Failed",
+            _ => "Stopped",
+        };
+        status.Foreground = health.RuntimeStatus switch
+        {
+            LocalMcpRuntimeStatus.Running => System.Windows.Media.Brushes.ForestGreen,
+            LocalMcpRuntimeStatus.Restarting or LocalMcpRuntimeStatus.Cooldown or LocalMcpRuntimeStatus.Starting or LocalMcpRuntimeStatus.Stopping => System.Windows.Media.Brushes.DarkOrange,
+            LocalMcpRuntimeStatus.Failed => System.Windows.Media.Brushes.Firebrick,
+            _ => System.Windows.Media.Brushes.Gray,
+        };
         OverviewUptimeText(key).Text = workspace.RuntimeRunning ? "Uptime: " + FormatDuration(workspace.RuntimeUptime) : "Uptime: -";
+        var nextRestart = health.RestartPending && health.NextRestartUtc.HasValue
+            ? $" | next restart {Math.Max(0, (health.NextRestartUtc.Value - DateTimeOffset.UtcNow).TotalSeconds):N1}s"
+            : "";
+        var lastHealthOk = health.LastTunnelHealthSuccessUtc.HasValue
+            ? $" | last OK {health.LastTunnelHealthSuccessUtc.Value.ToLocalTime():HH:mm:ss}"
+            : "";
+        var restartCount = health.TotalRestarts > 0 ? $" | restarts {health.TotalRestarts:N0}" : "";
+        OverviewComponentHealthText(key).Text =
+            $"MCP: {(health.LocalServerReady ? "ready" : "down")} | Tunnel: {(health.TunnelProcessRunning ? "running" : "down")} | Health: {FormatTunnelHealth(health.TunnelHealth)}{lastHealthOk}{restartCount}{nextRestart}";
     }
+
+    private static string FormatTunnelHealth(TunnelHealthProbeState state) => state switch
+    {
+        TunnelHealthProbeState.Reachable => "reachable",
+        TunnelHealthProbeState.Unreachable => "unreachable",
+        TunnelHealthProbeState.NotConfigured => "dynamic/not probed",
+        _ => "unknown",
+    };
 
     private void ApplyOverviewWorkspacePeriodUsage(string key, UsageCounters usage)
     {
@@ -391,6 +439,14 @@ public partial class MainWindow : Window
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
 
+    private TextBlock OverviewComponentHealthText(string key) => key switch
+    {
+        "C" => COverviewHealthText,
+        "D" => DOverviewHealthText,
+        "E" => EOverviewHealthText,
+        "F" => FOverviewHealthText,
+        _ => throw new ArgumentOutOfRangeException(nameof(key)),
+    };
     private TextBlock OverviewUptimeText(string key) => key switch
     {
         "C" => COverviewUptimeText,

@@ -35,3 +35,5 @@ V11-001 PASS: bounded logical session/correlation lifecycle verified by Release 
 V11-002 PASS: automatic process-wide retention maintenance verified by Release build + 316 assertions. NEXT_EXACT_ACTION: V11-003 tunnel supervisor.
 
 V11-003 PASS: supervised tunnel restart/backoff/cooldown verified by full runtime gate + 332 assertions. NEXT_EXACT_ACTION: V11-004 component health model.
+
+V11-004 PASS: component health + dashboard verified by Release build, 343 assertions and packaged WPF smoke. NEXT_EXACT_ACTION: V11-005 native .NET OpenTelemetry contracts.

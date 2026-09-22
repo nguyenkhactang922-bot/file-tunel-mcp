@@ -589,6 +589,7 @@ internal sealed class TelemetryWriter : IAsyncDisposable
     private readonly ITelemetryDeltaStore _store;
     private readonly TimeSpan _interval;
     private readonly Action<string>? _log;
+    private readonly TelemetryPersistenceHealthTracker? _health;
     private readonly SemaphoreSlim _flushGate = new(1, 1);
     private readonly Dictionary<string, UsageCounters> _pending = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _cts;
@@ -598,19 +599,30 @@ internal sealed class TelemetryWriter : IAsyncDisposable
         IEnumerable<WorkspaceUsageMeter> meters,
         ITelemetryDeltaStore store,
         TimeSpan? interval = null,
-        Action<string>? log = null)
+        Action<string>? log = null,
+        TelemetryPersistenceHealthTracker? health = null)
     {
         _meters = meters.ToArray();
         _store = store;
         _interval = interval ?? TimeSpan.FromSeconds(1);
         if (_interval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval));
         _log = log;
+        _health = health;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (_loop is not null) return;
-        await _store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+            _health?.RecordSuccess();
+        }
+        catch
+        {
+            _health?.RecordFailure();
+            throw;
+        }
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _loop = RunAsync(_cts.Token);
     }
@@ -622,9 +634,18 @@ internal sealed class TelemetryWriter : IAsyncDisposable
         {
             CollectPending();
             if (_pending.Count == 0) return;
-            await _store.InitializeAsync(cancellationToken).ConfigureAwait(false);
-            await _store.UpsertDeltasAsync(capturedAtUtc, _pending, cancellationToken).ConfigureAwait(false);
-            _pending.Clear();
+            try
+            {
+                await _store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+                await _store.UpsertDeltasAsync(capturedAtUtc, _pending, cancellationToken).ConfigureAwait(false);
+                _pending.Clear();
+                _health?.RecordSuccess(capturedAtUtc);
+            }
+            catch
+            {
+                _health?.RecordFailure(capturedAtUtc);
+                throw;
+            }
         }
         finally
         {

@@ -16,6 +16,7 @@ internal sealed class ObservabilityMaintenanceWorker : IAsyncDisposable
     private readonly TimeSpan _interval;
     private readonly Action<string>? _log;
     private readonly Func<DateTimeOffset> _clock;
+    private readonly TelemetryPersistenceHealthTracker? _health;
     private readonly SemaphoreSlim _runGate = new(1, 1);
     private CancellationTokenSource? _cts;
     private Task? _loop;
@@ -30,7 +31,8 @@ internal sealed class ObservabilityMaintenanceWorker : IAsyncDisposable
         LogicalChatCorrelationService correlation,
         TimeSpan? interval = null,
         Action<string>? log = null,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        TelemetryPersistenceHealthTracker? health = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
@@ -39,6 +41,7 @@ internal sealed class ObservabilityMaintenanceWorker : IAsyncDisposable
         if (_interval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval));
         _log = log;
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _health = health;
     }
 
     public Task StartAsync(CancellationToken cancellationToken = default)
@@ -59,6 +62,7 @@ internal sealed class ObservabilityMaintenanceWorker : IAsyncDisposable
             try
             {
                 await _store.CleanupRetentionAsync(now, cancellationToken).ConfigureAwait(false);
+                _health?.RecordSuccess(now);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -67,6 +71,7 @@ internal sealed class ObservabilityMaintenanceWorker : IAsyncDisposable
             catch (Exception ex)
             {
                 failed = true;
+                _health?.RecordFailure(now);
                 _log?.Invoke($"[Telemetry] retention maintenance failed: {ex.Message}\n");
             }
 

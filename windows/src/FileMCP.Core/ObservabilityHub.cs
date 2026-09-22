@@ -11,7 +11,8 @@ public sealed record WorkspaceObservabilitySnapshot(
 public sealed record ObservabilitySnapshot(
     TimeSpan AppUptime,
     UsageCounters GlobalUsage,
-    IReadOnlyDictionary<string, WorkspaceObservabilitySnapshot> Workspaces);
+    IReadOnlyDictionary<string, WorkspaceObservabilitySnapshot> Workspaces,
+    TelemetryPersistenceHealthSnapshot Persistence);
 
 public sealed record RealtimeUsageSample(
     DateTimeOffset CapturedUtc,
@@ -28,6 +29,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
     private readonly Queue<RealtimeUsageSample> _realtimeSamples = new();
     private readonly long _appStartedTicks = Stopwatch.GetTimestamp();
     private readonly TelemetrySqliteStore _store;
+    private readonly TelemetryPersistenceHealthTracker _persistenceHealth = new();
     private readonly TelemetryWriter _writer;
     private readonly LogicalSessionWriter _sessionWriter;
     private readonly ObservabilityMaintenanceWorker _maintenance;
@@ -57,9 +59,9 @@ public sealed class ObservabilityHub : IAsyncDisposable
         _meters = keys.ToDictionary(key => key, key => new WorkspaceUsageMeter(key), StringComparer.OrdinalIgnoreCase);
         _runtimeStartedTicks = keys.ToDictionary(key => key, _ => 0L, StringComparer.OrdinalIgnoreCase);
         _store = new TelemetrySqliteStore(databasePath);
-        _writer = new TelemetryWriter(_meters.Values, _store, writerInterval, log);
-        _sessionWriter = new LogicalSessionWriter(Sessions, _store, writerInterval, log);
-        _maintenance = new ObservabilityMaintenanceWorker(_store, Sessions, ChatCorrelation, maintenanceInterval, log);
+        _writer = new TelemetryWriter(_meters.Values, _store, writerInterval, log, _persistenceHealth);
+        _sessionWriter = new LogicalSessionWriter(Sessions, _store, writerInterval, log, _persistenceHealth);
+        _maintenance = new ObservabilityMaintenanceWorker(_store, Sessions, ChatCorrelation, maintenanceInterval, log, health: _persistenceHealth);
     }
 
     public WorkspaceUsageMeter MeterFor(string workspaceKey)
@@ -151,15 +153,25 @@ public sealed class ObservabilityHub : IAsyncDisposable
                 started != 0,
                 started == 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(started));
         }
-        return new ObservabilitySnapshot(Stopwatch.GetElapsedTime(_appStartedTicks), global, workspaces);
+        return new ObservabilitySnapshot(Stopwatch.GetElapsedTime(_appStartedTicks), global, workspaces, _persistenceHealth.Snapshot());
     }
 
-    public Task<UsageCounters> QueryExactPeriodAsync(UsagePeriodRange range, string? workspaceKey = null, CancellationToken cancellationToken = default)
+    public async Task<UsageCounters> QueryExactPeriodAsync(UsagePeriodRange range, string? workspaceKey = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
         var key = workspaceKey is null ? null : NormalizeWorkspaceKey(workspaceKey);
         if (key is not null && !_meters.ContainsKey(key)) throw new KeyNotFoundException($"Unknown FileMCP workspace key '{workspaceKey}'.");
-        return _store.QueryExactPeriodAsync(range, key, cancellationToken);
+        try
+        {
+            var usage = await _store.QueryExactPeriodAsync(range, key, cancellationToken).ConfigureAwait(false);
+            _persistenceHealth.RecordSuccess();
+            return usage;
+        }
+        catch
+        {
+            _persistenceHealth.RecordFailure();
+            throw;
+        }
     }
 
     public async Task FlushAsync(DateTimeOffset capturedAtUtc, CancellationToken cancellationToken = default)
@@ -169,10 +181,19 @@ public sealed class ObservabilityHub : IAsyncDisposable
         await _sessionWriter.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
     }
 
-    public Task CleanupRetentionAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
+    public async Task CleanupRetentionAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        return _store.CleanupRetentionAsync(nowUtc, cancellationToken);
+        try
+        {
+            await _store.CleanupRetentionAsync(nowUtc, cancellationToken).ConfigureAwait(false);
+            _persistenceHealth.RecordSuccess(nowUtc);
+        }
+        catch
+        {
+            _persistenceHealth.RecordFailure(nowUtc);
+            throw;
+        }
     }
 
     internal Task RunMaintenanceOnceForTestsAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default) =>
