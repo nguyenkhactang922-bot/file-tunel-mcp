@@ -1,8 +1,8 @@
 # FINAL PRODUCT INDEPENDENT REPOSITORY AUDIT  -  2026-09-22
 
-Repo: `D:\Tools\FileMCP`  
-Branch audited: `chatgpt/OBS-001-observability-foundation`  
-Audited HEAD: `b48f6afdcb52479ad4dc251cf1dac6dd7850731e`  
+Repo: `D:\Tools\FileMCP`
+Branch audited: `chatgpt/OBS-001-observability-foundation`
+Audited HEAD: `b48f6afdcb52479ad4dc251cf1dac6dd7850731e`
 Upstream main observed during audit: `3a41ba526d593aacdcc58e48105268427455712b`
 
 ## 1. Executive conclusion
@@ -248,7 +248,7 @@ This round found release-readiness gaps around signing/notarization, ARM64 smoke
 
 ## FPA-001  -  P1  -  Windows GitHub Actions release-resource verification uses the obsolete staging directory
 
-**Category:** confirmed CI/release bug  
+**Category:** confirmed CI/release bug
 **Must fix before final release:** YES
 
 ### Evidence
@@ -305,7 +305,7 @@ Suggested task: **FPA-001 / CI-STAGING-PARITY**.
 
 ## FPA-002  -  P1  -  README claims equivalent MCP surface, but macOS is missing the Windows observability-connect tool
 
-**Category:** confirmed cross-platform product/API parity bug  
+**Category:** confirmed cross-platform product/API parity bug
 **Must fix before claiming whole-app parity:** YES
 
 ### Evidence
@@ -375,7 +375,7 @@ Suggested task: **FPA-002 / MAC-LOGICAL-CHAT-PARITY**.
 
 ## FPA-003  -  P1  -  macOS tunnel crash behavior lacks the Windows restart/backoff/cooldown supervisor
 
-**Category:** confirmed runtime parity/reliability gap  
+**Category:** confirmed runtime parity/reliability gap
 **Must fix before claiming same tunnel behavior:** YES
 
 ### Evidence
@@ -441,7 +441,7 @@ Suggested task: **FPA-003 / MAC-TUNNEL-SUPERVISOR-PARITY**.
 
 ## FPA-004  -  P1 for public-market release  -  production signing/notarization pipeline is not implemented
 
-**Category:** release-readiness gap, not a Windows core logic bug  
+**Category:** release-readiness gap, not a Windows core logic bug
 **Must fix before public commercial distribution:** YES
 
 ### Evidence
@@ -496,7 +496,7 @@ Suggested task: **FPA-004 / PRODUCTION-SIGNING-GATE**.
 
 ## FPA-005  -  P2  -  Windows ARM64 package is advertised and built, but the app smoke test only executes x64
 
-**Category:** release assurance gap  
+**Category:** release assurance gap
 **Recommended before claiming Windows ARM64 production-ready:** YES
 
 ### Evidence
@@ -537,7 +537,7 @@ Suggested task: **FPA-005 / WIN-ARM64-RUNTIME-GATE**.
 
 ## FPA-006  -  P2  -  project state/handoff documents are stale and internally contradictory
 
-**Category:** workflow/state correctness bug  
+**Category:** workflow/state correctness bug
 **Must fix before MAIN VERIFIED under the user's project law:** YES
 
 ### Evidence
@@ -580,7 +580,7 @@ Suggested task: **FPA-006 / STATE-NORMALIZATION**.
 
 ## FPA-007  -  P2  -  desktop app does not enforce one app instance; profile locking occurs only when a runtime connects
 
-**Category:** operability/UX issue  
+**Category:** operability/UX issue
 **Evidence from real use:** YES
 
 ### Evidence
@@ -613,7 +613,7 @@ Suggested task: **FPA-007 / SINGLE-INSTANCE-UX**.
 
 ## FPA-008  -  P2 hardening  -  Local MCP TCP server has request-size bounds but no per-connection idle timeout or connection cap
 
-**Category:** defense-in-depth / resource exhaustion risk  
+**Category:** defense-in-depth / resource exhaustion risk
 **Status:** code-confirmed missing guard, exploitability not demonstrated in this audit
 
 ### Evidence
