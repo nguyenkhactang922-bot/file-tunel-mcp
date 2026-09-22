@@ -104,3 +104,15 @@ GitHub Actions run 35755705022 on that exact default-branch commit:
 Workflow registry now exposes Production Release as active. Environment production-release is restricted to branch main. Configured production-release Environment secrets: none.
 
 The previous default-branch/workflow-registration blocker is CLOSED. The only remaining FPA-004 acceptance blocker is real production trust material plus one real credentialed Production Release run.
+
+
+## Credential boundary recheck
+
+A metadata-only credential inventory was performed after default-branch registration. No private-key material or passwords were read/exported.
+
+Results:
+- usable Windows code-signing identities with private key + Code Signing EKU + nonexpired certificate in CurrentUser/My or LocalMachine/My: 0;
+- local release environment variables present: 0/7;
+- GitHub production-release Environment secrets present: 0/7.
+
+Therefore FPA-004 cannot advance to a real public-trust release without external credential provisioning.

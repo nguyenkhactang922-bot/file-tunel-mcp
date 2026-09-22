@@ -161,3 +161,15 @@ The project is technically verified up to the external public-distribution trust
 After the initial post-remediation audit, the full verified remediation/release tree was merged into the fork default branch main without conflict. Exact main commit 884e9a89a98ddd5343bb4d3e6aef8b4499f810cb passed GitHub Actions run 35755705022 on verify-macos, verify-windows and verify-windows-arm64. GitHub now registers the Production Release workflow on the default branch. The production-release Environment exists and is restricted to branch main.
 
 Accordingly, default-branch workflow registration is no longer an external blocker. The sole remaining public-market blocker is the absence of the seven real production release secrets and the resulting absence of a real signed/notarized release execution.
+
+
+## Credential boundary recheck
+
+A metadata-only credential inventory was performed after default-branch registration. No private-key material or passwords were read/exported.
+
+Results:
+- usable Windows code-signing identities with private key + Code Signing EKU + nonexpired certificate in CurrentUser/My or LocalMachine/My: 0;
+- local release environment variables present: 0/7;
+- GitHub production-release Environment secrets present: 0/7.
+
+Therefore FPA-004 cannot advance to a real public-trust release without external credential provisioning.
