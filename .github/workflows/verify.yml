@@ -108,6 +108,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_http_connection_bounds_contract.ps1
 
+      - name: Verify dynamic health discovery contract
+        shell: pwsh
+        run: ./tests/test_dynamic_health_discovery_contract.ps1
+
       - name: Verify Windows ARM64 assurance contract
         shell: pwsh
         run: ./tests/test_windows_arm64_assurance_contract.ps1
@@ -193,6 +197,10 @@ jobs:
       - name: Verify Windows release contract
         shell: pwsh
         run: ./tests/test_windows_release_contract.ps1
+
+      - name: Verify dynamic health discovery contract
+        shell: pwsh
+        run: ./tests/test_dynamic_health_discovery_contract.ps1
 
       - name: Verify Windows ARM64 assurance contract
         shell: pwsh

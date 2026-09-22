@@ -143,7 +143,7 @@ The common workflow and terminology are kept aligned across macOS and Windows. T
 | Allow shell commands | Enables `run_command`; disabled by default. |
 | Profile | FileMCP-owned `tunnel-client` profile name; letters/numbers plus `.`, `_`, `-`, maximum 128 characters. |
 | MCP port | Local loopback port used by the MCP server. |
-| Health listener | Loopback-only `tunnel-client` health/admin listener. Port `0` requests an ephemeral port. |
+| Health listener | Loopback-only `tunnel-client` health/admin listener. Port `0` requests an ephemeral port; Windows discovers the resolved loopback endpoint via tunnel-client health URL-file output and probes it automatically. |
 | Git name / Git email | Optional Git identity used by `git_commit`. |
 
 Closing the main window does not stop an active tunnel:

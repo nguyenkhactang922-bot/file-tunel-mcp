@@ -381,7 +381,7 @@ public partial class MainWindow : Window
     {
         TunnelHealthProbeState.Reachable => "reachable",
         TunnelHealthProbeState.Unreachable => "unreachable",
-        TunnelHealthProbeState.NotConfigured => "dynamic/not probed",
+        TunnelHealthProbeState.NotConfigured => "dynamic/pending",
         _ => "unknown",
     };
 

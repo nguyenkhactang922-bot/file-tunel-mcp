@@ -156,3 +156,11 @@ FPA-008 final acceptance:
 - GitHub Actions run 35745850301: macOS, Windows x64 and Windows ARM64 all SUCCESS.
 - Evidence: docs/evidence/FPA-008_CONNECTION_BOUNDS_EVIDENCE.md.
 - Next: FPA-009 design gate, then FPA-004 release signing scope.
+
+
+## FPA-009 candidate
+
+- Official tunnel-client health.url-file discovery is implemented for Windows dynamic health endpoints.
+- Local contracts/build/runtime PASS at 444 assertions.
+- Candidate evidence: docs/evidence/FPA-009_DYNAMIC_HEALTH_DISCOVERY_CANDIDATE.md.
+- FPA-009 remains ACTIVE until native macOS/Windows x64/Windows ARM64 CI succeeds.
