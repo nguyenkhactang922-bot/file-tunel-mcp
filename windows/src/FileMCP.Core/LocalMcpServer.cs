@@ -22,7 +22,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private static readonly HashSet<string> SingleValueHeaders = new(StringComparer.OrdinalIgnoreCase)
     {
         "content-length", "content-type", "host", "origin", "mcp-protocol-version", "mcp-method", "mcp-name",
-        "transfer-encoding", FileMcpConstants.LocalAuthHeaderName.ToLowerInvariant(),
+        "transfer-encoding", "traceparent", "tracestate", FileMcpConstants.LocalAuthHeaderName.ToLowerInvariant(),
     };
     private readonly ushort _port;
     private readonly string _localAuthToken;
@@ -219,11 +219,14 @@ public sealed class LocalMcpServer : IAsyncDisposable
         string? telemetryToolName = null;
         if (method == "tools/call" && parameters["name"] is JsonValue telemetryToolNode && telemetryToolNode.TryGetValue<string>(out var telemetryToolText))
             telemetryToolName = telemetryToolText;
-        using var standardOperation = BeginStandardTelemetrySafely(
+        McpExtractedTraceContext? traceContext = McpTraceContextAdapter.TryExtract(meta, request.Headers, out var extractedTraceContext)
+            ? extractedTraceContext
+            : null;        using var standardOperation = BeginStandardTelemetrySafely(
             headerVersion ?? bodyVersion ?? requestedLegacyVersion,
             method,
             telemetryToolName,
-            request.Body.LongLength);
+            request.Body.LongLength,
+            traceContext);
 
         byte[] FinishStandard(byte[] response)
         {
@@ -520,9 +523,9 @@ public sealed class LocalMcpServer : IAsyncDisposable
         return response;
     }
 
-    private McpStandardTelemetryOperation? BeginStandardTelemetrySafely(string? protocolVersion, string? method, string? toolName, long requestBytes)
+    private McpStandardTelemetryOperation? BeginStandardTelemetrySafely(string? protocolVersion, string? method, string? toolName, long requestBytes, McpExtractedTraceContext? traceContext)
     {
-        try { return _standardTelemetry?.BeginOperation(protocolVersion, method, toolName, _workspaceKey, requestBytes); }
+        try { return _standardTelemetry?.BeginOperation(protocolVersion, method, toolName, _workspaceKey, requestBytes, traceContext); }
         catch (Exception ex) { _log($"[Telemetry] standard operation start ignored: {ex.Message}\n"); return null; }
     }
 

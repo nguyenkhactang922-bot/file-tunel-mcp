@@ -30,6 +30,7 @@ internal static class Program
         {
             TestObservabilityContracts();
             await TestMcpStandardTelemetryAsync(root);
+            await TestMcpTraceContextAsync(root);
             TestLogicalChatCorrelation();
             await TestLogicalSessionRegistryAsync(root);
             await TestWorkspaceUsageMeterAsync();
@@ -130,7 +131,7 @@ internal static class Program
         Assert(McpTelemetryAttributeAdapter.NormalizeMethod("tools/call") == "tools/call" && McpTelemetryAttributeAdapter.NormalizeMethod("private-method") == "other", "standard telemetry method dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeToolName("read_file") == "read_file" && McpTelemetryAttributeAdapter.NormalizeToolName("private-tool-name") == "unknown", "standard telemetry tool dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeWorkspace("d") == "D" && McpTelemetryAttributeAdapter.NormalizeWorkspace("private-workspace") == "other", "standard telemetry workspace dimensions are bounded");
-        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("Ã¢â€šÂ¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
+        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
         Assert(Encoding.UTF8.GetByteCount(boundedUtf8) <= McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes, "standard telemetry UTF-8 attribute bound never splits beyond byte cap");
 
         const string privateMarker = "PRIVATE_OTEL_MARKER_8A2DF991";
@@ -208,6 +209,143 @@ internal static class Program
         Assert(!exportedText.Contains(privateMarker, StringComparison.Ordinal), "standard telemetry metric tags never export private tool arguments or marker values");
         Assert(metricSnapshot.Where(metric => metric.Name == "mcp.server.tool.calls").Any(metric => metric.Tags.TryGetValue("mcp.tool.name", out var value) && Equals(value, "unknown")), "standard telemetry unknown tool metric uses bounded unknown bucket");
         Console.WriteLine("windows-standard-mcp-telemetry: ok");
+    }
+    private static async Task TestMcpTraceContextAsync(string root)
+    {
+        const string metaTraceId = "11111111111111111111111111111111";
+        const string metaSpanId = "2222222222222222";
+        const string httpTraceId = "33333333333333333333333333333333";
+        const string httpSpanId = "4444444444444444";
+        const string metaTraceParent = "00-11111111111111111111111111111111-2222222222222222-01";
+        const string httpTraceParent = "00-33333333333333333333333333333333-4444444444444444-01";
+        const string baggageMarker = "PRIVATE_BAGGAGE_MUST_NOT_PROPAGATE_67A2";
+
+        var meta = new JsonObject
+        {
+            ["traceparent"] = metaTraceParent,
+            ["tracestate"] = "vendor=meta",
+            ["baggage"] = $"private={baggageMarker}",
+        };
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["traceparent"] = httpTraceParent,
+            ["tracestate"] = "vendor=http",
+            ["baggage"] = $"private={baggageMarker}",
+        };
+        Assert(McpTraceContextAdapter.TryExtract(meta, headers, out var metaExtracted), "trace context extracts valid MCP _meta parent");
+        Assert(metaExtracted.Source == McpTraceContextSource.McpMeta && metaExtracted.Parent.IsRemote, "MCP _meta trace context wins and is marked remote");
+        Assert(metaExtracted.Parent.TraceId.ToString() == metaTraceId && metaExtracted.Parent.SpanId.ToString() == metaSpanId && metaExtracted.TraceState == "vendor=meta", "MCP _meta traceparent/tracestate parsed exactly");
+
+        var invalidMeta = new JsonObject { ["traceparent"] = "not-a-traceparent", ["baggage"] = baggageMarker };
+        Assert(McpTraceContextAdapter.TryExtract(invalidMeta, headers, out var fallbackExtracted), "invalid MCP _meta traceparent falls back to HTTP W3C context");
+        Assert(fallbackExtracted.Source == McpTraceContextSource.Http && fallbackExtracted.Parent.TraceId.ToString() == httpTraceId && fallbackExtracted.Parent.SpanId.ToString() == httpSpanId, "HTTP traceparent is fallback parent");
+
+        var baggageOnly = new JsonObject { ["baggage"] = baggageMarker };
+        Assert(!McpTraceContextAdapter.TryExtract(baggageOnly, new Dictionary<string, string>(), out _), "baggage without traceparent is ignored");
+        var overlongState = new string('a', McpTraceContextAdapter.MaxTraceStateUtf8Bytes + 1);
+        var oversizedStateMeta = new JsonObject { ["traceparent"] = metaTraceParent, ["tracestate"] = overlongState };
+        Assert(McpTraceContextAdapter.TryExtract(oversizedStateMeta, new Dictionary<string, string>(), out var boundedState) && boundedState.TraceState is null, "overlong tracestate is dropped while valid traceparent remains usable");
+
+        var activities = new List<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == McpStandardTelemetry.ActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            SampleUsingParentId = (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity => activities.Add(activity),
+        };
+        ActivitySource.AddActivityListener(listener);
+        using var telemetry = new McpStandardTelemetry();
+        var workspace = Path.Combine(root, "trace-context-http");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "hello.txt"), "hello");
+        var port = FreePort();
+        var token = new string('r', 64);
+        var correlation = new LogicalChatCorrelationService();
+        var sessions = new LogicalSessionRegistry();
+        await using var server = new LocalMcpServer((ushort)port, workspace, "", "", false, token, _ => { }, chatCorrelation: correlation, sessions: sessions, workspaceKey: "D", standardTelemetry: telemetry);
+        await server.StartAsync();
+
+        var httpHeaders = AuthHeaders(token);
+        httpHeaders["traceparent"] = httpTraceParent;
+        httpHeaders["tracestate"] = "vendor=http";
+        httpHeaders["baggage"] = $"private={baggageMarker}";
+        const string legacyListBody = "{\"jsonrpc\":\"2.0\",\"id\":101,\"method\":\"tools/list\",\"params\":{}}";
+        _ = await SendHttpAsync(port, "POST", "/mcp", httpHeaders, legacyListBody);
+        var httpActivity = activities.Last(activity => activity.DisplayName == "mcp tools/list");
+        Assert(httpActivity.TraceId.ToString() == httpTraceId && httpActivity.ParentSpanId.ToString() == httpSpanId, "server Activity uses HTTP traceparent when MCP _meta has no trace context");
+        Assert(httpActivity.TagObjects.Any(tag => tag.Key == "filemcp.trace.parent_source" && Equals(tag.Value, "http")), "server Activity records bounded HTTP parent-source tag");
+        Assert(!httpActivity.Baggage.Any() && !httpActivity.TagObjects.Any(tag => tag.Value?.ToString()?.Contains(baggageMarker, StringComparison.Ordinal) == true), "HTTP baggage is not imported or exported");
+
+        var metaListBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 102,
+            ["method"] = "tools/list",
+            ["params"] = new JsonObject
+            {
+                ["_meta"] = new JsonObject
+                {
+                    ["traceparent"] = metaTraceParent,
+                    ["tracestate"] = "vendor=meta",
+                    ["baggage"] = $"private={baggageMarker}",
+                },
+            },
+        }.ToJsonString();
+        _ = await SendHttpAsync(port, "POST", "/mcp", httpHeaders, metaListBody);
+        var metaActivity = activities.Last(activity => activity.DisplayName == "mcp tools/list");
+        Assert(metaActivity.TraceId.ToString() == metaTraceId && metaActivity.ParentSpanId.ToString() == metaSpanId, "MCP _meta traceparent takes precedence over conflicting HTTP traceparent");
+        Assert(metaActivity.TraceStateString == "vendor=meta" && metaActivity.TagObjects.Any(tag => tag.Key == "filemcp.trace.parent_source" && Equals(tag.Value, "mcp_meta")), "server Activity preserves bounded MCP tracestate and source semantics");
+        Assert(!metaActivity.Baggage.Any() && !metaActivity.TagObjects.Any(tag => tag.Value?.ToString()?.Contains(baggageMarker, StringComparison.Ordinal) == true), "MCP baggage is intentionally ignored for privacy");
+
+        var invalidMetaListBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 103,
+            ["method"] = "tools/list",
+            ["params"] = new JsonObject { ["_meta"] = new JsonObject { ["traceparent"] = "invalid" } },
+        }.ToJsonString();
+        _ = await SendHttpAsync(port, "POST", "/mcp", httpHeaders, invalidMetaListBody);
+        var fallbackActivity = activities.Last(activity => activity.DisplayName == "mcp tools/list");
+        Assert(fallbackActivity.TraceId.ToString() == httpTraceId && fallbackActivity.ParentSpanId.ToString() == httpSpanId, "invalid MCP trace context safely falls back to HTTP parent");
+
+        var unboundReadBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 104,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "read_file",
+                ["arguments"] = new JsonObject { ["relative_path"] = "hello.txt", ["_filemcp_chat"] = metaTraceParent },
+                ["_meta"] = new JsonObject { ["traceparent"] = metaTraceParent, ["baggage"] = baggageMarker },
+            },
+        }.ToJsonString();
+        var unboundRead = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), unboundReadBody);
+        var unboundReadJson = JsonNode.Parse(HttpBody(unboundRead))!.AsObject();
+        Assert(!unboundReadJson["result"]!["isError"]!.GetValue<bool>(), "trace identity does not act as authority and does not break valid tool execution");
+        Assert(sessions.Snapshot(includeStale: true).Count == 0, "traceparent cannot be treated as logical chat identity");
+        var unbound = sessions.UnboundSnapshot(includeStale: true).Single();
+        Assert(unbound.Usage.ToolCalls == 1 && unbound.Usage.ReadCalls == 1, "invalid chat correlation remains unbound even when traceparent is valid");
+
+        var traversalBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 105,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "read_file",
+                ["arguments"] = new JsonObject { ["relative_path"] = "../escape.txt", ["_filemcp_chat"] = metaTraceParent },
+                ["_meta"] = new JsonObject { ["traceparent"] = metaTraceParent },
+            },
+        }.ToJsonString();
+        var traversal = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), traversalBody);
+        var traversalJson = JsonNode.Parse(HttpBody(traversal))!.AsObject();
+        Assert(traversalJson["result"]!["isError"]!.GetValue<bool>(), "trace context cannot bypass filesystem containment");
+        var afterTraversal = sessions.UnboundSnapshot(includeStale: true).Single();
+        Assert(afterTraversal.Usage.ToolCalls == 2 && afterTraversal.Usage.Errors == 1, "trace-context tool error remains ordinary unbound telemetry");
+        Console.WriteLine("windows-mcp-trace-context: ok");
     }
     private static void TestLogicalChatCorrelation()
     {

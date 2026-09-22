@@ -121,14 +121,19 @@ public sealed class McpStandardTelemetry : IDisposable
         string? method,
         string? toolName,
         string? workspaceKey,
-        long requestBytes)
+        long requestBytes,
+        McpExtractedTraceContext? traceContext = null)
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         var tags = McpTelemetryAttributeAdapter.BuildTags(protocolVersion, method, toolName, workspaceKey);
         var normalizedMethod = McpTelemetryAttributeAdapter.NormalizeMethod(method);
         var normalizedTool = normalizedMethod == "tools/call" ? McpTelemetryAttributeAdapter.NormalizeToolName(toolName) : null;
         var activityName = normalizedTool is null ? $"mcp {normalizedMethod}" : $"mcp {normalizedMethod} {normalizedTool}";
-        var activity = _activitySource.StartActivity(activityName, ActivityKind.Server, default(ActivityContext), tags);
+        var activity = traceContext.HasValue
+            ? _activitySource.StartActivity(activityName, ActivityKind.Server, traceContext.Value.Parent, tags)
+            : _activitySource.StartActivity(activityName, ActivityKind.Server, default(ActivityContext), tags);
+        if (activity is not null && traceContext.HasValue)
+            activity.SetTag("filemcp.trace.parent_source", traceContext.Value.Source == McpTraceContextSource.McpMeta ? "mcp_meta" : "http");
         return new McpStandardTelemetryOperation(this, activity, tags, normalizedMethod, Math.Max(0, requestBytes));
     }
 
