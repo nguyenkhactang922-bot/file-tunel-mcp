@@ -163,7 +163,7 @@ swiftc -o "$TMP_DIR/process-test" \
 
 "$TMP_DIR/process-test"
 
-cat >"$TMP_DIR/correlation.swift" <<'SWIFT'
+cat >"$TMP_DIR/main.swift" <<'SWIFT'
 import Foundation
 
 var now = Date(timeIntervalSince1970: 1_000)
@@ -243,7 +243,7 @@ SWIFT
 
 swiftc -framework Security -o "$TMP_DIR/correlation-test" \
     macos/LogicalChatCorrelation.swift \
-    "$TMP_DIR/correlation.swift"
+    "$TMP_DIR/main.swift"
 "$TMP_DIR/correlation-test"
 
 cat >"$TMP_DIR/tunnel-client" <<'SH'
