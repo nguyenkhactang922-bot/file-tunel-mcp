@@ -24,6 +24,10 @@ public partial class MainWindow : Window
     private readonly Forms.NotifyIcon _trayIcon;
     private FileMcpSettings _settings;
     private bool _quitting;
+    private UsagePeriodPreset _selectedOverviewPeriod = UsagePeriodPreset.Today;
+    private DateTimeOffset _lastOverviewPeriodRefreshUtc = DateTimeOffset.MinValue;
+    private int _overviewPeriodQueryGeneration;
+    private bool _overviewPeriodQueryRunning;
     private string _logBuffer = "";
     private const int MaxLogCharacters = 500_000;
 
@@ -32,7 +36,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         _observability = new ObservabilityHub(WorkspaceKeys, log: text => Dispatcher.BeginInvoke(new Action(() => AppendLog(text))));
         _overviewTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromSeconds(1) };
-        _overviewTimer.Tick += (_, _) => RefreshOverviewUi();
+        _overviewTimer.Tick += OverviewTimer_Tick;
+        OverviewPeriodCombo.SelectionChanged += OverviewPeriodCombo_SelectionChanged;
         _settings = LoadSettingsSafely();
         ApplySettings(_settings);
         UpdateApiKeyStatus();
@@ -65,7 +70,8 @@ public partial class MainWindow : Window
 
         RefreshRuntimeUi();
         _ = StartObservabilityAsync();
-        RefreshOverviewUi();
+        RefreshOverviewLiveUi();
+        _ = RefreshOverviewPeriodAsync(force: true);
         _overviewTimer.Start();
     }
 
@@ -81,16 +87,87 @@ public partial class MainWindow : Window
             AppendLog($"[Telemetry] Persistent observability unavailable; MCP remains operational: {ex.Message}\n");
         }
     }
-    private void RefreshOverviewUi()
+    private async void OverviewTimer_Tick(object? sender, EventArgs e)
+    {
+        RefreshOverviewLiveUi();
+        if (DateTimeOffset.UtcNow - _lastOverviewPeriodRefreshUtc >= TimeSpan.FromSeconds(5))
+            await RefreshOverviewPeriodAsync(force: false);
+    }
+
+    private void OverviewPeriodCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedOverviewPeriod = OverviewPeriodCombo.SelectedIndex switch
+        {
+            1 => UsagePeriodPreset.Yesterday,
+            2 => UsagePeriodPreset.SevenDays,
+            3 => UsagePeriodPreset.ThirtyDays,
+            _ => UsagePeriodPreset.Today,
+        };
+        _ = RefreshOverviewPeriodAsync(force: true);
+    }
+
+    private void RefreshOverviewLiveUi()
     {
         if (_quitting) return;
         ObservabilitySnapshot snapshot;
         try { snapshot = _observability.Snapshot(); }
         catch (ObjectDisposedException) { return; }
 
-        var usage = snapshot.GlobalUsage;
         OverviewClockText.Text = DateTimeOffset.Now.ToString("ddd, dd/MM/yyyy  HH:mm:ss");
         OverviewAppUptimeText.Text = "App uptime: " + FormatDuration(snapshot.AppUptime);
+        foreach (var key in WorkspaceKeys)
+            if (snapshot.Workspaces.TryGetValue(key, out var workspace)) UpdateOverviewWorkspaceLive(key, workspace);
+
+        RefreshObservedSessionsUi();
+    }
+
+    private async Task RefreshOverviewPeriodAsync(bool force)
+    {
+        if (_quitting) return;
+        var nowUtc = DateTimeOffset.UtcNow;
+        if (!force && nowUtc - _lastOverviewPeriodRefreshUtc < TimeSpan.FromSeconds(5)) return;
+        if (_overviewPeriodQueryRunning)
+        {
+            if (force) Interlocked.Increment(ref _overviewPeriodQueryGeneration);
+            return;
+        }
+
+        var generation = Interlocked.Increment(ref _overviewPeriodQueryGeneration);
+        _overviewPeriodQueryRunning = true;
+        var range = UsagePeriodResolver.Resolve(_selectedOverviewPeriod, nowUtc, TimeZoneInfo.Local);
+        OverviewPeriodRangeText.Text = $"{range.FromUtc.ToLocalTime():dd/MM/yyyy HH:mm} - {range.ToUtc.ToLocalTime():dd/MM/yyyy HH:mm}";
+        OverviewPeriodUpdatedText.Text = "Loading...";
+        try
+        {
+            await _observability.FlushAsync(nowUtc);
+            var globalTask = _observability.QueryExactPeriodAsync(range);
+            var workspaceTasks = WorkspaceKeys.ToDictionary(
+                key => key,
+                key => _observability.QueryExactPeriodAsync(range, key),
+                StringComparer.OrdinalIgnoreCase);
+            await Task.WhenAll(workspaceTasks.Values.Append(globalTask));
+            if (_quitting || generation != Volatile.Read(ref _overviewPeriodQueryGeneration)) return;
+
+            ApplyOverviewUsage(await globalTask);
+            foreach (var pair in workspaceTasks)
+                ApplyOverviewWorkspacePeriodUsage(pair.Key, await pair.Value);
+            _lastOverviewPeriodRefreshUtc = nowUtc;
+            OverviewPeriodUpdatedText.Text = "Updated " + DateTimeOffset.Now.ToString("HH:mm:ss");
+        }
+        catch (ObjectDisposedException) { }
+        catch (Exception ex)
+        {
+            if (generation == Volatile.Read(ref _overviewPeriodQueryGeneration))
+                OverviewPeriodUpdatedText.Text = "Unavailable: " + ex.Message;
+        }
+        finally
+        {
+            _overviewPeriodQueryRunning = false;
+        }
+    }
+
+    private void ApplyOverviewUsage(UsageCounters usage)
+    {
         OverviewTokenInText.Text = FormatCount(usage.TokensInEst);
         OverviewTokenOutText.Text = FormatCount(usage.TokensOutEst);
         OverviewTokenTotalText.Text = FormatCount(usage.TotalTokensEst);
@@ -105,19 +182,104 @@ public partial class MainWindow : Window
         OverviewGitCallsText.Text = FormatCount(usage.GitCalls);
         OverviewSkillCallsText.Text = FormatCount(usage.SkillCalls);
         OverviewErrorsText.Text = FormatCount(usage.Errors);
-
-        foreach (var key in WorkspaceKeys)
-            if (snapshot.Workspaces.TryGetValue(key, out var workspace)) UpdateOverviewWorkspace(key, workspace);
     }
 
-    private void UpdateOverviewWorkspace(string key, WorkspaceObservabilitySnapshot workspace)
+    private void UpdateOverviewWorkspaceLive(string key, WorkspaceObservabilitySnapshot workspace)
     {
         var status = OverviewStatusText(key);
         status.Text = workspace.RuntimeRunning ? "Connected" : "Stopped";
         status.Foreground = workspace.RuntimeRunning ? System.Windows.Media.Brushes.ForestGreen : System.Windows.Media.Brushes.Gray;
-        OverviewUptimeText(key).Text = workspace.RuntimeRunning ? "Uptime: " + FormatDuration(workspace.RuntimeUptime) : "Uptime: —";
-        OverviewCallsText(key).Text = "Calls: " + FormatCount(workspace.LifetimeUsage.ToolCalls);
-        OverviewTokensText(key).Text = "MCP tokens (est.): " + FormatCount(workspace.LifetimeUsage.TotalTokensEst);
+        OverviewUptimeText(key).Text = workspace.RuntimeRunning ? "Uptime: " + FormatDuration(workspace.RuntimeUptime) : "Uptime: -";
+    }
+
+    private void ApplyOverviewWorkspacePeriodUsage(string key, UsageCounters usage)
+    {
+        OverviewCallsText(key).Text = "Calls: " + FormatCount(usage.ToolCalls);
+        OverviewTokensText(key).Text = "MCP tokens (est.): " + FormatCount(usage.TotalTokensEst);
+    }
+
+    private void RefreshObservedSessionsUi()
+    {
+        var selectedKey = (OverviewSessionsGrid.SelectedItem as ObservedSessionRow)?.Key;
+        var rows = new List<ObservedSessionRow>();
+        foreach (var session in _observability.Sessions.Snapshot())
+        {
+            var usage = session.Workspaces.Values.Select(value => value.Usage).Aggregate(default(UsageCounters), (sum, value) => sum + value);
+            rows.Add(new ObservedSessionRow(
+                "B:" + session.SessionHash,
+                "Bound",
+                session.State.ToString(),
+                ShortHash(session.SessionHash),
+                string.Join(",", session.Workspaces.Keys.OrderBy(key => key)),
+                session.CreatedUtc,
+                session.LastSeenUtc,
+                usage.ToolCalls,
+                usage.ExecutionTasks,
+                usage.TotalTokensEst,
+                usage.TotalPayloadBytes,
+                usage.Errors));
+        }
+        foreach (var unbound in _observability.Sessions.UnboundSnapshot())
+        {
+            rows.Add(new ObservedSessionRow(
+                "U:" + unbound.WorkspaceKey,
+                "Unbound",
+                unbound.State.ToString(),
+                "unbound-" + unbound.WorkspaceKey,
+                unbound.WorkspaceKey,
+                unbound.FirstSeenUtc,
+                unbound.LastSeenUtc,
+                unbound.Usage.ToolCalls,
+                unbound.Usage.ExecutionTasks,
+                unbound.Usage.TotalTokensEst,
+                unbound.Usage.TotalPayloadBytes,
+                unbound.Usage.Errors));
+        }
+        rows = rows.OrderBy(row => row.State == nameof(LogicalSessionActivityState.Active) ? 0 : 1)
+            .ThenByDescending(row => row.LastSeenUtc)
+            .ToList();
+
+        OverviewSessionSummaryText.Text = rows.Count == 0
+            ? "No observed sessions yet. Unbound MCP traffic remains separate from correlated sessions."
+            : $"{rows.Count(row => row.Kind == "Bound")} correlated context(s), {rows.Count(row => row.Kind == "Unbound")} unbound activity bucket(s). Exact AI-chat labeling remains disabled pending live proof.";
+        OverviewSessionsGrid.ItemsSource = rows;
+        if (selectedKey is not null)
+        {
+            var selected = rows.FirstOrDefault(row => row.Key == selectedKey);
+            if (selected is not null) OverviewSessionsGrid.SelectedItem = selected;
+        }
+    }
+
+    private void OverviewSessionsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (OverviewSessionsGrid.SelectedItem is not ObservedSessionRow row)
+        {
+            OverviewSessionDetailText.Text = "Select an observed session row.";
+            return;
+        }
+        OverviewSessionDetailText.Text =
+            $"Type: {row.Kind} | State: {row.State} | Observed ID: {row.DisplayId} | Workspaces: {row.Workspaces}\n" +
+            $"First seen: {row.FirstSeenUtc.ToLocalTime():dd/MM/yyyy HH:mm:ss} | Last seen: {row.LastSeenUtc.ToLocalTime():dd/MM/yyyy HH:mm:ss}\n" +
+            $"Calls: {FormatCount(row.Calls)} | Tasks: {FormatCount(row.Tasks)} | MCP tokens est.: {FormatCount(row.Tokens)} | Payload: {FormatBytes(row.PayloadBytes)} | Errors: {FormatCount(row.Errors)}";
+    }
+
+    private static string ShortHash(string hash) => hash.Length <= 12 ? hash : hash[..12] + "...";
+
+    private sealed record ObservedSessionRow(
+        string Key,
+        string Kind,
+        string State,
+        string DisplayId,
+        string Workspaces,
+        DateTimeOffset FirstSeenUtc,
+        DateTimeOffset LastSeenUtc,
+        long Calls,
+        long Tasks,
+        long Tokens,
+        long PayloadBytes,
+        long Errors)
+    {
+        public string LastSeen => LastSeenUtc.ToLocalTime().ToString("dd/MM HH:mm:ss");
     }
 
     private TextBlock OverviewStatusText(string key) => key switch

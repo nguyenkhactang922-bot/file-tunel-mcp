@@ -9,14 +9,9 @@ Implementation: ACTIVE
 
 Completed:
 - FMR-001 PASS.
-- OBS-001 PASS - metric contracts/estimator/classifier.
-- OBS-002 PASS - concurrent hot meter.
-- OBS-003 PASS - SQLite WAL persistence.
-- OBS-004 PASS - exact period queries/retention.
-- OBS-005 PASS - LocalMcpServer instrumentation.
-- OBS-006 PASS - multi-drive hub + runtime uptime.
-- OBS-007 PASS - logical chat correlation facade.
-- OBS-008 PASS - logical/unbound session registry + hash-only persistence; 272 assertions PASS.
-- OBS-009 PASS - WPF Overview core cards from Core snapshots; Release build/regression PASS; live WPF process smoke PASS.
+- OBS-001 through OBS-008 PASS - observability Core, persistence, session identity/state.
+- OBS-009 PASS - WPF Overview core cards.
+- OBS-010 PASS - Today/Yesterday/7d/30d exact period controls + Observed MCP sessions/unbound detail; build/regression/WPF smoke PASS.
 
-Next task: OBS-010 - period controls + live observed session table/detail.
+Current evidence: Release build PASS, 0 warnings/errors; Windows integration 272 assertions PASS.
+Next task: OBS-011 - bounded realtime graph + exact measurable health surfaces.

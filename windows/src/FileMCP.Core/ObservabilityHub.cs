@@ -125,6 +125,12 @@ public sealed class ObservabilityHub : IAsyncDisposable
         return _store.QueryExactPeriodAsync(range, key, cancellationToken);
     }
 
+    public async Task FlushAsync(DateTimeOffset capturedAtUtc, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        await _writer.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
+        await _sessionWriter.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
+    }
     public Task CleanupRetentionAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();

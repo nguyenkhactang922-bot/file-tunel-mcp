@@ -58,15 +58,31 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
                                 <TextBlock FontSize="26" FontWeight="SemiBold" Text="Overview"/>
-                                <TextBlock Margin="0,3,0,0" Foreground="Gray" Text="Local FileMCP observability — current app session"/>
+                                <TextBlock Margin="0,3,0,0" Foreground="Gray" Text="Local FileMCP observability - selected period totals + live runtime state"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                                 <TextBlock x:Name="OverviewClockText" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Right"/>
                                 <TextBlock x:Name="OverviewAppUptimeText" Margin="0,3,0,0" Foreground="Gray" HorizontalAlignment="Right"/>
                             </StackPanel>
                         </Grid>
-
-                        <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,12">
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold" Text="Period"/>
+                            <ComboBox x:Name="OverviewPeriodCombo" Grid.Column="1" Height="30" SelectedIndex="0">
+                                <ComboBoxItem Content="Today" Tag="Today"/>
+                                <ComboBoxItem Content="Yesterday" Tag="Yesterday"/>
+                                <ComboBoxItem Content="7 days" Tag="SevenDays"/>
+                                <ComboBoxItem Content="30 days" Tag="ThirtyDays"/>
+                            </ComboBox>
+                            <TextBlock x:Name="OverviewPeriodRangeText" Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="Gray"/>
+                            <TextBlock x:Name="OverviewPeriodUpdatedText" Grid.Column="3" VerticalAlignment="Center" Foreground="Gray" Text="Not loaded"/>
+                        </Grid>
+<Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -163,6 +179,28 @@
                             </Border>
                         </Grid>
 
+                        <TextBlock Margin="0,6,0,8" FontWeight="SemiBold" Text="Observed MCP sessions"/>
+                        <TextBlock x:Name="OverviewSessionSummaryText" Margin="0,0,0,8" Foreground="Gray" Text="No observed sessions yet."/>
+                        <DataGrid x:Name="OverviewSessionsGrid" Height="190" Margin="0,0,0,10"
+                                  AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                                  HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="OverviewSessionsGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Type" Binding="{Binding Kind}" Width="90"/>
+                                <DataGridTextColumn Header="State" Binding="{Binding State}" Width="80"/>
+                                <DataGridTextColumn Header="Observed ID" Binding="{Binding DisplayId}" Width="150"/>
+                                <DataGridTextColumn Header="Workspace" Binding="{Binding Workspaces}" Width="100"/>
+                                <DataGridTextColumn Header="Last seen" Binding="{Binding LastSeen}" Width="150"/>
+                                <DataGridTextColumn Header="Calls" Binding="{Binding Calls}" Width="80"/>
+                                <DataGridTextColumn Header="Tokens est." Binding="{Binding Tokens}" Width="100"/>
+                                <DataGridTextColumn Header="Errors" Binding="{Binding Errors}" Width="80"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="Selected session detail"/>
+                                <TextBlock x:Name="OverviewSessionDetailText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#444444" Text="Select an observed session row."/>
+                            </StackPanel>
+                        </Border>
                         <TextBlock Margin="0,4,0,0" Foreground="Gray" TextWrapping="Wrap"
                                    Text="* Token values are deterministic estimates from accepted MCP JSON payload bytes (bytes_div_4_v1). They are not ChatGPT account/model token usage."/>
                     </StackPanel>
