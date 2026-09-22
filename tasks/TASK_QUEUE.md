@@ -13,8 +13,8 @@
 | OBS-008 | PASS | OBS-007 | live logical/unbound session registry, active/idle/stale state machine, hashed durable id |
 | OBS-009 | PASS | OBS-004,OBS-006 | Overview tab + truthful usage/activity/per-drive cards sourced only from Core snapshots |
 | OBS-010 | PASS | OBS-008,OBS-009 | period controls, live session table/detail, exact-chat label feature gate |
-| OBS-011 | READY | OBS-010 | bounded realtime graph + exact measurable health surfaces |
-| OBS-012 | BLOCKED | OBS-011 | privacy DB inspection, load/concurrency, DB failure/corruption/migration/security regression suite |
+| OBS-011 | PASS | OBS-010 | bounded realtime graph + exact measurable health surfaces |
+| OBS-012 | READY | OBS-011 | privacy DB inspection, load/concurrency, DB failure/corruption/migration/security regression suite |
 | OBS-013 | BLOCKED | OBS-012 | self-contained win-x64 publish, native SQLite smoke, one live ChatGPT correlation proof, final acceptance |
 
-NEXT_EXACT_ACTION: CLAIM OBS-011.
+NEXT_EXACT_ACTION: CLAIM OBS-012.

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
@@ -28,6 +29,7 @@ public partial class MainWindow : Window
     private DateTimeOffset _lastOverviewPeriodRefreshUtc = DateTimeOffset.MinValue;
     private int _overviewPeriodQueryGeneration;
     private bool _overviewPeriodQueryRunning;
+    private bool _observabilityStoreReady;
     private string _logBuffer = "";
     private const int MaxLogCharacters = 500_000;
 
@@ -80,10 +82,12 @@ public partial class MainWindow : Window
         try
         {
             await _observability.StartAsync();
+            _observabilityStoreReady = true;
             AppendLog("[Telemetry] Observability store ready.\n");
         }
         catch (Exception ex)
         {
+            _observabilityStoreReady = false;
             AppendLog($"[Telemetry] Persistent observability unavailable; MCP remains operational: {ex.Message}\n");
         }
     }
@@ -118,9 +122,66 @@ public partial class MainWindow : Window
         foreach (var key in WorkspaceKeys)
             if (snapshot.Workspaces.TryGetValue(key, out var workspace)) UpdateOverviewWorkspaceLive(key, workspace);
 
+        var realtime = _observability.CaptureRealtimeSample();
+        UpdateOverviewHealth(snapshot);
+        UpdateRealtimeGraph(realtime);
         RefreshObservedSessionsUi();
     }
 
+    private void UpdateOverviewHealth(ObservabilitySnapshot snapshot)
+    {
+        var connected = snapshot.Workspaces.Values.Count(workspace => workspace.RuntimeRunning);
+        var usage = snapshot.GlobalUsage;
+        var averageMs = usage.ToolCalls == 0
+            ? 0d
+            : (double)usage.TotalLatencyTicks / Stopwatch.Frequency / usage.ToolCalls * 1_000d;
+        var maxMs = usage.MaxLatencyTicks <= 0
+            ? 0d
+            : (double)usage.MaxLatencyTicks / Stopwatch.Frequency * 1_000d;
+
+        OverviewConnectedRuntimesText.Text = $"{connected} / {WorkspaceKeys.Length}";
+        OverviewAverageLatencyText.Text = $"{averageMs:N1} ms";
+        OverviewMaxLatencyText.Text = $"{maxMs:N1} ms";
+        OverviewTelemetryHealthText.Text = _observabilityStoreReady ? "Ready" : "Degraded";
+        OverviewTelemetryHealthText.Foreground = _observabilityStoreReady
+            ? System.Windows.Media.Brushes.ForestGreen
+            : System.Windows.Media.Brushes.DarkOrange;
+    }
+
+    private void UpdateRealtimeGraph(RealtimeUsageSample current)
+    {
+        OverviewRealtimeCurrentText.Text = $"Calls/s: {FormatCount(current.Delta.ToolCalls)} | Tokens est./s: {FormatCount(current.Delta.TotalTokensEst)}";
+        var samples = _observability.RealtimeSamples();
+        var width = OverviewRealtimeCanvas.ActualWidth;
+        var height = OverviewRealtimeCanvas.ActualHeight;
+        if (samples.Count < 2 || width <= 1 || height <= 1)
+        {
+            OverviewCallsPolyline.Points = new PointCollection();
+            OverviewTokensPolyline.Points = new PointCollection();
+            return;
+        }
+
+        OverviewCallsPolyline.Points = BuildRealtimePoints(samples, sample => sample.Delta.ToolCalls, width, height);
+        OverviewTokensPolyline.Points = BuildRealtimePoints(samples, sample => sample.Delta.TotalTokensEst, width, height);
+    }
+
+    private static PointCollection BuildRealtimePoints(
+        IReadOnlyList<RealtimeUsageSample> samples,
+        Func<RealtimeUsageSample, long> selector,
+        double width,
+        double height)
+    {
+        var max = Math.Max(1L, samples.Max(selector));
+        var denominator = Math.Max(1, samples.Count - 1);
+        var points = new PointCollection(samples.Count);
+        for (var index = 0; index < samples.Count; index++)
+        {
+            var x = width * index / denominator;
+            var y = height - height * selector(samples[index]) / max;
+            points.Add(new System.Windows.Point(x, y));
+        }
+        return points;
+    }
     private async Task RefreshOverviewPeriodAsync(bool force)
     {
         if (_quitting) return;

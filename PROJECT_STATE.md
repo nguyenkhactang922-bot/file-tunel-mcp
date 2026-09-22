@@ -9,9 +9,7 @@ Implementation: ACTIVE
 
 Completed:
 - FMR-001 PASS.
-- OBS-001 through OBS-008 PASS - observability Core, persistence, session identity/state.
-- OBS-009 PASS - WPF Overview core cards.
-- OBS-010 PASS - Today/Yesterday/7d/30d exact period controls + Observed MCP sessions/unbound detail; build/regression/WPF smoke PASS.
+- OBS-001 through OBS-010 PASS.
+- OBS-011 PASS - 15-minute bounded realtime ring, WPF calls/token-estimate graph, measurable runtime/tool-latency/persistent-telemetry health only; Release build PASS; Windows integration 277 assertions PASS; WPF realtime smoke PASS.
 
-Current evidence: Release build PASS, 0 warnings/errors; Windows integration 272 assertions PASS.
-Next task: OBS-011 - bounded realtime graph + exact measurable health surfaces.
+Next task: OBS-012 - security/privacy/load/recovery hardening audit.

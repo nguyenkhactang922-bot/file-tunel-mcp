@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 
 namespace FileMCP.Core;
 
@@ -13,16 +13,26 @@ public sealed record ObservabilitySnapshot(
     UsageCounters GlobalUsage,
     IReadOnlyDictionary<string, WorkspaceObservabilitySnapshot> Workspaces);
 
+public sealed record RealtimeUsageSample(
+    DateTimeOffset CapturedUtc,
+    UsageCounters Delta);
+
 public sealed class ObservabilityHub : IAsyncDisposable
 {
+    private const int MaxRealtimeSamples = 15 * 60;
+
     private readonly Dictionary<string, WorkspaceUsageMeter> _meters;
     private readonly Dictionary<string, long> _runtimeStartedTicks;
     private readonly object _runtimeGate = new();
+    private readonly object _realtimeGate = new();
+    private readonly Queue<RealtimeUsageSample> _realtimeSamples = new();
     private readonly long _appStartedTicks = Stopwatch.GetTimestamp();
     private readonly TelemetrySqliteStore _store;
     private readonly TelemetryWriter _writer;
     private readonly LogicalSessionWriter _sessionWriter;
     private readonly SemaphoreSlim _startGate = new(1, 1);
+    private UsageCounters _lastRealtimeUsage;
+    private bool _hasRealtimeBaseline;
     private bool _started;
     private bool _disposed;
 
@@ -95,6 +105,29 @@ public sealed class ObservabilityHub : IAsyncDisposable
         }
     }
 
+    public RealtimeUsageSample CaptureRealtimeSample(DateTimeOffset? capturedUtc = null)
+    {
+        ThrowIfDisposed();
+        var now = (capturedUtc ?? DateTimeOffset.UtcNow).ToUniversalTime();
+        var current = Snapshot().GlobalUsage;
+        lock (_realtimeGate)
+        {
+            var delta = _hasRealtimeBaseline ? SubtractNonNegative(current, _lastRealtimeUsage) : default;
+            _lastRealtimeUsage = current;
+            _hasRealtimeBaseline = true;
+            var sample = new RealtimeUsageSample(now, delta);
+            _realtimeSamples.Enqueue(sample);
+            while (_realtimeSamples.Count > MaxRealtimeSamples) _realtimeSamples.Dequeue();
+            return sample;
+        }
+    }
+
+    public IReadOnlyList<RealtimeUsageSample> RealtimeSamples()
+    {
+        ThrowIfDisposed();
+        lock (_realtimeGate) return _realtimeSamples.ToArray();
+    }
+
     public ObservabilitySnapshot Snapshot()
     {
         ThrowIfDisposed();
@@ -131,6 +164,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
         await _writer.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
         await _sessionWriter.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
     }
+
     public Task CleanupRetentionAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -142,6 +176,24 @@ public sealed class ObservabilityHub : IAsyncDisposable
         await _writer.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
         await _sessionWriter.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
     }
+
+    private static UsageCounters SubtractNonNegative(UsageCounters current, UsageCounters previous) => new(
+        Math.Max(0, current.McpRequests - previous.McpRequests),
+        Math.Max(0, current.ToolCalls - previous.ToolCalls),
+        Math.Max(0, current.ExecutionTasks - previous.ExecutionTasks),
+        Math.Max(0, current.RequestBytes - previous.RequestBytes),
+        Math.Max(0, current.ResponseBytes - previous.ResponseBytes),
+        Math.Max(0, current.TokensInEst - previous.TokensInEst),
+        Math.Max(0, current.TokensOutEst - previous.TokensOutEst),
+        Math.Max(0, current.Errors - previous.Errors),
+        Math.Max(0, current.ReadCalls - previous.ReadCalls),
+        Math.Max(0, current.WriteCalls - previous.WriteCalls),
+        Math.Max(0, current.CommandCalls - previous.CommandCalls),
+        Math.Max(0, current.GitCalls - previous.GitCalls),
+        Math.Max(0, current.SkillCalls - previous.SkillCalls),
+        Math.Max(0, current.OtherCalls - previous.OtherCalls),
+        Math.Max(0, current.TotalLatencyTicks - previous.TotalLatencyTicks),
+        current.MaxLatencyTicks);
 
     private static string NormalizeWorkspaceKey(string workspaceKey)
     {

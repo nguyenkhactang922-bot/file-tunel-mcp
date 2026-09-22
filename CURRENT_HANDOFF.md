@@ -2,8 +2,8 @@
 
 STATUS: IMPLEMENTATION ACTIVE
 BRANCH: chatgpt/OBS-001-observability-foundation
-COMPLETED: FMR-001 through OBS-010
-NEXT TASK: OBS-011 - realtime graph + health
+COMPLETED: FMR-001 through OBS-011
+NEXT TASK: OBS-012 - security/privacy/load/recovery hardening audit
 
 NEXT_EXACT_ACTION:
-Add bounded in-memory realtime samples and WPF graph for MCP activity deltas. Add only measurable health: local MCP/runtime ready state and measured tool latency. Do not invent Internet RTT. Tunnel health is conditional on a resolvable local tunnel health endpoint and may remain deferred if the current runtime does not expose the resolved ephemeral address.
+Run and extend the hardening gates: high-concurrency meter/server traffic, SQLite failure/corruption/reopen behavior, schema migration and retention, DB privacy inspection for forbidden content/arguments/secrets/raw chat handles, and all legacy filesystem/Git/HTTP/runtime security regressions. Fix any real defect found before advancing to packaging.

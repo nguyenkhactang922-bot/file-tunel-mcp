@@ -563,6 +563,20 @@ internal static class Program
         {
             Assert(true, "observability hub rejects unknown workspace");
         }
+        await using var realtimeHub = new ObservabilityHub(["D"], Path.Combine(root, "observability-realtime.sqlite3"), TimeSpan.FromHours(1));
+        var rt0 = new DateTimeOffset(2026, 9, 22, 2, 0, 0, TimeSpan.Zero);
+        var baselineSample = realtimeHub.CaptureRealtimeSample(rt0);
+        Assert(baselineSample.Delta.IsZero, "observability realtime first sample establishes zero baseline");
+        realtimeHub.MeterFor("D").RecordRequest(5);
+        realtimeHub.MeterFor("D").RecordResponse(9);
+        realtimeHub.MeterFor("D").RecordToolCall("read_file", false, 11);
+        var activitySample = realtimeHub.CaptureRealtimeSample(rt0.AddSeconds(1));
+        Assert(activitySample.Delta.McpRequests == 1 && activitySample.Delta.ToolCalls == 1 && activitySample.Delta.ReadCalls == 1, "observability realtime captures call delta");
+        Assert(activitySample.Delta.TokensInEst == 2 && activitySample.Delta.TokensOutEst == 3, "observability realtime captures token-estimate delta");
+        for (var index = 2; index < 910; index++) realtimeHub.CaptureRealtimeSample(rt0.AddSeconds(index));
+        var realtimeSamples = realtimeHub.RealtimeSamples();
+        Assert(realtimeSamples.Count == 900, "observability realtime ring bounded to 15 minutes");
+        Assert(realtimeSamples[^1].CapturedUtc == rt0.AddSeconds(909), "observability realtime ring keeps newest sample");
         Console.WriteLine("windows-observability-hub: ok");
     }
     private static Task TestSettingsAndCredentialsAsync(string root)

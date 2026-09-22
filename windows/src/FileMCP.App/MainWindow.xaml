@@ -154,6 +154,44 @@
                             </Grid>
                         </Border>
 
+                        <TextBlock Margin="0,4,0,8" FontWeight="SemiBold" Text="Realtime activity - last 15 minutes"/>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Style="{StaticResource OverviewCardStyle}">
+                                <StackPanel><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Connected runtimes"/><TextBlock x:Name="OverviewConnectedRuntimesText" Style="{StaticResource OverviewValueStyle}" Text="0 / 4"/></StackPanel>
+                            </Border>
+                            <Border Grid.Column="1" Style="{StaticResource OverviewCardStyle}">
+                                <StackPanel><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Average tool latency"/><TextBlock x:Name="OverviewAverageLatencyText" Style="{StaticResource OverviewValueStyle}" Text="0 ms"/></StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Style="{StaticResource OverviewCardStyle}">
+                                <StackPanel><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Max tool latency"/><TextBlock x:Name="OverviewMaxLatencyText" Style="{StaticResource OverviewValueStyle}" Text="0 ms"/></StackPanel>
+                            </Border>
+                            <Border Grid.Column="3" Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,10">
+                                <StackPanel><TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Persistent telemetry"/><TextBlock x:Name="OverviewTelemetryHealthText" Style="{StaticResource OverviewValueStyle}" Text="Starting"/></StackPanel>
+                            </Border>
+                        </Grid>
+                        <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,12">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Foreground="Gray" Text="Calls / second and MCP token estimate / second"/>
+                                    <TextBlock x:Name="OverviewRealtimeCurrentText" Grid.Column="1" Foreground="Gray" Text="Calls/s: 0 | Tokens est./s: 0"/>
+                                </Grid>
+                                <Canvas x:Name="OverviewRealtimeCanvas" Height="190" ClipToBounds="True" Background="#08000000">
+                                    <Polyline x:Name="OverviewCallsPolyline" Stroke="#2F6FED" StrokeThickness="2"/>
+                                    <Polyline x:Name="OverviewTokensPolyline" Stroke="#17A673" StrokeThickness="2"/>
+                                </Canvas>
+                                <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                                    <TextBlock Foreground="#2F6FED" FontWeight="SemiBold" Text="Calls/s" Margin="0,0,18,0"/>
+                                    <TextBlock Foreground="#17A673" FontWeight="SemiBold" Text="MCP token est./s"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                         <TextBlock Margin="0,4,0,8" FontWeight="SemiBold" Text="Workspaces"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
