@@ -73,3 +73,9 @@ LIVE DESKTOP RECONNECT CHECK (2026-09-22):
 - Verified release ZIP SHA-256 remains 5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E.
 - This existing ChatGPT conversation still exposes the old 18-tool FileMCP connector schema; filemcp_observability_connect is not present.
 - NEXT_EXACT_ACTION: open a fresh ChatGPT conversation while the upgraded FileMCP-release process is running, confirm filemcp_observability_connect appears, then execute OBS-013 live proof. No code/audit work should be repeated.
+
+OBS-013 LIVE PROOF STAGE A (2026-09-22):
+- Fresh ChatGPT connector schema now exposes 19 tools including filemcp_observability_connect.
+- Real ChatGPT handle creation/resume and _filemcp_chat propagation through read_file/git_status/run_command PASS.
+- Durable bound session hash verified; raw handle absent from DB/WAL/SHM.
+- Remaining frozen-spec gate: one subsequent user turn must reuse the same handle and remain bound to the same durable session before OBS-013 can be marked PASS / exact AI-chat wording enabled.
