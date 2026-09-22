@@ -11,7 +11,7 @@ internal interface ITelemetryDeltaStore
 
 internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
     private readonly string _databasePath;
     private readonly SemaphoreSlim _initializeGate = new(1, 1);
     private volatile bool _initialized;
@@ -82,6 +82,108 @@ internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
         }
     }
 
+    public async Task UpsertSessionDeltasAsync(LogicalSessionPersistenceBatch batch, CancellationToken cancellationToken = default)
+    {
+        if (batch.IsEmpty) return;
+        await InitializeAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await OpenConfiguredConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            foreach (var delta in batch.Sessions)
+            {
+                await using (var session = connection.CreateCommand())
+                {
+                    session.Transaction = (SqliteTransaction)transaction;
+                    session.CommandText = """
+                        INSERT INTO logical_sessions(session_hash, created_epoch, last_seen_epoch, client_name, state)
+                        VALUES($hash,$created,$last,NULL,$state)
+                        ON CONFLICT(session_hash) DO UPDATE SET
+                            created_epoch = MIN(created_epoch, excluded.created_epoch),
+                            last_seen_epoch = MAX(last_seen_epoch, excluded.last_seen_epoch),
+                            state = excluded.state;
+                        """;
+                    session.Parameters.AddWithValue("$hash", delta.SessionHash);
+                    session.Parameters.AddWithValue("$created", delta.CreatedEpoch);
+                    session.Parameters.AddWithValue("$last", delta.LastSeenEpoch);
+                    session.Parameters.AddWithValue("$state", delta.State);
+                    await session.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                await using var workspace = connection.CreateCommand();
+                workspace.Transaction = (SqliteTransaction)transaction;
+                workspace.CommandText = """
+                    INSERT INTO logical_session_workspace(
+                        session_hash,workspace_key,first_seen_epoch,last_seen_epoch,
+                        mcp_requests,tool_calls,execution_tasks,request_bytes,response_bytes,tokens_in_est,tokens_out_est,
+                        errors,read_calls,write_calls,command_calls,git_calls,skill_calls,other_calls)
+                    VALUES($hash,$workspace,$first,$last,$mcp,$tools,$tasks,$req,$res,$tin,$tout,$errors,$read,$write,$command,$git,$skill,$other)
+                    ON CONFLICT(session_hash,workspace_key) DO UPDATE SET
+                        first_seen_epoch = MIN(first_seen_epoch, excluded.first_seen_epoch),
+                        last_seen_epoch = MAX(last_seen_epoch, excluded.last_seen_epoch),
+                        mcp_requests = mcp_requests + excluded.mcp_requests,
+                        tool_calls = tool_calls + excluded.tool_calls,
+                        execution_tasks = execution_tasks + excluded.execution_tasks,
+                        request_bytes = request_bytes + excluded.request_bytes,
+                        response_bytes = response_bytes + excluded.response_bytes,
+                        tokens_in_est = tokens_in_est + excluded.tokens_in_est,
+                        tokens_out_est = tokens_out_est + excluded.tokens_out_est,
+                        errors = errors + excluded.errors,
+                        read_calls = read_calls + excluded.read_calls,
+                        write_calls = write_calls + excluded.write_calls,
+                        command_calls = command_calls + excluded.command_calls,
+                        git_calls = git_calls + excluded.git_calls,
+                        skill_calls = skill_calls + excluded.skill_calls,
+                        other_calls = other_calls + excluded.other_calls;
+                    """;
+                AddSessionUsageParameters(workspace, delta.SessionHash, delta.WorkspaceKey, delta.FirstSeenEpoch, delta.LastSeenEpoch, delta.Usage);
+                await workspace.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var delta in batch.Unbound)
+            {
+                await using var command = connection.CreateCommand();
+                command.Transaction = (SqliteTransaction)transaction;
+                command.CommandText = """
+                    INSERT INTO unbound_session_workspace(
+                        workspace_key,first_seen_epoch,last_seen_epoch,state,
+                        mcp_requests,tool_calls,execution_tasks,request_bytes,response_bytes,tokens_in_est,tokens_out_est,
+                        errors,read_calls,write_calls,command_calls,git_calls,skill_calls,other_calls)
+                    VALUES($workspace,$first,$last,$state,$mcp,$tools,$tasks,$req,$res,$tin,$tout,$errors,$read,$write,$command,$git,$skill,$other)
+                    ON CONFLICT(workspace_key) DO UPDATE SET
+                        first_seen_epoch = MIN(first_seen_epoch, excluded.first_seen_epoch),
+                        last_seen_epoch = MAX(last_seen_epoch, excluded.last_seen_epoch),
+                        state = excluded.state,
+                        mcp_requests = mcp_requests + excluded.mcp_requests,
+                        tool_calls = tool_calls + excluded.tool_calls,
+                        execution_tasks = execution_tasks + excluded.execution_tasks,
+                        request_bytes = request_bytes + excluded.request_bytes,
+                        response_bytes = response_bytes + excluded.response_bytes,
+                        tokens_in_est = tokens_in_est + excluded.tokens_in_est,
+                        tokens_out_est = tokens_out_est + excluded.tokens_out_est,
+                        errors = errors + excluded.errors,
+                        read_calls = read_calls + excluded.read_calls,
+                        write_calls = write_calls + excluded.write_calls,
+                        command_calls = command_calls + excluded.command_calls,
+                        git_calls = git_calls + excluded.git_calls,
+                        skill_calls = skill_calls + excluded.skill_calls,
+                        other_calls = other_calls + excluded.other_calls;
+                    """;
+                command.Parameters.AddWithValue("$workspace", delta.WorkspaceKey);
+                command.Parameters.AddWithValue("$first", delta.FirstSeenEpoch);
+                command.Parameters.AddWithValue("$last", delta.LastSeenEpoch);
+                command.Parameters.AddWithValue("$state", delta.State);
+                AddUsageParameters(command, delta.Usage);
+                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            try { await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false); } catch { }
+            throw;
+        }
+    }
     public async Task<UsageCounters> QueryExactPeriodAsync(
         UsagePeriodRange range,
         string? workspaceKey = null,
@@ -273,6 +375,26 @@ internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
                 PRIMARY KEY (session_hash, workspace_key),
                 FOREIGN KEY (session_hash) REFERENCES logical_sessions(session_hash) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS unbound_session_workspace (
+                workspace_key TEXT PRIMARY KEY,
+                first_seen_epoch INTEGER NOT NULL,
+                last_seen_epoch INTEGER NOT NULL,
+                state TEXT NOT NULL,
+                mcp_requests INTEGER NOT NULL DEFAULT 0,
+                tool_calls INTEGER NOT NULL DEFAULT 0,
+                execution_tasks INTEGER NOT NULL DEFAULT 0,
+                request_bytes INTEGER NOT NULL DEFAULT 0,
+                response_bytes INTEGER NOT NULL DEFAULT 0,
+                tokens_in_est INTEGER NOT NULL DEFAULT 0,
+                tokens_out_est INTEGER NOT NULL DEFAULT 0,
+                errors INTEGER NOT NULL DEFAULT 0,
+                read_calls INTEGER NOT NULL DEFAULT 0,
+                write_calls INTEGER NOT NULL DEFAULT 0,
+                command_calls INTEGER NOT NULL DEFAULT 0,
+                git_calls INTEGER NOT NULL DEFAULT 0,
+                skill_calls INTEGER NOT NULL DEFAULT 0,
+                other_calls INTEGER NOT NULL DEFAULT 0
+            );
             """;
         await ExecuteAsync(connection, schema, cancellationToken).ConfigureAwait(false);
 
@@ -288,9 +410,14 @@ internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
         await WriteMetaAsync(connection, "token_estimator", McpTokenEstimator.EstimatorId, cancellationToken).ConfigureAwait(false);
     }
 
-    private static Task MigrateAsync(SqliteConnection connection, int fromVersion, CancellationToken cancellationToken)
+    private static async Task MigrateAsync(SqliteConnection connection, int fromVersion, CancellationToken cancellationToken)
     {
-        if (fromVersion == SchemaVersion) return Task.CompletedTask;
+        if (fromVersion == SchemaVersion) return;
+        if (fromVersion == 1 && SchemaVersion == 2)
+        {
+            await WriteMetaAsync(connection, "schema_version", SchemaVersion.ToString(), cancellationToken).ConfigureAwait(false);
+            return;
+        }
         throw new FileMcpException($"Unsupported observability database migration from schema {fromVersion} to {SchemaVersion}.");
     }
 
@@ -359,6 +486,32 @@ internal sealed class TelemetrySqliteStore : ITelemetryDeltaStore
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    private static void AddSessionUsageParameters(SqliteCommand command, string sessionHash, string workspaceKey, long firstSeenEpoch, long lastSeenEpoch, UsageCounters usage)
+    {
+        command.Parameters.AddWithValue("$hash", sessionHash);
+        command.Parameters.AddWithValue("$workspace", workspaceKey);
+        command.Parameters.AddWithValue("$first", firstSeenEpoch);
+        command.Parameters.AddWithValue("$last", lastSeenEpoch);
+        AddUsageParameters(command, usage);
+    }
+
+    private static void AddUsageParameters(SqliteCommand command, UsageCounters usage)
+    {
+        command.Parameters.AddWithValue("$mcp", usage.McpRequests);
+        command.Parameters.AddWithValue("$tools", usage.ToolCalls);
+        command.Parameters.AddWithValue("$tasks", usage.ExecutionTasks);
+        command.Parameters.AddWithValue("$req", usage.RequestBytes);
+        command.Parameters.AddWithValue("$res", usage.ResponseBytes);
+        command.Parameters.AddWithValue("$tin", usage.TokensInEst);
+        command.Parameters.AddWithValue("$tout", usage.TokensOutEst);
+        command.Parameters.AddWithValue("$errors", usage.Errors);
+        command.Parameters.AddWithValue("$read", usage.ReadCalls);
+        command.Parameters.AddWithValue("$write", usage.WriteCalls);
+        command.Parameters.AddWithValue("$command", usage.CommandCalls);
+        command.Parameters.AddWithValue("$git", usage.GitCalls);
+        command.Parameters.AddWithValue("$skill", usage.SkillCalls);
+        command.Parameters.AddWithValue("$other", usage.OtherCalls);
+    }
     private static async Task<string?> ReadMetaAsync(SqliteConnection connection, string key, CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();

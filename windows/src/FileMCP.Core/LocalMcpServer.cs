@@ -31,14 +31,16 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private readonly Action<string> _log;
     private readonly WorkspaceUsageMeter? _usageMeter;
     private readonly LogicalChatCorrelationService? _chatCorrelation;
+    private readonly LogicalSessionRegistry? _sessions;
+    private readonly string? _workspaceKey;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _acceptLoop;
 
-    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null)
+    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null, LogicalSessionRegistry? sessions = null, string? workspaceKey = null)
     {
         if (Encoding.UTF8.GetByteCount(localAuthToken) < 32) throw new FileMcpException("Local MCP authentication token is too short");
-        _port = port; _localAuthToken = localAuthToken; _log = log; _usageMeter = usageMeter; _chatCorrelation = chatCorrelation;
+        _port = port; _localAuthToken = localAuthToken; _log = log; _usageMeter = usageMeter; _chatCorrelation = chatCorrelation; _sessions = sessions; _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey) ? null : workspaceKey.Trim().ToUpperInvariant();
         _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, enableCommands);
         _skills = new CodexSkillRegistry(allowedDirectory, log);
     }
@@ -216,21 +218,21 @@ public sealed class LocalMcpServer : IAsyncDisposable
         {
             var error = ValidateModernRequest(request, method, parameters, id); if (error is not null) return MeterResponse(error);
             if (message["id"] is null) return MeterResponse(HttpResponse(202, [], "application/json"));
-            return MeterResponse(await ProcessModernRequestAsync(id, method, parameters, cancellationToken).ConfigureAwait(false));
+            return MeterResponse(await ProcessModernRequestAsync(id, method, parameters, request.Body.LongLength, cancellationToken).ConfigureAwait(false));
         }
         if (message["id"] is null) return MeterResponse(HttpResponse(202, [], "application/json"));
-        return MeterResponse(await ProcessLegacyRequestAsync(id, method, parameters, cancellationToken).ConfigureAwait(false));
+        return MeterResponse(await ProcessLegacyRequestAsync(id, method, parameters, request.Body.LongLength, cancellationToken).ConfigureAwait(false));
     }
-    private async Task<byte[]> ProcessLegacyRequestAsync(JsonNode? id, string method, JsonObject parameters, CancellationToken cancellationToken) => method switch
+    private async Task<byte[]> ProcessLegacyRequestAsync(JsonNode? id, string method, JsonObject parameters, long requestBytes, CancellationToken cancellationToken) => method switch
     {
         "initialize" => JsonRpcResult(id, new JsonObject { ["protocolVersion"] = NegotiateLegacy(parameters["protocolVersion"]?.GetValue<string>()), ["capabilities"] = ServerCapabilities(), ["serverInfo"] = ServerInfo() }),
         "ping" => JsonRpcResult(id, new JsonObject()),
         "tools/list" => JsonRpcResult(id, new JsonObject { ["tools"] = AllToolDefinitions() }),
-        "tools/call" => await CallToolAsync(id, parameters, false, cancellationToken).ConfigureAwait(false),
+        "tools/call" => await CallToolAsync(id, parameters, false, requestBytes, cancellationToken).ConfigureAwait(false),
         _ => JsonRpcError(id, -32601, $"Method not found: {method}"),
     };
 
-    private async Task<byte[]> ProcessModernRequestAsync(JsonNode? id, string method, JsonObject parameters, CancellationToken cancellationToken)
+    private async Task<byte[]> ProcessModernRequestAsync(JsonNode? id, string method, JsonObject parameters, long requestBytes, CancellationToken cancellationToken)
     {
         if (method == "server/discover")
         {
@@ -247,7 +249,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
         }
         if (method == "ping") return JsonRpcResult(id, ModernComplete(new JsonObject()));
         if (method == "tools/list") { var result = ModernComplete(new JsonObject { ["tools"] = AllToolDefinitions() }); result["ttlMs"] = 30_000; result["cacheScope"] = "private"; return JsonRpcResult(id, result); }
-        if (method == "tools/call") return await CallToolAsync(id, parameters, true, cancellationToken).ConfigureAwait(false);
+        if (method == "tools/call") return await CallToolAsync(id, parameters, true, requestBytes, cancellationToken).ConfigureAwait(false);
         return JsonRpcError(id, -32601, $"Method not found: {method}", status: 404);
     }
 
@@ -306,19 +308,21 @@ public sealed class LocalMcpServer : IAsyncDisposable
         ["annotations"] = new JsonObject { ["readOnlyHint"] = true, ["destructiveHint"] = false, ["openWorldHint"] = false },
     };
 
-    private async Task<byte[]> CallToolAsync(JsonNode? id, JsonObject parameters, bool modern, CancellationToken cancellationToken)
+    private async Task<byte[]> CallToolAsync(JsonNode? id, JsonObject parameters, bool modern, long requestBytes, CancellationToken cancellationToken)
     {
         var started = Stopwatch.GetTimestamp();
         string? name = null;
         var isError = true;
+        LogicalSessionCallToken? sessionCall = null;
+        byte[]? response = null;
         try
         {
             if (parameters["name"] is not JsonValue nameNode || !nameNode.TryGetValue<string>(out name))
-                return JsonRpcError(id, -32602, "Missing tool name", status: modern ? 400 : 200);
+                return response = JsonRpcError(id, -32602, "Missing tool name", status: modern ? 400 : 200);
 
             var isObservabilityConnect = name == "filemcp_observability_connect" && _chatCorrelation is not null;
             if (!_tools.HasTool(name) && !_skills.HasTool(name) && !isObservabilityConnect)
-                return JsonRpcError(id, -32602, $"Unknown tool: {name}");
+                return response = JsonRpcError(id, -32602, $"Unknown tool: {name}");
 
             JsonObject arguments;
             if (parameters["arguments"] is null) arguments = new JsonObject();
@@ -331,7 +335,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
                     ["isError"] = true,
                 };
                 if (modern) invalid = ModernComplete(invalid);
-                return JsonRpcResult(id, invalid);
+                return response = JsonRpcResult(id, invalid);
             }
 
             try
@@ -349,6 +353,13 @@ public sealed class LocalMcpServer : IAsyncDisposable
                     }
 
                     var connection = _chatCorrelation!.Connect(requested);
+                    if (_sessions is not null && _workspaceKey is not null)
+                    {
+                        var sessionHash = LogicalChatCorrelationService.HashForPersistence(connection.ChatInstanceId);
+                        _sessions.RegisterSession(sessionHash);
+                        sessionCall = _sessions.BeginToolCall(_workspaceKey, sessionHash, requestBytes, name);
+                    }
+
                     var structured = new JsonObject
                     {
                         ["chat_instance_id"] = connection.ChatInstanceId,
@@ -366,13 +377,18 @@ public sealed class LocalMcpServer : IAsyncDisposable
                     };
                     if (modern) result = ModernComplete(result);
                     isError = false;
-                    return JsonRpcResult(id, result);
+                    return response = JsonRpcResult(id, result);
                 }
 
+                string? sessionHashForCall = null;
                 var correlationNode = arguments["_filemcp_chat"];
                 arguments.Remove("_filemcp_chat");
-                if (correlationNode is JsonValue correlationValue && correlationValue.TryGetValue<string>(out var correlationHandle))
-                    _ = _chatCorrelation?.TryResolve(correlationHandle, out _);
+                if (correlationNode is JsonValue correlationValue && correlationValue.TryGetValue<string>(out var correlationHandle) &&
+                    _chatCorrelation?.TryResolve(correlationHandle, out var resolvedHash) == true)
+                    sessionHashForCall = resolvedHash;
+
+                if (_sessions is not null && _workspaceKey is not null)
+                    sessionCall = _sessions.BeginToolCall(_workspaceKey, sessionHashForCall, requestBytes, name);
 
                 var output = _skills.HasTool(name)
                     ? _skills.Call(name, arguments)
@@ -380,19 +396,25 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 var toolResult = new JsonObject { ["content"] = output.Content, ["structuredContent"] = output.StructuredContent, ["isError"] = false };
                 if (modern) toolResult = ModernComplete(toolResult);
                 isError = false;
-                return JsonRpcResult(id, toolResult);
+                return response = JsonRpcResult(id, toolResult);
             }
             catch (Exception ex)
             {
                 if (_skills.HasTool(name)) _log($"[Skills] ERROR: {ex.Message}\n");
                 var result = new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = ex.Message }), ["isError"] = true };
                 if (modern) result = ModernComplete(result);
-                return JsonRpcResult(id, result);
+                return response = JsonRpcResult(id, result);
             }
         }
         finally
         {
-            RecordToolCallSafely(name, isError, Math.Max(0, Stopwatch.GetTimestamp() - started));
+            var latency = Math.Max(0, Stopwatch.GetTimestamp() - started);
+            RecordToolCallSafely(name, isError, latency);
+            if (sessionCall.HasValue && response is not null)
+            {
+                try { _sessions?.CompleteToolCall(sessionCall.Value, HttpBodyByteLength(response), isError, latency); }
+                catch (Exception ex) { _log($"[Telemetry] session metric ignored: {ex.Message}\n"); }
+            }
         }
     }
 

@@ -29,6 +29,7 @@ internal static class Program
         {
             TestObservabilityContracts();
             TestLogicalChatCorrelation();
+            await TestLogicalSessionRegistryAsync(root);
             await TestWorkspaceUsageMeterAsync();
             await TestTelemetryPersistenceAsync(root);
             await TestUsagePeriodsAndRetentionAsync(root);
@@ -142,6 +143,118 @@ internal static class Program
             Assert(true, "logical chat unknown resume rejected");
         }
         Console.WriteLine("windows-logical-chat-correlation: ok");
+    }
+    private static async Task TestLogicalSessionRegistryAsync(string root)
+    {
+        var t0 = new DateTimeOffset(2026, 9, 22, 1, 0, 0, TimeSpan.Zero);
+        var correlation = new LogicalChatCorrelationService();
+        var rawHandle = correlation.Connect().ChatInstanceId;
+        var sessionHash = LogicalChatCorrelationService.HashForPersistence(rawHandle);
+        var registry = new LogicalSessionRegistry();
+        registry.RegisterSession(sessionHash, t0);
+
+        var inFlight = registry.BeginToolCall("D", sessionHash, 5, "write_file", t0.AddSeconds(1));
+        var activeInFlight = registry.Snapshot(t0.AddHours(1), includeStale: true).Single();
+        Assert(activeInFlight.State == LogicalSessionActivityState.Active && activeInFlight.InFlightCalls == 1, "logical session in-flight call forces active state");
+        registry.CompleteToolCall(inFlight, 9, false, 7, t0.AddSeconds(2));
+        var active = registry.Snapshot(t0.AddSeconds(40), includeStale: true).Single();
+        Assert(active.State == LogicalSessionActivityState.Active && active.InFlightCalls == 0, "logical session stays active through 45 second idle threshold");
+        var idle = registry.Snapshot(t0.AddSeconds(48), includeStale: true).Single();
+        Assert(idle.State == LogicalSessionActivityState.Idle, "logical session becomes idle after 45 seconds");
+        var stale = registry.Snapshot(t0.AddMinutes(31), includeStale: true).Single();
+        Assert(stale.State == LogicalSessionActivityState.Stale, "logical session becomes stale after 30 minutes");
+        Assert(registry.Snapshot(t0.AddMinutes(31)).Count == 0, "logical session stale rows hidden by default");
+        Assert(stale.Workspaces["D"].Usage.ToolCalls == 1 && stale.Workspaces["D"].Usage.WriteCalls == 1 && stale.Workspaces["D"].Usage.ExecutionTasks == 1, "logical session bound usage categorized");
+        Assert(stale.Workspaces["D"].Usage.RequestBytes == 5 && stale.Workspaces["D"].Usage.ResponseBytes == 9, "logical session bound bytes captured");
+
+        var unboundCall = registry.BeginToolCall("E", null, 4, "read_file", t0.AddSeconds(3));
+        registry.CompleteToolCall(unboundCall, 8, true, 5, t0.AddSeconds(4));
+        var unbound = registry.UnboundSnapshot(t0.AddSeconds(20), includeStale: true).Single();
+        Assert(unbound.WorkspaceKey == "E" && unbound.Usage.ToolCalls == 1 && unbound.Usage.ReadCalls == 1 && unbound.Usage.Errors == 1, "logical session unbound traffic retained separately");
+
+        var databaseDirectory = Path.Combine(root, "logical-session-store");
+        Directory.CreateDirectory(databaseDirectory);
+        var database = Path.Combine(databaseDirectory, "sessions.sqlite3");
+        var store = new TelemetrySqliteStore(database);
+        var persistedRegistry = new LogicalSessionRegistry();
+        await using (var writer = new LogicalSessionWriter(persistedRegistry, store, TimeSpan.FromHours(1)))
+        {
+            await writer.StartAsync();
+            persistedRegistry.RegisterSession(sessionHash, t0);
+            var bound = persistedRegistry.BeginToolCall("D", sessionHash, 5, "write_file", t0.AddSeconds(1));
+            persistedRegistry.CompleteToolCall(bound, 9, false, 7, t0.AddSeconds(2));
+            var unboundToken = persistedRegistry.BeginToolCall("E", null, 4, "read_file", t0.AddSeconds(1));
+            persistedRegistry.CompleteToolCall(unboundToken, 8, true, 5, t0.AddSeconds(2));
+            await writer.FlushOnceAsync(t0.AddSeconds(3));
+            Assert(writer.PendingSnapshotForTests().IsEmpty, "logical session writer clears pending after successful flush");
+
+            await using (var connection = new SqliteConnection($"Data Source={database}"))
+            {
+                await connection.OpenAsync();
+                await using var schema = connection.CreateCommand();
+                schema.CommandText = "SELECT value FROM telemetry_meta WHERE key='schema_version';";
+                Assert((string?)await schema.ExecuteScalarAsync() == TelemetrySqliteStore.SchemaVersion.ToString(), "logical session store schema version current");
+
+                await using var sessionQuery = connection.CreateCommand();
+                sessionQuery.CommandText = "SELECT session_hash,state,created_epoch,last_seen_epoch FROM logical_sessions;";
+                await using var sessionReader = await sessionQuery.ExecuteReaderAsync();
+                Assert(await sessionReader.ReadAsync(), "logical session durable row exists");
+                Assert(sessionReader.GetString(0) == sessionHash && sessionReader.GetString(0) != rawHandle, "logical session durable identity is hash only");
+                Assert(sessionReader.GetString(1) == "active", "logical session durable active state");
+
+                await using var workspaceQuery = connection.CreateCommand();
+                workspaceQuery.CommandText = "SELECT tool_calls,execution_tasks,request_bytes,response_bytes,write_calls FROM logical_session_workspace WHERE session_hash=$hash AND workspace_key='D';";
+                workspaceQuery.Parameters.AddWithValue("$hash", sessionHash);
+                await using var workspaceReader = await workspaceQuery.ExecuteReaderAsync();
+                Assert(await workspaceReader.ReadAsync(), "logical session durable workspace row exists");
+                Assert(workspaceReader.GetInt64(0) == 1 && workspaceReader.GetInt64(1) == 1 && workspaceReader.GetInt64(2) == 5 && workspaceReader.GetInt64(3) == 9 && workspaceReader.GetInt64(4) == 1, "logical session durable bound counters");
+
+                await using var unboundQuery = connection.CreateCommand();
+                unboundQuery.CommandText = "SELECT tool_calls,read_calls,errors,request_bytes,response_bytes FROM unbound_session_workspace WHERE workspace_key='E';";
+                await using var unboundReader = await unboundQuery.ExecuteReaderAsync();
+                Assert(await unboundReader.ReadAsync(), "logical session durable unbound row exists");
+                Assert(unboundReader.GetInt64(0) == 1 && unboundReader.GetInt64(1) == 1 && unboundReader.GetInt64(2) == 1 && unboundReader.GetInt64(3) == 4 && unboundReader.GetInt64(4) == 8, "logical session durable unbound counters");
+            }
+
+            await writer.FlushOnceAsync(t0.AddMinutes(31));
+            await using var staleConnection = new SqliteConnection($"Data Source={database}");
+            await staleConnection.OpenAsync();
+            await using var staleQuery = staleConnection.CreateCommand();
+            staleQuery.CommandText = "SELECT state FROM logical_sessions WHERE session_hash=$hash;";
+            staleQuery.Parameters.AddWithValue("$hash", sessionHash);
+            Assert((string?)await staleQuery.ExecuteScalarAsync() == "stale", "logical session state-only transition persisted");
+        }
+
+        foreach (var file in Directory.GetFiles(databaseDirectory, "sessions.sqlite3*"))
+        {
+            await using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            var text = Encoding.UTF8.GetString(memory.ToArray());
+            Assert(!text.Contains(rawHandle, StringComparison.Ordinal), $"logical session persistence never stores raw handle ({Path.GetFileName(file)})");
+        }
+
+        var migrationDatabase = Path.Combine(root, "logical-session-store", "migration-v1.sqlite3");
+        await using (var connection = new SqliteConnection($"Data Source={migrationDatabase}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE telemetry_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL); INSERT INTO telemetry_meta(key,value) VALUES('schema_version','1');";
+            await command.ExecuteNonQueryAsync();
+        }
+        var migrationStore = new TelemetrySqliteStore(migrationDatabase);
+        await migrationStore.InitializeAsync();
+        await using (var connection = new SqliteConnection($"Data Source={migrationDatabase}"))
+        {
+            await connection.OpenAsync();
+            await using var version = connection.CreateCommand();
+            version.CommandText = "SELECT value FROM telemetry_meta WHERE key='schema_version';";
+            Assert((string?)await version.ExecuteScalarAsync() == "2", "logical session schema migrates v1 to v2");
+            await using var table = connection.CreateCommand();
+            table.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='unbound_session_workspace';";
+            Assert((long)(await table.ExecuteScalarAsync() ?? 0L) == 1, "logical session v2 migration creates unbound table");
+        }
+        Console.WriteLine("windows-logical-session-registry: ok");
     }
     private static async Task TestWorkspaceUsageMeterAsync()
     {
@@ -727,7 +840,8 @@ internal static class Program
         var correlatedPort = FreePort();
         var correlatedMeter = new WorkspaceUsageMeter("D");
         var chatCorrelation = new LogicalChatCorrelationService();
-        await using var correlatedServer = new LocalMcpServer((ushort)correlatedPort, workspace, "", "", false, token, _ => { }, correlatedMeter, chatCorrelation);
+        var serverSessions = new LogicalSessionRegistry();
+        await using var correlatedServer = new LocalMcpServer((ushort)correlatedPort, workspace, "", "", false, token, _ => { }, correlatedMeter, chatCorrelation, serverSessions, "D");
         await correlatedServer.StartAsync();
 
         var correlatedList = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), meteredListBody);
@@ -843,6 +957,12 @@ internal static class Program
         var discoverResponse = await SendHttpAsync(correlatedPort, "POST", "/mcp", correlatedModernHeaders, discoverBody);
         var discoverJson = JsonNode.Parse(HttpBody(discoverResponse))!.AsObject();
         Assert(discoverJson["result"]!["instructions"]!.GetValue<string>().Contains("filemcp_observability_connect", StringComparison.Ordinal), "modern discovery instructs logical correlation handshake");
+        var liveBound = serverSessions.Snapshot(includeStale: true).Single();
+        Assert(liveBound.Workspaces["D"].Usage.ToolCalls == 4, "server session attribution counts connect/resume/bound read/traversal");
+        Assert(liveBound.Workspaces["D"].Usage.OtherCalls == 2 && liveBound.Workspaces["D"].Usage.ReadCalls == 2, "server session attribution classifies bound calls");
+        Assert(liveBound.Workspaces["D"].Usage.Errors == 1, "server session attribution records bound tool error");
+        var liveUnbound = serverSessions.UnboundSnapshot(includeStale: true).Single();
+        Assert(liveUnbound.WorkspaceKey == "D" && liveUnbound.Usage.ToolCalls == 1 && liveUnbound.Usage.ReadCalls == 1, "server session attribution keeps foreign handle traffic unbound");
         var badHost = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), "", host: "evil.example");
         Assert(badHost.StartsWith("HTTP/1.1 403 Forbidden", StringComparison.Ordinal), "host validation");
         Console.WriteLine("windows-http-mcp: ok");

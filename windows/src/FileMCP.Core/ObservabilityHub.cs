@@ -21,11 +21,13 @@ public sealed class ObservabilityHub : IAsyncDisposable
     private readonly long _appStartedTicks = Stopwatch.GetTimestamp();
     private readonly TelemetrySqliteStore _store;
     private readonly TelemetryWriter _writer;
+    private readonly LogicalSessionWriter _sessionWriter;
     private readonly SemaphoreSlim _startGate = new(1, 1);
     private bool _started;
     private bool _disposed;
 
     public LogicalChatCorrelationService ChatCorrelation { get; } = new();
+    public LogicalSessionRegistry Sessions { get; } = new();
 
     public ObservabilityHub(
         IEnumerable<string> workspaceKeys,
@@ -44,6 +46,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
         _runtimeStartedTicks = keys.ToDictionary(key => key, _ => 0L, StringComparer.OrdinalIgnoreCase);
         _store = new TelemetrySqliteStore(databasePath);
         _writer = new TelemetryWriter(_meters.Values, _store, writerInterval, log);
+        _sessionWriter = new LogicalSessionWriter(Sessions, _store, writerInterval, log);
     }
 
     public WorkspaceUsageMeter MeterFor(string workspaceKey)
@@ -63,6 +66,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
         {
             if (_started) return;
             await _writer.StartAsync(cancellationToken).ConfigureAwait(false);
+            await _sessionWriter.StartAsync(cancellationToken).ConfigureAwait(false);
             _started = true;
         }
         finally
@@ -127,8 +131,11 @@ public sealed class ObservabilityHub : IAsyncDisposable
         return _store.CleanupRetentionAsync(nowUtc, cancellationToken);
     }
 
-    internal Task FlushOnceForTestsAsync(DateTimeOffset capturedAtUtc, CancellationToken cancellationToken = default) =>
-        _writer.FlushOnceAsync(capturedAtUtc, cancellationToken);
+    internal async Task FlushOnceForTestsAsync(DateTimeOffset capturedAtUtc, CancellationToken cancellationToken = default)
+    {
+        await _writer.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
+        await _sessionWriter.FlushOnceAsync(capturedAtUtc, cancellationToken).ConfigureAwait(false);
+    }
 
     private static string NormalizeWorkspaceKey(string workspaceKey)
     {
@@ -146,6 +153,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
         if (_disposed) return;
         _disposed = true;
         await _writer.DisposeAsync().ConfigureAwait(false);
+        await _sessionWriter.DisposeAsync().ConfigureAwait(false);
         _startGate.Dispose();
     }
 }

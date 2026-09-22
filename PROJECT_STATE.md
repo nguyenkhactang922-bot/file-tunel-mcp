@@ -15,8 +15,8 @@ Completed:
 - OBS-004 PASS - exact local-period queries/retention.
 - OBS-005 PASS - LocalMcpServer instrumentation.
 - OBS-006 PASS - multi-drive ObservabilityHub + app/runtime uptime.
-- OBS-007 PASS - logical chat correlation facade; 245 assertions PASS.
+- OBS-007 PASS - logical chat correlation facade.
+- OBS-008 PASS - logical/unbound session registry, active/idle/stale state machine, hash-only durable persistence; suite 272 assertions PASS.
 
 Current evidence: Release build PASS, 0 warnings/errors.
-Ready tasks: OBS-008, OBS-009.
-Next task: OBS-008 - live logical/unbound session registry/state machine + hashed durable identity.
+Next task: OBS-009 - WPF Overview core cards sourced only from Core snapshots.
