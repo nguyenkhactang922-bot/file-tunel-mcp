@@ -2089,7 +2089,17 @@ internal static class Program
     private static int ReadCounter(string path)
     {
         if (!File.Exists(path)) return 0;
-        return int.TryParse(File.ReadAllText(path), out var value) ? value : 0;
+        try
+        {
+            return int.TryParse(File.ReadAllText(path), out var value) ? value : 0;
+        }
+        catch (IOException)
+        {
+            // The fake tunnel process may hold the counter file exclusively for a few
+            // milliseconds while rewriting it. Treat that transient state as
+            // "not updated yet" so WaitUntilAsync retries instead of flaking.
+            return 0;
+        }
     }
 
     private static async Task<bool> WaitUntilAsync(Func<bool> predicate, TimeSpan timeout)
