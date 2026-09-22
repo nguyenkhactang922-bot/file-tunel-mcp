@@ -28,7 +28,7 @@ Current decision:
 
 ```text
 Windows core / Observability V1+V1.1   VERIFIED
-Whole-repository release readiness     REMEDIATION ACTIVE
+Whole-repository release readiness     EXTERNAL-BLOCKED ON FPA-004 REAL RELEASE TRUST
 V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 ```
 
@@ -46,7 +46,7 @@ V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 
 - FPA-002 PASS: macOS logical-chat/tool-surface parity, native CI verified.
 - FPA-003 PASS: macOS bounded tunnel supervisor parity, native CI verified.
-- FPA-004 ACTIVE: production signing/notarization plumbing implemented locally; native Verify and real release credentials/run remain.
+- FPA-004 EXTERNAL-BLOCKED: signing/notarization plumbing is native-CI verified; real production credentials + default-branch workflow registration + credentialed release run remain.
 - FPA-005 PASS: native Windows ARM64 runtime assurance verified by GitHub hosted ARM64 runner.
 - FPA-007 PASS: per-user Windows desktop single-instance activation verified on x64 and ARM64.
 - FPA-008 PASS: cross-platform HTTP connection cap plus idle/header deadlines, native CI verified.
@@ -77,3 +77,6 @@ FPA-009 native CI PASS: run 35748443822 succeeded on verify-macos, verify-window
 
 
 FPA-004 plumbing candidate: release-only Windows Authenticode and macOS Developer ID/notarization/stapling automation is implemented locally. Local contracts/build/runtime/package smoke PASS. Native Verify is the next gate; real production credentials are not configured on the connected fork and remain required for FPA-004 PASS.
+
+
+FPA-004 plumbing VERIFIED: GitHub Actions run 35752248896 succeeded on verify-macos, verify-windows and verify-windows-arm64. The fork production-release Environment now exists, but all seven real release secrets are absent. Upstream PR #2 remains open and the connected bot has read-only upstream permission. FPA-004 cannot be marked PASS until a real signed/notarized/stapled release run succeeds.

@@ -180,3 +180,15 @@ FPA-009 final acceptance:
 - Candidate evidence: docs/evidence/FPA-004_PRODUCTION_SIGNING_PLUMBING_CANDIDATE.md.
 - Connected fork currently has no production-release environment and no release secrets.
 - FPA-004 remains ACTIVE until native Verify succeeds; after that it becomes EXTERNAL-BLOCKED unless real signing/notarization credentials are provisioned and the Production Release workflow succeeds.
+
+
+## FPA-004 external blocker
+
+- Plumbing implementation commit: 934fb73.
+- Native Verify run 35752248896: macOS SUCCESS, Windows x64 SUCCESS, Windows ARM64 SUCCESS.
+- Evidence: docs/evidence/FPA-004_PRODUCTION_SIGNING_PLUMBING_EVIDENCE.md.
+- Fork environment production-release: created.
+- Seven required release secrets: not configured.
+- Production Release workflow is on the feature branch and must reach the chosen canonical default branch before workflow_dispatch registration.
+- Upstream PR #2 is OPEN; connected bot has read-only permission upstream.
+- Exact next action is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md. Do not mark FPA-004 or APP RELEASE READY PASS without a real credentialed production release run.
