@@ -42,7 +42,7 @@ The local self-signed Authenticode smoke was intentionally not accepted as produ
 
 Repository: nguyenkhactang922-bot/file-tunel-mcp
 
-- production-release GitHub Environment: CREATED.
+- production-release GitHub Environment: CREATED.\n- deployment branch policy: custom policy, allowed branch main only.
 - Environment release secrets: NONE CONFIGURED.
 - Repository release secrets: NONE CONFIGURED.
 - Fork permissions for connected bot: admin/push available.

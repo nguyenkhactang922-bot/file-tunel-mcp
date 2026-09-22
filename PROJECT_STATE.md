@@ -80,3 +80,6 @@ FPA-004 plumbing candidate: release-only Windows Authenticode and macOS Develope
 
 
 FPA-004 plumbing VERIFIED: GitHub Actions run 35752248896 succeeded on verify-macos, verify-windows and verify-windows-arm64. The fork production-release Environment now exists, but all seven real release secrets are absent. Upstream PR #2 remains open and the connected bot has read-only upstream permission. FPA-004 cannot be marked PASS until a real signed/notarized/stapled release run succeeds.
+
+
+Final post-remediation audit: docs/audit/FINAL_PRODUCT_POST_REMEDIATION_AUDIT_2026-09-22.md. No additional repo-internal bug was opened; remaining blocker is FPA-004 real release trust credentials/default-branch execution.
