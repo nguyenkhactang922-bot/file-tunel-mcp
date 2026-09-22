@@ -30,6 +30,8 @@ foreach ($Marker in @(
     "environment: production-release",
     "permissions:",
     "contents: read",
+    "release-preflight:",
+    "production-release-preflight: ready",
     "release-windows-x64:",
     "release-windows-arm64:",
     "release-macos-arm64:",
@@ -44,6 +46,11 @@ foreach ($Marker in @(
     if ($Workflow.IndexOf($Marker, [StringComparison]::Ordinal) -lt 0) {
         throw "Production release workflow marker missing: $Marker"
     }
+}
+
+$preflightNeedsCount = ([regex]::Matches($Workflow, '(?m)^\s{4}needs: release-preflight\s*$')).Count
+if ($preflightNeedsCount -ne 3) {
+    throw "Expected exactly three release jobs to depend on release-preflight; found $preflightNeedsCount."
 }
 
 $OnIndex = $Workflow.IndexOf("on:", [StringComparison]::Ordinal)
