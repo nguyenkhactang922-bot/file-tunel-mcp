@@ -3,36 +3,36 @@
 Project: FileMCP
 Baseline main HEAD: dd9df8effb5b8ebdf221bcd0cfc88a5b4cec4be3
 Active branch: chatgpt/OBS-001-observability-foundation
-Initiative: FILEMCP OBSERVABILITY V1
-Architecture: FROZEN + ADR 0002 amendment
-Implementation: FINAL ACCEPTANCE BLOCKED ON LIVE CONNECTOR PROOF
+Current branch HEAD: fdd7de1
+Initiative: FileMCP Observability V1 + V1.1 OSS Strengthening
+Architecture: FROZEN
+Implementation: COMPLETE THROUGH V11-008
+Final acceptance: BLOCKED ONLY ON OBS-013 LIVE CHATGPT CONNECTOR PROOF
 
-Completed:
-- FMR-001 PASS.
-- OBS-001 through OBS-012 PASS.
-- OBS-013 automated gates PASS: Release build, 293 integration assertions, self-contained win-x64 package, packaged WPF smoke, close-to-tray, tunnel-client gate, packaged native SQLite create/write/read, dependency audit.
+## Verified implementation
 
-Release artifact:
-- dist/FileMCP-v0.4.0-windows-x64.zip
-- SHA-256: 6B57D412CDB15325EDE50503E27713116BC4F86D0AC103313C94368FA0412BB2
+- FMR-001 PASS
+- OBS-001..OBS-012 PASS
+- V11-001 bounded logical session/correlation lifecycle PASS
+- V11-002 automatic observability retention maintenance PASS
+- V11-003 tunnel supervision/backoff/cooldown PASS
+- V11-004 component health/dashboard PASS
+- V11-005 native .NET ActivitySource/Meter MCP telemetry PASS
+- V11-006 MCP `_meta` + HTTP W3C trace-context propagation PASS
+- V11-007 optional official OpenTelemetry .NET OTLP exporter PASS
+- V11-008 independent long-lived hardening PASS
 
-Remaining blocker:
-- Live ChatGPT connector/schema proof. Current conversation is still attached to the older running bridge and its legacy tool schema, so exact AI-chat labeling remains disabled.
+## Current release candidate
 
-Next exact action:
-- Reconnect ChatGPT to the new packaged FileMCP binary, refresh schema, call filemcp_observability_connect, propagate _filemcp_chat through normal calls, verify bound session + hash-only persistence, then mark OBS-013 PASS and proceed to final review/merge.
-Approved next initiative:
-- FILEMCP OBSERVABILITY V1.1 OSS STRENGTHENING is user-approved and architecture-frozen.
-- Source audit and independent multi-round review are complete.
-- Implementation remains dependency-blocked solely by OBS-013 live acceptance.
-- Once OBS-013 passes, start V11-001 immediately; no repeated discovery/audit is required.
+- `dist/FileMCP-v0.4.0-windows-x64.zip`
+- SHA-256 `5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E`
+- build 0 warnings / 0 errors
+- Windows runtime suite 414 assertions PASS
+- WPF/package/SQLite/tunnel-client/OTLP/notices smoke PASS
+- dependency vulnerability/outdated audit PASS
 
-Execution-order amendment:
-- User explicitly requested OBS-013 be deferred.
-- V1.1 implementation now precedes OBS-013.
-- Previous OBS-013 automated/package evidence remains historical evidence only; final package evidence must be regenerated after V1.1 changes.
+## Remaining work
 
+OBS-013 is the only acceptance blocker. The current chat is attached to the legacy connector schema and the running desktop bridge is the old deployed binary. A desktop restart/reconnect to the upgraded release is required before the real ChatGPT logical-correlation proof can be executed.
 
-V11-007 PASS: optional OTLP exporter is disabled by default, failure-isolated, privacy-bounded and packaged with OpenTelemetry license/notices. Current post-V1.1 package gate hash: CC5F021486368471AB20685375495765F79270E4F231651FBF90AECD2074D08D.
-
-V11-008 PASS: all V1.1 implementation/hardening gates complete. Hardening discovered and fixed connect-only session retention leakage. Full runtime suite: 414 assertions PASS. Final pre-live package SHA-256: 5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E. Remaining gate: OBS-013 live ChatGPT connector proof, then V11-009 final merge/main verification.
+After OBS-013 PASS, V11-009 performs final review, merge, main verification and release closure. No V11-010/OBS-014 exists in the frozen plan.

@@ -1,20 +1,20 @@
-# TASK QUEUE Ã¢â‚¬â€ FileMCP Observability V1
+# TASK QUEUE — FileMCP Observability V1
 
 | ID | State | Depends | Acceptance |
 |---|---|---|---|
-| FMR-001 | PASS | - | Drive root D:\ resolves descendants; root listing/read/write/search work; traversal/junction/root-delete protections remain passing |
-| OBS-001 | PASS | FMR-001 | Usage contracts, bytes_div_4_v1 estimator, tool classifier, semantics tests |
-| OBS-002 | PASS | OBS-001 | Interlocked hot counters, exact concurrent increments, immutable snapshot + atomic delta drain tests |
-| OBS-003 | PASS | OBS-002 | Microsoft.Data.Sqlite integration, WAL schema/versioning, pending-delta writer, failed-flush retry tests |
-| OBS-004 | PASS | OBS-003 | minute/hour/day period queries, Today/Yesterday/7d/30d local-boundary and retention tests |
-| OBS-005 | PASS | OBS-003 | LocalMcpServer request/response/tool/error/latency hooks with unchanged protocol/security behavior |
-| OBS-006 | PASS | OBS-005 | process-wide hub, C/D/E/F aggregation, app/runtime uptime tests |
-| OBS-007 | PASS | OBS-005 | filemcp_observability_connect, optional _filemcp_chat facade metadata, no authority semantics |
-| OBS-008 | PASS | OBS-007 | live logical/unbound session registry, active/idle/stale state machine, hashed durable id |
-| OBS-009 | PASS | OBS-004,OBS-006 | Overview tab + truthful usage/activity/per-drive cards sourced only from Core snapshots |
-| OBS-010 | PASS | OBS-008,OBS-009 | period controls, live session table/detail, exact-chat label feature gate |
-| OBS-011 | PASS | OBS-010 | bounded realtime graph + exact measurable health surfaces |
-| OBS-012 | PASS | OBS-011 | privacy DB inspection, load/concurrency, DB failure/corruption/migration/security regression suite |
-| OBS-013 | BLOCKED | OBS-012 | self-contained win-x64 publish, native SQLite smoke, one live ChatGPT correlation proof, final acceptance |
+| FMR-001 | PASS | - | Drive-root descendants resolve; root list/read/write/search work; traversal/junction/root-delete protections pass |
+| OBS-001 | PASS | FMR-001 | Usage contracts, bytes_div_4_v1 estimator, classifier, semantics tests |
+| OBS-002 | PASS | OBS-001 | Interlocked hot counters, exact concurrent increments, snapshot/delta tests |
+| OBS-003 | PASS | OBS-002 | SQLite WAL schema/versioning, pending-delta retry tests |
+| OBS-004 | PASS | OBS-003 | minute/hour/day period queries and retention tests |
+| OBS-005 | PASS | OBS-003 | LocalMcpServer telemetry hooks preserve protocol/security behavior |
+| OBS-006 | PASS | OBS-005 | process-wide C/D/E/F hub and uptime |
+| OBS-007 | PASS | OBS-005 | `filemcp_observability_connect`, optional `_filemcp_chat`, no-authority semantics |
+| OBS-008 | PASS | OBS-007 | logical/unbound session registry, active/idle/stale, hashed durable id |
+| OBS-009 | PASS | OBS-004,OBS-006 | Overview dashboard sourced from Core snapshots |
+| OBS-010 | PASS | OBS-008,OBS-009 | period controls/session detail/exact-chat feature gate |
+| OBS-011 | PASS | OBS-010 | bounded realtime graph + measurable health |
+| OBS-012 | PASS | OBS-011 | privacy/concurrency/corruption/migration/security regression |
+| OBS-013 | BLOCKED | OBS-012,V11-008 | live ChatGPT connector correlation proof, then final acceptance |
 
-NEXT_EXACT_ACTION: Reconnect ChatGPT to the fully upgraded V1.1 FileMCP release binary (SHA-256 5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E), refresh connector schema, then execute the live filemcp_observability_connect + _filemcp_chat proof before marking OBS-013 PASS.
+NEXT_EXACT_ACTION: restart/reconnect ChatGPT to the fully upgraded V1.1 release (SHA-256 `5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E`) until `filemcp_observability_connect` is present, then execute the live handle propagation/hash-only persistence proof.

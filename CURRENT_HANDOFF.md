@@ -1,47 +1,66 @@
 # CURRENT HANDOFF
 
-STATUS: BLOCKED ON ONE LIVE ACCEPTANCE GATE
+STATUS: BLOCKED ON OBS-013 LIVE CHATGPT CONNECTOR PROOF
 BRANCH: chatgpt/OBS-001-observability-foundation
-COMPLETED: FMR-001 through OBS-012; OBS-013 automated/package gates complete
-BLOCKER: Current ChatGPT conversation is still connected to the old FileMCP bridge/schema. `filemcp_observability_connect` is not visible in the current connector tool registry.
+HEAD: fdd7de1
+WORKTREE: CLEAN at handoff
 
-RELEASE EVIDENCE:
-- Release ZIP: dist/FileMCP-v0.4.0-windows-x64.zip
-- SHA-256: 6B57D412CDB15325EDE50503E27713116BC4F86D0AC103313C94368FA0412BB2
-- Build: PASS, 0 warnings/errors
-- Integration: 293 assertions PASS
-- Packaged startup/close-to-tray/tunnel-client: PASS
-- Packaged native SQLite write/read: PASS
-- Dependency vulnerability/outdated audit: PASS
+## Completed
 
-NEXT_EXACT_ACTION:
-Reconnect ChatGPT to the new FileMCP release build so connector schema refreshes. Confirm `filemcp_observability_connect`, call it once, propagate its returned handle in `_filemcp_chat` on normal FileMCP calls, verify a bound observed session plus SHA-256-only durable identity, then mark OBS-013 PASS. Do not enable exact AI-chat wording before this proof.
-POST-OBS-013 APPROVED WORK:
-- User approved implementation of the frozen Observability V1.1 OSS-strengthening plan.
-- Do not repeat discovery/audit after OBS-013.
-- After OBS-013 PASS, immediately CLAIM V11-001 from tasks/OBSERVABILITY_V1_1_CANDIDATE_QUEUE.md and execute through V11-009 by dependency order.
-- Reuse mature OSS directly when technically appropriate and license-compatible; prefer official native .NET packages when available; preserve license/provenance for copied/adapted source; keep security/privacy boundaries unchanged.
+- FMR-001 PASS.
+- OBS-001 through OBS-012 PASS.
+- V11-001 through V11-008 PASS.
+- Observability V1.1 OSS strengthening implementation and independent hardening are complete.
 
-EXECUTION ORDER AMENDMENT (user-approved, 2026-09-22):
-- Defer OBS-013 until after V11-008.
-- Implement V11-001..V11-008 first so the live connector proof exercises the final upgraded build.
-- OBS-013 then proves live ChatGPT correlation on that build.
-- V11-009 closes final package/review/merge/main verification after OBS-013 PASS.
-- NEXT_EXACT_ACTION is V11-001.
+## Latest verified build
 
+- Release ZIP: `dist/FileMCP-v0.4.0-windows-x64.zip`
+- SHA-256: `5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E`
+- Release build: PASS, 0 warnings / 0 errors
+- Full Windows runtime suite: PASS, 414 assertions
+- Packaged WPF startup: PASS
+- Close-to-tray: PASS
+- Packaged tunnel-client: PASS
+- Packaged native SQLite create/write/read: PASS
+- Packaged optional OTLP provider: PASS
+- Packaged OpenTelemetry license/notices: PASS
+- NuGet vulnerability audit: PASS, no vulnerable packages reported
+- Direct-package outdated audit: PASS, no direct updates reported
 
-V11-001 PASS: bounded logical session/correlation lifecycle verified by Release build + 305 assertions. NEXT_EXACT_ACTION: V11-002 maintenance worker.
+## V1.1 hardening result
 
-V11-002 PASS: automatic process-wide retention maintenance verified by Release build + 316 assertions. NEXT_EXACT_ACTION: V11-003 tunnel supervisor.
+The independent V11-008 audit found and fixed one real leak-class bug: connect-only logical sessions could become stale without ever becoming evictable because they had no workspace row. The fixed build passed:
 
-V11-003 PASS: supervised tunnel restart/backoff/cooldown verified by full runtime gate + 332 assertions. NEXT_EXACT_ACTION: V11-004 component health model.
+- 24h-style correlation churn
+- 24h-style connect-only session churn
+- capacity pressure
+- bulk SQLite retention (12k expired minute rows + 4k expired hour rows)
+- 10k restart-storm decisions
+- OTLP collector outage isolation
+- raw OTLP protobuf privacy scan
+- durable SQLite/WAL privacy regression
+- full runtime/package regression
 
-V11-004 PASS: component health + dashboard verified by Release build, 343 assertions and packaged WPF smoke. NEXT_EXACT_ACTION: V11-005 native .NET OpenTelemetry contracts.
+## Current live blocker
 
-V11-005 PASS: native .NET ActivitySource/Meter MCP telemetry + bounded semantic adapter verified by full runtime gate + 362 assertions. NEXT_EXACT_ACTION: V11-006 W3C trace-context extraction.
+The current ChatGPT conversation still exposes only the 18 legacy FileMCP tools. `filemcp_observability_connect` is not present in this conversation's connector schema.
 
-V11-006 PASS: W3C trace context via MCP _meta with HTTP fallback, privacy and identity separation verified by full runtime gate + 381 assertions. NEXT_EXACT_ACTION: V11-007 optional OTLP exporter/settings.
+The currently running FileMCP processes are also from the old deployed path:
 
-V11-007 PASS: optional official OpenTelemetry .NET OTLP exporter verified by 397 assertions, dependency audit, self-contained x64 package and packaged provider/notices smoke. NEXT_EXACT_ACTION: V11-008 independent hardening audit.
+`D:\Tools\FileMCP\dist\windows-x64\FileMCP\FileMCP.exe`
 
-V11-008 PASS: independent hardening found/fixed connect-only session retention leak and verified 24h-style churn, bulk retention, 10k restart storm, OTLP privacy, 414 assertions and final package smoke. Current release SHA-256: 5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E. NEXT_EXACT_ACTION: OBS-013 live connector proof.
+Do NOT terminate the currently connected bridge from inside this chat; doing so can sever FileMCP tool access mid-handoff.
+
+## NEXT_EXACT_ACTION
+
+1. On the Windows desktop, exit the old FileMCP instance(s) from the tray.
+2. Start the upgraded build: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-release\FileMCP.exe` (or the executable extracted from the verified ZIP above).
+3. Reconnect/refresh the ChatGPT FileMCP connector; if the existing chat keeps its old registered schema, open a fresh chat after the upgraded bridge is running.
+4. Confirm the connector tool registry contains `filemcp_observability_connect`.
+5. Call `filemcp_observability_connect` once without an id to obtain a logical chat handle.
+6. Perform normal FileMCP calls while propagating that handle in `_filemcp_chat`.
+7. Verify the dashboard shows one bound observed session and that durable SQLite identity is SHA-256 only (no raw handle).
+8. Mark OBS-013 PASS.
+9. CLAIM V11-009: final review -> final package gate -> merge to main -> checkout/pull main -> Release build/runtime tests on main -> MAIN VERIFIED -> DONE.
+
+Do not enable exact AI-chat wording before step 7 proves the real ChatGPT connector propagates the handle reliably.
