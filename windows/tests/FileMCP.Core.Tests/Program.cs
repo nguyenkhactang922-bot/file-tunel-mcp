@@ -143,6 +143,24 @@ internal static class Program
         {
             Assert(true, "logical chat unknown resume rejected");
         }
+        var t0 = new DateTimeOffset(2026, 9, 22, 1, 0, 0, TimeSpan.Zero);
+        var bounded = new LogicalChatCorrelationService(maxKnownHandles: 2, retention: TimeSpan.FromHours(1));
+        var boundedFirst = bounded.Connect(nowUtc: t0).ChatInstanceId;
+        var boundedSecond = bounded.Connect(nowUtc: t0.AddMinutes(1)).ChatInstanceId;
+        Assert(bounded.TryResolve(boundedFirst, out _, t0.AddMinutes(30)), "logical chat touch refreshes retention age");
+        var boundedThird = bounded.Connect(nowUtc: t0.AddMinutes(31)).ChatInstanceId;
+        Assert(bounded.TryResolve(boundedFirst, out _, t0.AddMinutes(31)), "logical chat recent handle survives capacity pressure");
+        Assert(!bounded.TryResolve(boundedSecond, out _, t0.AddMinutes(31)), "logical chat oldest handle evicted under capacity pressure");
+        Assert(bounded.TryResolve(boundedThird, out _, t0.AddMinutes(31)), "logical chat newest handle retained under capacity pressure");
+        var boundedStats = bounded.RetentionSnapshot();
+        Assert(boundedStats.KnownHandles == 2 && boundedStats.PressureEvictions == 1 && boundedStats.CapacityPressureEvents == 1, "logical chat capacity is bounded with pressure metrics");
+
+        var expiring = new LogicalChatCorrelationService(maxKnownHandles: 2, retention: TimeSpan.FromHours(1));
+        var expiredHandle = expiring.Connect(nowUtc: t0).ChatInstanceId;
+        var expiredStats = expiring.Cleanup(t0.AddHours(2));
+        Assert(expiredStats.KnownHandles == 0 && expiredStats.ExpiredEvictions == 1, "logical chat TTL cleanup evicts expired handle");
+        Assert(!expiring.TryResolve(expiredHandle, out _, t0.AddHours(2)), "logical chat expired handle no longer resolves");
+
         Console.WriteLine("windows-logical-chat-correlation: ok");
     }
     private static async Task TestLogicalSessionRegistryAsync(string root)
@@ -172,6 +190,46 @@ internal static class Program
         registry.CompleteToolCall(unboundCall, 8, true, 5, t0.AddSeconds(4));
         var unbound = registry.UnboundSnapshot(t0.AddSeconds(20), includeStale: true).Single();
         Assert(unbound.WorkspaceKey == "E" && unbound.Usage.ToolCalls == 1 && unbound.Usage.ReadCalls == 1 && unbound.Usage.Errors == 1, "logical session unbound traffic retained separately");
+
+        var retentionHandle = correlation.Connect().ChatInstanceId;
+        var retentionHash = LogicalChatCorrelationService.HashForPersistence(retentionHandle);
+        var retentionRegistry = new LogicalSessionRegistry(maxSessions: 1, retention: TimeSpan.FromHours(1));
+        retentionRegistry.RegisterSession(retentionHash, t0);
+        var retentionCall = retentionRegistry.BeginToolCall("D", retentionHash, 3, "read_file", t0.AddSeconds(1));
+        retentionRegistry.CompleteToolCall(retentionCall, 4, false, 2, t0.AddSeconds(2));
+        var unpersistedBatch = retentionRegistry.DrainPersistence(t0.AddMinutes(31));
+        var beforePersistCleanup = retentionRegistry.Cleanup(t0.AddHours(2));
+        Assert(beforePersistCleanup.SessionCount == 1 && beforePersistCleanup.ExpiredSessionEvictions == 0, "logical session cleanup does not evict before final stale state is persisted");
+        retentionRegistry.MarkPersisted(unpersistedBatch);
+        var afterPersistCleanup = retentionRegistry.Cleanup(t0.AddHours(2));
+        Assert(afterPersistCleanup.SessionCount == 0 && afterPersistCleanup.ExpiredSessionEvictions == 1, "logical session TTL cleanup evicts only persisted stale session");
+
+        var pressureFirstHandle = correlation.Connect().ChatInstanceId;
+        var pressureSecondHandle = correlation.Connect().ChatInstanceId;
+        var pressureFirstHash = LogicalChatCorrelationService.HashForPersistence(pressureFirstHandle);
+        var pressureSecondHash = LogicalChatCorrelationService.HashForPersistence(pressureSecondHandle);
+        var pressureRegistry = new LogicalSessionRegistry(maxSessions: 1, retention: TimeSpan.FromHours(2));
+        pressureRegistry.RegisterSession(pressureFirstHash, t0);
+        var pressureCall = pressureRegistry.BeginToolCall("D", pressureFirstHash, 1, "read_file", t0.AddSeconds(1));
+        pressureRegistry.CompleteToolCall(pressureCall, 1, false, 1, t0.AddSeconds(2));
+        var pressureBatch = pressureRegistry.DrainPersistence(t0.AddMinutes(31));
+        pressureRegistry.MarkPersisted(pressureBatch);
+        pressureRegistry.RegisterSession(pressureSecondHash, t0.AddMinutes(40));
+        var pressureSessions = pressureRegistry.Snapshot(t0.AddMinutes(40), includeStale: true);
+        var pressureStats = pressureRegistry.RetentionSnapshot();
+        Assert(pressureSessions.Count == 1 && pressureSessions[0].SessionHash == pressureSecondHash, "logical session cap evicts oldest persisted stale session for new admission");
+        Assert(pressureStats.PressureSessionEvictions == 1 && pressureStats.CapacityPressureEvents == 1, "logical session cap exposes pressure metrics");
+
+        var inFlightHash = LogicalChatCorrelationService.HashForPersistence(correlation.Connect().ChatInstanceId);
+        var rejectedHash = LogicalChatCorrelationService.HashForPersistence(correlation.Connect().ChatInstanceId);
+        var inFlightRegistry = new LogicalSessionRegistry(maxSessions: 1, retention: TimeSpan.FromHours(1));
+        inFlightRegistry.RegisterSession(inFlightHash, t0);
+        var tokens = new LogicalSessionCallToken[32];
+        Parallel.For(0, tokens.Length, i => tokens[i] = inFlightRegistry.BeginToolCall("D", inFlightHash, 1, "read_file", t0.AddSeconds(i)));
+        inFlightRegistry.RegisterSession(rejectedHash, t0.AddHours(2));
+        var duringPressure = inFlightRegistry.Cleanup(t0.AddHours(2));
+        Assert(duringPressure.SessionCount == 1 && inFlightRegistry.Snapshot(t0.AddHours(2), includeStale: true).Single().SessionHash == inFlightHash, "logical session cleanup never evicts in-flight session under pressure");
+        Parallel.For(0, tokens.Length, i => inFlightRegistry.CompleteToolCall(tokens[i], 1, false, 1, t0.AddHours(2)));
 
         var databaseDirectory = Path.Combine(root, "logical-session-store");
         Directory.CreateDirectory(databaseDirectory);

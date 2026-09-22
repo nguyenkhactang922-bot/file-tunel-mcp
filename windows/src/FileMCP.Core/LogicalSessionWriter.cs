@@ -41,6 +41,7 @@ internal sealed class LogicalSessionWriter : IAsyncDisposable
             _pending = Merge(_pending, drained);
             if (_pending.IsEmpty) return;
             await _store.UpsertSessionDeltasAsync(_pending, cancellationToken).ConfigureAwait(false);
+            _registry.MarkPersisted(_pending);
             _pending = new([], []);
         }
         finally

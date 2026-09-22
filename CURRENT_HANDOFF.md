@@ -29,3 +29,5 @@ EXECUTION ORDER AMENDMENT (user-approved, 2026-09-22):
 - V11-009 closes final package/review/merge/main verification after OBS-013 PASS.
 - NEXT_EXACT_ACTION is V11-001.
 
+
+V11-001 PASS: bounded logical session/correlation lifecycle verified by Release build + 305 assertions. NEXT_EXACT_ACTION: V11-002 maintenance worker.
