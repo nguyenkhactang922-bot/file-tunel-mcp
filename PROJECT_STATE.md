@@ -34,3 +34,5 @@ Execution-order amendment:
 
 
 V11-007 PASS: optional OTLP exporter is disabled by default, failure-isolated, privacy-bounded and packaged with OpenTelemetry license/notices. Current post-V1.1 package gate hash: CC5F021486368471AB20685375495765F79270E4F231651FBF90AECD2074D08D.
+
+V11-008 PASS: all V1.1 implementation/hardening gates complete. Hardening discovered and fixed connect-only session retention leakage. Full runtime suite: 414 assertions PASS. Final pre-live package SHA-256: 5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E. Remaining gate: OBS-013 live ChatGPT connector proof, then V11-009 final merge/main verification.

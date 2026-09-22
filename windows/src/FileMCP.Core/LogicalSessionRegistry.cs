@@ -414,9 +414,13 @@ public sealed class LogicalSessionRegistry
 
     private bool CanEvictSession(SessionEntry entry, DateTimeOffset now, bool requireRetentionAge)
     {
-        if (entry.InFlight != 0 || entry.PendingState || entry.LastPersistedState != "stale" || entry.Workspaces.Count == 0) return false;
-        if (entry.Workspaces.Values.Any(workspace => !workspace.PendingUsage.IsZero)) return false;
+        if (entry.InFlight != 0 || entry.PendingState) return false;
         if (StateFor(entry.InFlight, entry.LastSeenUtc, now) != LogicalSessionActivityState.Stale) return false;
+        if (entry.Workspaces.Count > 0)
+        {
+            if (entry.LastPersistedState != "stale") return false;
+            if (entry.Workspaces.Values.Any(workspace => !workspace.PendingUsage.IsZero)) return false;
+        }
         return !requireRetentionAge || now - entry.LastSeenUtc >= _retention;
     }
 

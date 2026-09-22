@@ -1,4 +1,4 @@
-# TASK QUEUE — FileMCP Observability V1
+# TASK QUEUE Ã¢â‚¬â€ FileMCP Observability V1
 
 | ID | State | Depends | Acceptance |
 |---|---|---|---|
@@ -17,4 +17,4 @@
 | OBS-012 | PASS | OBS-011 | privacy DB inspection, load/concurrency, DB failure/corruption/migration/security regression suite |
 | OBS-013 | BLOCKED | OBS-012 | self-contained win-x64 publish, native SQLite smoke, one live ChatGPT correlation proof, final acceptance |
 
-NEXT_EXACT_ACTION: Reconnect ChatGPT to the new FileMCP release binary, refresh connector schema, then execute the live filemcp_observability_connect + _filemcp_chat proof before marking OBS-013 PASS.
+NEXT_EXACT_ACTION: Reconnect ChatGPT to the fully upgraded V1.1 FileMCP release binary (SHA-256 5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E), refresh connector schema, then execute the live filemcp_observability_connect + _filemcp_chat proof before marking OBS-013 PASS.

@@ -40,6 +40,7 @@ internal static class Program
             await TestUsagePeriodsAndRetentionAsync(root);
             await TestObservabilityHubAsync(root);
             await TestObservabilityHardeningAsync(root);
+            await TestV11HardeningAsync(root);
             await TestSettingsAndCredentialsAsync(root);
             await TestProcessRunnerAsync(root);
             TestTunnelRestartPolicy();
@@ -133,7 +134,7 @@ internal static class Program
         Assert(McpTelemetryAttributeAdapter.NormalizeMethod("tools/call") == "tools/call" && McpTelemetryAttributeAdapter.NormalizeMethod("private-method") == "other", "standard telemetry method dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeToolName("read_file") == "read_file" && McpTelemetryAttributeAdapter.NormalizeToolName("private-tool-name") == "unknown", "standard telemetry tool dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeWorkspace("d") == "D" && McpTelemetryAttributeAdapter.NormalizeWorkspace("private-workspace") == "other", "standard telemetry workspace dimensions are bounded");
-        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
+        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
         Assert(Encoding.UTF8.GetByteCount(boundedUtf8) <= McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes, "standard telemetry UTF-8 attribute bound never splits beyond byte cap");
 
         const string privateMarker = "PRIVATE_OTEL_MARKER_8A2DF991";
@@ -1310,6 +1311,173 @@ internal static class Program
 
         Console.WriteLine("windows-observability-hardening: ok");
     }
+    private static async Task TestV11HardeningAsync(string root)
+    {
+        var start = new DateTimeOffset(2026, 9, 21, 0, 0, 0, TimeSpan.Zero);
+
+        // Simulate one new logical chat per minute for a full day. The service must remain
+        // bounded even when the process stays alive indefinitely.
+        var correlation = new LogicalChatCorrelationService(maxKnownHandles: 128, retention: TimeSpan.FromHours(1));
+        for (var minute = 0; minute < 24 * 60; minute++)
+        {
+            var now = start.AddMinutes(minute);
+            _ = correlation.Connect(nowUtc: now);
+            if (minute % 15 == 0) _ = correlation.Cleanup(now);
+        }
+        var correlationChurn = correlation.Cleanup(start.AddHours(24));
+        Assert(correlationChurn.KnownHandles <= 60, "24h correlation churn remains bounded by TTL instead of process lifetime");
+        Assert(correlationChurn.ExpiredEvictions >= 1_300, "24h correlation churn evicts expired handles continuously");
+
+        // Connect-only logical sessions have no workspace row to persist. They still need
+        // deterministic eviction after their state has been drained, otherwise a connect flood
+        // can permanently consume the session cap.
+        var connectOnly = new LogicalSessionRegistry(maxSessions: 128, retention: TimeSpan.FromHours(1));
+        for (var minute = 0; minute < 24 * 60; minute++)
+        {
+            var now = start.AddMinutes(minute);
+            connectOnly.RegisterSession(((ulong)minute + 1UL).ToString("x64"), now);
+            _ = connectOnly.DrainPersistence(now);
+            if (minute % 15 == 0) _ = connectOnly.Cleanup(now);
+        }
+        var connectOnlyChurn = connectOnly.Cleanup(start.AddHours(24));
+        Assert(connectOnlyChurn.SessionCount <= 60, "24h connect-only session churn remains bounded by TTL");
+        Assert(connectOnlyChurn.ExpiredSessionEvictions >= 1_300, "24h connect-only session churn evicts old state instead of leaking registry entries");
+
+        var pressureRegistry = new LogicalSessionRegistry(maxSessions: 8, retention: TimeSpan.FromHours(1));
+        for (var index = 0; index < 8; index++)
+        {
+            pressureRegistry.RegisterSession(((ulong)index + 1UL).ToString("x64"), start);
+            _ = pressureRegistry.DrainPersistence(start);
+        }
+        var admittedHash = 99UL.ToString("x64");
+        pressureRegistry.RegisterSession(admittedHash, start.AddMinutes(31));
+        var pressureSnapshot = pressureRegistry.RetentionSnapshot();
+        Assert(pressureSnapshot.SessionCount == 8 && pressureSnapshot.PressureSessionEvictions == 1, "connect-only stale session can be pressure-evicted at the configured cap");
+        Assert(pressureRegistry.Snapshot(start.AddMinutes(31), includeStale: true).Any(session => session.SessionHash == admittedHash), "capacity pressure admits the new connect-only session after stale eviction");
+
+        // Seed a large synthetic history directly into SQLite to prove retention is a row-count
+        // invariant rather than a happy-path example with one or two rows.
+        var database = Path.Combine(root, "v11-hardening-retention.sqlite3");
+        var store = new TelemetrySqliteStore(database);
+        await store.InitializeAsync();
+        var retentionNow = new DateTimeOffset(2026, 9, 22, 0, 0, 0, TimeSpan.Zero);
+        await using (var connection = new SqliteConnection($"Data Source={database}"))
+        {
+            await connection.OpenAsync();
+            await using var transaction = await connection.BeginTransactionAsync();
+            async Task InsertRowsAsync(string table, int count, long firstEpoch, long stepSeconds)
+            {
+                await using var command = connection.CreateCommand();
+                command.Transaction = (SqliteTransaction)transaction;
+                command.CommandText = $"INSERT INTO {table} VALUES($workspace,$bucket,{string.Join(',', Enumerable.Repeat("0", 16))});";
+                command.Parameters.AddWithValue("$workspace", "D");
+                var bucket = command.Parameters.Add("$bucket", SqliteType.Integer);
+                for (var index = 0; index < count; index++)
+                {
+                    bucket.Value = firstEpoch + index * stepSeconds;
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+
+            await InsertRowsAsync("usage_minute", 12_000, retentionNow.AddDays(-60).ToUnixTimeSeconds(), 60);
+            await InsertRowsAsync("usage_minute", 120, retentionNow.AddMinutes(-119).ToUnixTimeSeconds(), 60);
+            await InsertRowsAsync("usage_hour", 4_000, retentionNow.AddDays(-300).ToUnixTimeSeconds(), 3_600);
+            await InsertRowsAsync("usage_hour", 72, retentionNow.AddHours(-71).ToUnixTimeSeconds(), 3_600);
+            await InsertRowsAsync("usage_day", 500, retentionNow.AddDays(-500).ToUnixTimeSeconds(), 86_400);
+            await transaction.CommitAsync();
+        }
+        await store.CleanupRetentionAsync(retentionNow);
+        await using (var connection = new SqliteConnection($"Data Source={database}"))
+        {
+            await connection.OpenAsync();
+            async Task<long> CountAsync(string table)
+            {
+                await using var command = connection.CreateCommand();
+                command.CommandText = $"SELECT COUNT(*) FROM {table};";
+                return (long)(await command.ExecuteScalarAsync() ?? -1L);
+            }
+            Assert(await CountAsync("usage_minute") == 120, "retention removes 12k expired minute rows while preserving recent minute history");
+            Assert(await CountAsync("usage_hour") == 72, "retention removes 4k expired hour rows while preserving recent hour history");
+            Assert(await CountAsync("usage_day") == 500, "retention preserves long-term day rows during high-volume cleanup");
+        }
+
+        // A sustained crash storm must not grow restart state or spin forever. After the budget
+        // is consumed, all further decisions stay in cooldown until the window expires.
+        var stormOptions = new TunnelSupervisorOptions(
+            TimeSpan.FromMilliseconds(10),
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromMinutes(5),
+            5,
+            TimeSpan.FromMinutes(2),
+            0);
+        var stormPolicy = new TunnelRestartPolicy(stormOptions);
+        var stormStarted = start;
+        var cooldownDecisions = 0;
+        for (var index = 0; index < 10_000; index++)
+        {
+            var decision = stormPolicy.Next(stormStarted, start.AddSeconds(1), () => 0.5);
+            if (decision.IsCooldown) cooldownDecisions++;
+        }
+        Assert(stormPolicy.AttemptsInWindow == stormOptions.MaxRestartsInWindow && stormPolicy.ConsecutiveRestarts == stormOptions.MaxRestartsInWindow, "10k crash decisions remain bounded by restart budget state");
+        Assert(cooldownDecisions == 10_000 - stormOptions.MaxRestartsInWindow, "restart storm enters cooldown instead of creating an unbounded retry loop");
+
+        // End-to-end privacy check against actual OTLP protobuf: private tool arguments, file
+        // content and raw chat handles must never be present in exported bytes.
+        const string privatePathMarker = "PRIVATE_OTLP_PATH_7F1BC9";
+        const string privateContentMarker = "PRIVATE_OTLP_CONTENT_0C42A1";
+        await using var collector = new OtlpTestCollector();
+        await using var hub = new ObservabilityHub(["D"], Path.Combine(root, "v11-hardening-otlp.sqlite3"), TimeSpan.FromHours(1));
+        Assert(hub.ConfigureOtlp(new OtlpTelemetrySettings(true, collector.Endpoint)).Status == OtlpExporterRuntimeStatus.Configured, "hardening OTLP collector configures");
+        var workspace = Path.Combine(root, "v11-hardening-otlp-workspace");
+        Directory.CreateDirectory(workspace);
+        var privateFile = privatePathMarker + ".txt";
+        File.WriteAllText(Path.Combine(workspace, privateFile), privateContentMarker);
+        var handle = hub.ChatCorrelation.Connect(nowUtc: start).ChatInstanceId;
+        var hash = LogicalChatCorrelationService.HashForPersistence(handle);
+        hub.Sessions.RegisterSession(hash, start);
+        var port = FreePort();
+        var auth = new string('v', 64);
+        await using var server = new LocalMcpServer(
+            (ushort)port,
+            workspace,
+            "",
+            "",
+            false,
+            auth,
+            _ => { },
+            chatCorrelation: hub.ChatCorrelation,
+            sessions: hub.Sessions,
+            workspaceKey: "D",
+            standardTelemetry: hub.StandardTelemetry);
+        await server.StartAsync();
+        var body = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 808,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "read_file",
+                ["arguments"] = new JsonObject
+                {
+                    ["relative_path"] = privateFile,
+                    ["_filemcp_chat"] = handle,
+                },
+            },
+        }.ToJsonString();
+        var response = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(auth), body);
+        Assert(response.StartsWith("HTTP/1.1 200 OK", StringComparison.Ordinal) && HttpBody(response).Contains(privateContentMarker, StringComparison.Ordinal), "hardening privacy fixture exercises real private path/content through MCP response");
+        _ = hub.ForceFlushOtlpForTests(2_000);
+        Assert(await WaitUntilAsync(() => collector.Requests.Any(request => request.Path == "/v1/traces") && collector.Requests.Any(request => request.Path == "/v1/metrics"), TimeSpan.FromSeconds(3)), "hardening privacy fixture exports OTLP trace and metrics");
+        var exportedBytes = collector.Requests.SelectMany(request => request.Body).ToArray();
+        var exportedText = Encoding.UTF8.GetString(exportedBytes);
+        Assert(!exportedText.Contains(privatePathMarker, StringComparison.Ordinal), "OTLP protobuf contains no private file path marker");
+        Assert(!exportedText.Contains(privateContentMarker, StringComparison.Ordinal), "OTLP protobuf contains no private file content marker");
+        Assert(!exportedText.Contains(handle, StringComparison.Ordinal), "OTLP protobuf contains no raw logical chat handle");
+
+        Console.WriteLine("windows-v11-hardening: ok");
+    }
+
     private static Task TestSettingsAndCredentialsAsync(string root)
     {
         var settingsDir = Path.Combine(root, "settings");

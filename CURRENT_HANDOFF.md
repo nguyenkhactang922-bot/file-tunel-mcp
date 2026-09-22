@@ -43,3 +43,5 @@ V11-005 PASS: native .NET ActivitySource/Meter MCP telemetry + bounded semantic 
 V11-006 PASS: W3C trace context via MCP _meta with HTTP fallback, privacy and identity separation verified by full runtime gate + 381 assertions. NEXT_EXACT_ACTION: V11-007 optional OTLP exporter/settings.
 
 V11-007 PASS: optional official OpenTelemetry .NET OTLP exporter verified by 397 assertions, dependency audit, self-contained x64 package and packaged provider/notices smoke. NEXT_EXACT_ACTION: V11-008 independent hardening audit.
+
+V11-008 PASS: independent hardening found/fixed connect-only session retention leak and verified 24h-style churn, bulk retention, 10k restart storm, OTLP privacy, 414 assertions and final package smoke. Current release SHA-256: 5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E. NEXT_EXACT_ACTION: OBS-013 live connector proof.
