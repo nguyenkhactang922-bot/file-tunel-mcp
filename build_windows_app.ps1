@@ -25,6 +25,8 @@ foreach ($Required in @(
     (Join-Path $Root "LICENSE"),
     (Join-Path $Root "vendor/tunnel-client/LICENSE"),
     (Join-Path $Root "vendor/tunnel-client/NOTICE"),
+    (Join-Path $Root "vendor/opentelemetry/LICENSE.txt"),
+    (Join-Path $Root "vendor/opentelemetry/THIRD-PARTY-NOTICES.txt"),
     $ThirdParty
 )) {
     if (-not (Test-Path -LiteralPath $Required -PathType Leaf)) {
@@ -51,6 +53,8 @@ Copy-Item (Join-Path $Root "LICENSE") (Join-Path $PublishDir "FileMCP-LICENSE.tx
 Copy-Item (Join-Path $Root "vendor/tunnel-client/LICENSE") (Join-Path $PublishDir "tunnel-client-LICENSE.txt")
 Copy-Item (Join-Path $Root "vendor/tunnel-client/NOTICE") (Join-Path $PublishDir "tunnel-client-NOTICE.txt")
 Copy-Item $ThirdParty (Join-Path $PublishDir "tunnel-client-THIRD-PARTY-LICENSES.txt")
+Copy-Item (Join-Path $Root "vendor/opentelemetry/LICENSE.txt") (Join-Path $PublishDir "OpenTelemetry-LICENSE.txt")
+Copy-Item (Join-Path $Root "vendor/opentelemetry/THIRD-PARTY-NOTICES.txt") (Join-Path $PublishDir "OpenTelemetry-THIRD-PARTY-NOTICES.txt")
 
 Remove-Item -Force $ZipPath -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $PublishDir "*") -DestinationPath $ZipPath -CompressionLevel Optimal

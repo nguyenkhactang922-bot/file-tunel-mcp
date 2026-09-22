@@ -12,7 +12,8 @@ public sealed record ObservabilitySnapshot(
     TimeSpan AppUptime,
     UsageCounters GlobalUsage,
     IReadOnlyDictionary<string, WorkspaceObservabilitySnapshot> Workspaces,
-    TelemetryPersistenceHealthSnapshot Persistence);
+    TelemetryPersistenceHealthSnapshot Persistence,
+    OtlpExporterSnapshot Otlp);
 
 public sealed record RealtimeUsageSample(
     DateTimeOffset CapturedUtc,
@@ -29,6 +30,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
     private readonly Queue<RealtimeUsageSample> _realtimeSamples = new();
     private readonly long _appStartedTicks = Stopwatch.GetTimestamp();
     private readonly TelemetrySqliteStore _store;
+    private readonly OtlpTelemetryBridge _otlpExport;
     private readonly TelemetryPersistenceHealthTracker _persistenceHealth = new();
     private readonly TelemetryWriter _writer;
     private readonly LogicalSessionWriter _sessionWriter;
@@ -60,6 +62,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
         _meters = keys.ToDictionary(key => key, key => new WorkspaceUsageMeter(key), StringComparer.OrdinalIgnoreCase);
         _runtimeStartedTicks = keys.ToDictionary(key => key, _ => 0L, StringComparer.OrdinalIgnoreCase);
         _store = new TelemetrySqliteStore(databasePath);
+        _otlpExport = new OtlpTelemetryBridge(log);
         _writer = new TelemetryWriter(_meters.Values, _store, writerInterval, log, _persistenceHealth);
         _sessionWriter = new LogicalSessionWriter(Sessions, _store, writerInterval, log, _persistenceHealth);
         _maintenance = new ObservabilityMaintenanceWorker(_store, Sessions, ChatCorrelation, maintenanceInterval, log, health: _persistenceHealth);
@@ -154,9 +157,26 @@ public sealed class ObservabilityHub : IAsyncDisposable
                 started != 0,
                 started == 0 ? TimeSpan.Zero : Stopwatch.GetElapsedTime(started));
         }
-        return new ObservabilitySnapshot(Stopwatch.GetElapsedTime(_appStartedTicks), global, workspaces, _persistenceHealth.Snapshot());
+        return new ObservabilitySnapshot(Stopwatch.GetElapsedTime(_appStartedTicks), global, workspaces, _persistenceHealth.Snapshot(), _otlpExport.Snapshot());
     }
 
+    public OtlpExporterSnapshot ConfigureOtlp(OtlpTelemetrySettings settings)
+    {
+        ThrowIfDisposed();
+        return _otlpExport.Configure(settings);
+    }
+
+    public OtlpExporterSnapshot OtlpSnapshot()
+    {
+        ThrowIfDisposed();
+        return _otlpExport.Snapshot();
+    }
+
+    internal bool ForceFlushOtlpForTests(int timeoutMilliseconds = 1_000)
+    {
+        ThrowIfDisposed();
+        return _otlpExport.ForceFlush(timeoutMilliseconds);
+    }
     public async Task<UsageCounters> QueryExactPeriodAsync(UsagePeriodRange range, string? workspaceKey = null, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -243,6 +263,7 @@ public sealed class ObservabilityHub : IAsyncDisposable
         await _maintenance.DisposeAsync().ConfigureAwait(false);
         await _writer.DisposeAsync().ConfigureAwait(false);
         await _sessionWriter.DisposeAsync().ConfigureAwait(false);
+        _otlpExport.Dispose();
         StandardTelemetry.Dispose();
         _startGate.Dispose();
     }

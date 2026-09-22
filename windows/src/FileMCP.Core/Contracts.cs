@@ -97,4 +97,6 @@ public sealed class FileMcpSettings
     public string GitUserName { get; set; } = "";
     public string GitUserEmail { get; set; } = "";
     public bool EnableCommands { get; set; }
+    public bool OtlpEnabled { get; set; }
+    public string OtlpEndpoint { get; set; } = OtlpTelemetrySettings.DefaultEndpoint;
 }

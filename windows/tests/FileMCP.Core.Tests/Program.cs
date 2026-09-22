@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
@@ -31,6 +32,7 @@ internal static class Program
             TestObservabilityContracts();
             await TestMcpStandardTelemetryAsync(root);
             await TestMcpTraceContextAsync(root);
+            await TestOtlpExporterAsync(root);
             TestLogicalChatCorrelation();
             await TestLogicalSessionRegistryAsync(root);
             await TestWorkspaceUsageMeterAsync();
@@ -131,7 +133,7 @@ internal static class Program
         Assert(McpTelemetryAttributeAdapter.NormalizeMethod("tools/call") == "tools/call" && McpTelemetryAttributeAdapter.NormalizeMethod("private-method") == "other", "standard telemetry method dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeToolName("read_file") == "read_file" && McpTelemetryAttributeAdapter.NormalizeToolName("private-tool-name") == "unknown", "standard telemetry tool dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeWorkspace("d") == "D" && McpTelemetryAttributeAdapter.NormalizeWorkspace("private-workspace") == "other", "standard telemetry workspace dimensions are bounded");
-        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
+        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
         Assert(Encoding.UTF8.GetByteCount(boundedUtf8) <= McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes, "standard telemetry UTF-8 attribute bound never splits beyond byte cap");
 
         const string privateMarker = "PRIVATE_OTEL_MARKER_8A2DF991";
@@ -346,6 +348,172 @@ internal static class Program
         var afterTraversal = sessions.UnboundSnapshot(includeStale: true).Single();
         Assert(afterTraversal.Usage.ToolCalls == 2 && afterTraversal.Usage.Errors == 1, "trace-context tool error remains ordinary unbound telemetry");
         Console.WriteLine("windows-mcp-trace-context: ok");
+    }
+    private sealed record OtlpCapturedRequest(string Path, string ContentType, byte[] Body);
+
+    private sealed class OtlpTestCollector : IAsyncDisposable
+    {
+        private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+        private readonly CancellationTokenSource _cts = new();
+        private readonly ConcurrentQueue<OtlpCapturedRequest> _requests = new();
+        private Task? _loop;
+
+        public OtlpTestCollector()
+        {
+            _listener.Start();
+            var port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            Endpoint = $"http://127.0.0.1:{port}";
+            _loop = Task.Run(() => RunAsync(_cts.Token));
+        }
+
+        public string Endpoint { get; }
+        public OtlpCapturedRequest[] Requests => _requests.ToArray();
+
+        private async Task RunAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    TcpClient client;
+                    try { client = await _listener.AcceptTcpClientAsync(cancellationToken); }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { return; }
+                    _ = Task.Run(() => HandleAsync(client, cancellationToken), CancellationToken.None);
+                }
+            }
+            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) { }
+        }
+
+        private async Task HandleAsync(TcpClient client, CancellationToken cancellationToken)
+        {
+            using (client)
+            {
+                var stream = client.GetStream();
+                var headerBytes = new List<byte>(1024);
+                var tail = new Queue<byte>(4);
+                while (headerBytes.Count < 64 * 1024)
+                {
+                    var one = new byte[1];
+                    var read = await stream.ReadAsync(one, cancellationToken);
+                    if (read == 0) return;
+                    headerBytes.Add(one[0]);
+                    tail.Enqueue(one[0]);
+                    while (tail.Count > 4) tail.Dequeue();
+                    if (tail.Count == 4 && tail.SequenceEqual(new byte[] { 13, 10, 13, 10 })) break;
+                }
+                var headerText = Encoding.ASCII.GetString(headerBytes.ToArray());
+                var lines = headerText.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length == 0) return;
+                var requestParts = lines[0].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var path = requestParts.Length >= 2 ? requestParts[1] : "";
+                var contentLength = 0;
+                var contentType = "";
+                foreach (var line in lines.Skip(1))
+                {
+                    var colon = line.IndexOf(':');
+                    if (colon <= 0) continue;
+                    var name = line[..colon].Trim();
+                    var value = line[(colon + 1)..].Trim();
+                    if (name.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)) _ = int.TryParse(value, out contentLength);
+                    if (name.Equals("Content-Type", StringComparison.OrdinalIgnoreCase)) contentType = value;
+                }
+                var body = new byte[Math.Max(0, contentLength)];
+                var offset = 0;
+                while (offset < body.Length)
+                {
+                    var read = await stream.ReadAsync(body.AsMemory(offset, body.Length - offset), cancellationToken);
+                    if (read == 0) break;
+                    offset += read;
+                }
+                if (offset != body.Length) Array.Resize(ref body, offset);
+                _requests.Enqueue(new OtlpCapturedRequest(path, contentType, body));
+                var response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                await stream.WriteAsync(response, cancellationToken);
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _cts.Cancel();
+            _listener.Stop();
+            if (_loop is not null)
+            {
+                try { await _loop; } catch (OperationCanceledException) { } catch (ObjectDisposedException) { }
+            }
+            _cts.Dispose();
+        }
+    }
+
+    private static async Task TestOtlpExporterAsync(string root)
+    {
+        Assert(!new FileMcpSettings().OtlpEnabled && new FileMcpSettings().OtlpEndpoint == OtlpTelemetrySettings.DefaultEndpoint, "OTLP settings default to disabled with local collector endpoint");
+        Assert(OtlpTelemetrySettings.NormalizeBaseEndpoint("http://127.0.0.1:4318").ToString() == "http://127.0.0.1:4318/", "OTLP base endpoint normalizes collector URI");
+        foreach (var invalid in new[] { "ftp://127.0.0.1:4318", "http://user:pass@127.0.0.1:4318", "http://127.0.0.1:4318/custom", "http://127.0.0.1:4318?secret=yes" })
+        {
+            try
+            {
+                _ = OtlpTelemetrySettings.NormalizeBaseEndpoint(invalid);
+                throw new Exception("Assertion failed: OTLP endpoint validation rejects unsafe/non-base URI");
+            }
+            catch (FileMcpException)
+            {
+                Assert(true, "OTLP endpoint validation rejects unsafe/non-base URI");
+            }
+        }
+
+        await using var disabledCollector = new OtlpTestCollector();
+        using (var disabledBridge = new OtlpTelemetryBridge())
+        {
+            var disabled = disabledBridge.Configure(new OtlpTelemetrySettings(false, disabledCollector.Endpoint));
+            Assert(disabled.Status == OtlpExporterRuntimeStatus.Disabled && disabledBridge.ForceFlush(250), "OTLP disabled mode configures no exporter and flush is a no-op");
+            using var disabledTelemetry = new McpStandardTelemetry();
+            using (var operation = disabledTelemetry.BeginOperation(FileMcpConstants.ModernProtocolVersion, "tools/call", "read_file", "D", 3)) operation.Complete(4, false);
+            await Task.Delay(150);
+            Assert(disabledCollector.Requests.Length == 0, "OTLP disabled mode performs zero collector network requests");
+        }
+
+        await using var collector = new OtlpTestCollector();
+        using (var bridge = new OtlpTelemetryBridge())
+        {
+            var configured = bridge.Configure(new OtlpTelemetrySettings(true, collector.Endpoint));
+            Assert(configured.Status == OtlpExporterRuntimeStatus.Configured && configured.Endpoint == collector.Endpoint, "OTLP exporter configures HTTP/Protobuf trace and metric providers");
+            using var telemetry = new McpStandardTelemetry();
+            using (var operation = telemetry.BeginOperation(FileMcpConstants.ModernProtocolVersion, "tools/call", "read_file", "D", 5)) operation.Complete(7, false);
+            _ = bridge.ForceFlush(2_000);
+            Assert(await WaitUntilAsync(() => collector.Requests.Any(request => request.Path == "/v1/traces") && collector.Requests.Any(request => request.Path == "/v1/metrics"), TimeSpan.FromSeconds(3)), "OTLP exporter sends traces and metrics to standard HTTP/Protobuf endpoints");
+            var exported = collector.Requests;
+            Assert(exported.Where(request => request.Path is "/v1/traces" or "/v1/metrics").All(request => request.ContentType.Contains("application/x-protobuf", StringComparison.OrdinalIgnoreCase) && request.Body.Length > 0), "OTLP exporter uses non-empty protobuf payloads");
+        }
+
+        using (var invalidBridge = new OtlpTelemetryBridge())
+        {
+            var invalid = invalidBridge.Configure(new OtlpTelemetrySettings(true, "http://127.0.0.1:4318/not-a-base"));
+            Assert(invalid.Status == OtlpExporterRuntimeStatus.ConfigurationError && !string.IsNullOrWhiteSpace(invalid.Error), "OTLP configuration errors degrade exporter without throwing into app startup");
+        }
+
+        var closedPort = FreePort();
+        var downEndpoint = $"http://127.0.0.1:{closedPort}";
+        await using (var hub = new ObservabilityHub(["D"], Path.Combine(root, "otlp-down.sqlite3"), TimeSpan.FromHours(1)))
+        {
+            var configured = hub.ConfigureOtlp(new OtlpTelemetrySettings(true, downEndpoint));
+            Assert(configured.Status == OtlpExporterRuntimeStatus.Configured, "OTLP unreachable collector remains an optional configured exporter");
+            var workspace = Path.Combine(root, "otlp-down-workspace");
+            Directory.CreateDirectory(workspace);
+            File.WriteAllText(Path.Combine(workspace, "hello.txt"), "hello");
+            var port = FreePort();
+            var token = new string('o', 64);
+            await using var server = new LocalMcpServer((ushort)port, workspace, "", "", false, token, _ => { }, workspaceKey: "D", standardTelemetry: hub.StandardTelemetry);
+            await server.StartAsync();
+            const string readBody = "{\"jsonrpc\":\"2.0\",\"id\":501,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"relative_path\":\"hello.txt\"}}}";
+            var response = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), readBody);
+            Assert(response.StartsWith("HTTP/1.1 200 OK", StringComparison.Ordinal) && HttpBody(response).Contains("hello", StringComparison.Ordinal), "MCP request succeeds while optional OTLP collector is unreachable");
+            var flushTimer = Stopwatch.StartNew();
+            _ = hub.ForceFlushOtlpForTests(500);
+            flushTimer.Stop();
+            Assert(flushTimer.Elapsed < TimeSpan.FromSeconds(2), "OTLP collector outage is bounded by exporter timeout and never blocks MCP indefinitely");
+        }
+
+        Console.WriteLine("windows-otlp-exporter: ok");
     }
     private static void TestLogicalChatCorrelation()
     {
@@ -1151,9 +1319,11 @@ internal static class Program
             TunnelId = "tunnel_" + new string('a', 32), Profile = "windows-test", Port = 18080,
             AllowedDirectory = Path.Combine(root, "workspace"), HealthAddress = "127.0.0.1:0",
             GitUserName = "FileMCP Test", GitUserEmail = "filemcp@example.invalid", EnableCommands = true,
+            OtlpEnabled = true, OtlpEndpoint = "http://127.0.0.1:4319",
         };
         store.Save(settings); var loaded = store.Load();
         Assert(loaded.TunnelId == settings.TunnelId && loaded.Profile == settings.Profile && loaded.EnableCommands, "settings roundtrip");
+        Assert(loaded.OtlpEnabled && loaded.OtlpEndpoint == "http://127.0.0.1:4319", "settings roundtrip preserves optional OTLP configuration");
         Assert(loaded.Workspaces.Count == 4 && loaded.Workspaces.Select(item => item.Key).SequenceEqual(new[] { "C", "D", "E", "F" }), "multi-workspace defaults");
         Assert(loaded.Workspaces.Count(item => item.Enabled) == 1 && loaded.Workspaces.Any(item => item.Enabled && item.AllowedDirectory == settings.AllowedDirectory), "legacy workspace mapped to matching drive");
         Assert(loaded.Workspaces.Select(item => item.Port).Distinct().Count() == 4, "workspace ports unique");

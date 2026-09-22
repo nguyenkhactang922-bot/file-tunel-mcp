@@ -41,3 +41,5 @@ V11-004 PASS: component health + dashboard verified by Release build, 343 assert
 V11-005 PASS: native .NET ActivitySource/Meter MCP telemetry + bounded semantic adapter verified by full runtime gate + 362 assertions. NEXT_EXACT_ACTION: V11-006 W3C trace-context extraction.
 
 V11-006 PASS: W3C trace context via MCP _meta with HTTP fallback, privacy and identity separation verified by full runtime gate + 381 assertions. NEXT_EXACT_ACTION: V11-007 optional OTLP exporter/settings.
+
+V11-007 PASS: optional official OpenTelemetry .NET OTLP exporter verified by 397 assertions, dependency audit, self-contained x64 package and packaged provider/notices smoke. NEXT_EXACT_ACTION: V11-008 independent hardening audit.

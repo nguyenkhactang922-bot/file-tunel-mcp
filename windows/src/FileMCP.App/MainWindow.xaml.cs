@@ -45,6 +45,7 @@ public partial class MainWindow : Window
         OverviewPeriodCombo.SelectionChanged += OverviewPeriodCombo_SelectionChanged;
         _settings = LoadSettingsSafely();
         ApplySettings(_settings);
+        ConfigureOtlpFromSettings();
         UpdateApiKeyStatus();
 
         foreach (var key in WorkspaceKeys)
@@ -86,6 +87,7 @@ public partial class MainWindow : Window
         {
             await _observability.StartAsync();
             await RunObservabilityPackageSmokeIfRequestedAsync();
+            await RunOtlpPackageSmokeIfRequestedAsync();
             AppendLog("[Telemetry] Observability store ready.\n");
         }
         catch (Exception ex)
@@ -125,6 +127,42 @@ public partial class MainWindow : Window
         {
             try { await File.WriteAllTextAsync(markerPath, "FAIL " + ex.Message); } catch { }
             throw;
+        }
+    }
+    private async Task RunOtlpPackageSmokeIfRequestedAsync()
+    {
+        var markerPath = Environment.GetEnvironmentVariable("FILEMCP_OTLP_SMOKE_MARKER");
+        if (string.IsNullOrWhiteSpace(markerPath)) return;
+
+        var endpoint = Environment.GetEnvironmentVariable("FILEMCP_OTLP_SMOKE_ENDPOINT");
+        if (string.IsNullOrWhiteSpace(endpoint)) endpoint = "http://127.0.0.1:1";
+        try
+        {
+            var configured = _observability.ConfigureOtlp(new OtlpTelemetrySettings(true, endpoint));
+            if (configured.Status != OtlpExporterRuntimeStatus.Configured)
+                throw new InvalidOperationException("Packaged OTLP provider configuration failed: " + configured.Error);
+
+            using (var operation = _observability.StandardTelemetry.BeginOperation(
+                       FileMcpConstants.ModernProtocolVersion,
+                       "tools/call",
+                       "read_file",
+                       "C",
+                       4))
+                operation.Complete(4, isError: false);
+
+            await Task.Delay(100);
+            var directory = Path.GetDirectoryName(Path.GetFullPath(markerPath));
+            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+            await File.WriteAllTextAsync(markerPath, $"PASS status={configured.Status} endpoint={configured.Endpoint}");
+        }
+        catch (Exception ex)
+        {
+            try { await File.WriteAllTextAsync(markerPath, "FAIL " + ex.Message); } catch { }
+            throw;
+        }
+        finally
+        {
+            ConfigureOtlpFromSettings();
         }
     }
     private async void OverviewTimer_Tick(object? sender, EventArgs e)
@@ -189,12 +227,19 @@ public partial class MainWindow : Window
         OverviewConnectedRuntimesText.Text = $"{connected} / {WorkspaceKeys.Length}";
         OverviewAverageLatencyText.Text = $"{averageMs:N1} ms";
         OverviewMaxLatencyText.Text = $"{maxMs:N1} ms";
-        OverviewTelemetryHealthText.Text = snapshot.Persistence.Status switch
+        var persistenceText = snapshot.Persistence.Status switch
         {
             TelemetryPersistenceStatus.Ready => "Ready",
             TelemetryPersistenceStatus.Degraded => $"Degraded ({snapshot.Persistence.FailureCount:N0})",
             _ => "Starting",
         };
+        var otlpText = snapshot.Otlp.Status switch
+        {
+            OtlpExporterRuntimeStatus.Configured => "OTLP on",
+            OtlpExporterRuntimeStatus.ConfigurationError => "OTLP error",
+            _ => "OTLP off",
+        };
+        OverviewTelemetryHealthText.Text = $"{persistenceText} | {otlpText}";
         OverviewTelemetryHealthText.Foreground = snapshot.Persistence.Status switch
         {
             TelemetryPersistenceStatus.Ready => System.Windows.Media.Brushes.ForestGreen,
@@ -519,6 +564,8 @@ public partial class MainWindow : Window
         GitNameBox.Text = settings.GitUserName;
         GitEmailBox.Text = settings.GitUserEmail;
         EnableCommandsCheckBox.IsChecked = settings.EnableCommands;
+        OtlpEnabledCheckBox.IsChecked = settings.OtlpEnabled;
+        OtlpEndpointBox.Text = string.IsNullOrWhiteSpace(settings.OtlpEndpoint) ? OtlpTelemetrySettings.DefaultEndpoint : settings.OtlpEndpoint;
     }
 
     private void UpdateApiKeyStatus()
@@ -749,6 +796,18 @@ public partial class MainWindow : Window
             }
         }
 
+        if (OtlpEnabledCheckBox.IsChecked == true)
+        {
+            try { _ = OtlpTelemetrySettings.NormalizeBaseEndpoint(OtlpEndpointBox.Text); }
+            catch (Exception ex) when (ex is FileMcpException or UriFormatException)
+            {
+                MainTabs.SelectedItem = SettingsTab;
+                AdvancedExpander.IsExpanded = true;
+                ShowError(ex.Message);
+                return false;
+            }
+        }
+
         if (enabledKeys.Count == 0)
         {
             MainTabs.SelectedItem = SettingsTab;
@@ -813,6 +872,18 @@ public partial class MainWindow : Window
         _settings.GitUserName = GitNameBox.Text.Trim();
         _settings.GitUserEmail = GitEmailBox.Text.Trim();
         _settings.EnableCommands = EnableCommandsCheckBox.IsChecked == true;
+        _settings.OtlpEnabled = OtlpEnabledCheckBox.IsChecked == true;
+        var otlpEndpoint = OtlpEndpointBox.Text.Trim();
+        _settings.OtlpEndpoint = otlpEndpoint.Length == 0 ? OtlpTelemetrySettings.DefaultEndpoint : otlpEndpoint;
+        ConfigureOtlpFromSettings();
+    }
+
+    private void ConfigureOtlpFromSettings()
+    {
+        var endpoint = string.IsNullOrWhiteSpace(_settings.OtlpEndpoint)
+            ? OtlpTelemetrySettings.DefaultEndpoint
+            : _settings.OtlpEndpoint.Trim();
+        _ = _observability.ConfigureOtlp(new OtlpTelemetrySettings(_settings.OtlpEnabled, endpoint));
     }
 
     private LocalMcpConfiguration BuildConfiguration(FileMcpWorkspaceSettings workspace, string apiKey) =>

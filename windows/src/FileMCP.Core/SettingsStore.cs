@@ -74,6 +74,8 @@ public sealed class SettingsStore
         if (string.IsNullOrWhiteSpace(settings.AllowedDirectory))
             settings.AllowedDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "FileMCP");
         if (string.IsNullOrWhiteSpace(settings.HealthAddress)) settings.HealthAddress = "127.0.0.1:0";
+        if (string.IsNullOrWhiteSpace(settings.OtlpEndpoint)) settings.OtlpEndpoint = OtlpTelemetrySettings.DefaultEndpoint;
+        else settings.OtlpEndpoint = settings.OtlpEndpoint.Trim();
 
         var existing = settings.Workspaces
             .Where(item => !string.IsNullOrWhiteSpace(item.Key))

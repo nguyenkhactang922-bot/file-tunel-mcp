@@ -1,4 +1,4 @@
-﻿# PROJECT STATE
+# PROJECT STATE
 
 Project: FileMCP
 Baseline main HEAD: dd9df8effb5b8ebdf221bcd0cfc88a5b4cec4be3
@@ -32,3 +32,5 @@ Execution-order amendment:
 - V1.1 implementation now precedes OBS-013.
 - Previous OBS-013 automated/package evidence remains historical evidence only; final package evidence must be regenerated after V1.1 changes.
 
+
+V11-007 PASS: optional OTLP exporter is disabled by default, failure-isolated, privacy-bounded and packaged with OpenTelemetry license/notices. Current post-V1.1 package gate hash: CC5F021486368471AB20685375495765F79270E4F231651FBF90AECD2074D08D.
