@@ -45,7 +45,7 @@ V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 ## Current open product findings
 
 - FPA-002 PASS: macOS logical-chat/tool-surface parity, native CI verified.
-- FPA-003 P1: macOS bounded tunnel supervisor parity.
+- FPA-003 PASS: macOS bounded tunnel supervisor parity, native CI verified.
 - FPA-004 P1 market: production signing/notarization.
 - FPA-005 P2: Windows ARM64 runtime assurance.
 - FPA-007 P2: single-instance/duplicate-process UX.
@@ -53,3 +53,6 @@ V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
 - FPA-009 P3 optional: dynamic health endpoint discovery.
 
 FPA-006 PASS. FPA-002 PASS with native macOS/Windows CI. Current remediation advances to FPA-003.
+
+
+FPA-003 native CI PASS: run 35723605790 succeeded on both verify-macos and verify-windows. Current remediation advances to FPA-005.

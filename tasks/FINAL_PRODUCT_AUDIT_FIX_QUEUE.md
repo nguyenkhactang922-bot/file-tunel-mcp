@@ -8,7 +8,7 @@ Status: AUDIT COMPLETE  -  FIXES NOT STARTED
 |---|---|---|---|---|
 | FPA-001 | P1 | PASS | - | GitHub Windows workflow verifies the actual `FileMCP-release` staging path for x64/ARM64; clean workflow path gate passes |
 | FPA-002 | P1 | PASS | - | macOS logical-chat/tool surface matches Windows, or product scope/docs explicitly freeze a Windows-only observability delta |
-| FPA-003 | P1 | ACTIVE | FPA-002 | macOS has bounded tunnel crash restart/backoff/jitter/budget/cooldown parity, or cross-platform tunnel-parity claim is explicitly removed |
+| FPA-003 | P1 | PASS | FPA-002 | macOS has bounded tunnel crash restart/backoff/jitter/budget/cooldown parity, or cross-platform tunnel-parity claim is explicitly removed |
 | FPA-004 | P1 market | BLOCKED | release-scope decision | production Windows artifacts are Authenticode-signed and macOS artifacts signed/notarized/stapled without secrets in repo/logs |
 | FPA-005 | P2 | READY | FPA-001 | Windows ARM64 gets native runtime smoke where available, or an explicit architecture-assurance gate and documented limitation |
 | FPA-006 | P2 | PASS | - | handoff/project/task state match real Git HEAD/status and expose exactly one current NEXT_EXACT_ACTION |
@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: obtain native GitHub macOS/Windows CI evidence for the FPA-003 tunnel-supervisor candidate.
+AUTHORITATIVE NEXT_EXACT_ACTION: CLAIM FPA-005 and close the Windows ARM64 release-assurance gap.
 
 Do not resume V11-009 as the only remaining whole-app gate until the P1 product/release scope is resolved.

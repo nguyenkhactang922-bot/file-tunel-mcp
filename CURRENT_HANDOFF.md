@@ -105,3 +105,8 @@ FPA-002 final acceptance:
 - Local static contracts and Windows regression are PASS.
 - Candidate evidence: `docs/evidence/FPA-003_MAC_TUNNEL_SUPERVISOR_CANDIDATE.md`.
 - FPA-003 remains ACTIVE until native GitHub verify-macos + verify-windows succeed.
+
+
+FPA-003 final acceptance:
+- GitHub Actions run 35723605790: verify-macos SUCCESS, verify-windows SUCCESS.
+- Evidence: docs/evidence/FPA-003_MAC_TUNNEL_SUPERVISOR_EVIDENCE.md.
