@@ -247,7 +247,7 @@ swiftc -framework Security -o "$TMP_DIR/correlation-test" \
     "$TMP_DIR/main.swift"
 "$TMP_DIR/correlation-test"
 
-cat >"$TMP_DIR/supervisor.swift" <<'SWIFT'
+cat >"$TMP_DIR/main.swift" <<'SWIFT'
 import Foundation
 
 func approx(_ lhs: TimeInterval, _ rhs: TimeInterval, tolerance: TimeInterval = 0.0001) -> Bool {
@@ -336,7 +336,7 @@ SWIFT
 
 swiftc -o "$TMP_DIR/supervisor-test" \
     macos/TunnelSupervisor.swift \
-    "$TMP_DIR/supervisor.swift"
+    "$TMP_DIR/main.swift"
 "$TMP_DIR/supervisor-test"
 
 cat >"$TMP_DIR/tunnel-client" <<'SH'
