@@ -187,7 +187,8 @@ precondition(first.chatInstanceID.count == 48, "generated handle total length")
 
 let firstHash = service.tryResolve(first.chatInstanceID)
 precondition(firstHash?.count == 64, "known handle resolves to SHA-256 hash")
-precondition((try LogicalChatCorrelationService.hashForPersistence(first.chatInstanceID)) == firstHash, "persistence hash parity")
+let persistedHash = try LogicalChatCorrelationService.hashForPersistence(first.chatInstanceID)
+precondition(persistedHash == firstHash, "persistence hash parity")
 
 let resumed = try service.connect(chatInstanceID: first.chatInstanceID)
 precondition(resumed.resumed && resumed.chatInstanceID == first.chatInstanceID, "known handle resumes")
