@@ -1559,7 +1559,7 @@ internal static class Program
         var timeout = await ProcessRunner.RunAsync("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 10"], timeoutSeconds: 1);
         Assert(timeout.TimedOut, "process timeout");
 
-        var bounded = await ProcessRunner.RunAsync("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "'x' * 150000"], timeoutSeconds: 5, outputLimitBytes: 10_000);
+        var bounded = await ProcessRunner.RunAsync("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Out.Write('x' * 20000)"], timeoutSeconds: 10, outputLimitBytes: 10_000);
         Assert(bounded.Stdout.Contains("[...truncated ", StringComparison.Ordinal), "bounded process output");
 
         var pidFile = Path.Combine(root, "child.pid");

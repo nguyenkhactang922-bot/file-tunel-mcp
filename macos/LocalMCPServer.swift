@@ -1704,9 +1704,7 @@ final class LocalMCPServer {
     private func receiveRequest(lease: MCPConnectionLease, accumulated: Data, headerDeadline: Date) {
         guard !lease.isFinished else { return }
 
-        let separator = Data("
-
-".utf8)
+        let separator = Data("\r\n\r\n".utf8)
         let headerComplete = accumulated.range(of: separator) != nil
         let now = Date()
         let idleDeadline = now.addingTimeInterval(limits.readIdleTimeout)
