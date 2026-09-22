@@ -42,11 +42,13 @@ internal static class Program
             await TestObservabilityHardeningAsync(root);
             await TestV11HardeningAsync(root);
             await TestSettingsAndCredentialsAsync(root);
+            await TestDesktopSingleInstanceCoordinatorAsync();
             await TestProcessRunnerAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
             await TestHttpAndMcpAsync(root);
+            await TestHttpConnectionBoundsAsync(root);
             await TestRuntimeAsync(root);
             Console.WriteLine($"windows-core-tests: ok ({_assertions} assertions)");
             return 0;
@@ -1513,12 +1515,51 @@ internal static class Program
         return Task.CompletedTask;
     }
 
+    private static async Task TestDesktopSingleInstanceCoordinatorAsync()
+    {
+        var instanceKey = "filemcp-single-instance-test-" + Guid.NewGuid().ToString("N");
+        using var primary = new DesktopSingleInstanceCoordinator(instanceKey);
+        Assert(primary.IsPrimary, "desktop first instance becomes primary");
+
+        var activationCount = 0;
+        var firstActivation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        primary.StartActivationListener(() =>
+        {
+            if (Interlocked.Increment(ref activationCount) == 1)
+                firstActivation.TrySetResult(true);
+        });
+
+        using var secondary = new DesktopSingleInstanceCoordinator(instanceKey);
+        Assert(!secondary.IsPrimary, "desktop second instance is secondary");
+        Assert(await secondary.SignalPrimaryAsync(TimeSpan.FromSeconds(2)), "desktop secondary signals primary");
+        await firstActivation.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert(Volatile.Read(ref activationCount) == 1, "desktop primary receives activation signal");
+
+        _ = await secondary.SendCommandForTestAsync("unknown\n", TimeSpan.FromSeconds(2));
+        await Task.Delay(100);
+        Assert(Volatile.Read(ref activationCount) == 1, "desktop unknown command does not activate");
+
+        _ = await secondary.SendCommandForTestAsync(new string('x', 80) + "\n", TimeSpan.FromSeconds(2));
+        await Task.Delay(100);
+        Assert(Volatile.Read(ref activationCount) == 1, "desktop oversized command does not activate");
+
+        Assert(await secondary.SignalPrimaryAsync(TimeSpan.FromSeconds(2)), "desktop repeated activation signal sent");
+        Assert(await WaitUntilAsync(() => Volatile.Read(ref activationCount) >= 2, TimeSpan.FromSeconds(2)), "desktop repeated activation received");
+
+        primary.Dispose();
+        await Task.Delay(50);
+        using var replacement = new DesktopSingleInstanceCoordinator(instanceKey);
+        Assert(replacement.IsPrimary, "desktop primary ownership recovers after dispose");
+
+        Console.WriteLine("windows-desktop-single-instance: ok");
+    }
+
     private static async Task TestProcessRunnerAsync(string root)
     {
         var timeout = await ProcessRunner.RunAsync("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 10"], timeoutSeconds: 1);
         Assert(timeout.TimedOut, "process timeout");
 
-        var bounded = await ProcessRunner.RunAsync("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "'x' * 150000"], timeoutSeconds: 5, outputLimitBytes: 10_000);
+        var bounded = await ProcessRunner.RunAsync("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Out.Write('x' * 20000)"], timeoutSeconds: 10, outputLimitBytes: 10_000);
         Assert(bounded.Stdout.Contains("[...truncated ", StringComparison.Ordinal), "bounded process output");
 
         var pidFile = Path.Combine(root, "child.pid");
@@ -1883,6 +1924,94 @@ internal static class Program
         Console.WriteLine("windows-http-mcp: ok");
     }
 
+    private static async Task TestHttpConnectionBoundsAsync(string root)
+    {
+        var workspace = Path.Combine(root, "http-bounds");
+        Directory.CreateDirectory(workspace);
+        var token = new string('b', 64);
+
+        var saturationPort = FreePort();
+        var saturationLimits = new LocalMcpServerLimits(2, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+        await using (var saturationServer = new LocalMcpServer(
+            (ushort)saturationPort, workspace, "", "", false, token, _ => { },
+            null, null, null, null, null, saturationLimits))
+        {
+            await saturationServer.StartAsync();
+            using var first = new TcpClient();
+            using var second = new TcpClient();
+            await first.ConnectAsync(IPAddress.Loopback, saturationPort);
+            await second.ConnectAsync(IPAddress.Loopback, saturationPort);
+            await first.GetStream().WriteAsync("G"u8.ToArray());
+            await second.GetStream().WriteAsync("G"u8.ToArray());
+            await Task.Delay(150);
+
+            using var excess = new TcpClient();
+            await excess.ConnectAsync(IPAddress.Loopback, saturationPort);
+            Assert(await WaitForSocketCloseAsync(excess, TimeSpan.FromSeconds(1)), "HTTP connection cap rejects excess client");
+
+            first.Dispose();
+            await Task.Delay(150);
+            var response = await SendHttpAsync(
+                saturationPort,
+                "POST",
+                "/mcp",
+                AuthHeaders(token),
+                "{\"jsonrpc\":\"2.0\",\"id\":90,\"method\":\"tools/list\",\"params\":{}}");
+            Assert(response.StartsWith("HTTP/1.1 200 OK", StringComparison.Ordinal), "HTTP connection slot is reusable after release");
+        }
+
+        var idlePort = FreePort();
+        var idleLimits = new LocalMcpServerLimits(4, TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(2));
+        await using (var idleServer = new LocalMcpServer(
+            (ushort)idlePort, workspace, "", "", false, token, _ => { },
+            null, null, null, null, null, idleLimits))
+        {
+            await idleServer.StartAsync();
+            using var idle = new TcpClient();
+            await idle.ConnectAsync(IPAddress.Loopback, idlePort);
+            Assert(await WaitForSocketCloseAsync(idle, TimeSpan.FromSeconds(2)), "HTTP idle connection times out");
+        }
+
+        var tricklePort = FreePort();
+        var trickleLimits = new LocalMcpServerLimits(4, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(650));
+        await using (var trickleServer = new LocalMcpServer(
+            (ushort)tricklePort, workspace, "", "", false, token, _ => { },
+            null, null, null, null, null, trickleLimits))
+        {
+            await trickleServer.StartAsync();
+            using var trickle = new TcpClient();
+            await trickle.ConnectAsync(IPAddress.Loopback, tricklePort);
+            var stream = trickle.GetStream();
+            var writeFailed = false;
+            for (var index = 0; index < 12; index++)
+            {
+                try { await stream.WriteAsync(new byte[] { (byte)'G' }); }
+                catch (IOException) { writeFailed = true; break; }
+                catch (SocketException) { writeFailed = true; break; }
+                await Task.Delay(100);
+            }
+            var closed = writeFailed || await WaitForSocketCloseAsync(trickle, TimeSpan.FromSeconds(1));
+            Assert(closed, "HTTP absolute header deadline stops trickle client");
+        }
+
+        var stopPort = FreePort();
+        var stopLimits = new LocalMcpServerLimits(4, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+        await using (var stopServer = new LocalMcpServer(
+            (ushort)stopPort, workspace, "", "", false, token, _ => { },
+            null, null, null, null, null, stopLimits))
+        {
+            await stopServer.StartAsync();
+            using var blocked = new TcpClient();
+            await blocked.ConnectAsync(IPAddress.Loopback, stopPort);
+            await blocked.GetStream().WriteAsync("G"u8.ToArray());
+            await Task.Delay(100);
+            stopServer.Stop();
+            Assert(await WaitForSocketCloseAsync(blocked, TimeSpan.FromSeconds(1)), "HTTP server stop cancels blocked read");
+        }
+
+        Console.WriteLine("windows-http-connection-bounds: ok");
+    }
+
     private static void TestTunnelRestartPolicy()
     {
         var options = new TunnelSupervisorOptions(
@@ -1912,7 +2041,7 @@ internal static class Program
         jitterPolicy.Reset();
         var highJitter = jitterPolicy.Next(t0, t0, () => 1);
         Assert(lowJitter.Delay == TimeSpan.FromMilliseconds(80) && highJitter.Delay == TimeSpan.FromMilliseconds(120), "tunnel supervisor jitter is bounded around base delay");
-        Assert(!LocalMcpRuntime.TryParseProbeEndpoint("127.0.0.1:0", out _, out _), "dynamic tunnel health port is intentionally not probed");
+        Assert(!LocalMcpRuntime.TryParseProbeEndpoint("127.0.0.1:0", out _, out _), "dynamic configured health port requires resolved URL-file discovery");
         Assert(LocalMcpRuntime.TryParseProbeEndpoint("[::1]:12345", out var probeHost, out var probePort) && probeHost == "::1" && probePort == 12345, "fixed loopback tunnel health endpoint parses for probing");
         Console.WriteLine("windows-tunnel-restart-policy: ok");
     }
@@ -1932,6 +2061,35 @@ internal static class Program
         var runtime = new LocalMcpRuntime("D", observability, profiles); var logs = new StringBuilder(); runtime.Log += text => logs.Append(text);
         try
         {
+            Directory.CreateDirectory(profiles);
+            var healthFixture = Path.Combine(root, "resolved-health-url.txt");
+            File.WriteAllText(healthFixture, "http://127.0.0.1:32123\n");
+            Assert(
+                LocalMcpRuntime.TryReadResolvedHealthEndpoint(healthFixture, out var resolvedAddress, out var resolvedHost, out var resolvedPort) &&
+                resolvedAddress == "127.0.0.1:32123" && resolvedHost == "127.0.0.1" && resolvedPort == 32123,
+                "dynamic health URL parser accepts loopback HTTP endpoint");
+            File.WriteAllText(healthFixture, "http://[::1]:32124/");
+            Assert(
+                LocalMcpRuntime.TryReadResolvedHealthEndpoint(healthFixture, out resolvedAddress, out resolvedHost, out resolvedPort) &&
+                resolvedAddress == "[::1]:32124" && resolvedHost == "::1" && resolvedPort == 32124,
+                "dynamic health URL parser accepts loopback IPv6 endpoint");
+            foreach (var invalid in new[]
+            {
+                "https://127.0.0.1:32123",
+                "http://10.10.10.10:32123",
+                "http://user:pass@127.0.0.1:32123",
+                "http://127.0.0.1:32123/healthz",
+                "http://127.0.0.1:32123/?q=1",
+                "http://127.0.0.1:32123/#fragment",
+                "http://127.0.0.1",
+            })
+            {
+                File.WriteAllText(healthFixture, invalid);
+                Assert(!LocalMcpRuntime.TryReadResolvedHealthEndpoint(healthFixture, out _, out _, out _), "dynamic health URL parser rejects unsafe or ambiguous endpoint: " + invalid);
+            }
+            File.WriteAllBytes(healthFixture, new byte[513]);
+            Assert(!LocalMcpRuntime.TryReadResolvedHealthEndpoint(healthFixture, out _, out _, out _), "dynamic health URL parser rejects oversized file");
+
             var config = new LocalMcpConfiguration("tunnel_" + new string('b', 32), "sk-runtime-test-secret", "runtime-test", (ushort)FreePort(), workspace, $"127.0.0.1:{healthPort}", "", "", false);
             await runtime.StartAsync(config);
             Assert(runtime.State.Status == LocalMcpRuntimeStatus.Running, "runtime running");
@@ -1957,6 +2115,41 @@ internal static class Program
             var stoppedObservation = observability.Snapshot().Workspaces["D"];
             Assert(!stoppedObservation.RuntimeRunning && stoppedObservation.RuntimeUptime == TimeSpan.Zero, "runtime clears connected uptime when stopped");
 
+            var dynamicHealthPort = FreePort();
+            using var dynamicHealthListener = new TcpListener(IPAddress.Loopback, dynamicHealthPort);
+            dynamicHealthListener.Start();
+            var dynamicProfile = "runtime-dynamic-health";
+            var dynamicHealthUrlFile = Path.Combine(profiles, dynamicProfile + ".health-url");
+            File.WriteAllText(dynamicHealthUrlFile, "STALE-HEALTH-URL");
+            Environment.SetEnvironmentVariable("MCP_TEST_HEALTH_URL", $"http://127.0.0.1:{dynamicHealthPort}");
+            Environment.SetEnvironmentVariable("MCP_TEST_HEALTH_REQUIRE_FRESH", "1");
+            await using (var dynamicRuntime = new LocalMcpRuntime("D", observability, profiles))
+            {
+                var dynamicConfig = new LocalMcpConfiguration(
+                    "tunnel_" + new string('h', 32),
+                    "test-key",
+                    dynamicProfile,
+                    (ushort)FreePort(),
+                    workspace,
+                    "127.0.0.1:0",
+                    "",
+                    "",
+                    false);
+                await dynamicRuntime.StartAsync(dynamicConfig);
+                Assert(dynamicRuntime.State.Status == LocalMcpRuntimeStatus.Running, "dynamic-health runtime running");
+                Assert(await WaitUntilAsync(() => File.Exists(dynamicHealthUrlFile), TimeSpan.FromSeconds(2)), "tunnel run writes resolved health URL file");
+                Assert(File.ReadAllText(dynamicHealthUrlFile).Trim() == $"http://127.0.0.1:{dynamicHealthPort}", "stale health URL file is replaced by current tunnel launch");
+                var dynamicHealth = await dynamicRuntime.RefreshHealthAsync();
+                Assert(dynamicHealth.TunnelHealth == TunnelHealthProbeState.Reachable && dynamicHealth.LastTunnelHealthSuccessUtc.HasValue, "dynamic :0 tunnel health resolves and probes reachable endpoint");
+                dynamicHealthListener.Stop();
+                dynamicHealth = await dynamicRuntime.RefreshHealthAsync();
+                Assert(dynamicHealth.TunnelHealth == TunnelHealthProbeState.Unreachable && dynamicHealth.LastTunnelHealthSuccessUtc.HasValue, "dynamic health preserves last success after endpoint becomes unreachable");
+                await dynamicRuntime.StopAsync();
+                Assert(!File.Exists(dynamicHealthUrlFile), "dynamic health URL file is removed on runtime stop");
+            }
+
+            Environment.SetEnvironmentVariable("MCP_TEST_HEALTH_URL", "http://127.0.0.1:65534");
+            Environment.SetEnvironmentVariable("MCP_TEST_HEALTH_REQUIRE_FRESH", "1");
             var restartCounter = Path.Combine(root, "runtime-restart-counter.txt");
             Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_RUN_COUNTER", restartCounter);
             Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_FAIL_RUNS", "2");
@@ -2042,6 +2235,7 @@ internal static class Program
             Environment.SetEnvironmentVariable("MCP_TUNNEL_CLIENT", null); Environment.SetEnvironmentVariable("MCP_TEST_ENV_CAPTURE", null);
             Environment.SetEnvironmentVariable("LOG_HTTP_RAW_UNSAFE", null); Environment.SetEnvironmentVariable("MCP_SERVER_URL", null);
             Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_RUN_COUNTER", null); Environment.SetEnvironmentVariable("MCP_TEST_TUNNEL_FAIL_RUNS", null);
+            Environment.SetEnvironmentVariable("MCP_TEST_HEALTH_URL", null); Environment.SetEnvironmentVariable("MCP_TEST_HEALTH_REQUIRE_FRESH", null);
         }
         Console.WriteLine("windows-runtime-lifecycle: ok");
     }
@@ -2069,6 +2263,26 @@ internal static class Program
             Console.WriteLine("init-ok " + apiKey + " " + token); return 0;
         }
         if (args[0] == "doctor") { Console.WriteLine("doctor-ok " + apiKey + " " + token); return 0; }
+
+        var healthUrlIndex = Array.IndexOf(args, "--health.url-file");
+        if (healthUrlIndex >= 0)
+        {
+            if (healthUrlIndex + 1 >= args.Length) return 92;
+            var healthUrlFile = args[healthUrlIndex + 1];
+            if (Environment.GetEnvironmentVariable("MCP_TEST_HEALTH_REQUIRE_FRESH") == "1" && File.Exists(healthUrlFile))
+            {
+                Console.Error.WriteLine("stale-health-url-file");
+                return 91;
+            }
+            var healthUrl = Environment.GetEnvironmentVariable("MCP_TEST_HEALTH_URL");
+            if (!string.IsNullOrWhiteSpace(healthUrl))
+            {
+                var parent = Path.GetDirectoryName(healthUrlFile);
+                if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
+                File.WriteAllText(healthUrlFile, healthUrl);
+            }
+        }
+
         var counterPath = Environment.GetEnvironmentVariable("MCP_TEST_TUNNEL_RUN_COUNTER");
         if (!string.IsNullOrWhiteSpace(counterPath))
         {
@@ -2126,6 +2340,32 @@ internal static class Program
         var builder = new StringBuilder($"{method} {path} HTTP/1.1\r\nHost: {host ?? $"127.0.0.1:{port}"}\r\n"); foreach (var pair in headers) builder.Append(pair.Key).Append(": ").Append(pair.Value).Append("\r\n"); builder.Append("Content-Length: ").Append(bytes.Length).Append("\r\n\r\n");
         var head = Encoding.UTF8.GetBytes(builder.ToString()); await stream.WriteAsync(head); await stream.WriteAsync(bytes); client.Client.Shutdown(SocketShutdown.Send);
         using var memory = new MemoryStream(); var buffer = new byte[8192]; int read; while ((read = await stream.ReadAsync(buffer)) > 0) memory.Write(buffer, 0, read); return Encoding.UTF8.GetString(memory.ToArray());
+    }
+    private static async Task<bool> WaitForSocketCloseAsync(TcpClient client, TimeSpan timeout)
+    {
+        using var cts = new CancellationTokenSource(timeout);
+        var buffer = new byte[1];
+        try
+        {
+            var read = await client.GetStream().ReadAsync(buffer, cts.Token);
+            return read == 0;
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch (SocketException)
+        {
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return true;
+        }
     }
     private static string HttpBody(string response) { var index = response.IndexOf("\r\n\r\n", StringComparison.Ordinal); return index >= 0 ? response[(index + 4)..] : response; }
 }

@@ -1,42 +1,85 @@
 # PROJECT STATE
 
 Project: FileMCP
-Baseline main HEAD: dd9df8effb5b8ebdf221bcd0cfc88a5b4cec4be3
-Active branch: chatgpt/OBS-001-observability-foundation
-Current branch HEAD: 3033084
-Initiative: FileMCP Observability V1 + V1.1 OSS Strengthening
-Architecture: FROZEN
-Implementation: COMPLETE THROUGH V11-008 + OBS-013 LIVE ACCEPTANCE
-Final acceptance: V11-009 ACTIVE — FINAL REVIEW / PACKAGE / MERGE / MAIN VERIFICATION
+Active branch: `chatgpt/OBS-001-observability-foundation`
+Git SHA source of truth: resolve dynamically with `git rev-parse HEAD`.
+Architecture law: `docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md`
+Execution law: `docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md`
 
-## Verified implementation
+## Completed initiatives
 
-- FMR-001 PASS
-- OBS-001..OBS-012 PASS
-- V11-001 bounded logical session/correlation lifecycle PASS
-- V11-002 automatic observability retention maintenance PASS
-- V11-003 tunnel supervision/backoff/cooldown PASS
-- V11-004 component health/dashboard PASS
-- V11-005 native .NET ActivitySource/Meter MCP telemetry PASS
-- V11-006 MCP `_meta` + HTTP W3C trace-context propagation PASS
-- V11-007 optional official OpenTelemetry .NET OTLP exporter PASS
-- V11-008 independent long-lived hardening PASS
+- FMR-001 PASS.
+- Observability V1: OBS-001 through OBS-013 PASS.
+- Observability V1.1 strengthening: V11-001 through V11-008 PASS.
+- Real ChatGPT connector logical-chat correlation acceptance PASS.
+- FPA-001 Windows CI staging parity PASS.
 
-## Current release candidate
+## Current final-product program
 
-- `dist/FileMCP-v0.4.0-windows-x64.zip`
-- SHA-256 `5B511CC07ADC85D19F5F1C5B1E6CBFC0903FEF0AF8A0F8CFEBF8BFEB577DC44E`
-- build 0 warnings / 0 errors
-- Windows runtime suite 414 assertions PASS
-- WPF/package/SQLite/tunnel-client/OTLP/notices smoke PASS
-- dependency vulnerability/outdated audit PASS
+Whole-app independent audit found additional blockers outside the already-verified Windows observability core.
 
-## Remaining work
+Audit report:
+`docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`
 
-V11-009 is ACTIVE. Execute final review, final package gate, PR/review/merge, then checkout/pull `main` and rerun Release build/runtime verification until `MAIN VERIFIED`.
+Task graph:
+`tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`
 
-OBS-013 PASS: real ChatGPT connector schema, handle creation/resume, cross-turn propagation, bound durable SHA-256 identity and raw-handle privacy all verified. Exact correlated AI-chat wording is enabled. V11-009 is ACTIVE for final closure.
+Current decision:
 
-Final pre-merge package SHA-256: `3C23BEE2198543CFE6D3C51FB134E31A82034B15FDDAC1FC9785F44603C17F23`. Isolated staging is supported so packaging can run while the current release bridge remains connected.
+```text
+Windows core / Observability V1+V1.1   VERIFIED
+Whole-repository release readiness     EXTERNAL-BLOCKED ON FPA-004 REAL RELEASE TRUST
+V11-009 / MAIN VERIFIED                DEFERRED UNTIL P1 REMEDIATION
+```
 
-V11-009 merge status: PR #2 is clean/mergeable. A local merge candidate from `origin/main` passed build, 414 runtime assertions and packaged app smoke. Upstream merge is blocked only because the authenticated bot has READ permission.
+## Verified quality baseline
+
+- Windows Release build: PASS, 0 warnings / 0 errors.
+- Full Windows runtime suite: PASS, 444 assertions.
+- x64 packaged app smoke: PASS.
+- x64 + ARM64 release-resource packaging: PASS under FPA-001 isolated staging verification.
+- NuGet vulnerable-package audit: no vulnerable packages reported.
+- Direct-package outdated audit: no updates reported.
+- OBS-013 live ChatGPT cross-turn correlation and raw-handle privacy: PASS.
+
+## Current open product findings
+
+- FPA-002 PASS: macOS logical-chat/tool-surface parity, native CI verified.
+- FPA-003 PASS: macOS bounded tunnel supervisor parity, native CI verified.
+- FPA-004 EXTERNAL-BLOCKED: signing/notarization plumbing is native-CI verified; real production credentials + default-branch workflow registration + credentialed release run remain.
+- FPA-005 PASS: native Windows ARM64 runtime assurance verified by GitHub hosted ARM64 runner.
+- FPA-007 PASS: per-user Windows desktop single-instance activation verified on x64 and ARM64.
+- FPA-008 PASS: cross-platform HTTP connection cap plus idle/header deadlines, native CI verified.
+- FPA-009 PASS: dynamic health endpoint discovery via official tunnel-client URL file, native CI verified.
+
+FPA-006 PASS. FPA-002 PASS with native macOS/Windows CI. Current remediation advances to FPA-003.
+
+
+FPA-003 native CI PASS: run 35723605790 succeeded on both verify-macos and verify-windows. Current remediation advances to FPA-005.
+
+
+FPA-005 candidate: native Windows ARM64 job + parameterized packaged smoke are implemented; local contracts and Windows regression PASS. Native ARM64 GitHub execution is the remaining acceptance gate.
+
+
+FPA-005 native CI PASS: run 35726514963 succeeded on verify-macos, verify-windows and verify-windows-arm64. Current remediation advances to FPA-007.
+
+
+FPA-007 candidate: per-user named-pipe single-instance activation is implemented; core 423 assertions and packaged x64 duplicate-launch activation smoke PASS. Native CI remains the final acceptance gate.
+
+
+FPA-007 native CI PASS: run 35728230159 succeeded on macOS, Windows x64 and Windows ARM64 with second-launch activation smoke. Current remediation advances to FPA-008.
+
+
+FPA-008 native CI PASS: run 35745850301 succeeded on verify-macos, verify-windows and verify-windows-arm64. Current technical remediation advances to FPA-009 before the remaining public-market signing gate.
+
+
+FPA-009 native CI PASS: run 35748443822 succeeded on verify-macos, verify-windows and verify-windows-arm64. Remaining whole-app market gate is FPA-004 signing/notarization.
+
+
+FPA-004 plumbing candidate: release-only Windows Authenticode and macOS Developer ID/notarization/stapling automation is implemented locally. Local contracts/build/runtime/package smoke PASS. Native Verify is the next gate; real production credentials are not configured on the connected fork and remain required for FPA-004 PASS.
+
+
+FPA-004 plumbing VERIFIED: GitHub Actions run 35752248896 succeeded on verify-macos, verify-windows and verify-windows-arm64. The fork production-release Environment now exists, but all seven real release secrets are absent. Upstream PR #2 remains open and the connected bot has read-only upstream permission. FPA-004 cannot be marked PASS until a real signed/notarized/stapled release run succeeds.
+
+
+Final post-remediation audit: docs/audit/FINAL_PRODUCT_POST_REMEDIATION_AUDIT_2026-09-22.md. No additional repo-internal bug was opened; remaining blocker is FPA-004 real release trust credentials/default-branch execution.

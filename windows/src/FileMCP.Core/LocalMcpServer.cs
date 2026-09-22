@@ -12,6 +12,18 @@ internal sealed record HttpRequestData(string Method, string Path, Dictionary<st
 internal enum HttpParseStatus { Incomplete, Request, Failure }
 internal sealed record HttpParseResult(HttpParseStatus Status, HttpRequestData? Request = null, int FailureStatus = 0, string? FailureMessage = null);
 
+internal sealed record LocalMcpServerLimits(int MaxConcurrentConnections, TimeSpan ReadIdleTimeout, TimeSpan HeaderReadTimeout)
+{
+    public static LocalMcpServerLimits Default { get; } = new(64, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30));
+
+    public void Validate()
+    {
+        if (MaxConcurrentConnections <= 0) throw new ArgumentOutOfRangeException(nameof(MaxConcurrentConnections));
+        if (ReadIdleTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(ReadIdleTimeout));
+        if (HeaderReadTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(HeaderReadTimeout));
+    }
+}
+
 public sealed class LocalMcpServer : IAsyncDisposable
 {
     private static readonly HashSet<string> UnauthenticatedOAuthDiscoveryPaths = new(StringComparer.Ordinal)
@@ -34,14 +46,24 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private readonly LogicalSessionRegistry? _sessions;
     private readonly string? _workspaceKey;
     private readonly McpStandardTelemetry? _standardTelemetry;
+    private readonly LocalMcpServerLimits _limits;
+    private readonly SemaphoreSlim _connectionSlots;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _acceptLoop;
 
     public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null, LogicalSessionRegistry? sessions = null, string? workspaceKey = null, McpStandardTelemetry? standardTelemetry = null)
+        : this(port, allowedDirectory, gitUserName, gitUserEmail, enableCommands, localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, LocalMcpServerLimits.Default)
+    {
+    }
+
+    internal LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter, LogicalChatCorrelationService? chatCorrelation, LogicalSessionRegistry? sessions, string? workspaceKey, McpStandardTelemetry? standardTelemetry, LocalMcpServerLimits limits)
     {
         if (Encoding.UTF8.GetByteCount(localAuthToken) < 32) throw new FileMcpException("Local MCP authentication token is too short");
+        limits.Validate();
         _port = port; _localAuthToken = localAuthToken; _log = log; _usageMeter = usageMeter; _chatCorrelation = chatCorrelation; _sessions = sessions; _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey) ? null : workspaceKey.Trim().ToUpperInvariant(); _standardTelemetry = standardTelemetry;
+        _limits = limits;
+        _connectionSlots = new SemaphoreSlim(limits.MaxConcurrentConnections, limits.MaxConcurrentConnections);
         _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, enableCommands);
         _skills = new CodexSkillRegistry(allowedDirectory, log);
     }
@@ -86,7 +108,16 @@ public sealed class LocalMcpServer : IAsyncDisposable
             catch (OperationCanceledException) { return; }
             catch (ObjectDisposedException) { return; }
             catch (SocketException) when (cancellationToken.IsCancellationRequested) { return; }
-            _ = Task.Run(() => HandleClientAsync(client, cancellationToken), CancellationToken.None);
+            if (!_connectionSlots.Wait(0))
+            {
+                client.Dispose();
+                continue;
+            }
+            _ = Task.Run(async () =>
+            {
+                try { await HandleClientAsync(client, cancellationToken).ConfigureAwait(false); }
+                finally { _connectionSlots.Release(); }
+            }, CancellationToken.None);
         }
     }
 
@@ -98,10 +129,13 @@ public sealed class LocalMcpServer : IAsyncDisposable
             var stream = client.GetStream();
             var buffer = new MemoryStream();
             var readBuffer = new byte[65_536];
+            var headerStartedAt = Stopwatch.GetTimestamp();
             while (!cancellationToken.IsCancellationRequested)
             {
+                var currentBytes = buffer.ToArray();
+                var headerComplete = IndexOf(currentBytes, "\r\n\r\n"u8.ToArray()) >= 0;
                 HttpParseResult parsed;
-                try { parsed = ParseHttpRequest(buffer.ToArray()); }
+                try { parsed = ParseHttpRequest(currentBytes); }
                 catch { parsed = new HttpParseResult(HttpParseStatus.Failure, FailureStatus: 400, FailureMessage: "Malformed request"); }
                 if (parsed.Status == HttpParseStatus.Request)
                 {
@@ -130,8 +164,19 @@ public sealed class LocalMcpServer : IAsyncDisposable
                     await stream.WriteAsync(response, cancellationToken).ConfigureAwait(false);
                     return;
                 }
+                var readTimeout = _limits.ReadIdleTimeout;
+                if (!headerComplete)
+                {
+                    var remainingHeader = _limits.HeaderReadTimeout - Stopwatch.GetElapsedTime(headerStartedAt);
+                    if (remainingHeader <= TimeSpan.Zero) return;
+                    if (remainingHeader < readTimeout) readTimeout = remainingHeader;
+                }
+
+                using var readCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                readCts.CancelAfter(readTimeout);
                 int read;
-                try { read = await stream.ReadAsync(readBuffer, cancellationToken).ConfigureAwait(false); }
+                try { read = await stream.ReadAsync(readBuffer, readCts.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { return; }
                 catch (OperationCanceledException) { return; }
                 if (read <= 0) return;
                 buffer.Write(readBuffer, 0, read);

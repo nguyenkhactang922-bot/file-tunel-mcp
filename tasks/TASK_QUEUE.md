@@ -1,4 +1,7 @@
-# TASK QUEUE - FileMCP Observability V1
+# TASK QUEUE - FileMCP Observability V1 (historical completed queue)
+
+This queue is retained as implementation history. All tasks listed here are complete.
+Current final-product work is tracked in `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`.
 
 | ID | State | Depends | Acceptance |
 |---|---|---|---|
@@ -15,6 +18,4 @@
 | OBS-010 | PASS | OBS-008,OBS-009 | period controls/session detail/exact-chat feature gate |
 | OBS-011 | PASS | OBS-010 | bounded realtime graph + measurable health |
 | OBS-012 | PASS | OBS-011 | privacy/concurrency/corruption/migration/security regression |
-| OBS-013 | PASS | OBS-012,V11-008 | live ChatGPT connector correlation proof, then final acceptance |
-
-NEXT_EXACT_ACTION: CLAIM V11-009 for final review, package gate, PR/merge, main verification and release closure.
+| OBS-013 | PASS | OBS-012,V11-008 | live ChatGPT connector correlation proof |

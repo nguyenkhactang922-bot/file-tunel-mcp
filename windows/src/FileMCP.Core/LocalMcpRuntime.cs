@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -44,7 +45,8 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         string Executable,
         string[] Arguments,
         IReadOnlyDictionary<string, string> Environment,
-        string[] Sensitive);
+        string[] Sensitive,
+        string HealthUrlFilePath);
 
     private readonly SemaphoreSlim _serial = new(1, 1);
     private readonly object _stateGate = new();
@@ -58,6 +60,7 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
     private readonly Func<double> _jitter;
     private readonly SemaphoreSlim _healthProbeGate = new(1, 1);
     private string? _configuredHealthAddress;
+    private string? _resolvedHealthAddress;
     private bool _localServerReady;
     private bool _tunnelProcessRunning;
     private TunnelHealthProbeState _tunnelHealth = TunnelHealthProbeState.NotConfigured;
@@ -190,22 +193,34 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         try
         {
             string? address;
+            string? resolvedAddress;
+            string? healthUrlFilePath;
             bool processRunning;
             lock (_stateGate)
             {
                 address = _configuredHealthAddress;
+                resolvedAddress = _resolvedHealthAddress;
+                healthUrlFilePath = _tunnelLaunch?.HealthUrlFilePath;
                 processRunning = _tunnelProcessRunning;
             }
 
             var now = _clock().ToUniversalTime();
             if (!TryParseProbeEndpoint(address, out var host, out var port))
             {
-                lock (_stateGate)
+                if (!TryParseProbeEndpoint(resolvedAddress, out host, out port))
                 {
-                    _tunnelHealth = TunnelHealthProbeState.NotConfigured;
-                    _lastTunnelHealthCheckUtc = now;
+                    if (!TryReadResolvedHealthEndpoint(healthUrlFilePath, out var discoveredAddress, out host, out port))
+                    {
+                        lock (_stateGate)
+                        {
+                            _tunnelHealth = TunnelHealthProbeState.NotConfigured;
+                            _lastTunnelHealthCheckUtc = now;
+                        }
+                        return HealthSnapshot;
+                    }
+
+                    lock (_stateGate) _resolvedHealthAddress = discoveredAddress;
                 }
-                return HealthSnapshot;
             }
 
             if (!processRunning)
@@ -312,11 +327,13 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
                 cancellationToken.ThrowIfCancellationRequested();
                 RequireSuccess(doctorResult, "tunnel-client doctor", sensitive);
 
+                var healthUrlFilePath = Path.Combine(profileDirectory, configuration.Profile + ".health-url");
                 _tunnelLaunch = new TunnelLaunchContext(
                     tunnelClient,
-                    ["run", "--profile", configuration.Profile, "--profile-dir", profileDirectory, "--health-listen-addr", healthAddress],
+                    ["run", "--profile", configuration.Profile, "--profile-dir", profileDirectory, "--health-listen-addr", healthAddress, "--health.url-file", healthUrlFilePath],
                     environment,
-                    sensitive);
+                    sensitive,
+                    healthUrlFilePath);
                 StartTunnelProcessUnsafe(_tunnelLaunch, countAsRestart: false);
                 SetState(LocalMcpRuntimeState.Running);
                 EmitLog($"[Runtime] OpenAI Secure MCP Tunnel started. Command execution: {(configuration.EnableCommands ? "enabled" : "disabled")}.\n");
@@ -393,10 +410,18 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
             lock (_stateGate)
             {
                 _tunnelProcessRunning = false;
-                if (TryParseProbeEndpoint(_configuredHealthAddress, out _, out _))
+                var hadProbeEndpoint =
+                    TryParseProbeEndpoint(_configuredHealthAddress, out _, out _) ||
+                    TryParseProbeEndpoint(_resolvedHealthAddress, out _, out _);
+                _resolvedHealthAddress = null;
+                if (hadProbeEndpoint)
                 {
                     _tunnelHealth = TunnelHealthProbeState.Unreachable;
                     _lastTunnelHealthCheckUtc = now;
+                }
+                else
+                {
+                    _tunnelHealth = TunnelHealthProbeState.NotConfigured;
                 }
             }
             RecordTunnelExitUnsafe(now, exitCode);
@@ -508,6 +533,7 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
 
     private void StartTunnelProcessUnsafe(TunnelLaunchContext launch, bool countAsRestart)
     {
+        PrepareHealthUrlFileForLaunch(launch.HealthUrlFilePath);
         var generation = ++_tunnelGeneration;
         _tunnelProcess = ProcessRunner.StartManaged(
             launch.Executable,
@@ -522,6 +548,7 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         {
             _lastTunnelStartedUtc = now;
             _tunnelProcessRunning = true;
+            _resolvedHealthAddress = null;
             _tunnelHealth = TryParseProbeEndpoint(_configuredHealthAddress, out _, out _)
                 ? TunnelHealthProbeState.Unknown
                 : TunnelHealthProbeState.NotConfigured;
@@ -610,6 +637,7 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
     private void CleanupRuntime()
     {
         _tunnelGeneration++;
+        var healthUrlFilePath = _tunnelLaunch?.HealthUrlFilePath;
         _server?.Stop();
         _server = null;
         _tunnelProcess?.Dispose();
@@ -618,10 +646,12 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         _profileLock = null;
         _tunnelLaunch = null;
         _tunnelStartedUtc = null;
+        BestEffortDeleteHealthUrlFile(healthUrlFilePath);
         lock (_stateGate)
         {
             _localServerReady = false;
             _tunnelProcessRunning = false;
+            _resolvedHealthAddress = null;
             _tunnelHealth = TryParseProbeEndpoint(_configuredHealthAddress, out _, out _)
                 ? TunnelHealthProbeState.Unknown
                 : TunnelHealthProbeState.NotConfigured;
@@ -633,11 +663,88 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         lock (_stateGate)
         {
             _configuredHealthAddress = healthAddress;
+            _resolvedHealthAddress = null;
             _tunnelHealth = TryParseProbeEndpoint(healthAddress, out _, out _)
                 ? TunnelHealthProbeState.Unknown
                 : TunnelHealthProbeState.NotConfigured;
             _lastTunnelHealthCheckUtc = null;
             _lastTunnelHealthSuccessUtc = null;
+        }
+    }
+
+    private void PrepareHealthUrlFileForLaunch(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new FileMcpException("Could not prepare the tunnel health discovery file.");
+        }
+
+        lock (_stateGate)
+        {
+            _resolvedHealthAddress = null;
+            _tunnelHealth = TryParseProbeEndpoint(_configuredHealthAddress, out _, out _)
+                ? TunnelHealthProbeState.Unknown
+                : TunnelHealthProbeState.NotConfigured;
+        }
+    }
+
+    private static void BestEffortDeleteHealthUrlFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try { if (File.Exists(path)) File.Delete(path); } catch { }
+    }
+
+    internal static bool TryReadResolvedHealthEndpoint(string? path, out string normalizedAddress, out string host, out int port)
+    {
+        normalizedAddress = "";
+        host = "";
+        port = 0;
+        if (string.IsNullOrWhiteSpace(path)) return false;
+
+        try
+        {
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length is <= 0 or > 512) return false;
+            if ((info.Attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0) return false;
+            var bytes = File.ReadAllBytes(path);
+            if (bytes.Length is <= 0 or > 512) return false;
+            var text = new UTF8Encoding(false, true).GetString(bytes).Trim();
+            if (!Uri.TryCreate(text, UriKind.Absolute, out var uri)) return false;
+            if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment)) return false;
+            if (uri.AbsolutePath is not ("" or "/")) return false;
+
+            var rawHost = uri.Host.Trim('[', ']').ToLowerInvariant();
+            string resolvedHost;
+            if (uri.HostNameType == UriHostNameType.IPv6)
+            {
+                if (!IPAddress.TryParse(rawHost, out var ipv6) || !IPAddress.IsLoopback(ipv6)) return false;
+                resolvedHost = "::1";
+            }
+            else
+            {
+                if (rawHost is not ("localhost" or "127.0.0.1")) return false;
+                resolvedHost = rawHost;
+            }
+
+            var authority = uri.Authority;
+            var hasExplicitPort = uri.HostNameType == UriHostNameType.IPv6
+                ? authority.LastIndexOf("]:", StringComparison.Ordinal) >= 0
+                : authority.LastIndexOf(':') > 0;
+            if (!hasExplicitPort || uri.Port is <= 0 or > 65535) return false;
+
+            host = resolvedHost;
+            port = uri.Port;
+            normalizedAddress = resolvedHost == "::1" ? $"[::1]:{port}" : $"{resolvedHost}:{port}";
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException or UriFormatException)
+        {
+            return false;
         }
     }
 

@@ -381,7 +381,7 @@ public partial class MainWindow : Window
     {
         TunnelHealthProbeState.Reachable => "reachable",
         TunnelHealthProbeState.Unreachable => "unreachable",
-        TunnelHealthProbeState.NotConfigured => "dynamic/not probed",
+        TunnelHealthProbeState.NotConfigured => "dynamic/pending",
         _ => "unknown",
     };
 
@@ -1098,6 +1098,24 @@ public partial class MainWindow : Window
         Activate();
         Topmost = true;
         Topmost = false;
+    }
+
+    internal void ActivateFromSecondaryLaunch()
+    {
+        ShowFromTray();
+
+        var markerPath = Environment.GetEnvironmentVariable("FILEMCP_SINGLE_INSTANCE_SMOKE_MARKER");
+        if (string.IsNullOrWhiteSpace(markerPath)) return;
+        try
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(markerPath));
+            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+            File.WriteAllText(markerPath, $"PASS pid={Environment.ProcessId}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[Desktop] Could not write single-instance smoke marker: {ex.Message}\n");
+        }
     }
 
     public void ShutdownForSystemSession()
