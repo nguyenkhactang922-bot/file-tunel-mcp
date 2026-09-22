@@ -19,3 +19,7 @@ Important truth constraint discovered during discussion:
 
 Audit-side discovery, not yet coded:
 - SafePathResolver currently mishandles a drive root such as D:\ when testing descendants because it appends an extra directory separator in the containment prefix. Root list works, nested file-tool paths can be rejected as outside. This is a P0 prerequisite task after design freeze.
+
+## 2026-09-22 — Post-V1 OSS strengthening audit
+
+After Observability V1 code/package completion, audit mature open-source implementations for stronger equivalents before declaring the architecture finished forever. Selected candidate upgrades for V1.1: bounded logical-session/correlation lifetime, automatic retention maintenance, 24/7 tunnel supervision/backoff, optional OpenTelemetry/MCP trace interoperability, cardinality/privacy guards and component health. Full gateway/proxy features and chart-library replacement are intentionally out of scope.
