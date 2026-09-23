@@ -384,12 +384,189 @@ Every candidate subsystem must be summarized using this exact logical structure:
 **Migration/compatibility cost:**
 **FileMCP equivalent today:**
 **Gap in FileMCP:**
-**Adopt / Adapt / Defer / Reject:**
+**Primary final action (KEEP / KEEP + HARDEN / ADAPT / REPLACE / ADD / DEPRECATE / REMOVE / DEFER / REJECT):**
 **Prerequisites:**
 **Required FileMCP test evidence:**
 **Open questions:**
 
 A capability cannot enter the final architecture without a completed card.
+
+---
+
+# 6A. FILEMCP FUNCTION / SUBSYSTEM UPGRADE MATRIX - MANDATORY
+
+This final audit must not stop at architecture-level conclusions.
+
+It must audit the actual FileMCP functions/subsystems that are running in the current repository and decide, for each meaningful capability, whether the current implementation should be preserved, strengthened, adapted, replaced, supplemented, deprecated, removed, deferred or explicitly rejected.
+
+## 6A.1 Exact-current-source rule
+
+Every FileMCP row must be derived from the exact current FileMCP source resolved during ROUND 0.
+
+Do not use remembered behavior from an earlier FileMCP revision.
+
+For each function/subsystem record at minimum:
+
+- FileMCP capability name;
+- exact Windows source file/class/method when applicable;
+- exact macOS source file/type/function when applicable;
+- MCP tool/schema entry points when applicable;
+- current behavior;
+- current strengths;
+- current weaknesses / missing guarantees;
+- current security boundary;
+- current performance/resource characteristics;
+- current cross-platform parity state;
+- current tests/evidence;
+- stronger or alternative reference implementations found in R1-R6;
+- whether the reference actually solves the same problem;
+- migration and compatibility cost;
+- required negative tests;
+- final upgrade action.
+
+## 6A.2 Allowed final upgrade actions
+
+Every audited FileMCP capability must end in exactly one primary action:
+
+| Action | Meaning |
+|---|---|
+| KEEP | Current FileMCP implementation is already the correct architecture; preserve it as-is except ordinary maintenance. |
+| KEEP + HARDEN | Preserve the implementation and contract, but add missing safety, evidence, performance or parity guarantees. |
+| ADAPT | Reuse the existing FileMCP subsystem as the base and import selected ideas/contracts from references. |
+| REPLACE | Current implementation is materially weaker or structurally wrong; introduce a stronger replacement with migration/compatibility plan. |
+| ADD | Capability does not currently exist and should be added as a new subsystem/tool. |
+| DEPRECATE | Keep temporarily for compatibility while a stronger path becomes preferred. |
+| REMOVE | Capability should be removed because it is redundant, unsafe or conflicts with the final architecture. |
+| DEFER | Useful, but dependencies/evidence/product need do not justify implementation in the current upgrade wave. |
+| REJECT | Explicitly unsuitable for FileMCP even if reference repositories implement it. |
+
+Secondary notes may be attached, but the primary action must be unambiguous.
+
+## 6A.3 Replacement rule
+
+A reference implementation may replace a FileMCP capability only when the audit proves all of the following:
+
+1. the current FileMCP capability has a concrete weakness, not merely a stylistic difference;
+2. the proposed replacement solves that weakness in shipped source, not only documentation;
+3. the replacement does not weaken FileMCP security/privacy invariants;
+4. Windows and macOS feasibility is designed;
+5. migration/compatibility behavior is explicit;
+6. rollback is possible or the irreversible trade-off is explicitly accepted;
+7. acceptance and negative tests are defined;
+8. the replacement does not create a larger unnecessary product surface.
+
+If those conditions are not met, prefer KEEP + HARDEN or ADAPT over REPLACE.
+
+## 6A.4 Add-new-function rule
+
+A new function/subsystem may be added only when:
+
+- no existing FileMCP capability already solves the need adequately;
+- the capability closes a source-verified gap;
+- its authority/trust boundary is explicit;
+- persistence/privacy impact is explicit;
+- Windows/macOS scope is explicit;
+- dependency position in the master task graph is explicit;
+- it has measurable acceptance evidence.
+
+Do not add a feature simply because another repository has it.
+
+## 6A.5 Function-level comparison schema
+
+The final audit must produce a matrix with at least these columns:
+
+| FileMCP current capability | Exact source | Current strength | Current weakness | Best external reference(s) | Reference evidence class | Gap type | Final action | Target design | Migration / compatibility | Required evidence |
+|---|---|---|---|---|---|---|---|---|---|---|
+
+Representative categories that must be covered include, at minimum:
+
+- tool catalog / schema generation;
+- LocalMcpServer request handling;
+- local authentication;
+- Secure MCP Tunnel integration;
+- SafePathResolver / path containment;
+- read_file / read_file_range;
+- search_content / search_filenames;
+- write_file;
+- delete_file / delete_directory;
+- process runner;
+- run_command;
+- Git discovery / status / diff / add / commit / push;
+- Git safe mode;
+- Codex skill discovery/loading;
+- observability correlation;
+- telemetry persistence;
+- runtime/tunnel supervision;
+- Windows/macOS parity tests;
+- release/build verification contracts.
+
+The audit must also add rows for capabilities that do not exist in FileMCP today but are serious candidates, such as:
+
+- canonical catalog hash/version;
+- structured exec_process;
+- structured result/evidence envelope;
+- file version token;
+- expected-version mutation;
+- atomic apply_edits;
+- shared budget/cursor contract;
+- project-context digest;
+- repository symbol map/index if justified;
+- checkpoint/recovery layer if justified;
+- policy profiles;
+- PTY if justified;
+- local task/sub-agent runtime only if the final architecture approves it.
+
+## 6A.6 Strong-current-function protection
+
+When FileMCP is stronger than the references, the matrix must say so explicitly.
+
+Examples may include, subject to actual source verification:
+
+- shared-root containment;
+- Windows reparse/junction defenses;
+- Git safe-mode constraints;
+- loopback + runtime local-auth boundary;
+- OpenAI Secure MCP Tunnel integration;
+- privacy-minimal observability.
+
+Such capabilities should normally become KEEP or KEEP + HARDEN, not be replaced merely for architectural uniformity with another repository.
+
+## 6A.7 Weak-current-function replacement proof
+
+When FileMCP is weaker, the audit must show:
+
+current source -> exact weakness -> reference source -> stronger property -> target FileMCP contract -> migration -> tests.
+
+Example logical shape only:
+
+run_command
+-> flexible but shell-string-facing
+-> underlying ProcessRunner already executable + argv
+-> ChatCMD/Codex structured execution provides a stronger MCP boundary
+-> KEEP ProcessRunner
+-> KEEP run_command for compatibility
+-> ADD exec_process as preferred structured primitive
+-> DEPRECATE nothing until usage evidence supports it.
+
+This example is not pre-approved as the final decision; the final audit must revalidate it against exact current source.
+
+## 6A.8 Mandatory final artifact
+
+The audit must produce:
+
+`docs/design/FINAL_FILEMCP_FUNCTION_UPGRADE_MATRIX.md`
+
+This file is a release gate for the final architecture. It must contain every meaningful FileMCP capability audited and every approved new capability.
+
+No MASTER FINAL architecture may be frozen while this matrix contains:
+
+- UNKNOWN;
+- TBD;
+- unmapped exact source;
+- unresolved cross-platform feasibility;
+- unresolved replacement migration;
+- unresolved security/privacy impact;
+- unresolved acceptance evidence.
 
 ---
 
@@ -404,6 +581,7 @@ Before comparing external repositories:
 2. read AGENTS.md, execution law, current handoff, project state, ADR-0004, ChatCMD source mapping, decision matrix and candidate task queue;
 3. enumerate actual tool schemas on Windows and macOS;
 4. map current process, file, Git, tunnel, telemetry and skill subsystems.
+5. enumerate meaningful current FileMCP functions/subsystems into the function-upgrade inventory required by Section 6A.
 
 Output: **FILEMCP_BASELINE_TRUTH**
 
@@ -841,6 +1019,8 @@ Required topics:
 - privacy;
 - cross-platform strategy.
 
+Before selecting the final FileMCP decision for each topic, update the Section 6A function/subsystem matrix so the architecture conclusion is traceable to the actual current FileMCP implementation.
+
 Where approaches conflict, explain:
 what each optimizes → what FileMCP optimizes → trade-off → chosen design → accepted failure mode → prevented failure mode.
 
@@ -925,6 +1105,7 @@ The audit is incomplete until each has an explicit answer:
 18. Does FileMCP need local sub-agents?
 19. Should FileMCP compose external MCP servers or coexist beside them?
 20. What is the Windows/macOS parity rule for every new common capability?
+21. For every meaningful current FileMCP function/subsystem, is the final action KEEP, KEEP + HARDEN, ADAPT, REPLACE, ADD, DEPRECATE, REMOVE, DEFER or REJECT, and what exact source/evidence justifies it?
 
 ---
 
@@ -934,6 +1115,7 @@ Executing this spec must ultimately produce:
 
 - `docs/audit/FINAL_CROSS_REPO_CODING_AGENT_ARCHITECTURE_AUDIT.md`
 - `docs/design/CROSS_REPO_CAPABILITY_AND_CONTRADICTION_MATRIX.md`
+- `docs/design/FINAL_FILEMCP_FUNCTION_UPGRADE_MATRIX.md`
 - `docs/design/FINAL_SECURITY_TRUST_BOUNDARY_MODEL.md`
 - `docs/design/FINAL_EXECUTION_EDITING_EVIDENCE_MODEL.md`
 - `docs/design/FINAL_LARGE_REPO_CONTEXT_ARCHITECTURE.md`
@@ -962,6 +1144,7 @@ The final architecture may be marked **FROZEN** only when all conditions below a
 - [ ] Every major claim pinned to exact source SHA.
 - [ ] Docs-only/proposal claims separated from shipped code.
 - [ ] Contradiction matrix complete.
+- [ ] FINAL_FILEMCP_FUNCTION_UPGRADE_MATRIX complete with every meaningful current capability mapped to exact source and one final action.
 - [ ] Security trust-boundary audit complete.
 - [ ] Sandbox-vs-host decision complete.
 - [ ] Process execution contract frozen.
