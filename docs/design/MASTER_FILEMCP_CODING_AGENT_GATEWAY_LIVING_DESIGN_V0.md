@@ -121,7 +121,7 @@ After every deep-dive subsystem audit:
 - current FileMCP source baseline mapped: IN PROGRESS.
 - ChatCMD deep audit: COMPLETE baseline, must be revalidated against final comparisons.
 - Codex audit: COMPLETE - source audit at docs/audit/CODEX_SOURCE_AUDIT_2026-09-23.md.
-- OpenHands audit: PENDING.
+- OpenHands audit: COMPLETE - exact runtime source at software-agent-sdk v1.49.4 / e7cc8c27; see docs/audit/OPENHANDS_SOURCE_AUDIT_2026-09-23.md.
 - Aider audit: PENDING.
 - Cline audit: PENDING.
 - Goose audit: PENDING.
@@ -147,3 +147,81 @@ Pinned source: openai/codex@cb1eea3e98ebc433ab5f9c12ce043e979d1902df
 6. Broad local thread/rollout persistence is rejected. A much smaller metadata-only checkpoint layer stays OPEN pending Cline/OpenHands.
 
 Open after Codex: optional isolation model; repository symbol map; minimal checkpoint/recovery; PTY timing; external MCP composition; local task/sub-agent runtime.
+## Cross-repo synthesis update R3
+
+Evidence inputs now include independent audits of ChatCMD, Codex, OpenHands runtime/SDK, Aider, Cline and Goose.
+
+### Decisions that have converged
+
+- **Transport/auth:** KEEP FileMCP loopback + runtime token + Secure MCP Tunnel. Public bearer-token MCP URLs and browser DOM automation remain rejected.
+- **Path/Git safety:** KEEP + HARDEN. Existing SafePathResolver/Git safe mode remain stronger product-fit controls than generic alternatives. Add a mutation-time path/identity revalidation guard for write/delete race safety.
+- **Catalog:** ADD a language-neutral canonical manifest with protocol/catalog/instruction hashes and capability/risk metadata. Runtime policy remains authoritative; catalog metadata never grants permission.
+- **Execution:** KEEP native ProcessRunner; ADD structured `exec_process`; KEEP `run_command` as explicit high-risk shell compatibility. The first implementation may call existing runners directly; a multi-backend execution abstraction is deferred until a second backend is actually approved.
+- **Isolation:** host-native execution remains default. Optional OS/container isolation is a source-backed future hardening mode, not a Phase A dependency and not a replacement for policy/Git/path controls.
+- **Environment:** new structured exec must use a sanitized baseline plus explicit overrides/allow rules rather than automatically inheriting the full FileMCP host environment.
+- **Filesystem concurrency:** ADD authenticated/opaque version identity, expected-version mutation, commit-time Mutation Guard and atomic `apply_edits`. Model-friendly patch/search-replace formats may be adapters later, not the storage authority.
+- **Traversal:** KEEP current simple list/search/read behavior as baseline but ADD shared budgets, signed/bound cursors where continuation is exposed, explicit usage/truncation and cooperative cancellation inside traversal loops.
+- **Evidence:** ADD a metadata-only evidence/freshness layer separate from observability. Persist operation state and opaque digests only; never raw prompt/tool args/commands/file content/Git messages/secrets.
+- **Project context:** ADD bounded instruction discovery/provenance/digest. Repository instructions never grant authority.
+- **Repository intelligence:** ADD an optional/on-demand structural symbol-map architecture slot after Phase A/profile proof; keep cache rebuildable and separate from observability. Do not persist full source as an index.
+- **Checkpoint:** DEFER. Git, checkpoint, task state, evidence and observability remain distinct. Any future destructive workspace restore requires a separate transaction/recovery design/ADR.
+- **PTY:** DEFER. It is useful for interactive workflows but not a prerequisite for deterministic build/test evidence.
+- **MCP composition:** REJECT from FileMCP core. FileMCP should coexist with other MCP servers rather than becoming an MCP-of-MCP secret/provider manager.
+- **Local task engine/sub-agents:** REJECT from FileMCP core under the current product law. ChatGPT remains the orchestration layer; adding local agents would redefine the product and requires a future product ADR.
+
+### New architecture invariant discovered after R2
+
+A mutation is authorized only if **both** are still true at commit time:
+
+1. the expected file/version identity still matches; and
+2. the canonical/no-follow path authority still resolves to the same authorized object/ancestor chain.
+
+This `Version + Mutation Guard` conjunction is now stronger than ADR-0004's original version-token-only wording.
+
+### Architecture slots still deliberately deferred rather than unknown
+
+- optional isolated execution backend;
+- persistent PTY;
+- ephemeral large-output artifact spillover;
+- repository intelligence implementation after benchmark/profile gate;
+- checkpoint capture/restore under a separate ADR if later justified.
+
+These are deliberate DEFER decisions, not unresolved blockers for Phase A architecture freeze.
+
+## OpenHands R3 architecture update
+
+OpenHands resolves the isolation question for the current architecture.
+
+### Phase A execution topology
+
+FileMCP remains **host-native by default**. Existing shared-root/Git/process containment stays mandatory, and the new structured execution/policy layers are built on top of the native ProcessRunner. Docker is not introduced as a normal prerequisite.
+
+### Reserved future seam
+
+The final architecture may reserve an execution-backend seam, but no generic backend abstraction is required before a second backend is actually approved. A later isolated backend may be added without changing MCP tool semantics if it satisfies hardened runtime requirements.
+
+### Minimum isolated-backend contract if later approved
+
+- per-runtime identity/credentials;
+- explicit workspace/persistence mounts only;
+- reparse/symlink-safe host containment;
+- non-root execution;
+- dropped capabilities and no-new-privileges;
+- loopback-only control plane;
+- CPU/memory/PID caps;
+- sanitized environment and explicit secret mediation;
+- image pin/provenance;
+- explicit outbound-network policy;
+- health/start/stop/restart/cleanup evidence;
+- execution result records backend identity.
+
+### Rejected from current core
+
+OpenHands-style event-sourced conversation runtime and local subagent/task engine are rejected from FileMCP core. FileMCP remains a narrow execution gateway; ChatGPT Web remains the coding/orchestration agent.
+
+### Still open after OpenHands
+
+- minimal metadata-only checkpoint/recovery (Cline decides);
+- large-repository intelligence (Aider decides);
+- external MCP/tool composition (Goose decides);
+- persistent PTY timing remains Phase B.

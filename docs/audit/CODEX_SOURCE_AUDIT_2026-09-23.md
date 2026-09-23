@@ -25,10 +25,10 @@ FileMCP should combine selected properties without becoming either product.
 
 ## Capability card CDX-01 - Filesystem/network sandbox policy
 
-**Capability:** explicit sandbox and permission profile model  
-**Reference repo:** OpenAI Codex  
-**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df  
-**Evidence classification:** S1 - SHIPPED + SOURCE + TEST  
+**Capability:** explicit sandbox and permission profile model
+**Reference repo:** OpenAI Codex
+**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df
+**Evidence classification:** S1 - SHIPPED + SOURCE + TEST
 **Source paths:**
 - codex-rs/protocol/src/protocol.rs
 - codex-rs/core/src/tools/sandboxing.rs
@@ -77,10 +77,10 @@ FileMCP should combine selected properties without becoming either product.
 
 ## Capability card CDX-02 - Approval and escalation policy
 
-**Capability:** server-owned approval requirement and escalation control  
-**Reference repo:** OpenAI Codex  
-**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df  
-**Evidence classification:** S1  
+**Capability:** server-owned approval requirement and escalation control
+**Reference repo:** OpenAI Codex
+**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df
+**Evidence classification:** S1
 **Source paths:**
 - codex-rs/protocol/src/protocol.rs
 - codex-rs/core/src/tools/sandboxing.rs
@@ -126,10 +126,10 @@ FileMCP should combine selected properties without becoming either product.
 
 ## Capability card CDX-03 - Unified execution lifecycle
 
-**Capability:** bounded process lifecycle with structured internal argv, cancellation, timeout and optional resumable process state  
-**Reference repo:** OpenAI Codex  
-**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df  
-**Evidence classification:** S1  
+**Capability:** bounded process lifecycle with structured internal argv, cancellation, timeout and optional resumable process state
+**Reference repo:** OpenAI Codex
+**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df
+**Evidence classification:** S1
 **Source paths:**
 - codex-rs/core/src/unified_exec/mod.rs
 - codex-rs/core/src/unified_exec/oneshot.rs
@@ -175,10 +175,10 @@ FileMCP should combine selected properties without becoming either product.
 
 ## Capability card CDX-04 - apply_patch engine
 
-**Capability:** model-oriented multi-hunk patch parser and mutation engine  
-**Reference repo:** OpenAI Codex  
-**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df  
-**Evidence classification:** S1  
+**Capability:** model-oriented multi-hunk patch parser and mutation engine
+**Reference repo:** OpenAI Codex
+**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df
+**Evidence classification:** S1
 **Source paths:**
 - codex-rs/apply-patch/src/lib.rs
 - codex-rs/apply-patch/src/parser.rs
@@ -222,10 +222,10 @@ FileMCP should combine selected properties without becoming either product.
 
 ## Capability card CDX-05 - Project instruction discovery and provenance
 
-**Capability:** hierarchical AGENTS.md discovery with provenance and byte budget  
-**Reference repo:** OpenAI Codex  
-**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df  
-**Evidence classification:** S1  
+**Capability:** hierarchical AGENTS.md discovery with provenance and byte budget
+**Reference repo:** OpenAI Codex
+**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df
+**Evidence classification:** S1
 **Source paths:**
 - codex-rs/core/src/agents_md.rs
 - codex-rs/core/src/agents_md_tests.rs
@@ -271,10 +271,10 @@ FileMCP should combine selected properties without becoming either product.
 
 ## Capability card CDX-06 - Session/rollout persistence and resume
 
-**Capability:** durable conversation/thread history, rollouts, cold resume and recovery  
-**Reference repo:** OpenAI Codex  
-**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df  
-**Evidence classification:** S1  
+**Capability:** durable conversation/thread history, rollouts, cold resume and recovery
+**Reference repo:** OpenAI Codex
+**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df
+**Evidence classification:** S1
 **Source paths:**
 - codex-rs/app-server/tests/suite/v2/thread_resume.rs
 - codex-rs/app-server-daemon/src/thread_recovery.rs
@@ -317,10 +317,10 @@ FileMCP should combine selected properties without becoming either product.
 
 ## Capability card CDX-07 - Immutable MCP permission authority
 
-**Capability:** MCP tool metadata/capabilities are descriptive while permission authority is captured server-side  
-**Reference repo:** OpenAI Codex  
-**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df  
-**Evidence classification:** S1  
+**Capability:** MCP tool metadata/capabilities are descriptive while permission authority is captured server-side
+**Reference repo:** OpenAI Codex
+**Pinned SHA:** cb1eea3e98ebc433ab5f9c12ce043e979d1902df
+**Evidence classification:** S1
 **Source paths:**
 - codex-rs/codex-mcp/src/binding.rs
 - codex-rs/codex-mcp/src/trusted_access.rs
