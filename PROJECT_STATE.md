@@ -36,35 +36,22 @@ Whole-repository technical remediation: COMPLETE.
 
 ## FPA-004
 
-State: EXTERNAL-BLOCKED.
+State: OUT-OF-SCOPE BY PRODUCT AUTHORITY for the current release target.
 
-Default-branch registration is complete.
-Production Release workflow is active on fork main.
-production-release Environment exists and is main-only.
-Real boundary run 35762454809 proved all jobs reach the intended credential gate.
+ADR: `docs/adr/0003-unsigned-distribution-scope.md`.
+Evidence: `docs/evidence/FPA-004_SCOPE_DECISION_EVIDENCE.md`.
 
-Current Environment secret-name readiness: 0/7. Fail-fast Production Release run 35764732944 correctly failed in release-preflight and skipped all three platform release jobs. Preflight implementation Verify run 35764406983 succeeded on macOS, Windows x64 and Windows ARM64.
+Current distribution target is unsigned developer/internal/direct-use distribution. Public-market signed/notarized distribution is not part of current acceptance. Existing signing/notarization plumbing remains verified and preserved as an optional future capability. No claim is made that current artifacts are signed/notarized.
 
-Remaining acceptance requires real public release identity material and one successful Production Release run producing:
-- trusted-timestamped Windows x64 Authenticode artifact;
-- trusted-timestamped Windows ARM64 Authenticode artifact;
-- macOS Developer ID signed artifact;
-- Apple notarization Accepted;
-- staple validation PASS;
-- Gatekeeper assessment PASS.
-
-Readiness helper:
-release/check_production_release_readiness.ps1
+If public-market signed distribution is required later, reopen FPA-004-F/G and provide real production identity plus real artifact evidence.
 
 ## V11-009
 
 Technical fork-main verification is complete.
 
-Final V11-009 cannot be marked fully PASS until:
-1. FPA-004 real signed/notarized release evidence exists; and
-2. upstream integration/merge is performed by an account with write/maintain permission, or project authority explicitly designates fork main as the final canonical main.
+Final V11-009 cannot be marked fully PASS until upstream integration/merge is performed by an account with write/maintain permission, or project authority explicitly designates fork main as the final canonical main.
 
 Current authoritative action is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md.
 
 
-Secure provisioning helper: PASS. `release/configure_production_release_secrets.ps1` is PS5.1-compatible, keeps credential files outside the repo, prompts passwords securely, streams values to GitHub Environment secrets through stdin, and runs the readiness checker afterward. Real signing/notarization identity remains external.
+Secure provisioning helper remains PASS and available for a future signed-distribution scope. It is not required for the current unsigned scope.

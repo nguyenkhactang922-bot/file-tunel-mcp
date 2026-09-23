@@ -24,42 +24,17 @@ Latest normal verification:
 - Production signing/notarization plumbing contract: PASS.
 - Production Release workflow: active on fork default branch main.
 
-## FPA-004 current boundary
+## FPA-004 scope decision
 
-FPA-004 state: EXTERNAL-BLOCKED ONLY ON REAL PRODUCTION RELEASE IDENTITY.
+FPA-004 state: OUT-OF-SCOPE BY PRODUCT AUTHORITY for the current release target.
 
-Repository-internal release plumbing is complete and verified:
-- Windows Authenticode signing + timestamp + post-package verification.
-- macOS Developer ID signing + hardened runtime + notarization + staple + Gatekeeper verification.
-- GitHub Environment production-release exists and is restricted to main.
-- Production Release workflow is registered on default branch main.
-- non-secret readiness checker exists at release/check_production_release_readiness.ps1.
+The current product scope does not require Windows Authenticode identity or Apple Developer ID/notarization identity. Unsigned developer/internal/direct-use distribution is accepted. Existing signing/notarization plumbing remains implemented and verified as an optional future capability; no signed/notarized artifact claim is made.
 
-Real Production Release boundary proof:
-- run 35762454809;
-- version 0.4.0;
-- Windows x64 failed only because WINDOWS_CODESIGN_PFX_BASE64 is absent;
-- Windows ARM64 failed only because WINDOWS_CODESIGN_PFX_BASE64 is absent;
-- macOS failed only because MACOS_DEVELOPER_ID_P12_BASE64 is absent.
+Authority/evidence:
+- `docs/adr/0003-unsigned-distribution-scope.md`;
+- `docs/evidence/FPA-004_SCOPE_DECISION_EVIDENCE.md`.
 
-Current readiness result:
-- workflow active: YES;
-- default branch: main;
-- required production Environment secret names present: 0/7;
-- usable local Windows code-signing certificate with private key: none found;
-- fail-fast Production Release run 35764732944: preflight FAILED on 7 missing secret names, all three platform release jobs SKIPPED;
-- preflight implementation Verify run 35764406983: macOS / Windows x64 / Windows ARM64 SUCCESS.
-
-Required real Environment secrets:
-1. WINDOWS_CODESIGN_PFX_BASE64
-2. WINDOWS_CODESIGN_PFX_PASSWORD
-3. MACOS_DEVELOPER_ID_P12_BASE64
-4. MACOS_DEVELOPER_ID_P12_PASSWORD
-5. APPLE_NOTARY_KEY_P8_BASE64
-6. APPLE_NOTARY_KEY_ID
-7. APPLE_NOTARY_ISSUER_ID
-
-Do not mark FPA-004 PASS until a real credentialed Production Release succeeds and final artifacts pass post-package signature/notarization checks.
+If public-market signed distribution is required later, reopen FPA-004-F/G and provide real credentials plus real signed/notarized artifact evidence.
 
 ## GitHub/upstream status
 
@@ -84,10 +59,4 @@ On a new chat:
 
 ## Secure production secret provisioning helper
 
-- Helper: `release/configure_production_release_secrets.ps1`.
-- Credential files must stay outside the repo.
-- Passwords are prompted with SecureString; secret values are streamed to `gh secret set` over stdin and are not printed.
-- Helper contract passes on Windows PowerShell 5.1.
-- Negative safety proof confirms repo-local credential files are rejected before prompting or GitHub mutation.
-- Evidence: `docs/evidence/FPA-004_SECRET_PROVISIONING_HELPER_EVIDENCE.md`.
-- Real release identity is still required; do not paste certificates, private keys, or passwords into chat.
+The helper remains available and verified for a future signed-distribution scope, but production signing credentials are not required by the current unsigned release target.

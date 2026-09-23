@@ -79,7 +79,7 @@ Launch it with:
 open "dist/FileMCP.app"
 ```
 
-The local build is unsigned. Distribution builds should be code-signed and notarized using the normal macOS release process.
+The local build is unsigned. If trusted public-market distribution is required in the future, builds should be code-signed and notarized using the normal macOS release process.
 
 ### Windows
 
@@ -111,7 +111,7 @@ dist/FileMCP-v0.4.0-windows-x64.zip
 dist/FileMCP-v0.4.0-windows-arm64.zip
 ```
 
-The Windows app is self-contained, so end users do not need to install .NET separately. Local builds are unsigned; production distribution should Authenticode-sign the executable/package.
+The Windows app is self-contained, so end users do not need to install .NET separately. Local builds are unsigned; if trusted public-market distribution is required in the future, the executable/package should be Authenticode-signed.
 
 For a development run on Windows:
 
@@ -401,9 +401,9 @@ Platform release builds are intentionally separate because signing/notarization 
 
 ### Production signing / notarization
 
-Ordinary local builds and the Verify workflow intentionally remain unsigned. Public distribution uses the separate manual Production Release workflow in .github/workflows/release.yml and the protected GitHub Environment production-release.
+Ordinary local builds and the Verify workflow intentionally remain unsigned. The current accepted product scope is unsigned developer/internal/direct-use distribution (ADR-0003). The separate manual Production Release workflow in .github/workflows/release.yml and the protected GitHub Environment production-release are retained as an optional future path if trusted public-market distribution is later required.
 
-Configure these Environment secrets before running the production workflow:
+If that optional signed-distribution path is activated, configure these Environment secrets before running the production workflow:
 
 | Platform | Secret | Purpose |
 | --- | --- | --- |
@@ -417,7 +417,7 @@ Configure these Environment secrets before running the production workflow:
 
 The release workflow is workflow_dispatch-only. It materializes credential files only under the ephemeral runner temp directory and cleans them after the job. Windows artifacts are Authenticode signed, RFC3161 timestamped, repackaged, then verified again from inside the ZIP. macOS artifacts are Developer ID signed with the hardened runtime, notarized, stapled, assessed by Gatekeeper, packaged after stapling, then reverified from the final ZIP.
 
-Do not add PFX/P12/P8 files to the repository. A syntactically complete release workflow is not itself proof of public-market signing: FPA-004 is complete only after a real credentialed production-release run succeeds and the uploaded artifacts pass the post-package signature/notarization checks.
+Do not add PFX/P12/P8 files to the repository. For the current unsigned scope, FPA-004 is OUT-OF-SCOPE rather than PASS. If signed public-market distribution is reintroduced, FPA-004 must be reopened and cannot pass until a real credentialed production-release run succeeds and the uploaded artifacts pass the post-package signature/notarization checks.
 
 To provision the seven Environment secrets without pasting private material into chat or command history, keep the PFX/P12/P8 files outside this repository and run:
 

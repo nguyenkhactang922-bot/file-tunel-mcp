@@ -11,3 +11,7 @@
 | FPA-004-G | F | final evidence/state closure | FPA-004 PASS |
 
 If release credentials are unavailable after E, set FPA-004 EXTERNAL-BLOCKED with exact missing secret names and do not claim market-ready.
+
+## Current scope override (2026-09-23)
+
+ADR-0003 removes signed/notarized public-market distribution from the current acceptance target. FPA-004-F/G are deferred and the item is classified OUT-OF-SCOPE rather than PASS. Reopen them if signed public distribution becomes required.

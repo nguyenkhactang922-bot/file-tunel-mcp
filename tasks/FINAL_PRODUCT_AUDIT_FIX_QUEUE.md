@@ -2,14 +2,14 @@
 
 Source audit: `docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`
 
-Status: REMEDIATION EXTERNAL-BLOCKED - FPA-004 REAL RELEASE CREDENTIALS / REAL SIGNED RELEASE RUN
+Status: TECHNICAL REMEDIATION COMPLETE - FPA-004 OUT-OF-SCOPE FOR CURRENT UNSIGNED DISTRIBUTION; V11-009 AWAITS UPSTREAM INTEGRATION
 
 | ID | Severity | State | Depends | Acceptance |
 |---|---|---|---|---|
 | FPA-001 | P1 | PASS | - | GitHub Windows workflow verifies the actual `FileMCP-release` staging path for x64/ARM64; clean workflow path gate passes |
 | FPA-002 | P1 | PASS | - | macOS logical-chat/tool surface matches Windows, or product scope/docs explicitly freeze a Windows-only observability delta |
 | FPA-003 | P1 | PASS | FPA-002 | macOS has bounded tunnel crash restart/backoff/jitter/budget/cooldown parity, or cross-platform tunnel-parity claim is explicitly removed |
-| FPA-004 | P1 market | EXTERNAL-BLOCKED | real release credentials + real signed/notarized release run | production Windows artifacts are Authenticode-signed and macOS artifacts signed/notarized/stapled without secrets in repo/logs |
+| FPA-004 | P1 market | OUT-OF-SCOPE | public-market signed distribution | Current scope explicitly accepts unsigned developer/internal/direct-use distribution; signing/notarization plumbing remains optional future capability |
 | FPA-005 | P2 | PASS | FPA-001 | Windows ARM64 gets native runtime smoke where available, or an explicit architecture-assurance gate and documented limitation |
 | FPA-006 | P2 | PASS | - | handoff/project/task state match real Git HEAD/status and expose exactly one current NEXT_EXACT_ACTION |
 | FPA-007 | P2 | PASS | - | duplicate desktop-process behavior is intentionally supported/documented or app-wide single-instance behavior is implemented/tested |
@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: obtain the real Windows PFX, macOS Developer ID P12 and Apple notarization P8/IDs outside the repo; run release/configure_production_release_secrets.ps1; then dispatch Production Release 0.4.0 and capture signed/notarized artifact evidence.
+AUTHORITATIVE NEXT_EXACT_ACTION: complete upstream PR #2 integration/merge under write/maintain authority; then checkout/pull merged upstream main, rerun final verification on merged main, and close V11-009. If upstream merge remains unavailable, only an explicit separate project-authority decision designating verified fork main as canonical can remove this gate.
 
-Do not resume V11-009 as the only remaining whole-app gate until the P1 product/release scope is resolved.
+FPA-004 product/release scope is resolved by ADR-0003. V11-009 is now the only remaining whole-app gate.
