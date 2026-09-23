@@ -122,9 +122,9 @@ After every deep-dive subsystem audit:
 - ChatCMD deep audit: COMPLETE baseline, must be revalidated against final comparisons.
 - Codex audit: COMPLETE - source audit at docs/audit/CODEX_SOURCE_AUDIT_2026-09-23.md.
 - OpenHands audit: COMPLETE - exact runtime source at software-agent-sdk v1.49.4 / e7cc8c27; see docs/audit/OPENHANDS_SOURCE_AUDIT_2026-09-23.md.
-- Aider audit: PENDING.
-- Cline audit: PENDING.
-- Goose audit: PENDING.
+- Aider audit: COMPLETE - source audit at docs/audit/AIDER_LARGE_REPO_EDITING_AUDIT_2026-09-23.md.
+- Cline audit: COMPLETE - source audit at docs/audit/CLINE_RECOVERY_CHECKPOINT_AUDIT_2026-09-23.md.
+- Goose audit: COMPLETE - source audit at docs/audit/GOOSE_MCP_ORCHESTRATION_AUDIT_2026-09-23.md.
 - independent contradiction/red-team rounds: PENDING.
 - ADR-0005: NOT CREATED.
 - final task graph: NOT CREATED.
@@ -225,3 +225,56 @@ OpenHands-style event-sourced conversation runtime and local subagent/task engin
 - large-repository intelligence (Aider decides);
 - external MCP/tool composition (Goose decides);
 - persistent PTY timing remains Phase B.
+
+## Aider R4 architecture update
+
+Pinned source: Aider-AI/aider@5dc9490bb35f9729ef2c95d00a19ccd30c26339c
+
+Aider confirms that large repositories benefit from structural symbol intelligence, but it should remain an **optional on-demand context service** rather than silently expanding FileMCP into a persistent code-index product.
+
+Final living decision after R4:
+- Phase A project_context: rules/provenance/digest/budget only;
+- Phase B repository intelligence: optional bounded `repo_map` / `symbol_search`;
+- cache is rebuildable performance metadata, separate from telemetry/evidence;
+- no raw full-source persistent index by default;
+- repo-map failure never blocks baseline file/search/edit tools;
+- Aider search/replace/patch formats may later compile into the safer FileMCP versioned edit primitive; they are not the storage/security contract;
+- Aider automatic Git commit workflow is not imported into low-level FileMCP.
+
+## Cline R5 architecture update
+
+Pinned source: cline/cline@9c0e4aaee09f6593eb8d06ec4a35bf19b7dc33f1
+
+Cline closes the recovery question for Phase A. FileMCP does **not** become a durable agent-session product.
+
+Approved now:
+- explicit operation/evidence identity;
+- terminal success/failure/cancel/timeout state;
+- optional metadata-only restart-resumable evidence records;
+- project task state remains repository-owned Markdown under the user's operating law.
+
+Deferred:
+- destructive workspace checkpoint capture/restore; if ever built it receives a separate ADR and transactional Git acceptance suite.
+
+Rejected:
+- prompt/transcript/tool-body persistence for general session resume;
+- a second local task/session authority competing with ChatGPT Web and repo state.
+
+This keeps recovery useful without expanding FileMCP's privacy boundary.
+
+## Goose R6 architecture update
+
+Pinned source: block/goose compatible upstream aaif-goose/goose@e678c3b64a1dfd3c262a6a2019f158d33d5dcab0
+
+Goose reinforces FileMCP's product boundary rather than expanding it.
+
+Approved concept:
+- effective catalog filtering by active server-owned policy, while runtime authorization remains independent and fail-closed.
+
+Rejected from FileMCP core:
+- MCP-of-MCP extension hosting;
+- external provider lifecycle/OAuth/credential management;
+- recipe engine duplication;
+- local subagent/background-agent runtime and its model/session/task persistence.
+
+FileMCP remains a hardened local execution bridge. ChatGPT or a separate future gateway composes other MCP servers/agents.

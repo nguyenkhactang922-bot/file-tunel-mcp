@@ -31,7 +31,7 @@ This matrix is deliberately preliminary. Actions can change after cross-repo aud
 | apply_edits | absent | - | range edits/expected version missing | ADD candidate | Codex apply_patch S1 is rich but explicitly permits partial side effects; do not use it as atomic/versioned replacement |
 | shared budget/cursor | partial fixed caps only | current caps protect runtime | no common resumable contract | ADAPT/ADD candidate | ChatCMD large-repo audit |
 | repository symbol map/index | absent | no persistence complexity today | large-repo context may be weak | OPEN | Aider deep audit + profiling |
-| checkpoint/recovery layer | no dedicated subsystem | Git + state files remain simple | crash/resume metadata semantics not formalized | OPEN minimal metadata only; broad event persistence REJECTED | Codex/OpenHands both prove broad session persistence is product-heavy; Cline decides minimal checkpoint |
+| checkpoint/recovery layer | no dedicated subsystem | Git + repo state remain simple | workspace rollback/session resume not owned | DEFER workspace checkpoint; ADD metadata-only restart-resumable evidence | Cline S1 proves transactional complexity and broad transcript persistence cost |
 | policy profiles | coarse EnableCommands + hard safety checks | simple and fail-closed in safe mode | no risk-class profile model | ADAPT candidate - strengthened by Codex | Codex S1 approval/sandbox tests require no self-elevation and separate FS/network authority |
 | persistent PTY | absent MCP-facing | avoids state complexity today | interactive workflows unsupported | DEFER Phase B | Codex + OpenHands S1 validate use case; not Phase A dependency |
 | local task/sub-agent runtime | absent | ChatGPT remains orchestrator; privacy simple | may limit local orchestration | REJECT/DEFER pending audit | Goose/ChatCMD/OpenHands comparison |
@@ -94,3 +94,43 @@ Material decisions:
 - persistent PTY remains Phase B;
 - broad event-sourced conversation persistence is REJECTED; only privacy-minimal checkpoint metadata remains OPEN pending Cline;
 - local task/subagent runtime is REJECTED from FileMCP core/Phase A because ChatGPT Web remains the orchestrator; a future task engine requires a separate ADR.
+
+## Aider R4 update - 2026-09-23
+
+Source audit: `docs/audit/AIDER_LARGE_REPO_EDITING_AUDIT_2026-09-23.md`
+
+Aider introduces one important architecture distinction:
+
+**Project Context** and **Repository Intelligence** are separate capabilities.
+
+- Project Context = repository/user instructions, source provenance, hashes/digest and bounded rule context. This remains Phase A.
+- Repository Intelligence = symbol definitions/references, structural map/ranking and optional cache. This is a Phase B on-demand service, not an authorization source and not a dependency for ordinary tools.
+
+Aider also strengthens the editing decision: model-friendly edit formats are useful adapters, but the FileMCP foundation remains expected-version + atomic apply_edits. Automatic dirty-worktree commits remain orchestration-level behavior, not a low-level gateway side effect.
+
+## Cline R5 update - 2026-09-23
+
+Source audit: `docs/audit/CLINE_RECOVERY_CHECKPOINT_AUDIT_2026-09-23.md`
+
+Cline forces an explicit separation:
+
+`Git history != workspace checkpoint != task state != execution evidence != observability`.
+
+Final living decisions:
+- full local session/transcript persistence is REJECTED;
+- workspace checkpoint/restore is DEFERRED outside Phase A because safe restore requires its own transactional lifecycle;
+- restart-resumable evidence metadata is accepted selectively: operation/evidence identity and terminal state may persist without prompts, raw commands, tool arguments/results or file contents;
+- any future checkpoint feature requires user-intent gating and fail-closed divergent-history semantics;
+- Git safe mode remains security containment and is not a checkpoint system.
+
+## Goose R6 update - 2026-09-23
+
+Source audit: `docs/audit/GOOSE_MCP_ORCHESTRATION_AUDIT_2026-09-23.md`
+
+Goose closes the MCP composition/orchestration question:
+
+- canonical catalog may expose an **effective policy-filtered tool view**, but visibility metadata never replaces runtime authorization;
+- FileMCP remains one focused MCP execution gateway and does not host arbitrary external MCP providers;
+- external MCP composition, OAuth/provider lifecycle and provider-name conflict resolution remain ChatGPT/separate-product responsibilities;
+- local child-agent/subagent/background-agent runtime is rejected from FileMCP core;
+- existing skills remain the lightweight reusable-instruction mechanism and gain provenance/hash through project_context rather than a second recipe engine.
