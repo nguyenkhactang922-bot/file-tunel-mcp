@@ -96,3 +96,6 @@ Do not begin feature code if:
 ## First implementation action when project authority starts this program
 
 Claim CCI-001 only. Do not parallelize dependent implementation before the canonical catalog contract is proven.
+## Superseded by final cross-repo architecture
+
+This candidate queue is historical design input. ADR-0005 and tasks/MASTER_FILEMCP_UPGRADE_TASK_GRAPH.md are the final authorities. Do not claim CCI-* tasks. The next future implementation root is FMG-001 when the implementation program is explicitly activated.

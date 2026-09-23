@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `main`
+Branch: `chatgpt/chatcmd-integration-audit`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -91,3 +91,18 @@ Authorities:
 - tasks/CHATCMD_INTEGRATION_CANDIDATE_QUEUE.md
 
 This future track does not replace the current authoritative V11-009 upstream-merge action. When project authority activates the integration program, claim CCI-001 only.
+## Final cross-repo architecture program
+
+Status: DESIGN GATE COMPLETE / READY TO IMPLEMENT, BUT FEATURE CODING NOT STARTED.
+
+Final authority:
+- docs/adr/0005-final-coding-agent-gateway-architecture.md
+- docs/design/MASTER_FILEMCP_CODING_AGENT_GATEWAY_ARCHITECTURE_V1.md
+- docs/design/FINAL_FILEMCP_FUNCTION_UPGRADE_MATRIX.md
+- tasks/MASTER_FILEMCP_UPGRADE_TASK_GRAPH.md
+
+The cross-repo program completed Codex/OpenHands/Aider/Cline/Goose/ChatCMD comparison, contradiction synthesis, function-level upgrade decisions, independent red-team, P1 repair and repair re-audit.
+
+Future implementation NEXT_EXACT_ACTION when this program is explicitly started: claim FMG-001 Canonical Catalog Authority only.
+
+Do not begin FMG-001 in this design-only handoff. The existing V11-009 upstream merge authority gate remains the repository's unrelated current external closure action.

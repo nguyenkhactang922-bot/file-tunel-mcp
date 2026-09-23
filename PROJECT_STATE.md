@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `main`
+Active branch: `chatgpt/chatcmd-integration-audit`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -85,3 +85,22 @@ Candidate queue:
 tasks/CHATCMD_INTEGRATION_CANDIDATE_QUEUE.md
 
 No feature code was changed by the audit/design task.
+## Final coding-agent gateway architecture
+
+State: ARCHITECTURE FROZEN / IMPLEMENTATION NOT STARTED.
+
+ADR-0005 supersedes ADR-0004 where more specific. Final Phase A graph is tasks/MASTER_FILEMCP_UPGRADE_TASK_GRAPH.md with FMG-001 as the only root implementation task.
+
+Design proof complete:
+- source-first cross-repo audits;
+- final contradiction matrix;
+- final function upgrade matrix;
+- security/trust model;
+- execution/edit/evidence model;
+- large-repo context decision;
+- recovery/checkpoint decision;
+- independent red-team;
+- P1 blocker repairs;
+- repair re-audit PASS.
+
+No feature code was changed by this architecture program. Optional isolation, repo intelligence implementation, checkpoint, PTY, artifact spillover and command idempotency registry are explicit DEFER decisions. Local task manager/sub-agents/MCP provider hosting/browser DOM/public bearer endpoint remain rejected from core.
