@@ -64,3 +64,24 @@ Evidence:
 docs/evidence/V11-009_FINAL_TECHNICAL_MAIN_EVIDENCE.md
 
 Current authoritative action is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md.
+## Future architecture - ChatCMD-inspired integration
+
+State: DESIGN-FROZEN / NOT ACTIVE IMPLEMENTATION.
+
+ADR-0004 freezes Phase A:
+- canonical tool catalog/hash;
+- structured result envelope;
+- structured exec_process;
+- file version tokens;
+- atomic versioned apply_edits;
+- common budget/cursor semantics;
+- metadata-only execution evidence;
+- project-context digest;
+- server-owned policy profiles.
+
+Persistent PTY is deferred. Sub-agents require a separate ADR. Browser DOM automation, public tokenized MCP transport, broad task-content persistence and a Rust rewrite are rejected.
+
+Candidate queue:
+tasks/CHATCMD_INTEGRATION_CANDIDATE_QUEUE.md
+
+No feature code was changed by the audit/design task.

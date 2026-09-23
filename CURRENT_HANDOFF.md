@@ -77,3 +77,17 @@ Evidence:
 PR #2 is open, clean and mergeable at the exact verified tree. The connected bot has upstream READ only and cannot execute the final merge.
 
 No repository-internal technical task remains.
+## Future architecture track - ChatCMD integration
+
+Status: DESIGN-FROZEN, NOT ACTIVE IMPLEMENTATION.
+
+A multi-round independent audit of int04/ChatCmd was completed against pinned commit c20e134ad6b60ef12eee7231bcbca56f5252be45. The accepted design is selective native reimplementation, not repository merging or a runtime rewrite.
+
+Authorities:
+- docs/audit/CHATCMD_INDEPENDENT_MULTI_ROUND_INTEGRATION_AUDIT_2026-09-23.md
+- docs/design/CHATCMD_SOURCE_TO_FILEMCP_MAPPING_V1.md
+- docs/design/CHATCMD_INTEGRATION_DECISION_MATRIX_V1.md
+- docs/adr/0004-chatcmd-inspired-execution-foundation.md
+- tasks/CHATCMD_INTEGRATION_CANDIDATE_QUEUE.md
+
+This future track does not replace the current authoritative V11-009 upstream-merge action. When project authority activates the integration program, claim CCI-001 only.
