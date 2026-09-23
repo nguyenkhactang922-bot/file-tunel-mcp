@@ -47,11 +47,20 @@ If public-market signed distribution is required later, reopen FPA-004-F/G and p
 
 ## V11-009
 
-Technical fork-main verification is complete.
+State: EXTERNAL-BLOCKED ONLY ON UPSTREAM MERGE AUTHORITY.
 
-Final V11-009 cannot be marked fully PASS until upstream integration/merge is performed by an account with write/maintain permission, or project authority explicitly designates fork main as the final canonical main.
+Technical fork-main verification is complete:
+- exact verified main commit before evidence-only closure: 71bc829bb6ea0476c2325a7c4d264b4cd8dd048d;
+- native Verify run 35874974993: macOS / Windows x64 / Windows ARM64 SUCCESS;
+- local Windows Release build: 0 warnings / 0 errors;
+- Windows runtime suite: 444 assertions PASS;
+- x64/ARM64 package resource verification PASS;
+- x64 packaged app smoke PASS;
+- PR #2 is open, clean and mergeable at the exact verified tree.
+
+The authenticated bot has upstream READ only. Merge API is unavailable to this account.
+
+Evidence:
+docs/evidence/V11-009_FINAL_TECHNICAL_MAIN_EVIDENCE.md
 
 Current authoritative action is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md.
-
-
-Secure provisioning helper remains PASS and available for a future signed-distribution scope. It is not required for the current unsigned scope.

@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: complete upstream PR #2 integration/merge under write/maintain authority; then checkout/pull merged upstream main, rerun final verification on merged main, and close V11-009. If upstream merge remains unavailable, only an explicit separate project-authority decision designating verified fork main as canonical can remove this gate.
+AUTHORITATIVE NEXT_EXACT_ACTION: upstream WRITE/MAINTAIN authority merges PR #2; then fetch/pull upstream main and perform final merged-main confirmation for V11-009.
 
 FPA-004 product/release scope is resolved by ADR-0003. V11-009 is now the only remaining whole-app gate.

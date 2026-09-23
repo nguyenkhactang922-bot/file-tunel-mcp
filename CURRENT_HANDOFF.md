@@ -60,3 +60,20 @@ On a new chat:
 ## Secure production secret provisioning helper
 
 The helper remains available and verified for a future signed-distribution scope, but production signing credentials are not required by the current unsigned release target.
+
+
+## V11-009 final technical verification
+
+Technical main verification is PASS on fork main.
+
+Evidence:
+- docs/evidence/V11-009_FINAL_TECHNICAL_MAIN_EVIDENCE.md
+- native Verify run 35874974993: macOS / Windows x64 / Windows ARM64 SUCCESS
+- local Windows Release build: 0 warnings / 0 errors
+- Windows runtime suite: 444 assertions PASS
+- x64/ARM64 package resources PASS
+- x64 packaged app smoke PASS
+
+PR #2 is open, clean and mergeable at the exact verified tree. The connected bot has upstream READ only and cannot execute the final merge.
+
+No repository-internal technical task remains.

@@ -27,4 +27,4 @@ V11-005 --> V11-006 --> V11-007+
 
 No LiveCharts2/ScottPlot migration, no Prometheus server, no full proxy circuit-breaker/hedging, no distributed session store, no payload trace persistence.
 
-NEXT_EXACT_ACTION: final PASS requires upstream PR #2 merge under WRITE/MAINTAIN authority and FPA-004 real signed/notarized release evidence; fork main technical verification is already PASS.
+NEXT_EXACT_ACTION: upstream WRITE/MAINTAIN authority merges PR #2; then fetch upstream main and perform final merged-main confirmation.
