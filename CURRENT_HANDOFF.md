@@ -80,3 +80,14 @@ On a new chat:
 4. read tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md;
 5. resume the single authoritative next action;
 6. do not repeat completed OBS/V11/FPA technical work.
+
+
+## Secure production secret provisioning helper
+
+- Helper: `release/configure_production_release_secrets.ps1`.
+- Credential files must stay outside the repo.
+- Passwords are prompted with SecureString; secret values are streamed to `gh secret set` over stdin and are not printed.
+- Helper contract passes on Windows PowerShell 5.1.
+- Negative safety proof confirms repo-local credential files are rejected before prompting or GitHub mutation.
+- Evidence: `docs/evidence/FPA-004_SECRET_PROVISIONING_HELPER_EVIDENCE.md`.
+- Real release identity is still required; do not paste certificates, private keys, or passwords into chat.

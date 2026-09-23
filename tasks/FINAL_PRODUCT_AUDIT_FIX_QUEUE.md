@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: configure the seven real production-release Environment secrets in GitHub, run release/check_production_release_readiness.ps1, then dispatch Production Release 0.4.0 and capture signed/notarized artifact evidence.
+AUTHORITATIVE NEXT_EXACT_ACTION: obtain the real Windows PFX, macOS Developer ID P12 and Apple notarization P8/IDs outside the repo; run release/configure_production_release_secrets.ps1; then dispatch Production Release 0.4.0 and capture signed/notarized artifact evidence.
 
 Do not resume V11-009 as the only remaining whole-app gate until the P1 product/release scope is resolved.

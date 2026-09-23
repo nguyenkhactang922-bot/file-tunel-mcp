@@ -419,7 +419,16 @@ The release workflow is workflow_dispatch-only. It materializes credential files
 
 Do not add PFX/P12/P8 files to the repository. A syntactically complete release workflow is not itself proof of public-market signing: FPA-004 is complete only after a real credentialed production-release run succeeds and the uploaded artifacts pass the post-package signature/notarization checks.
 
-After the seven Environment secrets are configured in GitHub, run release/check_production_release_readiness.ps1. It prints only workflow and secret-name readiness. Add -Dispatch to dispatch Production Release version 0.4.0 after all seven required secret names are present.
+To provision the seven Environment secrets without pasting private material into chat or command history, keep the PFX/P12/P8 files outside this repository and run:
+
+```powershell
+.\release\configure_production_release_secrets.ps1 `
+  -WindowsPfxPath "C:\secure\filemcp-code-signing.pfx" `
+  -MacDeveloperIdP12Path "C:\secure\developer-id-application.p12" `
+  -AppleNotaryP8Path "C:\secure\AuthKey_private.p8"
+```
+
+The helper prompts for the Windows/macOS certificate passwords and Apple notarization identifiers, streams secret values directly to GitHub Environment secrets, prints only secret names, and never writes credential copies into the repository. After provisioning, it automatically runs `release/check_production_release_readiness.ps1`. Add `-Dispatch` only when you intentionally want it to dispatch Production Release version 0.4.0 after readiness succeeds.
 
 ## Contributing
 

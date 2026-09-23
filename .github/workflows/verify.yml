@@ -124,6 +124,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_release_signing_contract.ps1
 
+      - name: Verify release secret provisioning contract
+        shell: pwsh
+        run: ./tests/test_release_secret_provisioning_contract.ps1
+
       - name: Windows integration tests
         shell: pwsh
         run: ./tests/test_windows_runtime.ps1
@@ -217,6 +221,10 @@ jobs:
       - name: Verify production release signing contract
         shell: pwsh
         run: ./tests/test_release_signing_contract.ps1
+
+      - name: Verify release secret provisioning contract
+        shell: pwsh
+        run: ./tests/test_release_secret_provisioning_contract.ps1
 
       - name: Build Windows ARM64 release
         shell: pwsh

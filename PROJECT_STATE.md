@@ -65,3 +65,6 @@ Final V11-009 cannot be marked fully PASS until:
 2. upstream integration/merge is performed by an account with write/maintain permission, or project authority explicitly designates fork main as the final canonical main.
 
 Current authoritative action is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md.
+
+
+Secure provisioning helper: PASS. `release/configure_production_release_secrets.ps1` is PS5.1-compatible, keeps credential files outside the repo, prompts passwords securely, streams values to GitHub Environment secrets through stdin, and runs the readiness checker afterward. Real signing/notarization identity remains external.
