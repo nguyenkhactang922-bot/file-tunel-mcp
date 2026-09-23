@@ -103,7 +103,7 @@ Design proof complete:
 - P1 blocker repairs;
 - repair re-audit PASS.
 
-No feature code was changed by this architecture program. Optional isolation, repo intelligence implementation, checkpoint, PTY, artifact spillover and command idempotency registry are explicit DEFER decisions. Local task manager/sub-agents/MCP provider hosting/browser DOM/public bearer endpoint remain rejected from core.
+Historical ADR-0005 note: the foundation architecture originally marked optional isolation, repo intelligence, checkpoint, PTY, artifact spillover and command idempotency registry as DEFER. ADR-0006 subsequently superseded that planning state for the complete current scope by resolving former DEFER items to BUILD or REJECT before implementation.
 
 ## Complete upgrade scope frozen before implementation
 
