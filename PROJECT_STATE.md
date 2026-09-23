@@ -104,3 +104,13 @@ Design proof complete:
 - repair re-audit PASS.
 
 No feature code was changed by this architecture program. Optional isolation, repo intelligence implementation, checkpoint, PTY, artifact spillover and command idempotency registry are explicit DEFER decisions. Local task manager/sub-agents/MCP provider hosting/browser DOM/public bearer endpoint remain rejected from core.
+
+## Complete upgrade scope frozen before implementation
+
+State: COMPLETE-SCOPE ARCHITECTURE/TASK GRAPH FROZEN / IMPLEMENTATION NOT STARTED.
+
+ADR-0006 extends ADR-0005. Former Phase B candidates have been resolved before coding:
+- BUILD: artifact/content refs, batch read/stat, quarantine restore, edit adapters, repository intelligence, PTY, checkpoint/restore, execution backend interface, optional Docker isolated backend;
+- REJECT: arbitrary-command idempotency/auto-replay and previously rejected agent/browser/provider/product expansions.
+
+`tasks/MASTER_FILEMCP_COMPLETE_UPGRADE_TASK_GRAPH.md` is the complete ordering authority FMG-001..FMG-026. FMG-001 is the only initial READY task. FMG-013 is foundation verification; FMG-026 is COMPLETE_UPGRADE_MAIN_VERIFIED.

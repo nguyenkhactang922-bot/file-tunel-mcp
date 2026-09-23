@@ -119,3 +119,7 @@ Durable evidence belongs to the local FileMCP/workspace identity, not a TCP conn
 ### Policy generation
 
 Operation context captures effective policy generation/hash. Side-effect authority is rechecked immediately before exec/commit; authority removal invalidates a prepared action. Evidence records the effective generation for completed actions.
+
+## Complete-scope supersession note
+
+This V1 remains the frozen foundation architecture. Product authority subsequently required all advanced design to be completed before coding. ADR-0006 + `MASTER_FILEMCP_COMPLETE_UPGRADE_ARCHITECTURE_V2.md` extend this foundation and are the complete-scope authority. Do not stop after FMG-013 for a new design cycle.

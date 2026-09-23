@@ -453,3 +453,7 @@ Implementation may start only after:
 - FMG-001 is claimed alone.
 
 Until then: DO NOT CODE.
+
+## Complete-scope extension authority
+
+This file remains the detailed task specification for FMG-001..FMG-013. `MASTER_FILEMCP_COMPLETE_UPGRADE_TASK_GRAPH.md` is the complete ordering authority through FMG-026. FMG-013 is a foundation milestone, not final project completion.

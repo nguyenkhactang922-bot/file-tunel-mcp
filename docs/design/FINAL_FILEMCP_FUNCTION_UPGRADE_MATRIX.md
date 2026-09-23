@@ -135,3 +135,7 @@ This matrix contains no unresolved UNKNOWN/TBD architecture decision for Phase A
 | Cursor lifecycle signer | absent | ADD where cursor tools are introduced | authenticated short-lived read cursor bound to tool/options/root/generation/position; restart invalidation acceptable |
 
 These are prerequisites/acceptance refinements, not new product-surface expansion.
+
+## Complete-scope extension note
+
+This matrix remains authoritative for foundation decisions. `FINAL_COMPLETE_SCOPE_FUNCTION_MATRIX.md` resolves the former DEFER items into BUILD or REJECT before implementation begins.

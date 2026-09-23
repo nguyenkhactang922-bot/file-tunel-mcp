@@ -106,3 +106,19 @@ The cross-repo program completed Codex/OpenHands/Aider/Cline/Goose/ChatCMD compa
 Future implementation NEXT_EXACT_ACTION when this program is explicitly started: claim FMG-001 Canonical Catalog Authority only.
 
 Do not begin FMG-001 in this design-only handoff. The existing V11-009 upstream merge authority gate remains the repository's unrelated current external closure action.
+
+## Complete-scope pre-code freeze
+
+Status: COMPLETE DESIGN/TASK SPLIT FROZEN / FEATURE CODING NOT STARTED.
+
+Product authority requires the complete current upgrade to be designed before coding. ADR-0006 extends ADR-0005 and resolves all former advanced `DEFER` items into BUILD or REJECT.
+
+Complete authorities:
+- docs/adr/0006-complete-upgrade-scope-freeze.md
+- docs/design/MASTER_FILEMCP_COMPLETE_UPGRADE_ARCHITECTURE_V2.md
+- docs/design/FINAL_COMPLETE_SCOPE_FUNCTION_MATRIX.md
+- tasks/MASTER_FILEMCP_COMPLETE_UPGRADE_TASK_GRAPH.md
+
+Implementation starts at FMG-001 only and proceeds through FMG-026 without a new architecture pause after FMG-013.
+
+FMG-026, not FMG-013, is the complete upgrade completion gate.
