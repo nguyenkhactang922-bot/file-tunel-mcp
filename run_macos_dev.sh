@@ -41,6 +41,7 @@ echo "Compiling full Swift macOS app ..."
     "$ROOT/macos/ProcessRunner.swift" \
     "$ROOT/macos/LogicalChatCorrelation.swift" \
     "$ROOT/macos/ToolCatalog.swift" \
+    "$ROOT/macos/ToolResultEnvelope.swift" \
     "$ROOT/macos/LocalMCPServer.swift" \
     "$ROOT/macos/TunnelSupervisor.swift" \
     "$ROOT/macos/LocalMCPRuntime.swift" \

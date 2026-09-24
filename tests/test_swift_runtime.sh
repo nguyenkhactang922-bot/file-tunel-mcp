@@ -102,7 +102,7 @@ SWIFT
 swiftc -framework CryptoKit -o "$TMP_DIR/catalog-test" macos/ToolCatalog.swift "$TMP_DIR/main.swift"
 "$TMP_DIR/catalog-test"
 
-case "$(uname -m)" in
+cat >"$TMP_DIR/main.swift" <<'SWIFT'\nimport Foundation\n\nfunc expectEnvelopeFailure(_ label: String, _ envelope: [String: Any], containing expected: String) {\n    do {\n        try ToolResultEnvelope.validate(envelope)\n        fatalError("expected envelope failure: \\(label)")\n    } catch {\n        precondition(error.localizedDescription.lowercased().contains(expected.lowercased()), "\\(label) unexpected error: \\(error)")\n    }\n}\n\nlet content: [[String: Any]] = [["type": "text", "text": "ok"]]\nlet success = ToolResultEnvelope.create(isError: false, content: content, structuredContent: ["result": "ok"], warnings: ["non-blocking warning"])\nprecondition(success["schemaVersion"] as? String == "1.0.0")\nprecondition(success["status"] as? String == "success")\nlet operationID = success["operationId"] as! String\nprecondition(operationID.hasPrefix("op_") && operationID.count == 35)\nlet successTruncation = success["truncation"] as! [String: Any]\nprecondition(successTruncation["truncated"] as? Bool == false && successTruncation["reason"] as? String == "none")\nprecondition((success["usage"] as! [String: Any])["contentItems"] as? Int == 1)\nprecondition((success["warnings"] as! [String]) == ["non-blocking warning"])\n\nlet partial = ToolResultEnvelope.create(isError: false, content: content, structuredContent: ["truncated": true])\nprecondition(partial["status"] as? String == "partial")\nlet partialTruncation = partial["truncation"] as! [String: Any]\nprecondition(partialTruncation["truncated"] as? Bool == true && partialTruncation["reason"] as? String == "server_limit")\nlet toolError = ToolResultEnvelope.create(isError: true, content: content, structuredContent: nil)\nprecondition(toolError["status"] as? String == "tool_error")\n\nvar carrier: [String: Any] = ["content": content, "isError": false]\nToolResultEnvelope.attach(to: &carrier, isError: false, content: content, structuredContent: ["result": "ok"])\nprecondition(try ToolResultEnvelope.require(from: carrier)["status"] as? String == "success")\nprecondition(carrier["resultEnvelope"] == nil)\n\nvar badVersion = success; badVersion["schemaVersion"] = "9.9.9"\nexpectEnvelopeFailure("unknown schema", badVersion, containing: "schemaVersion")\nvar badStatus = success; badStatus["status"] = "mystery"\nexpectEnvelopeFailure("unknown status", badStatus, containing: "status")\nvar badOperation = success; badOperation.removeValue(forKey: "operationId")\nexpectEnvelopeFailure("missing operation", badOperation, containing: "operationId")\nvar badUsage = success; badUsage["usage"] = ["contentItems": -1]\nexpectEnvelopeFailure("bad usage", badUsage, containing: "usage")\nvar badTruncation = partial; badTruncation["truncation"] = ["truncated": true, "reason": "none"]\nexpectEnvelopeFailure("bad truncation", badTruncation, containing: "truncation")\nvar badWarnings = success; badWarnings["warnings"] = [""]\nexpectEnvelopeFailure("bad warnings", badWarnings, containing: "warnings")\nprint("swift-result-envelope: ok")\nSWIFT\nswiftc -o "$TMP_DIR/result-envelope-test" macos/ToolResultEnvelope.swift "$TMP_DIR/main.swift"\n"$TMP_DIR/result-envelope-test"\n\ncase "$(uname -m)" in
     arm64|aarch64) TUNNEL_TARGET="darwin-arm64" ;;
     x86_64|amd64) TUNNEL_TARGET="darwin-amd64" ;;
     *) echo "unsupported macOS architecture for tunnel-client test" >&2; exit 2 ;;
@@ -774,6 +774,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ProcessRunner.swift \
     macos/LogicalChatCorrelation.swift \
     macos/ToolCatalog.swift \
+    macos/ToolResultEnvelope.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -918,6 +919,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ProcessRunner.swift \
     macos/LogicalChatCorrelation.swift \
     macos/ToolCatalog.swift \
+    macos/ToolResultEnvelope.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"
@@ -1850,6 +1852,22 @@ MODERN_CALL="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$MODERN_CALL" | grep -q 'hello swift'
 printf '%s' "$MODERN_CALL" | grep -q '"resultType":"complete"'
 printf '%s' "$MODERN_CALL" | plutil -extract result.structuredContent.result raw -expect string -o - - | grep -qx 'hello swift'
+printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.schemaVersion raw -expect string -o - - | grep -qx '1.0.0'
+printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.status raw -expect string -o - - | grep -qx 'success'
+printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.truncation.truncated raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.usage.contentItems raw -expect integer -o - - | grep -qx '1'
+OPERATION_ID="$(printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.operationId raw -expect string -o - -)"
+printf '%s' "$OPERATION_ID" | grep -Eq '^op_[0-9a-f]{32}$'
+
+MODERN_TOOL_ERROR="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H 'MCP-Protocol-Version: 2026-07-28' \
+    -H 'Mcp-Method: tools/call' \
+    -H 'Mcp-Name: =?base64?cmVhZF9maWxl?=' \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":121,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"relative_path\":\"missing-file.txt\"},\"_meta\":$MODERN_META}}")"
+printf '%s' "$MODERN_TOOL_ERROR" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$MODERN_TOOL_ERROR" | plutil -extract result._meta.io.filemcp/result.status raw -expect string -o - - | grep -qx 'tool_error'
+printf '%s' "$MODERN_TOOL_ERROR" | plutil -extract result._meta.io.filemcp/result.schemaVersion raw -expect string -o - - | grep -qx '1.0.0'
 
 UNKNOWN_TOOL="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \

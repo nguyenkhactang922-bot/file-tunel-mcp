@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-001-canonical-catalog`
+Branch: `chatgpt/FMG-002-structured-result-envelope`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -128,4 +128,10 @@ State: CLAIMED / ACTIVE.
 
 Branch: `chatgpt/FMG-001-canonical-catalog`.
 
-NEXT_EXACT_ACTION: stage and commit the locally verified FMG-001 candidate, push the exact branch, create/reuse the fork-main PR, require native GitHub Verify on macOS + Windows x64 + Windows ARM64, review/merge only on green exact-head evidence, then verify fork main and claim FMG-002. Do not begin FMG-002 before FMG-001 MAIN VERIFIED.
+NEXT_EXACT_ACTION: implement FMG-002 Structured Result Envelope only: versioned result metadata, status/warnings/truncation/usage/operation identity, backward-compatible content, Windows/macOS parity, fail-closed validation and negative tests. Do not begin FMG-003 or later tasks.
+
+## FMG-001 closure / FMG-002 claim
+
+FMG-001: DONE / MAIN VERIFIED on merge commit `71d658131342581f14407276bcfe18164a0afa37`; native Verify run `35988856441` SUCCESS.
+
+FMG-002: CLAIMED / ACTIVE on `chatgpt/FMG-002-structured-result-envelope`.

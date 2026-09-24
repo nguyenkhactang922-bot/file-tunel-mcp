@@ -60,13 +60,13 @@ For FMG-001..FMG-013, the detailed scope/acceptance/negative-test text in `tasks
 
 ## FMG-001 - Canonical Catalog Authority
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: ADR-0005 + ADR-0006
 Detailed specification: `tasks/MASTER_FILEMCP_UPGRADE_TASK_GRAPH.md` FMG-001.
 
 ## FMG-002 - Structured Result Envelope
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-001
 Detailed specification: foundation graph FMG-002.
 
