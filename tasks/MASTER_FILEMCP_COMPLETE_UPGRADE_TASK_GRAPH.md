@@ -60,7 +60,7 @@ For FMG-001..FMG-013, the detailed scope/acceptance/negative-test text in `tasks
 
 ## FMG-001 - Canonical Catalog Authority
 
-State: READY ROOT TASK
+State: ACTIVE / CLAIMED
 Depends: ADR-0005 + ADR-0006
 Detailed specification: `tasks/MASTER_FILEMCP_UPGRADE_TASK_GRAPH.md` FMG-001.
 

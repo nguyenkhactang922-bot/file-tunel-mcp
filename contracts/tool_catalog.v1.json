@@ -1,0 +1,1005 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "1.0.0",
+  "protocolVersions": {
+    "modern": "2026-07-28",
+    "legacy": [
+      "2025-11-25",
+      "2025-06-18",
+      "2025-03-26"
+    ]
+  },
+  "instructionVersion": "1.0.0",
+  "instructions": {
+    "base": "Read and manage files, Git repositories, Codex project skills, and optionally local commands inside the configured shared directory. When a user message begins with '/<skill-name>', call load_codex_skill with that exact name before answering and follow the returned SKILL.md instructions.",
+    "observabilitySuffix": " For local observability, call filemcp_observability_connect once for this chat context, then include the returned chat_instance_id as _filemcp_chat on later FileMCP tool calls. The handle is correlation metadata only and grants no additional authority."
+  },
+  "facades": {
+    "correlationArgument": {
+      "name": "_filemcp_chat",
+      "definition": {
+        "type": "string",
+        "description": "Optional opaque FileMCP correlation handle returned by filemcp_observability_connect. It is observability metadata only and grants no additional authority."
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "list_files",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.list"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "list_files",
+        "description": "List files and folders inside the shared directory (optionally a subfolder).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "subpath": {
+              "type": "string",
+              "description": "Subpath inside the shared root."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "result",
+            "truncated"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "read_file",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "read_file",
+        "description": "Read the text content of a file inside the shared directory.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "relative_path": {
+              "type": "string",
+              "description": "Relative path to a text file."
+            }
+          },
+          "required": [
+            "relative_path"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "read_file_range",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "read_file_range",
+        "description": "Read a targeted line range from a text file. Use this after search_content to inspect surrounding implementation. Expand the range or use read_file before drawing conclusions when callers, state, imports, or other surrounding code may matter.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "relative_path": {
+              "type": "string",
+              "description": "Relative path to a text file."
+            },
+            "start_line": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based first line to return."
+            },
+            "end_line": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based last line to return (inclusive)."
+            }
+          },
+          "required": [
+            "relative_path",
+            "start_line",
+            "end_line"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "start_line": {
+              "type": "integer"
+            },
+            "end_line": {
+              "type": "integer"
+            },
+            "requested_end_line": {
+              "type": "integer"
+            },
+            "total_lines": {
+              "type": "integer"
+            },
+            "has_before": {
+              "type": "boolean"
+            },
+            "has_after": {
+              "type": "boolean"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "start_line",
+            "end_line",
+            "requested_end_line",
+            "total_lines",
+            "has_before",
+            "has_after",
+            "truncated",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "search_content",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.search"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "search_content",
+        "description": "Search text content recursively to locate relevant files and line regions. This is a locator, not a substitute for reading the implementation: inspect important matches with read_file_range or read_file before drawing conclusions.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Literal text to search for."
+            },
+            "path": {
+              "type": "string",
+              "description": "Optional subdirectory to search inside the shared root."
+            },
+            "case_sensitive": {
+              "type": "boolean",
+              "default": false
+            },
+            "context_lines": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 2
+            },
+            "max_results": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "case_sensitive": {
+              "type": "boolean"
+            },
+            "matches": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer"
+                  },
+                  "preview_start_line": {
+                    "type": "integer"
+                  },
+                  "preview_end_line": {
+                    "type": "integer"
+                  },
+                  "preview": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "line",
+                  "preview_start_line",
+                  "preview_end_line",
+                  "preview"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "visited_entries": {
+              "type": "integer"
+            },
+            "files_scanned": {
+              "type": "integer"
+            },
+            "bytes_scanned": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "query",
+            "path",
+            "case_sensitive",
+            "matches",
+            "truncated",
+            "visited_entries",
+            "files_scanned",
+            "bytes_scanned"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "search_filenames",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.search"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "search_filenames",
+        "description": "Recursively search filenames (not content) under the shared directory.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Case-insensitive filename substring."
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "result",
+            "truncated"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "write_file",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "write",
+      "capabilities": [
+        "filesystem.write"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "write_file",
+        "description": "Create a file, overwrite it, or append to it inside the shared directory.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "relative_path": {
+              "type": "string",
+              "description": "Relative file path."
+            },
+            "content": {
+              "type": "string",
+              "description": "UTF-8 text content."
+            },
+            "append": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "relative_path",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "delete_file",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "delete",
+      "capabilities": [
+        "filesystem.delete"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "delete_file",
+        "description": "Delete a file inside the shared directory (files only, not directories).",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "relative_path": {
+              "type": "string",
+              "description": "Relative file path."
+            }
+          },
+          "required": [
+            "relative_path"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "delete_directory",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "delete",
+      "capabilities": [
+        "filesystem.delete.recursive"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "delete_directory",
+        "description": "Recursively delete a folder and everything inside it.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "relative_path": {
+              "type": "string",
+              "description": "Relative directory path."
+            }
+          },
+          "required": [
+            "relative_path"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "git_init",
+      "handler": "local_tools",
+      "risk": "medium",
+      "effect": "write",
+      "capabilities": [
+        "git.init"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "git_init",
+        "description": "Create a new git repository inside the shared directory.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string",
+              "description": "Repository path relative to the shared root."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "git_status",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "git.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "git_status",
+        "description": "Show the working-tree status of a git repo whose worktree and Git metadata stay inside the shared directory.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string",
+              "description": "Repository path relative to the shared root."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "git_log",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "git.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "git_log",
+        "description": "Show recent commit history of a Git repo fully contained inside the shared directory.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string",
+              "description": "Repository path relative to the shared root."
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "git_diff",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "git.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "git_diff",
+        "description": "Show uncommitted changes (working tree vs index). Repository paths are containment-checked; external diff/textconv are suppressed when command execution is disabled.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string",
+              "description": "Repository path relative to the shared root."
+            },
+            "paths": {
+              "type": "string",
+              "description": "Optional path or whitespace-separated pathspecs. Quote pathspecs that contain spaces."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "git_add",
+      "handler": "local_tools",
+      "risk": "medium",
+      "effect": "write",
+      "capabilities": [
+        "git.index.write"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "git_add",
+        "description": "Stage files for the next commit. When command execution is disabled, paths using Git content filters are refused.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string",
+              "description": "Repository path relative to the shared root."
+            },
+            "paths": {
+              "type": "string",
+              "description": "Path or whitespace-separated pathspecs. Quote pathspecs that contain spaces.",
+              "default": "."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "git_commit",
+      "handler": "local_tools",
+      "risk": "medium",
+      "effect": "write",
+      "capabilities": [
+        "git.commit"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "git_commit",
+        "description": "Create a commit from staged changes. Repository hooks and GPG signing are suppressed when command execution is disabled.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string",
+              "description": "Repository path relative to the shared root."
+            },
+            "message": {
+              "type": "string",
+              "default": "update"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "git_push",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "external",
+      "capabilities": [
+        "git.remote.write",
+        "network.open_world"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "git_push",
+        "description": "Push the current branch to its upstream remote. In safe mode, repository hooks, signing, local file transport, and repository-local credential helpers are restricted.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string",
+              "description": "Repository path relative to the shared root."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": true
+        }
+      }
+    },
+    {
+      "name": "run_command",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "execute",
+      "capabilities": [
+        "process.shell",
+        "network.open_world"
+      ],
+      "availability": {
+        "requiresCommands": true
+      },
+      "definition": {
+        "name": "run_command",
+        "description": "Run a command through the platform-native shell on the local machine. The command inherits the current user's environment and is not OS-sandboxed. cwd must stay inside the shared directory.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "Shell command string to execute using the platform-native shell."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Working directory relative to the shared root."
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 120,
+              "default": 30
+            }
+          },
+          "required": [
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": true
+        }
+      }
+    },
+    {
+      "name": "list_codex_skills",
+      "handler": "skills",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "skills.list"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "list_codex_skills",
+        "description": "List Codex project skills discovered under .agents/skills in the current shared workspace. If the user's message starts with '/<skill-name>', use this list when needed to resolve the requested skill before answering.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "load_codex_skill",
+      "handler": "skills",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "skills.load"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "load_codex_skill",
+        "description": "Load a Codex Agent Skill from .agents/skills/<name>/SKILL.md in the current shared workspace. IMPORTANT: when the user's message starts with '/<skill-name>', call this tool with <skill-name> before answering, then follow the returned SKILL.md instructions for the current task. The name is a skill identifier, not a path.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Exact skill directory name under .agents/skills, for example speckit-analyze."
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "filemcp_observability_connect",
+      "handler": "server",
+      "risk": "low",
+      "effect": "metadata",
+      "capabilities": [
+        "observability.correlation"
+      ],
+      "availability": {
+        "requiresObservability": true
+      },
+      "definition": {
+        "name": "filemcp_observability_connect",
+        "description": "Establish or resume an opaque FileMCP logical-chat correlation handle for local observability. This handle is metadata only and never grants file, Git, or command permissions.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "chat_instance_id": {
+              "type": "string",
+              "description": "Optional prior FileMCP chat correlation handle to resume within this FileMCP process."
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "chat_instance_id": {
+              "type": "string"
+            },
+            "resumed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "chat_instance_id",
+            "resumed"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/chatcmd-integration-audit`
+Active branch: `chatgpt/FMG-001-canonical-catalog`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -114,3 +114,13 @@ ADR-0006 extends ADR-0005. Former Phase B candidates have been resolved before c
 - REJECT: arbitrary-command idempotency/auto-replay and previously rejected agent/browser/provider/product expansions.
 
 `tasks/MASTER_FILEMCP_COMPLETE_UPGRADE_TASK_GRAPH.md` is the complete ordering authority FMG-001..FMG-026. FMG-001 is the only initial READY task. FMG-013 is foundation verification; FMG-026 is COMPLETE_UPGRADE_MAIN_VERIFIED.
+## FMG-001 implementation
+
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+Branch: `chatgpt/FMG-001-canonical-catalog`.
+Scope: Canonical Catalog Authority only.
+Canonical candidate hash: `d597f611374045825808d930f2bb0ef7e995515bb816a52ceccb47fd42a8e6aa`.
+Local proof: Windows runtime 470 assertions PASS; Release build 0 warnings / 0 errors; contract/parity PASS; isolated x64+ARM64 package build PASS; packaged x64 catalog/app smoke PASS.
+Evidence: `docs/evidence/FMG-001_CANONICAL_CATALOG_EVIDENCE.md`.
+Next gate: exact-head native GitHub Verify -> review -> merge fork main -> MAIN VERIFIED.
+Later FMG tasks remain BLOCKED by dependency graph.

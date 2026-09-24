@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using FileMCP.Core;
@@ -30,6 +31,7 @@ internal static class Program
         try
         {
             TestObservabilityContracts();
+            TestCanonicalToolCatalog();
             await TestMcpStandardTelemetryAsync(root);
             await TestMcpTraceContextAsync(root);
             await TestOtlpExporterAsync(root);
@@ -66,6 +68,98 @@ internal static class Program
         finally
         {
             try { Directory.Delete(root, true); } catch { }
+        }
+    }
+
+    private static void TestCanonicalToolCatalog()
+    {
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.0.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
+        Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
+        Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
+        CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 15, "catalog safe local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 16, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 1, "catalog server tool count");
+        CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
+        try
+        {
+            CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills" });
+            throw new Exception("Assertion failed: missing handler rejected");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains("missing=[load_codex_skill]", StringComparison.Ordinal))
+        {
+            Assert(true, "missing handler rejected");
+        }
+        try
+        {
+            CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill", "extra_tool" });
+            throw new Exception("Assertion failed: extra handler rejected");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains("extra=[extra_tool]", StringComparison.Ordinal))
+        {
+            Assert(true, "extra handler rejected");
+        }
+        var canonicalPayload = File.ReadAllText("contracts/tool_catalog.v1.json");
+        CanonicalToolCatalog.ValidateCatalogPayloadForTest(canonicalPayload);
+        var crlfPayload = canonicalPayload.Replace("\n", "\r\n", StringComparison.Ordinal);
+        Assert(CanonicalToolCatalog.CatalogHashForPayloadForTest(canonicalPayload) == CanonicalToolCatalog.CatalogHashForPayloadForTest(crlfPayload), "catalog hash normalizes line endings");
+
+        ExpectCatalogFailure(
+            MutateCatalog(canonicalPayload, root => root["catalogVersion"] = "0.9.0"),
+            "catalogVersion",
+            "stale catalog version rejected");
+        ExpectCatalogFailure(
+            MutateCatalog(canonicalPayload, root => root["instructionVersion"] = "0.9.0"),
+            "instructionVersion",
+            "stale instruction version rejected");
+        ExpectCatalogFailure(
+            MutateCatalog(canonicalPayload, root =>
+            {
+                var first = (JsonObject)((JsonArray)root["tools"]!)[0]!;
+                ((JsonObject)first["definition"]!)["inputSchema"] = "not-an-object";
+            }),
+            "inputSchema",
+            "schema mismatch rejected");
+        ExpectCatalogFailure(
+            MutateCatalog(canonicalPayload, root => ((JsonObject)((JsonArray)root["tools"]!)[0]!)["risk"] = "unknown"),
+            "risk metadata",
+            "metadata mismatch rejected");
+        ExpectCatalogFailure(
+            MutateCatalog(canonicalPayload, root => ((JsonObject)((JsonArray)root["tools"]!)[0]!)["handler"] = "unknown_handler"),
+            "handler metadata",
+            "handler metadata mismatch rejected");
+        ExpectCatalogFailure(
+            MutateCatalog(canonicalPayload, root => ((JsonObject)((JsonArray)root["tools"]!)[0]!)["availability"] = new JsonObject { ["unknown"] = true }),
+            "availability metadata",
+            "availability metadata mismatch rejected");
+        ExpectCatalogFailure("{ malformed", "Malformed canonical tool catalog JSON", "malformed catalog rejected");
+
+        var metadata = CanonicalToolCatalog.Metadata("test-build");
+        Assert(metadata["catalogHash"]!.GetValue<string>() == CanonicalToolCatalog.CatalogHash, "catalog metadata hash");
+        Assert(metadata["instructionHash"]!.GetValue<string>() == CanonicalToolCatalog.InstructionHash, "catalog metadata instruction hash");
+        Assert(metadata["buildIdentity"]!.GetValue<string>() == "test-build", "catalog metadata build identity");
+        Console.WriteLine($"windows-tool-catalog: ok (hash={CanonicalToolCatalog.CatalogHash})");
+    }
+
+    private static string MutateCatalog(string payload, Action<JsonObject> mutate)
+    {
+        var root = JsonNode.Parse(payload) as JsonObject ?? throw new Exception("test catalog must be an object");
+        mutate(root);
+        return root.ToJsonString();
+    }
+
+    private static void ExpectCatalogFailure(string payload, string expectedMessage, string assertion)
+    {
+        try
+        {
+            CanonicalToolCatalog.ValidateCatalogPayloadForTest(payload);
+            throw new Exception($"Assertion failed: {assertion}");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains(expectedMessage, StringComparison.Ordinal))
+        {
+            Assert(true, assertion);
         }
     }
 
@@ -1734,6 +1828,11 @@ internal static class Program
         Assert(legacyTools.Count == 17, "legacy tools list");
         Assert(legacyTools.Any(t => t!["name"]!.GetValue<string>() == "list_codex_skills"), "legacy list_codex_skills exposed");
         Assert(legacyTools.Any(t => t!["name"]!.GetValue<string>() == "load_codex_skill"), "legacy load_codex_skill exposed");
+        var legacyCatalog = legacyBody["result"]!["catalog"]!.AsObject();
+        Assert(legacyCatalog["catalogVersion"]!.GetValue<string>() == CanonicalToolCatalog.CatalogVersion, "legacy catalog version exposed");
+        Assert(legacyCatalog["catalogHash"]!.GetValue<string>() == CanonicalToolCatalog.CatalogHash, "legacy catalog hash exposed");
+        Assert(legacyCatalog["instructionHash"]!.GetValue<string>() == CanonicalToolCatalog.InstructionHash, "legacy instruction hash exposed");
+        Assert(legacyCatalog["buildIdentity"]!.GetValue<string>() == FileMcpConstants.ServerVersion, "legacy build identity exposed");
 
         var skillDir = Path.Combine(workspace, ".agents", "skills", "speckit-analyze");
         Directory.CreateDirectory(skillDir);
@@ -1758,6 +1857,10 @@ internal static class Program
         var modernJson = JsonNode.Parse(HttpBody(modern))!.AsObject();
         Assert(modernJson["result"]!["resultType"]!.GetValue<string>() == "complete", "modern result type");
         Assert(modernJson["result"]!["tools"]!.AsArray().Count == 17, "modern tools list");
+        var modernCatalog = modernJson["result"]!["catalog"]!.AsObject();
+        Assert(modernCatalog["catalogVersion"]!.GetValue<string>() == CanonicalToolCatalog.CatalogVersion, "modern catalog version exposed");
+        Assert(modernCatalog["catalogHash"]!.GetValue<string>() == CanonicalToolCatalog.CatalogHash, "modern catalog hash exposed");
+        Assert(modernCatalog["instructionVersion"]!.GetValue<string>() == CanonicalToolCatalog.InstructionVersion, "modern instruction version exposed");
 
         var meteredPort = FreePort();
         var meter = new WorkspaceUsageMeter("D");

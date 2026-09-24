@@ -255,6 +255,7 @@ jobs:
           cmp vendor/tunnel-client/LICENSE dist/FileMCP.app/Contents/Resources/tunnel-client-LICENSE.txt
           cmp vendor/tunnel-client/NOTICE dist/FileMCP.app/Contents/Resources/tunnel-client-NOTICE.txt
           cmp vendor/tunnel-client/darwin-arm64/THIRD-PARTY-LICENSES.txt dist/FileMCP.app/Contents/Resources/tunnel-client-THIRD-PARTY-LICENSES.txt
+          cmp contracts/tool_catalog.v1.json dist/FileMCP.app/Contents/Resources/tool_catalog.v1.json
 
       - name: Upload signed and notarized macOS package
         uses: actions/upload-artifact@v4

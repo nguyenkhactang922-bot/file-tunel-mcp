@@ -39,11 +39,15 @@ jobs:
             -framework Security \
             macos/ProcessRunner.swift \
             macos/LogicalChatCorrelation.swift \
+            macos/ToolCatalog.swift \
             macos/LocalMCPServer.swift \
             macos/TunnelSupervisor.swift \
             macos/LocalMCPRuntime.swift \
             macos/FileMCPApp.swift \
             macos/main.swift
+
+      - name: Verify canonical tool catalog contract
+        run: python3 tests/test_tool_catalog_contract.py
 
       - name: Integration tests
         run: ./tests/test_swift_runtime.sh
@@ -59,6 +63,7 @@ jobs:
           cmp vendor/tunnel-client/LICENSE dist/FileMCP.app/Contents/Resources/tunnel-client-LICENSE.txt
           cmp vendor/tunnel-client/NOTICE dist/FileMCP.app/Contents/Resources/tunnel-client-NOTICE.txt
           cmp vendor/tunnel-client/darwin-arm64/THIRD-PARTY-LICENSES.txt dist/FileMCP.app/Contents/Resources/tunnel-client-THIRD-PARTY-LICENSES.txt
+          cmp contracts/tool_catalog.v1.json dist/FileMCP.app/Contents/Resources/tool_catalog.v1.json
 
   verify-windows:
     runs-on: windows-2025
@@ -99,6 +104,10 @@ jobs:
       - name: Verify cross-platform tool surface
         shell: pwsh
         run: ./tests/test_tool_surface_parity.ps1
+
+      - name: Verify canonical tool catalog contract
+        shell: pwsh
+        run: python tests/test_tool_catalog_contract.py
 
       - name: Verify macOS supervisor contract
         shell: pwsh

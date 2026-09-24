@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/chatcmd-integration-audit`
+Branch: `chatgpt/FMG-001-canonical-catalog`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -122,3 +122,10 @@ Complete authorities:
 Implementation starts at FMG-001 only and proceeds through FMG-026 without a new architecture pause after FMG-013.
 
 FMG-026, not FMG-013, is the complete upgrade completion gate.
+## FMG-001 active implementation
+
+State: CLAIMED / ACTIVE.
+
+Branch: `chatgpt/FMG-001-canonical-catalog`.
+
+NEXT_EXACT_ACTION: stage and commit the locally verified FMG-001 candidate, push the exact branch, create/reuse the fork-main PR, require native GitHub Verify on macOS + Windows x64 + Windows ARM64, review/merge only on green exact-head evidence, then verify fork main and claim FMG-002. Do not begin FMG-002 before FMG-001 MAIN VERIFIED.

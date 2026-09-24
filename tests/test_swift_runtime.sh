@@ -37,6 +37,71 @@ if [ "$MCP_HTTP_FUZZ_ITERATIONS" -lt 1 ]; then
     exit 2
 fi
 
+cat >"$TMP_DIR/main.swift" <<'SWIFT'
+import Foundation
+
+func mutatedCatalog(_ data: Data, _ mutate: (inout [String: Any]) -> Void) throws -> Data {
+    guard var root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        fatalError("canonical catalog test fixture must be an object")
+    }
+    mutate(&root)
+    return try JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+}
+
+func expectCatalogFailure(_ label: String, _ data: Data, containing expected: String) {
+    do {
+        _ = try CanonicalToolCatalog.fromPayloadForTest(data)
+        fatalError("expected catalog failure: \(label)")
+    } catch {
+        precondition(error.localizedDescription.contains(expected), "\(label) failed with unexpected error: \(error)")
+    }
+}
+
+let canonicalURL = URL(fileURLWithPath: "contracts/tool_catalog.v1.json")
+let canonicalData = try Data(contentsOf: canonicalURL)
+let canonical = try CanonicalToolCatalog.fromPayloadForTest(canonicalData)
+let canonicalText = String(data: canonicalData, encoding: .utf8)!
+let crlf = Data(canonicalText.replacingOccurrences(of: "\n", with: "\r\n").utf8)
+let crlfCatalog = try CanonicalToolCatalog.fromPayloadForTest(crlf)
+precondition(canonical.catalogHash == crlfCatalog.catalogHash, "catalog hash must normalize line endings")
+try canonical.validateHandlerCoverage(handler: "skills", runtimeHandlerNames: ["list_codex_skills", "load_codex_skill"])
+do {
+    try canonical.validateHandlerCoverage(handler: "skills", runtimeHandlerNames: ["list_codex_skills"])
+    fatalError("missing handler must fail closed")
+} catch {
+    precondition(error.localizedDescription.contains("missing=[load_codex_skill]"))
+}
+do {
+    try canonical.validateHandlerCoverage(handler: "skills", runtimeHandlerNames: ["list_codex_skills", "load_codex_skill", "extra_tool"])
+    fatalError("extra runtime tool must fail closed")
+} catch {
+    precondition(error.localizedDescription.contains("extra=[extra_tool]"))
+}
+
+expectCatalogFailure("stale catalog version", try mutatedCatalog(canonicalData) { $0["catalogVersion"] = "0.9.0" }, containing: "catalogVersion")
+expectCatalogFailure("stale instruction version", try mutatedCatalog(canonicalData) { $0["instructionVersion"] = "0.9.0" }, containing: "instructionVersion")
+expectCatalogFailure("schema mismatch", try mutatedCatalog(canonicalData) { root in
+    var tools = root["tools"] as! [[String: Any]]
+    var first = tools[0]
+    var definition = first["definition"] as! [String: Any]
+    definition["inputSchema"] = "not-an-object"
+    first["definition"] = definition
+    tools[0] = first
+    root["tools"] = tools
+}, containing: "inputSchema")
+expectCatalogFailure("metadata mismatch", try mutatedCatalog(canonicalData) { root in
+    var tools = root["tools"] as! [[String: Any]]
+    var first = tools[0]
+    first["risk"] = "unknown"
+    tools[0] = first
+    root["tools"] = tools
+}, containing: "risk metadata")
+expectCatalogFailure("malformed catalog", Data("{ malformed".utf8), containing: "Malformed canonical tool catalog JSON")
+print("swift-tool-catalog: ok (hash=\(canonical.catalogHash))")
+SWIFT
+swiftc -framework CryptoKit -o "$TMP_DIR/catalog-test" macos/ToolCatalog.swift "$TMP_DIR/main.swift"
+"$TMP_DIR/catalog-test"
+
 case "$(uname -m)" in
     arm64|aarch64) TUNNEL_TARGET="darwin-arm64" ;;
     x86_64|amd64) TUNNEL_TARGET="darwin-amd64" ;;
@@ -708,6 +773,7 @@ SWIFT
 swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ProcessRunner.swift \
     macos/LogicalChatCorrelation.swift \
+    macos/ToolCatalog.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -851,6 +917,7 @@ SWIFT
 swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ProcessRunner.swift \
     macos/LogicalChatCorrelation.swift \
+    macos/ToolCatalog.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"
@@ -863,6 +930,9 @@ BASE_URL="http://127.0.0.1:18088/mcp"
 SAFE_BASE_URL="http://127.0.0.1:18089/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+CATALOG_HASH="$(shasum -a 256 contracts/tool_catalog.v1.json | awk '{print $1}')"
+CATALOG_VERSION="1.0.0"
+INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
 import socket
@@ -1730,6 +1800,10 @@ printf '%s' "$DISCOVER" | grep -q '"supportedVersions":\["2026-07-28"\]'
 printf '%s' "$DISCOVER" | grep -q '"resultType":"complete"'
 printf '%s' "$DISCOVER" | grep -q '"name":"filemcp"'
 printf '%s' "$DISCOVER" | grep -q 'io.modelcontextprotocol\\/serverInfo'
+printf '%s' "$DISCOVER" | plutil -extract result.catalog.catalogHash raw -expect string -o - - | grep -qx "$CATALOG_HASH"
+printf '%s' "$DISCOVER" | plutil -extract result.catalog.catalogVersion raw -expect string -o - - | grep -qx "$CATALOG_VERSION"
+printf '%s' "$DISCOVER" | plutil -extract result.catalog.instructionVersion raw -expect string -o - - | grep -qx "$INSTRUCTION_VERSION"
+printf '%s' "$DISCOVER" | plutil -extract result.catalog.buildIdentity raw -expect string -o - - | grep -qx '0.4.0-swift'
 
 TOOLS="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1744,6 +1818,9 @@ printf '%s' "$TOOLS" | grep -q '"name":"search_content"'
 printf '%s' "$TOOLS" | grep -q '"outputSchema"'
 printf '%s' "$TOOLS" | grep -q '"name":"filemcp_observability_connect"'
 printf '%s' "$TOOLS" | grep -q '"_filemcp_chat"'
+printf '%s' "$TOOLS" | plutil -extract result.catalog.catalogHash raw -expect string -o - - | grep -qx "$CATALOG_HASH"
+printf '%s' "$TOOLS" | plutil -extract result.catalog.catalogVersion raw -expect string -o - - | grep -qx "$CATALOG_VERSION"
+printf '%s' "$TOOLS" | plutil -extract result.catalog.instructionVersion raw -expect string -o - - | grep -qx "$INSTRUCTION_VERSION"
 printf '%s' "$DISCOVER" | grep -q 'filemcp_observability_connect'
 printf '%s' "$DISCOVER" | grep -q '_filemcp_chat'
 

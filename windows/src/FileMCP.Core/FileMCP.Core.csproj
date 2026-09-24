@@ -11,6 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="FileMCP.Core.Tests" />
+    <EmbeddedResource Include="..\..\..\contracts\tool_catalog.v1.json" LogicalName="FileMCP.Contracts.tool_catalog.v1.json" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />

@@ -20,6 +20,7 @@ $Rid = if ($Architecture -eq "arm64") { "win-arm64" } else { "win-x64" }
 $VendorTag = if ($Architecture -eq "arm64") { "windows-arm64" } else { "windows-amd64" }
 $TunnelClient = Join-Path $Root "vendor/tunnel-client/$VendorTag/tunnel-client.exe"
 $ThirdParty = Join-Path $Root "vendor/tunnel-client/$VendorTag/THIRD-PARTY-LICENSES.txt"
+$ToolCatalog = Join-Path $Root "contracts/tool_catalog.v1.json"
 $PublishDir = Join-Path $Root "dist/windows-$Architecture/$StagingName"
 $ZipPath = Join-Path $Root "dist/FileMCP-v0.4.0-windows-$Architecture.zip"
 
@@ -30,7 +31,8 @@ foreach ($Required in @(
     (Join-Path $Root "vendor/tunnel-client/NOTICE"),
     (Join-Path $Root "vendor/opentelemetry/LICENSE.txt"),
     (Join-Path $Root "vendor/opentelemetry/THIRD-PARTY-NOTICES.txt"),
-    $ThirdParty
+    $ThirdParty,
+    $ToolCatalog
 )) {
     if (-not (Test-Path -LiteralPath $Required -PathType Leaf)) {
         throw "Missing required release file: $Required"
@@ -58,6 +60,7 @@ Copy-Item (Join-Path $Root "vendor/tunnel-client/NOTICE") (Join-Path $PublishDir
 Copy-Item $ThirdParty (Join-Path $PublishDir "tunnel-client-THIRD-PARTY-LICENSES.txt")
 Copy-Item (Join-Path $Root "vendor/opentelemetry/LICENSE.txt") (Join-Path $PublishDir "OpenTelemetry-LICENSE.txt")
 Copy-Item (Join-Path $Root "vendor/opentelemetry/THIRD-PARTY-NOTICES.txt") (Join-Path $PublishDir "OpenTelemetry-THIRD-PARTY-NOTICES.txt")
+Copy-Item $ToolCatalog (Join-Path $PublishDir "tool_catalog.v1.json")
 
 Remove-Item -Force $ZipPath -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $PublishDir "*") -DestinationPath $ZipPath -CompressionLevel Optimal

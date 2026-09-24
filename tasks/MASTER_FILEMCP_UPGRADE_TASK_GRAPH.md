@@ -69,7 +69,7 @@ FMG-004 budget primitives are required by FMG-009 and FMG-010.
 
 ## FMG-001 — Canonical Catalog Authority
 
-State: READY ROOT TASK
+State: ACTIVE / CLAIMED
 Depends: ADR-0005
 
 Scope:
