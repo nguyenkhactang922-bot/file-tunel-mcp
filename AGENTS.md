@@ -1,4 +1,4 @@
-﻿# AGENTS.md
+# AGENTS.md
 
 ## Repository-specific rules
 
@@ -13,3 +13,11 @@
 - TCP connections must never be presented as distinct chats.
 - Build/test evidence is mandatory before PASS.
 - Lifecycle after architecture freeze: CLAIM -> ANALYZE -> PLAN -> CODE -> TEST -> EVIDENCE -> VERIFY -> COMMIT -> REVIEW -> MERGE -> DONE.
+
+## Complete-current-scope pre-code law
+
+- FileMCP follows complete-scope-first design. Before the first feature implementation task is claimed, every capability/phase in the currently approved upgrade scope must be captured, deep-dived, compared, independently reviewed/red-teamed, repaired, architecture-frozen, dependency-checked, and task-split.
+- Do not deliberately stop at an intermediate implementation milestone to reopen a known later architecture phase. Known later-scope items must be resolved before coding as BUILD, REJECT, or explicitly OUT-OF-SCOPE by product authority.
+- Ambiguous `DEFER` is not an acceptable final pre-code state for a capability already inside the currently desired product scope.
+- For the current FileMCP complete upgrade, ADR-0006 and `tasks/MASTER_FILEMCP_COMPLETE_UPGRADE_TASK_GRAPH.md` are the ordering authorities. FMG-001 is the only initial READY task; FMG-013 is a foundation milestone; FMG-026 is the complete-upgrade final gate.
+- Any later change to product boundary, trust boundary, persistence class, or dependency architecture requires a new ADR/review round; task-level implementation detail may evolve inside the frozen contracts.

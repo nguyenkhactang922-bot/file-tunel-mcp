@@ -16,6 +16,12 @@ internal sealed partial class LocalTools
     private readonly SemaphoreSlim _serializedSlot = new(1, 1);
     private readonly SemaphoreSlim _commandSlots = new(2, 2);
     private readonly SemaphoreSlim _gitSlots = new(3, 3);
+    private static readonly HashSet<string> HandlerToolNames = new(StringComparer.Ordinal)
+    {
+        "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
+        "write_file", "delete_file", "delete_directory", "git_init", "git_status", "git_log", "git_diff",
+        "git_add", "git_commit", "git_push", "run_command",
+    };
     private static readonly HashSet<string> SerializedToolNames = new(StringComparer.Ordinal)
     {
         "write_file", "delete_file", "delete_directory", "run_command",
@@ -32,85 +38,16 @@ internal sealed partial class LocalTools
         _gitUserName = gitUserName;
         _gitUserEmail = gitUserEmail;
         _enableCommands = enableCommands;
+        CanonicalToolCatalog.ValidateHandlerCoverage("local_tools", HandlerToolNames);
         if (!enableCommands)
         {
             (_safeGitEmptyFile, _safeGitHooksDirectory) = PrepareSafeGitResources();
         }
     }
 
-    public JsonArray ToolDefinitions
-    {
-        get
-        {
-            var tools = new JsonArray
-            {
-                Tool("list_files", "List files and folders inside the shared directory (optionally a subfolder).",
-                    Props(("subpath", StringProperty("Subpath inside the shared root."))), [], true, output: StringArrayOutputSchema()),
-                Tool("read_file", "Read the text content of a file inside the shared directory.",
-                    Props(("relative_path", StringProperty("Relative path to a text file."))), ["relative_path"], true),
-                Tool("read_file_range", "Read a targeted line range from a text file. Use this after search_content to inspect surrounding implementation. Expand the range or use read_file before drawing conclusions when callers, state, imports, or other surrounding code may matter.",
-                    Props(
-                        ("relative_path", StringProperty("Relative path to a text file.")),
-                        ("start_line", IntegerProperty(1, null, null, "1-based first line to return.")),
-                        ("end_line", IntegerProperty(1, null, null, "1-based last line to return (inclusive)."))),
-                    ["relative_path", "start_line", "end_line"], true, output: ReadFileRangeOutputSchema()),
-                Tool("search_content", "Search text content recursively to locate relevant files and line regions. This is a locator, not a substitute for reading the implementation: inspect important matches with read_file_range or read_file before drawing conclusions.",
-                    Props(
-                        ("query", StringProperty("Literal text to search for.")),
-                        ("path", StringProperty("Optional subdirectory to search inside the shared root.")),
-                        ("case_sensitive", BooleanProperty(false)),
-                        ("context_lines", IntegerProperty(0, 10, 2)),
-                        ("max_results", IntegerProperty(1, FileMcpConstants.MaxSearchContentResults, 20))),
-                    ["query"], true, output: SearchContentOutputSchema()),
-                Tool("search_filenames", "Recursively search filenames (not content) under the shared directory.",
-                    Props(("query", StringProperty("Case-insensitive filename substring."))), ["query"], true, output: StringArrayOutputSchema()),
-                Tool("write_file", "Create a file, overwrite it, or append to it inside the shared directory.",
-                    Props(
-                        ("relative_path", StringProperty("Relative file path.")),
-                        ("content", StringProperty("UTF-8 text content.")),
-                        ("append", BooleanProperty(false))),
-                    ["relative_path", "content"], false, destructive: true),
-                Tool("delete_file", "Delete a file inside the shared directory (files only, not directories).",
-                    Props(("relative_path", StringProperty("Relative file path."))), ["relative_path"], false, destructive: true),
-                Tool("delete_directory", "Recursively delete a folder and everything inside it.",
-                    Props(("relative_path", StringProperty("Relative directory path."))), ["relative_path"], false, destructive: true),
-                Tool("git_init", "Create a new git repository inside the shared directory.",
-                    Props(("repo_path", StringProperty("Repository path relative to the shared root."))), [], false),
-                Tool("git_status", "Show the working-tree status of a git repo whose worktree and Git metadata stay inside the shared directory.",
-                    Props(("repo_path", StringProperty("Repository path relative to the shared root."))), [], true),
-                Tool("git_log", "Show recent commit history of a Git repo fully contained inside the shared directory.",
-                    Props(
-                        ("repo_path", StringProperty("Repository path relative to the shared root.")),
-                        ("count", IntegerProperty(1, 50, 10))), [], true),
-                Tool("git_diff", "Show uncommitted changes (working tree vs index). Repository paths are containment-checked; external diff/textconv are suppressed when command execution is disabled.",
-                    Props(
-                        ("repo_path", StringProperty("Repository path relative to the shared root.")),
-                        ("paths", StringProperty("Optional path or whitespace-separated pathspecs. Quote pathspecs that contain spaces."))), [], true),
-                Tool("git_add", "Stage files for the next commit. When command execution is disabled, paths using Git content filters are refused.",
-                    Props(
-                        ("repo_path", StringProperty("Repository path relative to the shared root.")),
-                        ("paths", StringProperty("Path or whitespace-separated pathspecs. Quote pathspecs that contain spaces.", "."))), [], false),
-                Tool("git_commit", "Create a commit from staged changes. Repository hooks and GPG signing are suppressed when command execution is disabled.",
-                    Props(
-                        ("repo_path", StringProperty("Repository path relative to the shared root.")),
-                        ("message", StringProperty(null, "update"))), [], false),
-                Tool("git_push", "Push the current branch to its upstream remote. In safe mode, repository hooks, signing, local file transport, and repository-local credential helpers are restricted.",
-                    Props(("repo_path", StringProperty("Repository path relative to the shared root."))), [], false, openWorld: true),
-            };
-            if (_enableCommands)
-            {
-                tools.Add(Tool("run_command", "Run a PowerShell command on the local machine. The command inherits the current user's environment and is not OS-sandboxed. cwd must stay inside the shared directory.",
-                    Props(
-                        ("command", StringProperty("PowerShell command to execute.")),
-                        ("cwd", StringProperty("Working directory relative to the shared root.")),
-                        ("timeout_seconds", IntegerProperty(1, ProcessRunner.MaxCommandTimeoutSeconds, ProcessRunner.DefaultCommandTimeoutSeconds))),
-                    ["command"], false, destructive: true, openWorld: true));
-            }
-            return tools;
-        }
-    }
+    public JsonArray ToolDefinitions => CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: _enableCommands);
 
-    public bool HasTool(string name) => ToolDefinitions.OfType<JsonObject>().Any(tool => tool["name"]?.GetValue<string>() == name);
+    public bool HasTool(string name) => HandlerToolNames.Contains(name) && (name != "run_command" || _enableCommands);
 
     public async Task<ToolCallOutput> CallAsync(string name, JsonObject arguments, CancellationToken cancellationToken = default)
     {
@@ -458,28 +395,6 @@ internal sealed partial class LocalTools
             }
         }
     }
-
-    private static JsonObject Props(params (string Key, JsonObject Value)[] values) { var result = new JsonObject(); foreach (var (key, value) in values) result[key] = value; return result; }
-    private static JsonObject StringProperty(string? description = null, string? defaultValue = null) { var value = new JsonObject { ["type"] = "string" }; if (description is not null) value["description"] = description; if (defaultValue is not null) value["default"] = defaultValue; return value; }
-    private static JsonObject BooleanProperty(bool defaultValue) => new() { ["type"] = "boolean", ["default"] = defaultValue };
-    private static JsonObject IntegerProperty(int? min, int? max, int? defaultValue, string? description = null) { var value = new JsonObject { ["type"] = "integer" }; if (min.HasValue) value["minimum"] = min.Value; if (max.HasValue) value["maximum"] = max.Value; if (defaultValue.HasValue) value["default"] = defaultValue.Value; if (description is not null) value["description"] = description; return value; }
-    private static JsonObject Tool(string name, string description, JsonObject properties, string[] required, bool readOnly, bool destructive = false, bool openWorld = false, JsonObject? output = null) => new()
-    {
-        ["name"] = name, ["description"] = description,
-        ["inputSchema"] = new JsonObject { ["type"] = "object", ["properties"] = properties, ["required"] = new JsonArray(required.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()), ["additionalProperties"] = false },
-        ["outputSchema"] = output ?? StringOutputSchema(),
-        ["annotations"] = new JsonObject { ["readOnlyHint"] = readOnly, ["destructiveHint"] = destructive, ["openWorldHint"] = openWorld },
-    };
-    private static JsonObject StringOutputSchema() => new() { ["type"] = "object", ["properties"] = new JsonObject { ["result"] = new JsonObject { ["type"] = "string" } }, ["required"] = new JsonArray("result"), ["additionalProperties"] = false };
-    private static JsonObject StringArrayOutputSchema() => new() { ["type"] = "object", ["properties"] = new JsonObject { ["result"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } }, ["truncated"] = new JsonObject { ["type"] = "boolean" } }, ["required"] = new JsonArray("result", "truncated"), ["additionalProperties"] = false };
-    private static JsonObject ReadFileRangeOutputSchema() => ObjectSchema(new[] { ("path","string"),("start_line","integer"),("end_line","integer"),("requested_end_line","integer"),("total_lines","integer"),("has_before","boolean"),("has_after","boolean"),("truncated","boolean"),("content","string") });
-    private static JsonObject SearchContentOutputSchema()
-    {
-        var match = ObjectSchema(new[] { ("path","string"),("line","integer"),("preview_start_line","integer"),("preview_end_line","integer"),("preview","string") });
-        var props = new JsonObject { ["query"] = new JsonObject { ["type"] = "string" }, ["path"] = new JsonObject { ["type"] = "string" }, ["case_sensitive"] = new JsonObject { ["type"] = "boolean" }, ["matches"] = new JsonObject { ["type"] = "array", ["items"] = match }, ["truncated"] = new JsonObject { ["type"] = "boolean" }, ["visited_entries"] = new JsonObject { ["type"] = "integer" }, ["files_scanned"] = new JsonObject { ["type"] = "integer" }, ["bytes_scanned"] = new JsonObject { ["type"] = "integer" } };
-        return new JsonObject { ["type"] = "object", ["properties"] = props, ["required"] = new JsonArray(props.Select(p => JsonValue.Create(p.Key)).ToArray()), ["additionalProperties"] = false };
-    }
-    private static JsonObject ObjectSchema(IEnumerable<(string Name, string Type)> fields) { var props = new JsonObject(); var required = new JsonArray(); foreach (var field in fields) { props[field.Name] = new JsonObject { ["type"] = field.Type }; required.Add(field.Name); } return new JsonObject { ["type"] = "object", ["properties"] = props, ["required"] = required, ["additionalProperties"] = false }; }
 
     private static string FormatProcessResult(ProcessResult result)
     {

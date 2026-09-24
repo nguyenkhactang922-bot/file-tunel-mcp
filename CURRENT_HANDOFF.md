@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `main`
+Branch: `chatgpt/FMG-001-canonical-catalog`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -77,3 +77,55 @@ Evidence:
 PR #2 is open, clean and mergeable at the exact verified tree. The connected bot has upstream READ only and cannot execute the final merge.
 
 No repository-internal technical task remains.
+## Future architecture track - ChatCMD integration
+
+Status: DESIGN-FROZEN, NOT ACTIVE IMPLEMENTATION.
+
+A multi-round independent audit of int04/ChatCmd was completed against pinned commit c20e134ad6b60ef12eee7231bcbca56f5252be45. The accepted design is selective native reimplementation, not repository merging or a runtime rewrite.
+
+Authorities:
+- docs/audit/CHATCMD_INDEPENDENT_MULTI_ROUND_INTEGRATION_AUDIT_2026-09-23.md
+- docs/design/CHATCMD_SOURCE_TO_FILEMCP_MAPPING_V1.md
+- docs/design/CHATCMD_INTEGRATION_DECISION_MATRIX_V1.md
+- docs/adr/0004-chatcmd-inspired-execution-foundation.md
+- tasks/CHATCMD_INTEGRATION_CANDIDATE_QUEUE.md
+
+This future track does not replace the current authoritative V11-009 upstream-merge action. When project authority activates the integration program, claim CCI-001 only.
+## Final cross-repo architecture program
+
+Status: DESIGN GATE COMPLETE / READY TO IMPLEMENT, BUT FEATURE CODING NOT STARTED.
+
+Final authority:
+- docs/adr/0005-final-coding-agent-gateway-architecture.md
+- docs/design/MASTER_FILEMCP_CODING_AGENT_GATEWAY_ARCHITECTURE_V1.md
+- docs/design/FINAL_FILEMCP_FUNCTION_UPGRADE_MATRIX.md
+- tasks/MASTER_FILEMCP_UPGRADE_TASK_GRAPH.md
+
+The cross-repo program completed Codex/OpenHands/Aider/Cline/Goose/ChatCMD comparison, contradiction synthesis, function-level upgrade decisions, independent red-team, P1 repair and repair re-audit.
+
+Future implementation NEXT_EXACT_ACTION when this program is explicitly started: claim FMG-001 Canonical Catalog Authority only.
+
+Do not begin FMG-001 in this design-only handoff. The existing V11-009 upstream merge authority gate remains the repository's unrelated current external closure action.
+
+## Complete-scope pre-code freeze
+
+Status: COMPLETE DESIGN/TASK SPLIT FROZEN / FEATURE CODING NOT STARTED.
+
+Product authority requires the complete current upgrade to be designed before coding. ADR-0006 extends ADR-0005 and resolves all former advanced `DEFER` items into BUILD or REJECT.
+
+Complete authorities:
+- docs/adr/0006-complete-upgrade-scope-freeze.md
+- docs/design/MASTER_FILEMCP_COMPLETE_UPGRADE_ARCHITECTURE_V2.md
+- docs/design/FINAL_COMPLETE_SCOPE_FUNCTION_MATRIX.md
+- tasks/MASTER_FILEMCP_COMPLETE_UPGRADE_TASK_GRAPH.md
+
+Implementation starts at FMG-001 only and proceeds through FMG-026 without a new architecture pause after FMG-013.
+
+FMG-026, not FMG-013, is the complete upgrade completion gate.
+## FMG-001 active implementation
+
+State: CLAIMED / ACTIVE.
+
+Branch: `chatgpt/FMG-001-canonical-catalog`.
+
+NEXT_EXACT_ACTION: stage and commit the locally verified FMG-001 candidate, push the exact branch, create/reuse the fork-main PR, require native GitHub Verify on macOS + Windows x64 + Windows ARM64, review/merge only on green exact-head evidence, then verify fork main and claim FMG-002. Do not begin FMG-002 before FMG-001 MAIN VERIFIED.

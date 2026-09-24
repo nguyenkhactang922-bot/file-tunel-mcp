@@ -8,6 +8,7 @@ namespace FileMCP.Core;
 internal sealed class CodexSkillRegistry
 {
     private const int MaxSkillBytes = 256 * 1024;
+    private static readonly HashSet<string> HandlerToolNames = new(StringComparer.Ordinal) { "list_codex_skills", "load_codex_skill" };
     private static readonly Regex ValidSkillName = new("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private readonly SafePathResolver _resolver;
     private readonly Action<string> _log;
@@ -18,23 +19,12 @@ internal sealed class CodexSkillRegistry
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _log = log;
+        CanonicalToolCatalog.ValidateHandlerCoverage("skills", HandlerToolNames);
     }
 
-    public JsonArray ToolDefinitions => new()
-    {
-        Tool(
-            "list_codex_skills",
-            "List Codex project skills discovered under .agents/skills in the current shared workspace. If the user's message starts with '/<skill-name>', use this list when needed to resolve the requested skill before answering.",
-            new JsonObject(),
-            []),
-        Tool(
-            "load_codex_skill",
-            "Load a Codex Agent Skill from .agents/skills/<name>/SKILL.md in the current shared workspace. IMPORTANT: when the user's message starts with '/<skill-name>', call this tool with <skill-name> before answering, then follow the returned SKILL.md instructions for the current task. The name is a skill identifier, not a path.",
-            new JsonObject { ["name"] = new JsonObject { ["type"] = "string", ["description"] = "Exact skill directory name under .agents/skills, for example speckit-analyze." } },
-            ["name"]),
-    };
+    public JsonArray ToolDefinitions => CanonicalToolCatalog.ToolDefinitions("skills");
 
-    public bool HasTool(string name) => name is "list_codex_skills" or "load_codex_skill";
+    public bool HasTool(string name) => HandlerToolNames.Contains(name);
 
     public int Refresh()
     {

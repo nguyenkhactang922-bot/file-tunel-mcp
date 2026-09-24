@@ -26,6 +26,7 @@ internal sealed record LocalMcpServerLimits(int MaxConcurrentConnections, TimeSp
 
 public sealed class LocalMcpServer : IAsyncDisposable
 {
+    private static readonly HashSet<string> ServerHandlerToolNames = new(StringComparer.Ordinal) { "filemcp_observability_connect" };
     private static readonly HashSet<string> UnauthenticatedOAuthDiscoveryPaths = new(StringComparer.Ordinal)
     {
         "/.well-known/oauth-protected-resource/mcp",
@@ -64,6 +65,8 @@ public sealed class LocalMcpServer : IAsyncDisposable
         _port = port; _localAuthToken = localAuthToken; _log = log; _usageMeter = usageMeter; _chatCorrelation = chatCorrelation; _sessions = sessions; _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey) ? null : workspaceKey.Trim().ToUpperInvariant(); _standardTelemetry = standardTelemetry;
         _limits = limits;
         _connectionSlots = new SemaphoreSlim(limits.MaxConcurrentConnections, limits.MaxConcurrentConnections);
+        CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
+        CanonicalToolCatalog.ValidateHandlerCoverage("server", ServerHandlerToolNames);
         _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, enableCommands);
         _skills = new CodexSkillRegistry(allowedDirectory, log);
     }
@@ -294,7 +297,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
     {
         "initialize" => JsonRpcResult(id, new JsonObject { ["protocolVersion"] = NegotiateLegacy(parameters["protocolVersion"]?.GetValue<string>()), ["capabilities"] = ServerCapabilities(), ["serverInfo"] = ServerInfo() }),
         "ping" => JsonRpcResult(id, new JsonObject()),
-        "tools/list" => JsonRpcResult(id, new JsonObject { ["tools"] = AllToolDefinitions() }),
+        "tools/list" => JsonRpcResult(id, ToolListResult()),
         "tools/call" => await CallToolAsync(id, parameters, false, requestBytes, cancellationToken).ConfigureAwait(false),
         _ => JsonRpcError(id, -32601, $"Method not found: {method}"),
     };
@@ -303,22 +306,26 @@ public sealed class LocalMcpServer : IAsyncDisposable
     {
         if (method == "server/discover")
         {
-            var instructions = "Read and manage files, Git repositories, Codex project skills, and optionally local commands inside the configured shared directory. When a user message begins with '/<skill-name>', call load_codex_skill with that exact name before answering and follow the returned SKILL.md instructions.";
-            if (_chatCorrelation is not null)
-                instructions += " For local observability, call filemcp_observability_connect once for this chat context, then include the returned chat_instance_id as _filemcp_chat on later FileMCP tool calls. The handle is correlation metadata only and grants no additional authority.";
             var result = ModernComplete(new JsonObject
             {
                 ["supportedVersions"] = new JsonArray(FileMcpConstants.ModernProtocolVersion),
                 ["capabilities"] = ServerCapabilities(),
-                ["instructions"] = instructions,
+                ["instructions"] = CanonicalToolCatalog.Instructions(_chatCorrelation is not null),
+                ["catalog"] = CanonicalToolCatalog.Metadata(FileMcpConstants.ServerVersion),
             });
             result["ttlMs"] = 60_000; result["cacheScope"] = "private"; return JsonRpcResult(id, result);
         }
         if (method == "ping") return JsonRpcResult(id, ModernComplete(new JsonObject()));
-        if (method == "tools/list") { var result = ModernComplete(new JsonObject { ["tools"] = AllToolDefinitions() }); result["ttlMs"] = 30_000; result["cacheScope"] = "private"; return JsonRpcResult(id, result); }
+        if (method == "tools/list") { var result = ModernComplete(ToolListResult()); result["ttlMs"] = 30_000; result["cacheScope"] = "private"; return JsonRpcResult(id, result); }
         if (method == "tools/call") return await CallToolAsync(id, parameters, true, requestBytes, cancellationToken).ConfigureAwait(false);
         return JsonRpcError(id, -32601, $"Method not found: {method}", status: 404);
     }
+
+    private JsonObject ToolListResult() => new()
+    {
+        ["tools"] = AllToolDefinitions(),
+        ["catalog"] = CanonicalToolCatalog.Metadata(FileMcpConstants.ServerVersion),
+    };
 
     private JsonArray AllToolDefinitions()
     {
@@ -335,45 +342,11 @@ public sealed class LocalMcpServer : IAsyncDisposable
         if (_chatCorrelation is null || clone is not JsonObject tool) return clone;
         if (tool["inputSchema"] is not JsonObject inputSchema) return clone;
         if (inputSchema["properties"] is not JsonObject properties) return clone;
-        properties["_filemcp_chat"] = new JsonObject
-        {
-            ["type"] = "string",
-            ["description"] = "Optional opaque FileMCP correlation handle returned by filemcp_observability_connect. It is observability metadata only and grants no additional authority.",
-        };
+        properties[CanonicalToolCatalog.CorrelationArgumentName] = CanonicalToolCatalog.CorrelationArgumentDefinition();
         return clone;
     }
 
-    private static JsonObject ObservabilityConnectToolDefinition() => new()
-    {
-        ["name"] = "filemcp_observability_connect",
-        ["description"] = "Establish or resume an opaque FileMCP logical-chat correlation handle for local observability. This handle is metadata only and never grants file, Git, or command permissions.",
-        ["inputSchema"] = new JsonObject
-        {
-            ["type"] = "object",
-            ["properties"] = new JsonObject
-            {
-                ["chat_instance_id"] = new JsonObject
-                {
-                    ["type"] = "string",
-                    ["description"] = "Optional prior FileMCP chat correlation handle to resume within this FileMCP process.",
-                },
-            },
-            ["required"] = new JsonArray(),
-            ["additionalProperties"] = false,
-        },
-        ["outputSchema"] = new JsonObject
-        {
-            ["type"] = "object",
-            ["properties"] = new JsonObject
-            {
-                ["chat_instance_id"] = new JsonObject { ["type"] = "string" },
-                ["resumed"] = new JsonObject { ["type"] = "boolean" },
-            },
-            ["required"] = new JsonArray("chat_instance_id", "resumed"),
-            ["additionalProperties"] = false,
-        },
-        ["annotations"] = new JsonObject { ["readOnlyHint"] = true, ["destructiveHint"] = false, ["openWorldHint"] = false },
-    };
+    private static JsonObject ObservabilityConnectToolDefinition() => CanonicalToolCatalog.ToolDefinition("filemcp_observability_connect");
 
     private async Task<byte[]> CallToolAsync(JsonNode? id, JsonObject parameters, bool modern, long requestBytes, CancellationToken cancellationToken)
     {

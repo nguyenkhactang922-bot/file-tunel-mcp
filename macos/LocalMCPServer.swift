@@ -112,18 +112,17 @@ private final class SafePathResolver {
     }
 }
 
-private enum LocalToolOutputShape {
-    case string
-    case stringArray
-    case object([String: Any])
-}
-
 private struct LocalToolCallOutput {
     let content: [[String: Any]]
     let structuredContent: [String: Any]
 }
 
 private final class LocalTools {
+    private static let handlerToolNames: Set<String> = [
+        "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
+        "write_file", "delete_file", "delete_directory", "git_init", "git_status", "git_log", "git_diff",
+        "git_add", "git_commit", "git_push", "run_command",
+    ]
     private let resolver: SafePathResolver
     private let gitUserName: String
     private let gitUserEmail: String
@@ -140,187 +139,20 @@ private final class LocalTools {
         ".git", ".venv", "node_modules", "__pycache__", "build", "dist"
     ]
 
-    init(resolver: SafePathResolver, gitUserName: String, gitUserEmail: String, enableCommands: Bool) {
+    init(resolver: SafePathResolver, gitUserName: String, gitUserEmail: String, enableCommands: Bool) throws {
         self.resolver = resolver
         self.gitUserName = gitUserName
         self.gitUserEmail = gitUserEmail
         self.enableCommands = enableCommands
+        try CanonicalToolCatalog.shared.validateHandlerCoverage(handler: "local_tools", runtimeHandlerNames: Self.handlerToolNames)
     }
 
     var toolDefinitions: [[String: Any]] {
-        var tools: [[String: Any]] = [
-            tool(
-                name: "list_files",
-                description: "List files and folders inside the shared directory (optionally a subfolder).",
-                properties: ["subpath": stringProperty("Subpath inside the shared root.")],
-                required: [],
-                readOnly: true,
-                output: .stringArray
-            ),
-            tool(
-                name: "read_file",
-                description: "Read the text content of a file inside the shared directory.",
-                properties: ["relative_path": stringProperty("Relative path to a text file.")],
-                required: ["relative_path"],
-                readOnly: true
-            ),
-            tool(
-                name: "read_file_range",
-                description: "Read a targeted line range from a text file. Use this after search_content to inspect surrounding implementation. Expand the range or use read_file before drawing conclusions when callers, state, imports, or other surrounding code may matter.",
-                properties: [
-                    "relative_path": stringProperty("Relative path to a text file."),
-                    "start_line": ["type": "integer", "minimum": 1, "description": "1-based first line to return."],
-                    "end_line": ["type": "integer", "minimum": 1, "description": "1-based last line to return (inclusive)."],
-                ],
-                required: ["relative_path", "start_line", "end_line"],
-                readOnly: true,
-                output: .object(readFileRangeOutputSchema())
-            ),
-            tool(
-                name: "search_content",
-                description: "Search text content recursively to locate relevant files and line regions. This is a locator, not a substitute for reading the implementation: inspect important matches with read_file_range or read_file before drawing conclusions.",
-                properties: [
-                    "query": stringProperty("Literal text to search for."),
-                    "path": stringProperty("Optional subdirectory to search inside the shared root."),
-                    "case_sensitive": ["type": "boolean", "default": false],
-                    "context_lines": ["type": "integer", "minimum": 0, "maximum": 10, "default": 2],
-                    "max_results": ["type": "integer", "minimum": 1, "maximum": maxSearchContentResults, "default": 20],
-                ],
-                required: ["query"],
-                readOnly: true,
-                output: .object(searchContentOutputSchema())
-            ),
-            tool(
-                name: "search_filenames",
-                description: "Recursively search filenames (not content) under the shared directory.",
-                properties: ["query": stringProperty("Case-insensitive filename substring.")],
-                required: ["query"],
-                readOnly: true,
-                output: .stringArray
-            ),
-            tool(
-                name: "write_file",
-                description: "Create a file, overwrite it, or append to it inside the shared directory.",
-                properties: [
-                    "relative_path": stringProperty("Relative file path."),
-                    "content": stringProperty("UTF-8 text content."),
-                    "append": ["type": "boolean", "default": false],
-                ],
-                required: ["relative_path", "content"],
-                readOnly: false,
-                destructive: true
-            ),
-            tool(
-                name: "delete_file",
-                description: "Delete a file inside the shared directory (files only, not directories).",
-                properties: ["relative_path": stringProperty("Relative file path.")],
-                required: ["relative_path"],
-                readOnly: false,
-                destructive: true
-            ),
-            tool(
-                name: "delete_directory",
-                description: "Recursively delete a folder and everything inside it.",
-                properties: ["relative_path": stringProperty("Relative directory path.")],
-                required: ["relative_path"],
-                readOnly: false,
-                destructive: true
-            ),
-            tool(
-                name: "git_init",
-                description: "Create a new git repository inside the shared directory.",
-                properties: ["repo_path": stringProperty("Repository path relative to the shared root.")],
-                required: [],
-                readOnly: false
-            ),
-            tool(
-                name: "git_status",
-                description: "Show the working-tree status of a git repo whose worktree and Git metadata stay inside the shared directory.",
-                properties: ["repo_path": stringProperty("Repository path relative to the shared root.")],
-                required: [],
-                readOnly: true
-            ),
-            tool(
-                name: "git_log",
-                description: "Show recent commit history of a Git repo fully contained inside the shared directory.",
-                properties: [
-                    "repo_path": stringProperty("Repository path relative to the shared root."),
-                    "count": ["type": "integer", "minimum": 1, "maximum": 50, "default": 10],
-                ],
-                required: [],
-                readOnly: true
-            ),
-            tool(
-                name: "git_diff",
-                description: "Show uncommitted changes (working tree vs index). Repository paths are containment-checked; external diff/textconv are suppressed when command execution is disabled.",
-                properties: [
-                    "repo_path": stringProperty("Repository path relative to the shared root."),
-                    "paths": stringProperty("Optional path or whitespace-separated pathspecs. Quote pathspecs that contain spaces."),
-                ],
-                required: [],
-                readOnly: true
-            ),
-            tool(
-                name: "git_add",
-                description: "Stage files for the next commit. When command execution is disabled, paths using Git content filters are refused.",
-                properties: [
-                    "repo_path": stringProperty("Repository path relative to the shared root."),
-                    "paths": [
-                        "type": "string",
-                        "default": ".",
-                        "description": "Path or whitespace-separated pathspecs. Quote pathspecs that contain spaces.",
-                    ],
-                ],
-                required: [],
-                readOnly: false
-            ),
-            tool(
-                name: "git_commit",
-                description: "Create a commit from staged changes. Repository hooks and GPG signing are suppressed when command execution is disabled.",
-                properties: [
-                    "repo_path": stringProperty("Repository path relative to the shared root."),
-                    "message": ["type": "string", "default": "update"],
-                ],
-                required: [],
-                readOnly: false
-            ),
-            tool(
-                name: "git_push",
-                description: "Push the current branch to its upstream remote. In safe mode, repository hooks, signing, local file transport, and repository-local credential helpers are restricted.",
-                properties: ["repo_path": stringProperty("Repository path relative to the shared root.")],
-                required: [],
-                readOnly: false,
-                openWorld: true
-            ),
-        ]
-
-        if enableCommands {
-            tools.append(
-                tool(
-                    name: "run_command",
-                    description: "Run a shell command on the local machine. The command inherits the current user's environment and is not OS-sandboxed. cwd must stay inside the shared directory.",
-                    properties: [
-                        "command": stringProperty("Shell command to execute."),
-                        "cwd": stringProperty("Working directory relative to the shared root."),
-                        "timeout_seconds": [
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": ProcessRunner.maxCommandTimeoutSeconds,
-                            "default": ProcessRunner.defaultCommandTimeoutSeconds,
-                        ],
-                    ],
-                    required: ["command"],
-                    readOnly: false,
-                    destructive: true,
-                    openWorld: true
-                )
-            )
-        }
-        return tools
+        CanonicalToolCatalog.shared.toolDefinitions(handler: "local_tools", commandsEnabled: enableCommands)
     }
 
     func hasTool(named name: String) -> Bool {
-        toolDefinitions.contains { $0["name"] as? String == name }
+        Self.handlerToolNames.contains(name) && (name != "run_command" || enableCommands)
     }
 
     func call(name: String, arguments: [String: Any]) throws -> LocalToolCallOutput {
@@ -1329,10 +1161,6 @@ private final class LocalTools {
         integerArgument(arguments, key) ?? defaultValue
     }
 
-    private func stringProperty(_ description: String) -> [String: Any] {
-        ["type": "string", "description": description]
-    }
-
     private func stringOutput(_ value: String) -> LocalToolCallOutput {
         LocalToolCallOutput(
             content: [["type": "text", "text": value]],
@@ -1397,106 +1225,6 @@ private final class LocalTools {
         }
     }
 
-    private func readFileRangeOutputSchema() -> [String: Any] {
-        [
-            "type": "object",
-            "properties": [
-                "path": ["type": "string"],
-                "start_line": ["type": "integer"],
-                "end_line": ["type": "integer"],
-                "requested_end_line": ["type": "integer"],
-                "total_lines": ["type": "integer"],
-                "has_before": ["type": "boolean"],
-                "has_after": ["type": "boolean"],
-                "truncated": ["type": "boolean"],
-                "content": ["type": "string"],
-            ],
-            "required": ["path", "start_line", "end_line", "requested_end_line", "total_lines", "has_before", "has_after", "truncated", "content"],
-            "additionalProperties": false,
-        ]
-    }
-
-    private func searchContentOutputSchema() -> [String: Any] {
-        let matchSchema: [String: Any] = [
-            "type": "object",
-            "properties": [
-                "path": ["type": "string"],
-                "line": ["type": "integer"],
-                "preview_start_line": ["type": "integer"],
-                "preview_end_line": ["type": "integer"],
-                "preview": ["type": "string"],
-            ],
-            "required": ["path", "line", "preview_start_line", "preview_end_line", "preview"],
-            "additionalProperties": false,
-        ]
-        return [
-            "type": "object",
-            "properties": [
-                "query": ["type": "string"],
-                "path": ["type": "string"],
-                "case_sensitive": ["type": "boolean"],
-                "matches": ["type": "array", "items": matchSchema],
-                "truncated": ["type": "boolean"],
-                "visited_entries": ["type": "integer"],
-                "files_scanned": ["type": "integer"],
-                "bytes_scanned": ["type": "integer"],
-            ],
-            "required": ["query", "path", "case_sensitive", "matches", "truncated", "visited_entries", "files_scanned", "bytes_scanned"],
-            "additionalProperties": false,
-        ]
-    }
-
-    private func outputSchema(for output: LocalToolOutputShape) -> [String: Any] {
-        switch output {
-        case .string:
-            return [
-                "type": "object",
-                "properties": ["result": ["type": "string"]],
-                "required": ["result"],
-                "additionalProperties": false,
-            ]
-        case .stringArray:
-            return [
-                "type": "object",
-                "properties": [
-                    "result": ["type": "array", "items": ["type": "string"]],
-                    "truncated": ["type": "boolean"],
-                ],
-                "required": ["result", "truncated"],
-                "additionalProperties": false,
-            ]
-        case let .object(schema):
-            return schema
-        }
-    }
-
-    private func tool(
-        name: String,
-        description: String,
-        properties: [String: Any],
-        required: [String],
-        readOnly: Bool,
-        destructive: Bool = false,
-        openWorld: Bool = false,
-        output: LocalToolOutputShape = .string
-    ) -> [String: Any] {
-        [
-            "name": name,
-            "description": description,
-            "inputSchema": [
-                "type": "object",
-                "properties": properties,
-                "required": required,
-                "additionalProperties": false,
-            ],
-            "outputSchema": outputSchema(for: output),
-            "annotations": [
-                "readOnlyHint": readOnly,
-                "destructiveHint": destructive,
-                "openWorldHint": openWorld,
-            ],
-        ]
-    }
 }
 
 private struct HTTPRequest {
@@ -1568,6 +1296,7 @@ private final class MCPConnectionLease {
 }
 
 final class LocalMCPServer {
+    private static let handlerToolNames: Set<String> = ["filemcp_observability_connect"]
     private let port: UInt16
     private let localAuthToken: String
     private let tools: LocalTools
@@ -1602,8 +1331,11 @@ final class LocalMCPServer {
         self.log = log
         self.limits = limits
         self.connectionSlots = DispatchSemaphore(value: limits.maxConcurrentConnections)
+        let catalog = CanonicalToolCatalog.shared
+        try catalog.validateProtocolContract(modern: mcpModernProtocolVersion, legacy: mcpLegacySupportedVersions)
+        try catalog.validateHandlerCoverage(handler: "server", runtimeHandlerNames: Self.handlerToolNames)
         let resolver = try SafePathResolver(rootPath: allowedDirectory)
-        self.tools = LocalTools(
+        self.tools = try LocalTools(
             resolver: resolver,
             gitUserName: gitUserName,
             gitUserEmail: gitUserEmail,
@@ -1975,6 +1707,13 @@ final class LocalMCPServer {
         }
     }
 
+    private func toolListResult() -> [String: Any] {
+        [
+            "tools": allToolDefinitions(),
+            "catalog": CanonicalToolCatalog.shared.metadata(buildIdentity: mcpServerVersion),
+        ]
+    }
+
     private func allToolDefinitions() -> [[String: Any]] {
         var result = tools.toolDefinitions.map(withCorrelationFacadeMetadata)
         result.append(contentsOf: skills.toolDefinitions.map(withCorrelationFacadeMetadata))
@@ -1988,45 +1727,14 @@ final class LocalMCPServer {
               var properties = inputSchema["properties"] as? [String: Any] else {
             return tool
         }
-        properties["_filemcp_chat"] = [
-            "type": "string",
-            "description": "Optional opaque FileMCP correlation handle returned by filemcp_observability_connect. It is observability metadata only and grants no additional authority.",
-        ]
+        properties[CanonicalToolCatalog.shared.correlationArgumentName] = CanonicalToolCatalog.shared.correlationArgumentDefinition()
         inputSchema["properties"] = properties
         tool["inputSchema"] = inputSchema
         return tool
     }
 
     private func observabilityConnectToolDefinition() -> [String: Any] {
-        [
-            "name": "filemcp_observability_connect",
-            "description": "Establish or resume an opaque FileMCP logical-chat correlation handle for local observability. This handle is metadata only and never grants file, Git, or command permissions.",
-            "inputSchema": [
-                "type": "object",
-                "properties": [
-                    "chat_instance_id": [
-                        "type": "string",
-                        "description": "Optional prior FileMCP chat correlation handle to resume within this FileMCP process.",
-                    ],
-                ],
-                "required": [],
-                "additionalProperties": false,
-            ] as [String: Any],
-            "outputSchema": [
-                "type": "object",
-                "properties": [
-                    "chat_instance_id": ["type": "string"],
-                    "resumed": ["type": "boolean"],
-                ],
-                "required": ["chat_instance_id", "resumed"],
-                "additionalProperties": false,
-            ] as [String: Any],
-            "annotations": [
-                "readOnlyHint": true,
-                "destructiveHint": false,
-                "openWorldHint": false,
-            ],
-        ]
+        try! CanonicalToolCatalog.shared.toolDefinition(named: "filemcp_observability_connect")
     }
 
     private func processLegacyRequest(id: Any, method: String, params: [String: Any]) -> Data {
@@ -2044,7 +1752,7 @@ final class LocalMCPServer {
         case "ping":
             return jsonRPCResult(id: id, result: [:])
         case "tools/list":
-            return jsonRPCResult(id: id, result: ["tools": allToolDefinitions()])
+            return jsonRPCResult(id: id, result: toolListResult())
         case "tools/call":
             return callTool(id: id, params: params, modern: false)
         default:
@@ -2058,14 +1766,15 @@ final class LocalMCPServer {
             var result = modernCompleteResult([
                 "supportedVersions": [mcpModernProtocolVersion],
                 "capabilities": serverCapabilities(),
-                "instructions": "Read and manage files, Git repositories, Codex project skills, and optionally local commands inside the configured shared directory. When a user message begins with '/<skill-name>', call load_codex_skill with that exact name before answering and follow the returned SKILL.md instructions. For local observability, call filemcp_observability_connect once for this chat context, then include the returned chat_instance_id as _filemcp_chat on later FileMCP tool calls. The handle is correlation metadata only and grants no additional authority.",
+                "instructions": CanonicalToolCatalog.shared.instructions(includeObservability: true),
+                "catalog": CanonicalToolCatalog.shared.metadata(buildIdentity: mcpServerVersion),
             ])
             addCacheMetadata(to: &result, ttlMs: 60_000)
             return jsonRPCResult(id: id, result: result)
         case "ping":
             return jsonRPCResult(id: id, result: modernCompleteResult([:]))
         case "tools/list":
-            var result = modernCompleteResult(["tools": allToolDefinitions()])
+            var result = modernCompleteResult(toolListResult())
             addCacheMetadata(to: &result, ttlMs: 30_000)
             return jsonRPCResult(id: id, result: result)
         case "tools/call":
@@ -2423,6 +2132,7 @@ private enum CodexSkillError: LocalizedError {
 }
 
 final class CodexSkillRegistry {
+    private static let handlerToolNames: Set<String> = ["list_codex_skills", "load_codex_skill"]
     static let maxSkillBytes = 256 * 1024
     private let root: URL
     private let rootPath: String
@@ -2437,33 +2147,14 @@ final class CodexSkillRegistry {
         root = url.resolvingSymlinksInPath().standardizedFileURL
         self.rootPath = root.path
         self.log = log
+        try CanonicalToolCatalog.shared.validateHandlerCoverage(handler: "skills", runtimeHandlerNames: Self.handlerToolNames)
     }
 
     var toolDefinitions: [[String: Any]] {
-        [
-            [
-                "name": "list_codex_skills",
-                "description": "List Codex project skills discovered under .agents/skills in the current shared workspace. If the user's message starts with '/<skill-name>', use this list when needed to resolve the requested skill before answering.",
-                "inputSchema": ["type": "object", "properties": [:], "required": [], "additionalProperties": false],
-                "outputSchema": ["type": "object", "additionalProperties": true],
-                "annotations": ["readOnlyHint": true, "destructiveHint": false, "openWorldHint": false],
-            ],
-            [
-                "name": "load_codex_skill",
-                "description": "Load a Codex Agent Skill from .agents/skills/<name>/SKILL.md in the current shared workspace. IMPORTANT: when the user's message starts with '/<skill-name>', call this tool with <skill-name> before answering, then follow the returned SKILL.md instructions for the current task. The name is a skill identifier, not a path.",
-                "inputSchema": [
-                    "type": "object",
-                    "properties": ["name": ["type": "string", "description": "Exact skill directory name under .agents/skills, for example speckit-analyze."]],
-                    "required": ["name"],
-                    "additionalProperties": false,
-                ],
-                "outputSchema": ["type": "object", "additionalProperties": true],
-                "annotations": ["readOnlyHint": true, "destructiveHint": false, "openWorldHint": false],
-            ],
-        ]
+        CanonicalToolCatalog.shared.toolDefinitions(handler: "skills")
     }
 
-    func hasTool(named name: String) -> Bool { name == "list_codex_skills" || name == "load_codex_skill" }
+    func hasTool(named name: String) -> Bool { Self.handlerToolNames.contains(name) }
 
     @discardableResult
     func refresh() -> Int {

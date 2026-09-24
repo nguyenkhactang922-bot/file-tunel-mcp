@@ -38,6 +38,21 @@ if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $TunnelClient -PathType Leaf)) {
     throw "tunnel-client.exe is missing from the Windows $Architecture release archive."
 }
+$PackagedCatalog = Join-Path $SmokeRoot "tool_catalog.v1.json"
+$SourceCatalog = Join-Path $Root "contracts/tool_catalog.v1.json"
+if (-not (Test-Path -LiteralPath $PackagedCatalog -PathType Leaf)) {
+    throw "tool_catalog.v1.json is missing from the Windows $Architecture release archive."
+}
+$PackagedCatalogHash = (Get-FileHash -Algorithm SHA256 $PackagedCatalog).Hash
+$SourceCatalogHash = (Get-FileHash -Algorithm SHA256 $SourceCatalog).Hash
+if ($PackagedCatalogHash -ne $SourceCatalogHash) {
+    throw "Packaged tool catalog hash does not match canonical source."
+}
+$PackagedCatalogJson = Get-Content $PackagedCatalog -Raw | ConvertFrom-Json
+if ($PackagedCatalogJson.schemaVersion -ne 1 -or $PackagedCatalogJson.catalogVersion -ne "1.0.0") {
+    throw "Packaged tool catalog version is invalid."
+}
+Write-Host "windows-packaged-tool-catalog-$Architecture`: ok (sha256=$($PackagedCatalogHash.ToLowerInvariant()))"
 $SmokeDatabase = Join-Path $SmokeRoot "observability-package-smoke.sqlite3"
 $SmokeMarker = Join-Path $SmokeRoot "observability-package-smoke.txt"
 $OtlpSmokeMarker = Join-Path $SmokeRoot "otlp-package-smoke.txt"

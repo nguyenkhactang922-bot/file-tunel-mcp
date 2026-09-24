@@ -26,12 +26,13 @@ APP_LICENSE="$ROOT/LICENSE"
 TUNNEL_LICENSE="$ROOT/vendor/tunnel-client/LICENSE"
 TUNNEL_NOTICE="$ROOT/vendor/tunnel-client/NOTICE"
 TUNNEL_THIRD_PARTY="$ROOT/vendor/tunnel-client/$TARGET_TAG/THIRD-PARTY-LICENSES.txt"
+TOOL_CATALOG="$ROOT/contracts/tool_catalog.v1.json"
 if [ ! -f "$TUNNEL_BIN" ]; then
     echo "ERROR: missing tunnel-client for $TARGET_TAG:" >&2
     echo "       $TUNNEL_BIN" >&2
     exit 1
 fi
-for required_file in "$APP_LICENSE" "$TUNNEL_LICENSE" "$TUNNEL_NOTICE" "$TUNNEL_THIRD_PARTY"; do
+for required_file in "$APP_LICENSE" "$TUNNEL_LICENSE" "$TUNNEL_NOTICE" "$TUNNEL_THIRD_PARTY" "$TOOL_CATALOG"; do
     if [ ! -f "$required_file" ]; then
         echo "ERROR: missing required license/provenance file: $required_file" >&2
         exit 1
@@ -46,6 +47,7 @@ cp "$APP_LICENSE" "$APP/Contents/Resources/FileMCP-LICENSE.txt"
 cp "$TUNNEL_LICENSE" "$APP/Contents/Resources/tunnel-client-LICENSE.txt"
 cp "$TUNNEL_NOTICE" "$APP/Contents/Resources/tunnel-client-NOTICE.txt"
 cp "$TUNNEL_THIRD_PARTY" "$APP/Contents/Resources/tunnel-client-THIRD-PARTY-LICENSES.txt"
+cp "$TOOL_CATALOG" "$APP/Contents/Resources/tool_catalog.v1.json"
 cp "$TUNNEL_BIN" "$APP/Contents/MacOS/tunnel-client"
 chmod 755 "$APP/Contents/MacOS/tunnel-client"
 
@@ -58,6 +60,7 @@ chmod 755 "$APP/Contents/MacOS/tunnel-client"
     -o "$APP/Contents/MacOS/FileMCP" \
     "$ROOT/macos/ProcessRunner.swift" \
     "$ROOT/macos/LogicalChatCorrelation.swift" \
+    "$ROOT/macos/ToolCatalog.swift" \
     "$ROOT/macos/LocalMCPServer.swift" \
     "$ROOT/macos/TunnelSupervisor.swift" \
     "$ROOT/macos/LocalMCPRuntime.swift" \

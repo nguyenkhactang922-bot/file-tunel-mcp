@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `main`
+Active branch: `chatgpt/FMG-001-canonical-catalog`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -64,3 +64,63 @@ Evidence:
 docs/evidence/V11-009_FINAL_TECHNICAL_MAIN_EVIDENCE.md
 
 Current authoritative action is owned by tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md.
+## Future architecture - ChatCMD-inspired integration
+
+State: DESIGN-FROZEN / NOT ACTIVE IMPLEMENTATION.
+
+ADR-0004 freezes Phase A:
+- canonical tool catalog/hash;
+- structured result envelope;
+- structured exec_process;
+- file version tokens;
+- atomic versioned apply_edits;
+- common budget/cursor semantics;
+- metadata-only execution evidence;
+- project-context digest;
+- server-owned policy profiles.
+
+Persistent PTY is deferred. Sub-agents require a separate ADR. Browser DOM automation, public tokenized MCP transport, broad task-content persistence and a Rust rewrite are rejected.
+
+Candidate queue:
+tasks/CHATCMD_INTEGRATION_CANDIDATE_QUEUE.md
+
+No feature code was changed by the audit/design task.
+## Final coding-agent gateway architecture
+
+State: ARCHITECTURE FROZEN / IMPLEMENTATION NOT STARTED.
+
+ADR-0005 supersedes ADR-0004 where more specific. Final Phase A graph is tasks/MASTER_FILEMCP_UPGRADE_TASK_GRAPH.md with FMG-001 as the only root implementation task.
+
+Design proof complete:
+- source-first cross-repo audits;
+- final contradiction matrix;
+- final function upgrade matrix;
+- security/trust model;
+- execution/edit/evidence model;
+- large-repo context decision;
+- recovery/checkpoint decision;
+- independent red-team;
+- P1 blocker repairs;
+- repair re-audit PASS.
+
+Historical ADR-0005 note: the foundation architecture originally marked optional isolation, repo intelligence, checkpoint, PTY, artifact spillover and command idempotency registry as DEFER. ADR-0006 subsequently superseded that planning state for the complete current scope by resolving former DEFER items to BUILD or REJECT before implementation.
+
+## Complete upgrade scope frozen before implementation
+
+State: COMPLETE-SCOPE ARCHITECTURE/TASK GRAPH FROZEN / IMPLEMENTATION NOT STARTED.
+
+ADR-0006 extends ADR-0005. Former Phase B candidates have been resolved before coding:
+- BUILD: artifact/content refs, batch read/stat, quarantine restore, edit adapters, repository intelligence, PTY, checkpoint/restore, execution backend interface, optional Docker isolated backend;
+- REJECT: arbitrary-command idempotency/auto-replay and previously rejected agent/browser/provider/product expansions.
+
+`tasks/MASTER_FILEMCP_COMPLETE_UPGRADE_TASK_GRAPH.md` is the complete ordering authority FMG-001..FMG-026. FMG-001 is the only initial READY task. FMG-013 is foundation verification; FMG-026 is COMPLETE_UPGRADE_MAIN_VERIFIED.
+## FMG-001 implementation
+
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+Branch: `chatgpt/FMG-001-canonical-catalog`.
+Scope: Canonical Catalog Authority only.
+Canonical candidate hash: `d597f611374045825808d930f2bb0ef7e995515bb816a52ceccb47fd42a8e6aa`.
+Local proof: Windows runtime 470 assertions PASS; Release build 0 warnings / 0 errors; contract/parity PASS; isolated x64+ARM64 package build PASS; packaged x64 catalog/app smoke PASS.
+Evidence: `docs/evidence/FMG-001_CANONICAL_CATALOG_EVIDENCE.md`.
+Next gate: exact-head native GitHub Verify -> review -> merge fork main -> MAIN VERIFIED.
+Later FMG tasks remain BLOCKED by dependency graph.
