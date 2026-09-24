@@ -134,7 +134,8 @@ precondition(toolError["status"] as? String == "tool_error")
 
 var carrier: [String: Any] = ["content": content, "isError": false]
 ToolResultEnvelope.attach(to: &carrier, isError: false, content: content, structuredContent: ["result": "ok"])
-precondition(try ToolResultEnvelope.require(from: carrier)["status"] as? String == "success")
+let requiredEnvelope = try ToolResultEnvelope.require(from: carrier)
+precondition(requiredEnvelope["status"] as? String == "success")
 precondition(carrier["resultEnvelope"] == nil)
 
 var badVersion = success; badVersion["schemaVersion"] = "9.9.9"
