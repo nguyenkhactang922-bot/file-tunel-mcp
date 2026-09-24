@@ -369,11 +369,8 @@ public sealed class LocalMcpServer : IAsyncDisposable
             else if (parameters["arguments"] is JsonObject obj) arguments = (JsonObject)obj.DeepClone();
             else
             {
-                var invalid = new JsonObject
-                {
-                    ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "Invalid arguments: expected an object" }),
-                    ["isError"] = true,
-                };
+                var invalidContent = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "Invalid arguments: expected an object" });
+                var invalid = ToolCallResult(invalidContent, null, isError: true);
                 if (modern) invalid = ModernComplete(invalid);
                 return response = JsonRpcResult(id, invalid);
             }
@@ -405,16 +402,12 @@ public sealed class LocalMcpServer : IAsyncDisposable
                         ["chat_instance_id"] = connection.ChatInstanceId,
                         ["resumed"] = connection.Resumed,
                     };
-                    var result = new JsonObject
+                    var connectContent = new JsonArray(new JsonObject
                     {
-                        ["content"] = new JsonArray(new JsonObject
-                        {
-                            ["type"] = "text",
-                            ["text"] = structured.ToJsonString(),
-                        }),
-                        ["structuredContent"] = structured,
-                        ["isError"] = false,
-                    };
+                        ["type"] = "text",
+                        ["text"] = structured.ToJsonString(),
+                    });
+                    var result = ToolCallResult(connectContent, structured, isError: false);
                     if (modern) result = ModernComplete(result);
                     isError = false;
                     return response = JsonRpcResult(id, result);
@@ -433,7 +426,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 var output = _skills.HasTool(name)
                     ? _skills.Call(name, arguments)
                     : await _tools.CallAsync(name, arguments, cancellationToken).ConfigureAwait(false);
-                var toolResult = new JsonObject { ["content"] = output.Content, ["structuredContent"] = output.StructuredContent, ["isError"] = false };
+                var toolResult = ToolCallResult(output.Content, output.StructuredContent, isError: false);
                 if (modern) toolResult = ModernComplete(toolResult);
                 isError = false;
                 return response = JsonRpcResult(id, toolResult);
@@ -441,7 +434,8 @@ public sealed class LocalMcpServer : IAsyncDisposable
             catch (Exception ex)
             {
                 if (_skills.HasTool(name)) _log($"[Skills] ERROR: {ex.Message}\n");
-                var result = new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = ex.Message }), ["isError"] = true };
+                var errorContent = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = ex.Message });
+                var result = ToolCallResult(errorContent, null, isError: true);
                 if (modern) result = ModernComplete(result);
                 return response = JsonRpcResult(id, result);
             }
@@ -456,6 +450,18 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 catch (Exception ex) { _log($"[Telemetry] session metric ignored: {ex.Message}\n"); }
             }
         }
+    }
+
+    private static JsonObject ToolCallResult(JsonArray content, JsonObject? structuredContent, bool isError)
+    {
+        var result = new JsonObject
+        {
+            ["content"] = content,
+            ["isError"] = isError,
+        };
+        if (structuredContent is not null) result["structuredContent"] = structuredContent;
+        ToolResultEnvelope.Attach(result, isError, content, structuredContent);
+        return result;
     }
 
     private byte[]? ValidateModernRequest(HttpRequestData request, string method, JsonObject parameters, JsonNode? id)
@@ -486,7 +492,14 @@ public sealed class LocalMcpServer : IAsyncDisposable
     }
 
     private static string NegotiateLegacy(string? requested) => requested is not null && FileMcpConstants.LegacySupportedVersions.Contains(requested) ? requested : FileMcpConstants.LatestLegacyProtocolVersion;
-    private static JsonObject ModernComplete(JsonObject fields) { fields["resultType"] = "complete"; fields["_meta"] = new JsonObject { ["io.modelcontextprotocol/serverInfo"] = ServerInfo() }; return fields; }
+    private static JsonObject ModernComplete(JsonObject fields)
+    {
+        fields["resultType"] = "complete";
+        var meta = fields["_meta"] as JsonObject ?? new JsonObject();
+        meta["io.modelcontextprotocol/serverInfo"] = ServerInfo();
+        fields["_meta"] = meta;
+        return fields;
+    }
     private static JsonObject ServerInfo() => new() { ["name"] = FileMcpConstants.ServerName, ["version"] = FileMcpConstants.ServerVersion };
     private static JsonObject ServerCapabilities() => new() { ["tools"] = new JsonObject { ["listChanged"] = false } };
 

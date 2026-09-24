@@ -1807,10 +1807,8 @@ final class LocalMCPServer {
         var arguments: [String: Any]
         if let rawArguments = params["arguments"] {
             guard let typedArguments = rawArguments as? [String: Any] else {
-                var result: [String: Any] = [
-                    "content": [["type": "text", "text": "Invalid arguments: expected an object"]],
-                    "isError": true,
-                ]
+                let invalidContent: [[String: Any]] = [["type": "text", "text": "Invalid arguments: expected an object"]]
+                var result = toolCallResult(content: invalidContent, structuredContent: nil, isError: true)
                 if modern { result = modernCompleteResult(result) }
                 return jsonRPCResult(id: id, result: result)
             }
@@ -1842,11 +1840,8 @@ final class LocalMCPServer {
                 ]
                 let textData = try JSONSerialization.data(withJSONObject: structuredContent, options: [.sortedKeys])
                 let text = String(data: textData, encoding: .utf8) ?? "{}"
-                var result: [String: Any] = [
-                    "content": [["type": "text", "text": text]],
-                    "structuredContent": structuredContent,
-                    "isError": false,
-                ]
+                let connectContent: [[String: Any]] = [["type": "text", "text": text]]
+                var result = toolCallResult(content: connectContent, structuredContent: structuredContent, isError: false)
                 if modern { result = modernCompleteResult(result) }
                 return jsonRPCResult(id: id, result: result)
             }
@@ -1866,24 +1861,37 @@ final class LocalMCPServer {
                 content = output.content
                 structuredContent = output.structuredContent
             }
-            var result: [String: Any] = [
-                "content": content,
-                "structuredContent": structuredContent,
-                "isError": false,
-            ]
+            var result = toolCallResult(content: content, structuredContent: structuredContent, isError: false)
             if modern { result = modernCompleteResult(result) }
             return jsonRPCResult(id: id, result: result)
         } catch {
             if skills.hasTool(named: toolName) {
                 log("[Skills] ERROR: \(error.localizedDescription)\n")
             }
-            var result: [String: Any] = [
-                "content": [["type": "text", "text": error.localizedDescription]],
-                "isError": true,
-            ]
+            let errorContent: [[String: Any]] = [["type": "text", "text": error.localizedDescription]]
+            var result = toolCallResult(content: errorContent, structuredContent: nil, isError: true)
             if modern { result = modernCompleteResult(result) }
             return jsonRPCResult(id: id, result: result)
         }
+    }
+
+    private func toolCallResult(
+        content: [[String: Any]],
+        structuredContent: [String: Any]?,
+        isError: Bool
+    ) -> [String: Any] {
+        var result: [String: Any] = [
+            "content": content,
+            "isError": isError,
+        ]
+        if let structuredContent { result["structuredContent"] = structuredContent }
+        ToolResultEnvelope.attach(
+            to: &result,
+            isError: isError,
+            content: content,
+            structuredContent: structuredContent
+        )
+        return result
     }
 
     private func validateModernRequest(
@@ -1962,7 +1970,9 @@ final class LocalMCPServer {
     private func modernCompleteResult(_ fields: [String: Any]) -> [String: Any] {
         var result = fields
         result["resultType"] = "complete"
-        result["_meta"] = ["io.modelcontextprotocol/serverInfo": serverInfo()]
+        var meta = result["_meta"] as? [String: Any] ?? [:]
+        meta["io.modelcontextprotocol/serverInfo"] = serverInfo()
+        result["_meta"] = meta
         return result
     }
 

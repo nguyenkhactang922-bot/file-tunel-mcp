@@ -3,7 +3,7 @@
 Date: 2026-09-24
 Task: FMG-001
 Branch: chatgpt/FMG-001-canonical-catalog
-Status: LOCAL VERIFIED / NATIVE CI PENDING
+Status: MAIN VERIFIED
 Authority: ADR-0005, ADR-0006, tasks/MASTER_FILEMCP_UPGRADE_TASK_GRAPH.md
 
 ## Implemented scope
@@ -79,3 +79,16 @@ The local Windows host cannot execute the native Swift/macOS runtime suite. The 
 ## Remaining exact gate
 
 Commit exact candidate -> push -> fork-main PR -> native Verify macOS + Windows x64 + Windows ARM64 -> scoped review -> merge -> verify fork main -> mark FMG-001 DONE -> claim FMG-002.
+
+## Final MAIN VERIFIED closure
+
+- PR #3 merged to fork main.
+- Merge commit: `71d658131342581f14407276bcfe18164a0afa37`.
+- Exact main Verify run: `35988856441` ? SUCCESS.
+- Native macOS: PASS.
+- Windows x64: PASS.
+- Windows ARM64: PASS.
+- Post-merge Release build: 0 warnings / 0 errors.
+- Canonical catalog hash on main remains `d597f611374045825808d930f2bb0ef7e995515bb816a52ceccb47fd42a8e6aa`.
+
+FMG-001 is DONE / MAIN VERIFIED. FMG-002 is dependency-unblocked.

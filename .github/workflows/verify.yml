@@ -40,6 +40,7 @@ jobs:
             macos/ProcessRunner.swift \
             macos/LogicalChatCorrelation.swift \
             macos/ToolCatalog.swift \
+            macos/ToolResultEnvelope.swift \
             macos/LocalMCPServer.swift \
             macos/TunnelSupervisor.swift \
             macos/LocalMCPRuntime.swift \

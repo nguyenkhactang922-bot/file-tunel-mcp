@@ -69,7 +69,7 @@ FMG-004 budget primitives are required by FMG-009 and FMG-010.
 
 ## FMG-001 — Canonical Catalog Authority
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: ADR-0005
 
 Scope:
@@ -108,7 +108,7 @@ Evidence:
 
 ## FMG-002 — Structured Result Envelope
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-001
 
 Scope:

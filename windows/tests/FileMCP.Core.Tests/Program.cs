@@ -32,6 +32,7 @@ internal static class Program
         {
             TestObservabilityContracts();
             TestCanonicalToolCatalog();
+            TestToolResultEnvelope();
             await TestMcpStandardTelemetryAsync(root);
             await TestMcpTraceContextAsync(root);
             await TestOtlpExporterAsync(root);
@@ -143,6 +144,53 @@ internal static class Program
         Assert(metadata["instructionHash"]!.GetValue<string>() == CanonicalToolCatalog.InstructionHash, "catalog metadata instruction hash");
         Assert(metadata["buildIdentity"]!.GetValue<string>() == "test-build", "catalog metadata build identity");
         Console.WriteLine($"windows-tool-catalog: ok (hash={CanonicalToolCatalog.CatalogHash})");
+    }
+
+    private static void TestToolResultEnvelope()
+    {
+        var content = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "ok" });
+        var success = ToolResultEnvelope.Create(false, content, new JsonObject { ["result"] = "ok" }, new[] { "non-blocking warning" });
+        Assert(success["schemaVersion"]!.GetValue<string>() == ToolResultEnvelope.SchemaVersion, "result envelope schema version");
+        Assert(success["status"]!.GetValue<string>() == "success", "result envelope success status");
+        Assert(success["operationId"]!.GetValue<string>().StartsWith("op_", StringComparison.Ordinal) && success["operationId"]!.GetValue<string>().Length == 35, "result envelope operation id");
+        var successTruncation = success["truncation"]!.AsObject();
+        Assert(!successTruncation["truncated"]!.GetValue<bool>() && successTruncation["reason"]!.GetValue<string>() == "none", "result envelope success truncation");
+        Assert(((JsonObject)success["usage"]!)["contentItems"]!.GetValue<int>() == 1, "result envelope content usage");
+        Assert(((JsonArray)success["warnings"]!).Single()!.GetValue<string>() == "non-blocking warning", "result envelope warnings");
+
+        var partial = ToolResultEnvelope.Create(false, content, new JsonObject { ["truncated"] = true });
+        Assert(partial["status"]!.GetValue<string>() == "partial", "result envelope partial status");
+        var partialTruncation = partial["truncation"]!.AsObject();
+        Assert(partialTruncation["truncated"]!.GetValue<bool>() && partialTruncation["reason"]!.GetValue<string>() == "server_limit", "result envelope partial truncation reason");
+
+        var error = ToolResultEnvelope.Create(true, content);
+        Assert(error["status"]!.GetValue<string>() == "tool_error", "result envelope tool error status");
+
+        var carrier = new JsonObject { ["content"] = content.DeepClone(), ["isError"] = false };
+        ToolResultEnvelope.Attach(carrier, false, (JsonArray)content.DeepClone(), new JsonObject { ["result"] = "ok" });
+        Assert(ToolResultEnvelope.Require(carrier)["status"]!.GetValue<string>() == "success", "result envelope metadata attachment");
+        Assert(carrier["resultEnvelope"] is null, "result envelope does not add non-MCP top-level field");
+
+        ExpectEnvelopeFailure((JsonObject)success.DeepClone(), e => e["schemaVersion"] = "9.9.9", "schemaVersion", "unknown envelope schema rejected");
+        ExpectEnvelopeFailure((JsonObject)success.DeepClone(), e => e["status"] = "mystery", "status", "unknown envelope status rejected");
+        ExpectEnvelopeFailure((JsonObject)success.DeepClone(), e => e.Remove("operationId"), "operationId", "malformed envelope operation id rejected");
+        ExpectEnvelopeFailure((JsonObject)success.DeepClone(), e => e["usage"] = new JsonObject { ["contentItems"] = -1 }, "usage", "malformed envelope usage rejected");
+        ExpectEnvelopeFailure((JsonObject)partial.DeepClone(), e => e["truncation"]!["reason"] = "none", "truncation", "inconsistent truncation rejected");
+        ExpectEnvelopeFailure((JsonObject)success.DeepClone(), e => e["warnings"] = new JsonArray(""), "warnings", "malformed warning rejected");
+    }
+
+    private static void ExpectEnvelopeFailure(JsonObject envelope, Action<JsonObject> mutate, string expectedMessage, string assertion)
+    {
+        mutate(envelope);
+        try
+        {
+            ToolResultEnvelope.Validate(envelope);
+            throw new Exception($"Assertion failed: {assertion}");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase))
+        {
+            Assert(true, assertion);
+        }
     }
 
     private static string MutateCatalog(string payload, Action<JsonObject> mutate)
@@ -1848,6 +1896,8 @@ internal static class Program
         var invalidSkill = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), "{\"jsonrpc\":\"2.0\",\"id\":22,\"method\":\"tools/call\",\"params\":{\"name\":\"load_codex_skill\",\"arguments\":{\"name\":\"../escape\"}}}");
         var invalidSkillBody = JsonNode.Parse(HttpBody(invalidSkill))!.AsObject();
         Assert(invalidSkillBody["result"]!["isError"]!.GetValue<bool>(), "unsafe skill name refused");
+        var invalidSkillEnvelope = invalidSkillBody["result"]!["_meta"]![ToolResultEnvelope.MetadataKey]!.AsObject();
+        Assert(invalidSkillEnvelope["status"]!.GetValue<string>() == "tool_error", "tool-level error result envelope");
 
         var modernHeaders = AuthHeaders(token); modernHeaders["MCP-Protocol-Version"] = FileMcpConstants.ModernProtocolVersion; modernHeaders["Mcp-Method"] = "tools/list";
         var modernBody = new JsonObject
@@ -1882,8 +1932,18 @@ internal static class Program
         var unmeteredUnknown = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), meteredUnknownBody);
         var meteredUnknown = await SendHttpAsync(meteredPort, "POST", "/mcp", AuthHeaders(token), meteredUnknownBody);
         Assert(HttpBody(meteredList) == HttpBody(legacy), "telemetry preserves tools/list JSON-RPC body");
-        Assert(HttpBody(meteredRead) == HttpBody(unmeteredRead), "telemetry preserves successful tool response body");
-        Assert(HttpBody(meteredUnknown) == HttpBody(unmeteredUnknown), "telemetry preserves tool error response body");
+        var meteredReadJson = JsonNode.Parse(HttpBody(meteredRead))!.AsObject();
+        var unmeteredReadJson = JsonNode.Parse(HttpBody(unmeteredRead))!.AsObject();
+        Assert(meteredReadJson["result"]!["content"]!.ToJsonString() == unmeteredReadJson["result"]!["content"]!.ToJsonString(), "telemetry preserves successful tool legacy content");
+        Assert(meteredReadJson["result"]!["structuredContent"]!.ToJsonString() == unmeteredReadJson["result"]!["structuredContent"]!.ToJsonString(), "telemetry preserves successful tool structured content");
+        var successEnvelope = meteredReadJson["result"]!["_meta"]![ToolResultEnvelope.MetadataKey]!.AsObject();
+        Assert(successEnvelope["schemaVersion"]!.GetValue<string>() == ToolResultEnvelope.SchemaVersion && successEnvelope["status"]!.GetValue<string>() == "success", "successful tool result envelope");
+        Assert(successEnvelope["operationId"]!.GetValue<string>().StartsWith("op_", StringComparison.Ordinal) && successEnvelope["operationId"]!.GetValue<string>().Length == 35, "successful tool result operation id");
+
+        var meteredUnknownJson = JsonNode.Parse(HttpBody(meteredUnknown))!.AsObject();
+        var unmeteredUnknownJson = JsonNode.Parse(HttpBody(unmeteredUnknown))!.AsObject();
+        Assert(meteredUnknownJson["error"]!.ToJsonString() == unmeteredUnknownJson["error"]!.ToJsonString(), "telemetry preserves protocol-level unknown-tool error response");
+        Assert(meteredUnknownJson["result"] is null, "protocol-level error has no tool result envelope");
 
         var meteredSnapshot = meter.Snapshot();
         var requestBodies = new[] { meteredListBody, meteredReadBody, meteredUnknownBody };
@@ -1950,7 +2010,7 @@ internal static class Program
             },
         }.ToJsonString();
         var boundRead = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), boundReadBody);
-        Assert(HttpBody(boundRead) == HttpBody(unmeteredRead), "logical correlation metadata is stripped before strict tool validation and preserves tool result");
+        AssertToolPayloadEquivalentIgnoringOperationId(boundRead, unmeteredRead, "logical correlation metadata is stripped before strict tool validation and preserves tool result");
 
         var foreignHandle = new LogicalChatCorrelationService().Connect().ChatInstanceId;
         var foreignReadBody = new JsonObject
@@ -1965,7 +2025,7 @@ internal static class Program
             },
         }.ToJsonString();
         var foreignRead = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), foreignReadBody);
-        Assert(HttpBody(foreignRead) == HttpBody(unmeteredRead), "unknown correlation handle remains unbound without changing tool behavior");
+        AssertToolPayloadEquivalentIgnoringOperationId(foreignRead, unmeteredRead, "unknown correlation handle remains unbound without changing tool behavior");
 
         var traversalBody = new JsonObject
         {
@@ -2435,6 +2495,22 @@ internal static class Program
     private static string ValueAfter(string[] args, string key) { var index = Array.IndexOf(args, key); return index >= 0 && index + 1 < args.Length ? args[index + 1] : throw new InvalidOperationException("missing " + key); }
     private static async Task GitCli(string repo, string[] args) { var all = new List<string> { "-C", repo }; all.AddRange(args); var result = await ProcessRunner.RunAsync("git.exe", all, timeoutSeconds: 20); if (result.ExitCode != 0) throw new Exception("git fixture failed: " + result.Stderr); }
     private static JsonObject Obj(params (string Key, object Value)[] values) { var obj = new JsonObject(); foreach (var (key, value) in values) obj[key] = JsonValue.Create(value); return obj; }
+    private static void AssertToolPayloadEquivalentIgnoringOperationId(string leftResponse, string rightResponse, string message)
+    {
+        var left = JsonNode.Parse(HttpBody(leftResponse))!.AsObject()["result"]!.AsObject();
+        var right = JsonNode.Parse(HttpBody(rightResponse))!.AsObject()["result"]!.AsObject();
+        Assert(left["content"]!.ToJsonString() == right["content"]!.ToJsonString(), message + " content");
+        Assert((left["structuredContent"]?.ToJsonString() ?? "") == (right["structuredContent"]?.ToJsonString() ?? ""), message + " structuredContent");
+        Assert(left["isError"]!.GetValue<bool>() == right["isError"]!.GetValue<bool>(), message + " isError");
+        var leftEnvelope = left["_meta"]![ToolResultEnvelope.MetadataKey]!.AsObject();
+        var rightEnvelope = right["_meta"]![ToolResultEnvelope.MetadataKey]!.AsObject();
+        Assert(leftEnvelope["schemaVersion"]!.GetValue<string>() == rightEnvelope["schemaVersion"]!.GetValue<string>(), message + " envelope schema");
+        Assert(leftEnvelope["status"]!.GetValue<string>() == rightEnvelope["status"]!.GetValue<string>(), message + " envelope status");
+        Assert(leftEnvelope["truncation"]!.ToJsonString() == rightEnvelope["truncation"]!.ToJsonString(), message + " envelope truncation");
+        Assert(leftEnvelope["usage"]!.ToJsonString() == rightEnvelope["usage"]!.ToJsonString(), message + " envelope usage");
+        Assert(leftEnvelope["warnings"]!.ToJsonString() == rightEnvelope["warnings"]!.ToJsonString(), message + " envelope warnings");
+    }
+
     private static void Assert(bool condition, string message) { _assertions++; if (!condition) throw new Exception("Assertion failed: " + message); }
     private static async Task AssertThrowsAsync(Func<Task> action, string contains, string message) { try { await action(); } catch (Exception ex) when (ex.Message.Contains(contains, StringComparison.OrdinalIgnoreCase)) { Assert(true, message); return; } throw new Exception("Assertion failed: " + message); }
     private static int FreePort() { var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start(); var port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop(); return port; }
