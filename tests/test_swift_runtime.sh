@@ -102,7 +102,60 @@ SWIFT
 swiftc -framework CryptoKit -o "$TMP_DIR/catalog-test" macos/ToolCatalog.swift "$TMP_DIR/main.swift"
 "$TMP_DIR/catalog-test"
 
-cat >"$TMP_DIR/main.swift" <<'SWIFT'\nimport Foundation\n\nfunc expectEnvelopeFailure(_ label: String, _ envelope: [String: Any], containing expected: String) {\n    do {\n        try ToolResultEnvelope.validate(envelope)\n        fatalError("expected envelope failure: \\(label)")\n    } catch {\n        precondition(error.localizedDescription.lowercased().contains(expected.lowercased()), "\\(label) unexpected error: \\(error)")\n    }\n}\n\nlet content: [[String: Any]] = [["type": "text", "text": "ok"]]\nlet success = ToolResultEnvelope.create(isError: false, content: content, structuredContent: ["result": "ok"], warnings: ["non-blocking warning"])\nprecondition(success["schemaVersion"] as? String == "1.0.0")\nprecondition(success["status"] as? String == "success")\nlet operationID = success["operationId"] as! String\nprecondition(operationID.hasPrefix("op_") && operationID.count == 35)\nlet successTruncation = success["truncation"] as! [String: Any]\nprecondition(successTruncation["truncated"] as? Bool == false && successTruncation["reason"] as? String == "none")\nprecondition((success["usage"] as! [String: Any])["contentItems"] as? Int == 1)\nprecondition((success["warnings"] as! [String]) == ["non-blocking warning"])\n\nlet partial = ToolResultEnvelope.create(isError: false, content: content, structuredContent: ["truncated": true])\nprecondition(partial["status"] as? String == "partial")\nlet partialTruncation = partial["truncation"] as! [String: Any]\nprecondition(partialTruncation["truncated"] as? Bool == true && partialTruncation["reason"] as? String == "server_limit")\nlet toolError = ToolResultEnvelope.create(isError: true, content: content, structuredContent: nil)\nprecondition(toolError["status"] as? String == "tool_error")\n\nvar carrier: [String: Any] = ["content": content, "isError": false]\nToolResultEnvelope.attach(to: &carrier, isError: false, content: content, structuredContent: ["result": "ok"])\nprecondition(try ToolResultEnvelope.require(from: carrier)["status"] as? String == "success")\nprecondition(carrier["resultEnvelope"] == nil)\n\nvar badVersion = success; badVersion["schemaVersion"] = "9.9.9"\nexpectEnvelopeFailure("unknown schema", badVersion, containing: "schemaVersion")\nvar badStatus = success; badStatus["status"] = "mystery"\nexpectEnvelopeFailure("unknown status", badStatus, containing: "status")\nvar badOperation = success; badOperation.removeValue(forKey: "operationId")\nexpectEnvelopeFailure("missing operation", badOperation, containing: "operationId")\nvar badUsage = success; badUsage["usage"] = ["contentItems": -1]\nexpectEnvelopeFailure("bad usage", badUsage, containing: "usage")\nvar badTruncation = partial; badTruncation["truncation"] = ["truncated": true, "reason": "none"]\nexpectEnvelopeFailure("bad truncation", badTruncation, containing: "truncation")\nvar badWarnings = success; badWarnings["warnings"] = [""]\nexpectEnvelopeFailure("bad warnings", badWarnings, containing: "warnings")\nprint("swift-result-envelope: ok")\nSWIFT\nswiftc -o "$TMP_DIR/result-envelope-test" macos/ToolResultEnvelope.swift "$TMP_DIR/main.swift"\n"$TMP_DIR/result-envelope-test"\n\ncase "$(uname -m)" in
+cat >"$TMP_DIR/main.swift" <<'SWIFT'
+import Foundation
+
+func expectEnvelopeFailure(_ label: String, _ envelope: [String: Any], containing expected: String) {
+    do {
+        try ToolResultEnvelope.validate(envelope)
+        fatalError("expected envelope failure: \(label)")
+    } catch {
+        precondition(error.localizedDescription.lowercased().contains(expected.lowercased()), "\(label) unexpected error: \(error)")
+    }
+}
+
+let content: [[String: Any]] = [["type": "text", "text": "ok"]]
+let success = ToolResultEnvelope.create(isError: false, content: content, structuredContent: ["result": "ok"], warnings: ["non-blocking warning"])
+precondition(success["schemaVersion"] as? String == "1.0.0")
+precondition(success["status"] as? String == "success")
+let operationID = success["operationId"] as! String
+precondition(operationID.hasPrefix("op_") && operationID.count == 35)
+let successTruncation = success["truncation"] as! [String: Any]
+precondition(successTruncation["truncated"] as? Bool == false && successTruncation["reason"] as? String == "none")
+precondition((success["usage"] as! [String: Any])["contentItems"] as? Int == 1)
+precondition((success["warnings"] as! [String]) == ["non-blocking warning"])
+
+let partial = ToolResultEnvelope.create(isError: false, content: content, structuredContent: ["truncated": true])
+precondition(partial["status"] as? String == "partial")
+let partialTruncation = partial["truncation"] as! [String: Any]
+precondition(partialTruncation["truncated"] as? Bool == true && partialTruncation["reason"] as? String == "server_limit")
+let toolError = ToolResultEnvelope.create(isError: true, content: content, structuredContent: nil)
+precondition(toolError["status"] as? String == "tool_error")
+
+var carrier: [String: Any] = ["content": content, "isError": false]
+ToolResultEnvelope.attach(to: &carrier, isError: false, content: content, structuredContent: ["result": "ok"])
+let requiredEnvelope = try ToolResultEnvelope.require(from: carrier)
+precondition(requiredEnvelope["status"] as? String == "success")
+precondition(carrier["resultEnvelope"] == nil)
+
+var badVersion = success; badVersion["schemaVersion"] = "9.9.9"
+expectEnvelopeFailure("unknown schema", badVersion, containing: "schemaVersion")
+var badStatus = success; badStatus["status"] = "mystery"
+expectEnvelopeFailure("unknown status", badStatus, containing: "status")
+var badOperation = success; badOperation.removeValue(forKey: "operationId")
+expectEnvelopeFailure("missing operation", badOperation, containing: "operationId")
+var badUsage = success; badUsage["usage"] = ["contentItems": -1]
+expectEnvelopeFailure("bad usage", badUsage, containing: "usage")
+var badTruncation = partial; badTruncation["truncation"] = ["truncated": true, "reason": "none"]
+expectEnvelopeFailure("bad truncation", badTruncation, containing: "truncation")
+var badWarnings = success; badWarnings["warnings"] = [""]
+expectEnvelopeFailure("bad warnings", badWarnings, containing: "warnings")
+print("swift-result-envelope: ok")
+SWIFT
+swiftc -o "$TMP_DIR/result-envelope-test" macos/ToolResultEnvelope.swift "$TMP_DIR/main.swift"
+"$TMP_DIR/result-envelope-test"
+
+case "$(uname -m)" in
     arm64|aarch64) TUNNEL_TARGET="darwin-arm64" ;;
     x86_64|amd64) TUNNEL_TARGET="darwin-amd64" ;;
     *) echo "unsupported macOS architecture for tunnel-client test" >&2; exit 2 ;;
@@ -1219,6 +1272,7 @@ READ_RESULT="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$READ_RESULT" | grep -q 'hello swift'
 
 printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.result raw -expect string -o - - | grep -qx 'hello swift'
+printf '%s' "$READ_RESULT" | python3 -c 'import json,sys,re; d=json.load(sys.stdin); e=d["result"]["_meta"]["io.filemcp/result"]; assert e["schemaVersion"]=="1.0.0" and e["status"]=="success"; assert re.fullmatch(r"op_[0-9a-f]{32}", e["operationId"]); assert e["truncation"]=={"truncated":False,"reason":"none"}; assert e["usage"]["contentItems"]==1 and e["warnings"]==[]'
 
 LIST_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1233,6 +1287,7 @@ LIST_LIMIT_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -d '{"jsonrpc":"2.0","id":300,"method":"tools/call","params":{"name":"list_files","arguments":{"subpath":"list-limit"}}}')"
 printf '%s' "$LIST_LIMIT_RESULT" | plutil -extract result.structuredContent.result raw -expect array -o - - | grep -qx '1000'
 printf '%s' "$LIST_LIMIT_RESULT" | plutil -extract result.structuredContent.truncated raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$LIST_LIMIT_RESULT" | python3 -c 'import json,sys; e=json.load(sys.stdin)["result"]["_meta"]["io.filemcp/result"]; assert e["status"]=="partial"; assert e["truncation"]=={"truncated":True,"reason":"server_limit"}; assert e["usage"]["contentItems"]==1000'
 if printf '%s' "$LIST_LIMIT_RESULT" | grep -q '\[\.\.\.truncated'; then
     echo "list_files leaked truncation marker into filename results" >&2
     exit 1
@@ -1263,6 +1318,7 @@ EMPTY_FILENAME_QUERY="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":307,"method":"tools/call","params":{"name":"search_filenames","arguments":{"query":""}}}')"
 printf '%s' "$EMPTY_FILENAME_QUERY" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$EMPTY_FILENAME_QUERY" | python3 -c 'import json,sys; e=json.load(sys.stdin)["result"]["_meta"]["io.filemcp/result"]; assert e["status"]=="tool_error" and e["truncation"]["truncated"] is False'
 printf '%s' "$EMPTY_FILENAME_QUERY" | grep -q 'query must not be empty'
 
 INVALID_OPTIONAL_TYPE="$(curl -fsS -X POST "$BASE_URL" \
@@ -1852,12 +1908,8 @@ MODERN_CALL="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$MODERN_CALL" | grep -q 'hello swift'
 printf '%s' "$MODERN_CALL" | grep -q '"resultType":"complete"'
 printf '%s' "$MODERN_CALL" | plutil -extract result.structuredContent.result raw -expect string -o - - | grep -qx 'hello swift'
-printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.schemaVersion raw -expect string -o - - | grep -qx '1.0.0'
-printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.status raw -expect string -o - - | grep -qx 'success'
-printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.truncation.truncated raw -expect bool -o - - | grep -qx 'false'
-printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.usage.contentItems raw -expect integer -o - - | grep -qx '1'
-OPERATION_ID="$(printf '%s' "$MODERN_CALL" | plutil -extract result._meta.io.filemcp/result.operationId raw -expect string -o - -)"
-printf '%s' "$OPERATION_ID" | grep -Eq '^op_[0-9a-f]{32}$'
+printf '%s' "$MODERN_CALL" | python3 -c 'import json,sys,re; d=json.load(sys.stdin); m=d["result"]["_meta"]; assert "io.modelcontextprotocol/serverInfo" in m; e=m["io.filemcp/result"]; assert e["schemaVersion"]=="1.0.0" and e["status"]=="success"; assert re.fullmatch(r"op_[0-9a-f]{32}", e["operationId"]); assert e["truncation"]=={"truncated":False,"reason":"none"}; assert e["usage"]["contentItems"]==1 and e["warnings"]==[]'
+
 
 MODERN_TOOL_ERROR="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1866,8 +1918,7 @@ MODERN_TOOL_ERROR="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Mcp-Name: =?base64?cmVhZF9maWxl?=' \
     -d "{\"jsonrpc\":\"2.0\",\"id\":121,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"relative_path\":\"missing-file.txt\"},\"_meta\":$MODERN_META}}")"
 printf '%s' "$MODERN_TOOL_ERROR" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
-printf '%s' "$MODERN_TOOL_ERROR" | plutil -extract result._meta.io.filemcp/result.status raw -expect string -o - - | grep -qx 'tool_error'
-printf '%s' "$MODERN_TOOL_ERROR" | plutil -extract result._meta.io.filemcp/result.schemaVersion raw -expect string -o - - | grep -qx '1.0.0'
+printf '%s' "$MODERN_TOOL_ERROR" | python3 -c 'import json,sys; d=json.load(sys.stdin); m=d["result"]["_meta"]; assert "io.modelcontextprotocol/serverInfo" in m; e=m["io.filemcp/result"]; assert e["schemaVersion"]=="1.0.0" and e["status"]=="tool_error"; assert e["truncation"]["truncated"] is False'
 
 UNKNOWN_TOOL="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1876,6 +1927,7 @@ UNKNOWN_TOOL="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Mcp-Name: does_not_exist' \
     -d "{\"jsonrpc\":\"2.0\",\"id\":13,\"method\":\"tools/call\",\"params\":{\"name\":\"does_not_exist\",\"arguments\":{},\"_meta\":$MODERN_META}}")"
 printf '%s' "$UNKNOWN_TOOL" | grep -q '"code":-32602'
+printf '%s' "$UNKNOWN_TOOL" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "error" in d and "result" not in d'
 
 STATUS="$(curl -sS -o "$TMP_DIR/mismatch.json" -w '%{http_code}' -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
