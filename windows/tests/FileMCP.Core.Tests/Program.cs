@@ -103,6 +103,7 @@ internal static class Program
         }
         var canonicalPayload = File.ReadAllText("contracts/tool_catalog.v1.json");
         CanonicalToolCatalog.ValidateCatalogPayloadForTest(canonicalPayload);
+        Assert(CanonicalToolCatalog.CatalogHash == CanonicalToolCatalog.CatalogHashForPayloadForTest(canonicalPayload), "embedded catalog matches canonical source");
         var crlfPayload = canonicalPayload.Replace("\n", "\r\n", StringComparison.Ordinal);
         Assert(CanonicalToolCatalog.CatalogHashForPayloadForTest(canonicalPayload) == CanonicalToolCatalog.CatalogHashForPayloadForTest(crlfPayload), "catalog hash normalizes line endings");
 
