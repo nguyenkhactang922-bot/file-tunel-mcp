@@ -3,7 +3,7 @@
 Date: 2026-09-25
 Task: FMG-004
 Branch: `chatgpt/FMG-004-toolbudget-cursor`
-Status: LOCAL VERIFIED / NATIVE CI PENDING
+Status: DONE / MAIN VERIFIED
 
 ## Implemented scope
 
@@ -58,3 +58,13 @@ Before FMG-004 can be DONE / MAIN VERIFIED:
 5. rerun native Verify on merged main;
 6. rerun local merged-main Windows build/runtime;
 7. update state and only then claim FMG-005.
+
+## Final closure
+
+- final candidate head: `6e90b2c049e9a85ac408853c9e593a76d8617f54`;
+- PR #7 merged to fork `main` as `9e65230a672cac533f74d6b007f2f08ce83d8687`;
+- final exact-head Verify runs `36113893848` and `36113898863`: macOS SUCCESS, Windows x64 SUCCESS, Windows ARM64 SUCCESS;
+- merged-main native Verify run `36114335810`: macOS SUCCESS, Windows x64 SUCCESS, Windows ARM64 SUCCESS;
+- merged-main local Windows runtime: 576 assertions PASS;
+- merged-main Release build: 0 warnings / 0 errors;
+- FMG-004: DONE / MAIN VERIFIED.

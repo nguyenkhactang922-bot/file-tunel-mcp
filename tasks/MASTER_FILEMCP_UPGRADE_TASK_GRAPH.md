@@ -158,7 +158,7 @@ Negative tests:
 
 ## FMG-004 — ToolBudget / Cancellation / Cursor Core
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: FMG-002
 
 Scope:
@@ -184,7 +184,7 @@ Negative tests:
 
 ## FMG-005 — Structured exec_process + Environment Authority
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-002, FMG-003, FMG-004
 
 Scope:
