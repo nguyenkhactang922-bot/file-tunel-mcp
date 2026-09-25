@@ -1222,8 +1222,11 @@ let otherURL = root.appendingPathComponent("fmg006-other.txt")
 try "token-state".write(to: tokenURL, atomically: true, encoding: .utf8)
 try "token-state".write(to: otherURL, atomically: true, encoding: .utf8)
 let tokenVersion = try versionService.readVersioned(relativePath: "fmg006-token.txt", maxBytes: 5_000_000)
-let last = tokenVersion.versionToken.last!
-let tamperedToken = String(tokenVersion.versionToken.dropLast()) + (last == "A" ? "B" : "A")
+var tokenParts = tokenVersion.versionToken.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+precondition(tokenParts.count == 3 && !tokenParts[2].isEmpty)
+let firstSignatureCharacter = tokenParts[2].first!
+tokenParts[2] = String(firstSignatureCharacter == "A" ? "B" : "A") + tokenParts[2].dropFirst()
+let tamperedToken = tokenParts.joined(separator: ":")
 do {
     _ = try versionService.verifyExpectedVersion(relativePath: "fmg006-token.txt", token: tamperedToken, maxBytes: 5_000_000)
     preconditionFailure("tampered file version token must fail")
