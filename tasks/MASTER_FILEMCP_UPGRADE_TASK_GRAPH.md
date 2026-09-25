@@ -246,7 +246,7 @@ Negative tests:
 
 ## FMG-007 — AuthorizedPathSnapshot / Mutation Guard
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-006
 
 Scope:
@@ -270,7 +270,7 @@ Negative tests:
 
 ## FMG-008 — Harden Existing write/delete Mutations
 
-State: BLOCKED
+State: ACTIVE
 Depends: FMG-007, FMG-003
 
 Scope:

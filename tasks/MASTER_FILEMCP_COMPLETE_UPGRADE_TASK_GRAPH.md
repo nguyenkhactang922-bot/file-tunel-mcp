@@ -96,13 +96,13 @@ Detailed specification: foundation graph FMG-006.
 
 ## FMG-007 - AuthorizedPathSnapshot / Mutation Guard
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-006
 Detailed specification: foundation graph FMG-007.
 
 ## FMG-008 - Harden Existing write/delete Mutations
 
-State: BLOCKED
+State: ACTIVE
 Depends: FMG-007, FMG-003
 Detailed specification: foundation graph FMG-008.
 

@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-007-mutation-guard`
+Branch: `chatgpt/FMG-008-existing-mutation-hardening`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -229,3 +229,11 @@ FMG-007: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-007-mutatio
 Local evidence: Windows runtime 637 assertions PASS including `windows-mutation-guard: ok`; Mutation Guard contract PASS; canonical catalog/parity and FMG-006 prerequisite contract PASS; Release build 0 warnings/errors; state/diff/shell syntax gates PASS. Native Swift implementation/test wiring is complete but requires GitHub macOS Verify because this Windows host has no `swiftc`.
 
 NEXT_EXACT_ACTION: commit/push the exact FMG-007 candidate, require native GitHub Verify on macOS + Windows x64 + Windows ARM64, fix only the exact failing stage if any, perform scoped security review, merge only exact green head, verify merged main, mark FMG-007 DONE / MAIN VERIFIED, then claim FMG-008.
+
+## FMG-007 closure / FMG-008 claim
+
+FMG-007: DONE / MAIN VERIFIED. Candidate `2319488761c845df7be5010dca0283485a41a8e9` merged by PR #11 as main `ad78b0f75564728c7a4aa5dae218d4e79d697569`; merged-main Verify `36167404567` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows runtime 637 assertions and Release build PASS.
+
+FMG-008: CLAIMED / ACTIVE on `chatgpt/FMG-008-existing-mutation-hardening`.
+
+NEXT_EXACT_ACTION: harden existing write/delete mutations only: expected-version support, Mutation Guard immediately before commit/delete, commit-time policy reauthorization, cancellation-before-commit safety, and required dry-run semantics. Preserve root/link/backward-compatibility contracts. Do not begin FMG-009 before FMG-008 MAIN VERIFIED.

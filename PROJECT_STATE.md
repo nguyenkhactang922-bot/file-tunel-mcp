@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-007-mutation-guard`
+Active branch: `chatgpt/FMG-008-existing-mutation-hardening`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -178,11 +178,22 @@ Evidence: `docs/evidence/FMG-006_FILE_VERSION_SOURCE_STATE_EVIDENCE.md`.
 
 ## FMG-007 implementation
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-007-mutation-guard`.
-Depends: FMG-006 DONE / MAIN VERIFIED.
-Scope: AuthorizedPathSnapshot / Mutation Guard only.
-NEXT_EXACT_ACTION: implement stable root/parent/target identity snapshots, new-target parent + expected leaf absence, and final no-follow/reparse-safe recheck on Windows/macOS. Add adversarial tests for ancestor/target replacement, symlink/junction swap, new-file leaf insertion and root authority change. Do not begin FMG-008 before FMG-007 MAIN VERIFIED.
+Final candidate head: `2319488761c845df7be5010dca0283485a41a8e9`.
+PR: #11.
+Merge main: `ad78b0f75564728c7a4aa5dae218d4e79d697569`.
+Native merged-main Verify: run `36167404567` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Local merged-main proof: Mutation Guard/catalog/parity/FM??G-006 prerequisite contracts PASS; Windows runtime 637 assertions PASS; Release build 0 warnings / 0 errors.
 Evidence: `docs/evidence/FMG-007_MUTATION_GUARD_EVIDENCE.md`.
-Local proof: Mutation Guard contract PASS; Windows runtime 637 assertions PASS; Release build 0 warnings / 0 errors; catalog/parity/prerequisite/state/diff gates PASS.
-Native macOS: pending GitHub Verify because local Windows host has no `swiftc`.
+
+## FMG-008 implementation
+
+State: ACTIVE / CLAIMED.
+Branch: `chatgpt/FMG-008-existing-mutation-hardening`.
+Depends: FMG-007, FMG-003 DONE / MAIN VERIFIED.
+Scope: Harden existing `write_file`, `delete_file`, `delete_directory` mutations only.
+NEXT_EXACT_ACTION: integrate expected-version + Mutation Guard + commit-time policy reauthorization/dry-run semantics while preserving existing compatibility and root/link protections. Add stale/path-swap/cancellation/delete-race/policy-removal tests. Do not begin FMG-009 before FMG-008 MAIN VERIFIED.
+
+
+FMG-007 final main proof: merge `ad78b0f75564728c7a4aa5dae218d4e79d697569`; native Verify `36167404567` SUCCESS on all three platform jobs; local merged-main Windows runtime 637 assertions and Release build PASS.
