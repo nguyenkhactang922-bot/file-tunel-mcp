@@ -1417,23 +1417,27 @@ INITIALIZE="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$INITIALIZE" | grep -q '"protocolVersion":"2025-03-26"'
 printf '%s' "$INITIALIZE" | grep -q '"serverInfo"'
 printf '%s' "$INITIALIZE" | grep -q '"name":"filemcp"'
+echo "mcp-legacy-initialize: ok"
 
 TOP_LEVEL_NON_OBJECT_PARAMS="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":101,"method":"initialize","params":[]}')"
 printf '%s' "$TOP_LEVEL_NON_OBJECT_PARAMS" | grep -q '"code":-32602'
 printf '%s' "$TOP_LEVEL_NON_OBJECT_PARAMS" | grep -q 'Invalid params: expected an object'
+echo "mcp-legacy-invalid-params: ok"
 
 CLAIMLESS_DISCOVER="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":102,"method":"server/discover","params":{}}')"
 printf '%s' "$CLAIMLESS_DISCOVER" | grep -q '"code":-32601'
 printf '%s' "$CLAIMLESS_DISCOVER" | grep -q 'Method not found: server.*discover'
+echo "mcp-legacy-claimless-discover: ok"
 
 DOWNGRADE="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2099-01-01","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}')"
 printf '%s' "$DOWNGRADE" | grep -q '"protocolVersion":"2025-11-25"'
+echo "mcp-legacy-downgrade: ok"
 
 READ_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1442,6 +1446,7 @@ printf '%s' "$READ_RESULT" | grep -q 'hello swift'
 
 printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.result raw -expect string -o - - | grep -qx 'hello swift'
 printf '%s' "$READ_RESULT" | python3 -c 'import json,sys,re; d=json.load(sys.stdin); e=d["result"]["_meta"]["io.filemcp/result"]; assert e["schemaVersion"]=="1.0.0" and e["status"]=="success"; assert re.fullmatch(r"op_[0-9a-f]{32}", e["operationId"]); assert e["truncation"]=={"truncated":False,"reason":"none"}; assert e["usage"]["contentItems"]==1 and e["warnings"]==[]'
+echo "mcp-legacy-read-envelope: ok"
 
 LIST_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1450,6 +1455,7 @@ printf '%s' "$LIST_RESULT" | plutil -extract result.structuredContent.result raw
 printf '%s' "$LIST_RESULT" | plutil -extract result.structuredContent.result json -o - - | grep -q '"sample.swift"'
 
 printf '%s' "$LIST_RESULT" | plutil -extract result.structuredContent.truncated raw -expect bool -o - - | grep -qx 'false'
+echo "mcp-legacy-list-baseline: ok"
 
 BUDGET_LIST_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1458,12 +1464,14 @@ printf '%s' "$BUDGET_LIST_RESULT" | plutil -extract result.isError raw -expect b
 printf '%s' "$BUDGET_LIST_RESULT" | plutil -extract result.structuredContent.result raw -expect array -o - - | grep -qx '1'
 printf '%s' "$BUDGET_LIST_RESULT" | plutil -extract result.structuredContent.truncated raw -expect bool -o - - | grep -qx 'true'
 printf '%s' "$BUDGET_LIST_RESULT" | python3 -c 'import json,sys; e=json.load(sys.stdin)["result"]["_meta"]["io.filemcp/result"]; assert e["status"]=="partial"; assert e["usage"]["outputItems"]==1; assert e["usage"]["budget"]["maxOutputItems"]==1; assert e["truncation"]["detail"]=="output_items"'
+echo "mcp-legacy-budget-list: ok"
 
 UNSUPPORTED_BUDGET_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":310,"method":"tools/call","params":{"name":"read_file","arguments":{"relative_path":"hello.txt"},"_meta":{"io.filemcp/budget":{"maxOutputItems":1}}}}')"
 printf '%s' "$UNSUPPORTED_BUDGET_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
 printf '%s' "$UNSUPPORTED_BUDGET_RESULT" | grep -q 'Tool budget metadata is not supported for tool: read_file'
+echo "mcp-legacy-budget-unsupported: ok"
 
 LIST_LIMIT_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
