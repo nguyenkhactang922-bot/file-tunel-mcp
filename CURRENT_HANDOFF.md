@@ -197,4 +197,3 @@ FMG-005: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-005-exec-pr
 Local evidence: Windows runtime 609 assertions PASS; canonical catalog/parity PASS at 20 tools / `d03c6cd0c4d6582a89e408078e5f4053039f7178d172614256d510f86c137895`; exec-process contract PASS; Release 0 warnings/errors; project-state/diff checks PASS. Native Swift execution is environment-blocked on this Windows host and must be proven by GitHub macOS Verify.
 
 NEXT_EXACT_ACTION: commit/push the exact FMG-005 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, perform scoped review, merge only on green exact-head evidence, verify merged main, then mark FMG-005 DONE / MAIN VERIFIED and claim the next READY task. Do not start FMG-006 before FMG-005 MAIN VERIFIED.
-
