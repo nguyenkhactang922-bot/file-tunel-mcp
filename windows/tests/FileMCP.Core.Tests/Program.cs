@@ -34,6 +34,7 @@ internal static class Program
             TestCanonicalToolCatalog();
             TestServerPolicy();
             TestToolResultEnvelope();
+            TestToolBudgetAndCursor();
             await TestMcpStandardTelemetryAsync(root);
             await TestMcpTraceContextAsync(root);
             await TestOtlpExporterAsync(root);
@@ -288,6 +289,119 @@ internal static class Program
             throw new Exception($"Assertion failed: {assertion}");
         }
         catch (FileMcpException ex) when (ex.Message.Contains(expectedMessage, StringComparison.Ordinal))
+        {
+            Assert(true, assertion);
+        }
+    }
+
+    private static void TestToolBudgetAndCursor()
+    {
+        using (var lowered = ToolExecutionContext.Create(new JsonObject
+        {
+            [ToolExecutionContext.BudgetMetadataKey] = new JsonObject
+            {
+                ["maxVisitedEntries"] = 3,
+                ["maxFilesScanned"] = 2,
+                ["maxBytesScanned"] = 20L,
+                ["maxOutputItems"] = 2,
+                ["timeoutMs"] = 5_000,
+            },
+        }))
+        {
+            Assert(lowered.Limits.MaxVisitedEntries == 3 && lowered.Limits.MaxFilesScanned == 2, "budget caller can lower entry/file caps");
+            Assert(lowered.Limits.MaxBytesScanned == 20 && lowered.Limits.MaxOutputItems == 2, "budget caller can lower byte/output caps");
+            Assert(lowered.TryVisitEntry() && lowered.TryVisitEntry() && lowered.TryVisitEntry(), "budget accepts entries within cap");
+            Assert(!lowered.TryVisitEntry() && lowered.Truncated && lowered.TruncationReason == "visited_entries", "budget truncates at visited cap");
+        }
+
+        try
+        {
+            using var _ = ToolExecutionContext.Create(new JsonObject
+            {
+                [ToolExecutionContext.BudgetMetadataKey] = new JsonObject
+                {
+                    ["maxVisitedEntries"] = ToolBudgetLimits.ServerCaps.MaxVisitedEntries + 1,
+                },
+            });
+            throw new Exception("Assertion failed: oversized caller budget rejected");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains("may only lower", StringComparison.Ordinal))
+        {
+            Assert(true, "oversized caller budget rejected");
+        }
+
+        try
+        {
+            using var _ = ToolExecutionContext.Create(new JsonObject
+            {
+                [ToolExecutionContext.BudgetMetadataKey] = new JsonObject { ["unknown"] = 1 },
+            });
+            throw new Exception("Assertion failed: unknown budget field rejected");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains("Unknown budget field", StringComparison.Ordinal))
+        {
+            Assert(true, "unknown budget field rejected");
+        }
+
+        using (var cancellation = new CancellationTokenSource())
+        using (var cancellable = ToolExecutionContext.Create(null, cancellation.Token))
+        {
+            Assert(cancellable.TryVisitEntry(), "budget cancellation fixture starts before cancellation");
+            cancellation.Cancel();
+            Assert(!cancellable.TryContinue() && cancellable.Truncated && cancellable.TruncationReason == "cancelled", "budget cooperative parent cancellation");
+        }
+
+        using (var timed = ToolExecutionContext.Create(new JsonObject
+        {
+            [ToolExecutionContext.BudgetMetadataKey] = new JsonObject { ["timeoutMs"] = 1 },
+        }))
+        {
+            Assert(SpinWait.SpinUntil(() => timed.CancellationToken.IsCancellationRequested, 1_000), "budget deadline cancellation token fires");
+            Assert(!timed.TryContinue() && timed.Truncated && timed.TruncationReason == "timeout", "budget cooperative deadline timeout");
+            var usage = timed.Usage();
+            Assert(usage["truncated"]?.GetValue<bool>() == true && usage["truncationReason"]?.GetValue<string>() == "timeout", "budget usage exposes truncation metadata");
+        }
+
+        var key = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
+        var now = DateTimeOffset.UnixEpoch;
+        var codec = new AuthenticatedCursorCodec(key, () => now);
+        var expiry = now.AddMinutes(10);
+        var cursor = codec.Encode("search_filenames", "opts", "root", 7, "pos-42", expiry);
+        Assert(codec.Decode(cursor, "search_filenames", "opts", "root", 7, now) == "pos-42", "cursor roundtrip");
+
+        ExpectCursorFailure(() => codec.Decode(cursor + "x", "search_filenames", "opts", "root", 7, now), "cursor", "tampered cursor rejected");
+        ExpectCursorFailure(() => codec.Decode(cursor, "search_content", "opts", "root", 7, now), "tool mismatch", "cursor tool binding");
+        ExpectCursorFailure(() => codec.Decode(cursor, "search_filenames", "other", "root", 7, now), "options mismatch", "cursor options binding");
+        ExpectCursorFailure(() => codec.Decode(cursor, "search_filenames", "opts", "other-root", 7, now), "root mismatch", "cursor root binding");
+        ExpectCursorFailure(() => codec.Decode(cursor, "search_filenames", "opts", "root", 8, now), "generation is stale", "cursor generation binding");
+        ExpectCursorFailure(() => codec.Decode(cursor, "search_filenames", "opts", "root", 7, expiry), "expired", "cursor expiry");
+        var restarted = new AuthenticatedCursorCodec(Enumerable.Repeat((byte)0xA5, 32).ToArray(), () => now);
+        ExpectCursorFailure(() => restarted.Decode(cursor, "search_filenames", "opts", "root", 7, now), "authentication", "cursor restart key invalidation");
+
+        try
+        {
+            _ = codec.Encode("search_filenames", "opts", "root", 7, "pos", now.AddMinutes(16));
+            throw new Exception("Assertion failed: cursor lifetime upper bound");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains("expiry", StringComparison.OrdinalIgnoreCase))
+        {
+            Assert(true, "cursor lifetime upper bound");
+        }
+
+        ExpectCursorFailure(
+            () => codec.Decode(new string('a', 5000), "search_filenames", "opts", "root", 7, now),
+            "malformed",
+            "oversized cursor rejected");
+    }
+
+    private static void ExpectCursorFailure(Action action, string expected, string assertion)
+    {
+        try
+        {
+            action();
+            throw new Exception($"Assertion failed: {assertion}");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains(expected, StringComparison.OrdinalIgnoreCase))
         {
             Assert(true, assertion);
         }
@@ -1863,6 +1977,49 @@ internal static class Program
         var list = await safe.CallAsync("list_files", Obj(("subpath", "docs")));
         Assert(list.StructuredContent["result"]!.AsArray().Any(n => n!.GetValue<string>() == "note.txt"), "list files");
 
+        await safe.CallAsync("write_file", Obj(("relative_path", "docs/second.txt"), ("content", "second-file\n")));
+        using (var listBudget = ToolExecutionContext.Create(new JsonObject
+        {
+            [ToolExecutionContext.BudgetMetadataKey] = new JsonObject
+            {
+                ["maxVisitedEntries"] = 10,
+                ["maxOutputItems"] = 1,
+            },
+        }))
+        {
+            var budgetedList = await safe.CallAsync("list_files", Obj(("subpath", "docs")), executionContext: listBudget);
+            Assert(budgetedList.StructuredContent["result"]!.AsArray().Count == 1, "list budget limits output items");
+            Assert(budgetedList.StructuredContent["truncated"]!.GetValue<bool>(), "list budget marks structured result truncated");
+            Assert(listBudget.Truncated && listBudget.TruncationReason == "output_items", "list budget records output truncation reason");
+        }
+        using (var byteBudget = ToolExecutionContext.Create(new JsonObject
+        {
+            [ToolExecutionContext.BudgetMetadataKey] = new JsonObject
+            {
+                ["maxVisitedEntries"] = 10,
+                ["maxFilesScanned"] = 10,
+                ["maxBytesScanned"] = 4L,
+                ["maxOutputItems"] = 10,
+            },
+        }))
+        {
+            var budgetedSearch = await safe.CallAsync("search_content", Obj(("query", "beta"), ("path", "docs")), executionContext: byteBudget);
+            Assert(budgetedSearch.StructuredContent["truncated"]!.GetValue<bool>(), "search byte budget marks result truncated");
+            Assert(byteBudget.Truncated && byteBudget.TruncationReason == "bytes_scanned", "search byte budget stops before oversized read");
+            Assert(byteBudget.Usage()["bytesScanned"]!.GetValue<long>() <= 4, "search byte budget never accounts beyond caller cap");
+        }
+
+        var cancellationChecks = 0;
+        using (var scanCancellation = ToolExecutionContext.Create(
+            new JsonObject { [ToolExecutionContext.BudgetMetadataKey] = new JsonObject { ["maxVisitedEntries"] = 10, ["maxOutputItems"] = 10 } },
+            cancellationProbe: () => ++cancellationChecks > 2))
+        {
+            var cancelledList = await safe.CallAsync("list_files", Obj(("subpath", "docs")), executionContext: scanCancellation);
+            Assert(cancelledList.StructuredContent["truncated"]!.GetValue<bool>(), "mid-scan cancellation marks list truncated");
+            Assert(scanCancellation.Truncated && scanCancellation.TruncationReason == "cancelled", "mid-scan cancellation is cooperative");
+            Assert(scanCancellation.Usage()["visitedEntries"]!.GetValue<int>() < 10, "mid-scan cancellation stops traversal before budget cap");
+        }
+
         await full.CallAsync("run_command", Obj(("command", "Write-Output windows-command-ok"), ("cwd", ""), ("timeout_seconds", 5)));
         var command = await full.CallAsync("run_command", Obj(("command", "Write-Output windows-command-ok"), ("timeout_seconds", 5)));
         Assert(command.StructuredContent["result"]!.GetValue<string>().Contains("windows-command-ok"), "run command");
@@ -1878,6 +2035,7 @@ internal static class Program
         await safe.CallAsync("delete_file", Obj(("relative_path", "escape")));
         Assert(!Directory.Exists(junction) && File.Exists(Path.Combine(outside, "secret.txt")), "junction delete removes link only");
         await safe.CallAsync("delete_file", Obj(("relative_path", "docs/note.txt")));
+        await safe.CallAsync("delete_file", Obj(("relative_path", "docs/second.txt")));
         await safe.CallAsync("delete_directory", Obj(("relative_path", "docs")));
         Assert(!Directory.Exists(Path.Combine(workspace, "docs")), "delete directory");
         Console.WriteLine("windows-filesystem-tools: ok");
@@ -1945,10 +2103,56 @@ internal static class Program
 
     private static async Task TestHttpAndMcpAsync(string root)
     {
-        var workspace = Path.Combine(root, "http"); Directory.CreateDirectory(workspace); File.WriteAllText(Path.Combine(workspace, "hello.txt"), "hello");
+        var workspace = Path.Combine(root, "http"); Directory.CreateDirectory(workspace); File.WriteAllText(Path.Combine(workspace, "hello.txt"), "hello"); File.WriteAllText(Path.Combine(workspace, "second.txt"), "second");
         var port = FreePort(); var token = new string('a', 64);
         await using var server = new LocalMcpServer((ushort)port, workspace, "", "", false, token, _ => { });
         await server.StartAsync();
+
+        var budgetCallBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0", ["id"] = 901, ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "list_files",
+                ["arguments"] = new JsonObject(),
+                ["_meta"] = new JsonObject
+                {
+                    [ToolExecutionContext.BudgetMetadataKey] = new JsonObject
+                    {
+                        ["maxVisitedEntries"] = 10,
+                        ["maxOutputItems"] = 1,
+                    },
+                },
+            },
+        }.ToJsonString();
+        var budgetCall = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), budgetCallBody);
+        var budgetJson = JsonNode.Parse(HttpBody(budgetCall))!.AsObject();
+        var budgetResult = budgetJson["result"]!.AsObject();
+        Assert(!budgetResult["isError"]!.GetValue<bool>(), "MCP budgeted list succeeds");
+        Assert(budgetResult["structuredContent"]!["result"]!.AsArray().Count == 1 && budgetResult["structuredContent"]!["truncated"]!.GetValue<bool>(), "MCP budget reaches list tool");
+        var budgetEnvelope = ToolResultEnvelope.Require(budgetResult);
+        Assert(budgetEnvelope["status"]!.GetValue<string>() == "partial", "MCP budget partial envelope status");
+        var budgetUsage = budgetEnvelope["usage"]!.AsObject();
+        Assert(budgetUsage["outputItems"]!.GetValue<int>() == 1, "MCP budget envelope exposes output usage");
+        Assert(budgetUsage["budget"]!["maxOutputItems"]!.GetValue<int>() == 1, "MCP budget envelope exposes effective caller cap");
+
+        var unsupportedBudgetBody = new JsonObject
+        {
+            ["jsonrpc"] = "2.0", ["id"] = 902, ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = "read_file",
+                ["arguments"] = new JsonObject { ["relative_path"] = "hello.txt" },
+                ["_meta"] = new JsonObject
+                {
+                    [ToolExecutionContext.BudgetMetadataKey] = new JsonObject { ["maxOutputItems"] = 1 },
+                },
+            },
+        }.ToJsonString();
+        var unsupportedBudget = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), unsupportedBudgetBody);
+        var unsupportedJson = JsonNode.Parse(HttpBody(unsupportedBudget))!.AsObject();
+        Assert(unsupportedJson["result"]!["isError"]!.GetValue<bool>(), "budget on unsupported tool fails closed");
+        Assert(unsupportedJson["result"]!["content"]![0]!["text"]!.GetValue<string>().Contains("not supported", StringComparison.OrdinalIgnoreCase), "unsupported budget error is explicit");
 
         var fuzzIterations = int.TryParse(Environment.GetEnvironmentVariable("MCP_HTTP_FUZZ_ITERATIONS"), out var configuredFuzz) ? Math.Max(1, configuredFuzz) : 160;
         var random = new Random(0xF11E);

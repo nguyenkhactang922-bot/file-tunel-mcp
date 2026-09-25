@@ -438,11 +438,26 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 if (_sessions is not null && _workspaceKey is not null)
                     sessionCall = _sessions.BeginToolCall(_workspaceKey, sessionHashForCall, requestBytes, name);
 
+                var callMeta = parameters["_meta"] as JsonObject;
+                var budgetedTool = _tools.SupportsBudget(name);
+                if (ToolExecutionContext.HasBudget(callMeta) && !budgetedTool)
+                    throw new FileMcpException($"Tool budget metadata is not supported for tool: {name}");
+                if (callMeta?[AuthenticatedCursorCodec.CursorMetadataKey] is not null)
+                    throw new FileMcpException($"Cursor metadata is not supported for tool: {name}");
+
+                using var executionContext = budgetedTool
+                    ? ToolExecutionContext.Create(callMeta, cancellationToken)
+                    : null;
+
                 _policy.Authorize(name, preparedPolicy);
                 var output = _skills.HasTool(name)
                     ? _skills.Call(name, arguments)
-                    : await _tools.CallAsync(name, arguments, cancellationToken).ConfigureAwait(false);
-                var toolResult = ToolCallResult(output.Content, output.StructuredContent, isError: false);
+                    : await _tools.CallAsync(
+                        name,
+                        arguments,
+                        executionContext?.CancellationToken ?? cancellationToken,
+                        executionContext).ConfigureAwait(false);
+                var toolResult = ToolCallResult(output.Content, output.StructuredContent, isError: false, executionContext);
                 if (modern) toolResult = ModernComplete(toolResult);
                 isError = false;
                 return response = JsonRpcResult(id, toolResult);
@@ -468,15 +483,29 @@ public sealed class LocalMcpServer : IAsyncDisposable
         }
     }
 
-    private static JsonObject ToolCallResult(JsonArray content, JsonObject? structuredContent, bool isError)
+    private static JsonObject ToolCallResult(
+        JsonArray content,
+        JsonObject? structuredContent,
+        bool isError,
+        ToolExecutionContext? executionContext = null)
     {
+        if (executionContext?.Truncated == true && structuredContent is not null)
+            structuredContent["truncated"] = true;
+
         var result = new JsonObject
         {
             ["content"] = content,
             ["isError"] = isError,
         };
         if (structuredContent is not null) result["structuredContent"] = structuredContent;
-        ToolResultEnvelope.Attach(result, isError, content, structuredContent);
+        ToolResultEnvelope.Attach(
+            result,
+            isError,
+            content,
+            structuredContent,
+            usage: executionContext?.Usage(),
+            forceTruncated: executionContext?.Truncated == true,
+            truncationDetail: executionContext?.TruncationReason);
         return result;
     }
 

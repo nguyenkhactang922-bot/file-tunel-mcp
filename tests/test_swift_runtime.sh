@@ -224,6 +224,99 @@ SWIFT
 swiftc -framework CryptoKit -o "$TMP_DIR/server-policy-test" macos/ToolCatalog.swift macos/ServerPolicy.swift "$TMP_DIR/main.swift"
 "$TMP_DIR/server-policy-test"
 
+cat >"$TMP_DIR/main.swift" <<'SWIFT'
+import Foundation
+
+func expectFailure(_ label: String, containing expected: String, _ body: () throws -> Void) {
+    do {
+        try body()
+        fatalError("expected failure: \(label)")
+    } catch {
+        precondition(error.localizedDescription.lowercased().contains(expected.lowercased()), "\(label) unexpected error: \(error)")
+    }
+}
+
+let budgetMeta: [String: Any] = [ToolExecutionContext.budgetMetadataKey: [
+    "maxVisitedEntries": 3,
+    "maxFilesScanned": 2,
+    "maxBytesScanned": 20,
+    "maxOutputItems": 2,
+    "timeoutMs": 500,
+]]
+let budget = try ToolExecutionContext(meta: budgetMeta)
+precondition(budget.limits.maxVisitedEntries == 3 && budget.limits.maxFilesScanned == 2)
+precondition(budget.limits.maxBytesScanned == 20 && budget.limits.maxOutputItems == 2)
+precondition(budget.tryVisitEntry() && budget.tryVisitEntry() && budget.tryVisitEntry())
+precondition(!budget.tryVisitEntry() && budget.truncated && budget.truncationReason == "visited_entries")
+let budgetUsage = budget.usage()
+precondition(budgetUsage["truncated"] as? Bool == true)
+precondition(budgetUsage["truncationReason"] as? String == "visited_entries")
+
+expectFailure("oversized budget", containing: "may only lower") {
+    _ = try ToolExecutionContext(meta: [ToolExecutionContext.budgetMetadataKey: [
+        "maxVisitedEntries": ToolBudgetLimits.serverCaps.maxVisitedEntries + 1
+    ]])
+}
+expectFailure("unknown budget", containing: "unknown budget field") {
+    _ = try ToolExecutionContext(meta: [ToolExecutionContext.budgetMetadataKey: ["future": 1]])
+}
+
+var cancelled = false
+let cancellable = try ToolExecutionContext(meta: nil, cancellationProbe: { cancelled })
+precondition(cancellable.tryContinue())
+cancelled = true
+precondition(!cancellable.tryContinue() && cancellable.truncationReason == "cancelled")
+
+var now = Date(timeIntervalSince1970: 1_700_000_000)
+let timed = try ToolExecutionContext(
+    meta: [ToolExecutionContext.budgetMetadataKey: ["timeoutMs": 10]],
+    nowProvider: { now }
+)
+precondition(timed.tryContinue())
+now = now.addingTimeInterval(0.011)
+precondition(!timed.tryContinue() && timed.truncationReason == "timeout")
+
+let key = Data(repeating: 0x5a, count: 32)
+let codec = try AuthenticatedCursorCodec(keyData: key, nowProvider: { now })
+let expiry = now.addingTimeInterval(60)
+let cursor = try codec.encode(tool: "search_filenames", optionsHash: "opts", rootAuthorityID: "root", generation: 7, position: "pos-42", expiresAt: expiry)
+precondition(try codec.decode(cursor, expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now) == "pos-42")
+expectFailure("tamper", containing: "cursor") {
+    _ = try codec.decode(cursor + "x", expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
+}
+expectFailure("tool binding", containing: "tool mismatch") {
+    _ = try codec.decode(cursor, expectedTool: "search_content", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
+}
+expectFailure("options binding", containing: "options mismatch") {
+    _ = try codec.decode(cursor, expectedTool: "search_filenames", expectedOptionsHash: "other", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
+}
+expectFailure("root binding", containing: "root mismatch") {
+    _ = try codec.decode(cursor, expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "other", expectedGeneration: 7, now: now)
+}
+expectFailure("generation binding", containing: "stale") {
+    _ = try codec.decode(cursor, expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 8, now: now)
+}
+expectFailure("expiry", containing: "expired") {
+    _ = try codec.decode(cursor, expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: expiry)
+}
+let restarted = try AuthenticatedCursorCodec(keyData: Data(repeating: 0xa5, count: 32), nowProvider: { now })
+expectFailure("restart key", containing: "authentication") {
+    _ = try restarted.decode(cursor, expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
+}
+expectFailure("cursor lifetime", containing: "one hour") {
+    _ = try AuthenticatedCursorCodec(keyData: key, nowProvider: { now }, maxLifetime: 60 * 60 + 1)
+}
+expectFailure("cursor expiry upper bound", containing: "within") {
+    _ = try codec.encode(tool: "search_filenames", optionsHash: "opts", rootAuthorityID: "root", generation: 7, position: "pos", expiresAt: now.addingTimeInterval(16 * 60))
+}
+expectFailure("oversized cursor", containing: "malformed") {
+    _ = try codec.decode(String(repeating: "a", count: 4097), expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
+}
+print("swift-tool-budget-cursor: ok")
+SWIFT
+swiftc -framework Security -framework CryptoKit -o "$TMP_DIR/tool-budget-cursor-test" macos/ToolExecutionContext.swift macos/AuthenticatedCursorCodec.swift "$TMP_DIR/main.swift"
+"$TMP_DIR/tool-budget-cursor-test"
+
 case "$(uname -m)" in
     arm64|aarch64) TUNNEL_TARGET="darwin-arm64" ;;
     x86_64|amd64) TUNNEL_TARGET="darwin-amd64" ;;
@@ -898,6 +991,8 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ToolCatalog.swift \
     macos/ServerPolicy.swift \
     macos/ToolResultEnvelope.swift \
+    macos/ToolExecutionContext.swift \
+    macos/AuthenticatedCursorCodec.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -1044,6 +1139,8 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ToolCatalog.swift \
     macos/ServerPolicy.swift \
     macos/ToolResultEnvelope.swift \
+    macos/ToolExecutionContext.swift \
+    macos/AuthenticatedCursorCodec.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"
@@ -1352,6 +1449,20 @@ printf '%s' "$LIST_RESULT" | plutil -extract result.structuredContent.result raw
 printf '%s' "$LIST_RESULT" | plutil -extract result.structuredContent.result json -o - - | grep -q '"sample.swift"'
 
 printf '%s' "$LIST_RESULT" | plutil -extract result.structuredContent.truncated raw -expect bool -o - - | grep -qx 'false'
+
+BUDGET_LIST_RESULT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":309,"method":"tools/call","params":{"name":"list_files","arguments":{},"_meta":{"io.filemcp/budget":{"maxVisitedEntries":10,"maxOutputItems":1}}}}')"
+printf '%s' "$BUDGET_LIST_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$BUDGET_LIST_RESULT" | plutil -extract result.structuredContent.result raw -expect array -o - - | grep -qx '1'
+printf '%s' "$BUDGET_LIST_RESULT" | plutil -extract result.structuredContent.truncated raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$BUDGET_LIST_RESULT" | python3 -c 'import json,sys; e=json.load(sys.stdin)["result"]["_meta"]["io.filemcp/result"]; assert e["status"]=="partial"; assert e["usage"]["outputItems"]==1; assert e["usage"]["budget"]["maxOutputItems"]==1; assert e["truncation"]["detail"]=="output_items"'
+
+UNSUPPORTED_BUDGET_RESULT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":310,"method":"tools/call","params":{"name":"read_file","arguments":{"relative_path":"hello.txt"},"_meta":{"io.filemcp/budget":{"maxOutputItems":1}}}}')"
+printf '%s' "$UNSUPPORTED_BUDGET_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$UNSUPPORTED_BUDGET_RESULT" | grep -q 'Tool budget metadata is not supported for tool: read_file'
 
 LIST_LIMIT_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \

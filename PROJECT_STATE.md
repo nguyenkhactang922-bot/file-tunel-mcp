@@ -145,8 +145,12 @@ Evidence: `docs/evidence/FMG-003_SERVER_POLICY_EVIDENCE.md`.
 
 ## FMG-004 implementation
 
-State: ACTIVE / CLAIMED.
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
 Branch: `chatgpt/FMG-004-toolbudget-cursor`.
 Depends: FMG-002 DONE / MAIN VERIFIED.
 Scope: ToolBudget / Cancellation / Cursor Core only.
+Local proof: Windows runtime 576 assertions PASS; catalog/parity PASS; Release build 0 warnings / 0 errors; state contract + diff check PASS.
+macOS local proof: environment-blocked on Windows host; native GitHub Verify required.
+Evidence: `docs/evidence/FMG-004_TOOL_BUDGET_CURSOR_EVIDENCE.md`.
+Next gate: exact-head native Verify -> review -> merge fork main -> MAIN VERIFIED.
 Later dependent tasks remain BLOCKED by frozen graph.

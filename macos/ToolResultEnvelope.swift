@@ -17,18 +17,35 @@ enum ToolResultEnvelope {
         isError: Bool,
         content: [[String: Any]],
         structuredContent: [String: Any]?,
-        warnings: [String] = []
+        warnings: [String] = [],
+        usage: [String: Any]? = nil,
+        forceTruncated: Bool = false,
+        truncationDetail: String? = nil
     ) -> [String: Any] {
-        let truncated = structuredContent?["truncated"] as? Bool ?? false
+        let structuredTruncated = structuredContent?["truncated"] as? Bool ?? false
+        let truncated = forceTruncated || structuredTruncated
+
+        var truncation: [String: Any] = [
+            "truncated": truncated,
+            "reason": truncated ? "server_limit" : "none",
+        ]
+        if truncated, let detail = truncationDetail?.trimmingCharacters(in: .whitespacesAndNewlines), !detail.isEmpty {
+            truncation["detail"] = detail
+        }
+
+        var usageValue: [String: Any] = ["contentItems": content.count]
+        if let usage {
+            for (key, value) in usage where key != "contentItems" {
+                usageValue[key] = value
+            }
+        }
+
         let envelope: [String: Any] = [
             "schemaVersion": schemaVersion,
             "status": isError ? "tool_error" : (truncated ? "partial" : "success"),
             "operationId": "op_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
-            "truncation": [
-                "truncated": truncated,
-                "reason": truncated ? "server_limit" : "none",
-            ],
-            "usage": ["contentItems": content.count],
+            "truncation": truncation,
+            "usage": usageValue,
             "warnings": warnings,
         ]
         do { try validate(envelope) }
@@ -41,10 +58,21 @@ enum ToolResultEnvelope {
         isError: Bool,
         content: [[String: Any]],
         structuredContent: [String: Any]?,
-        warnings: [String] = []
+        warnings: [String] = [],
+        usage: [String: Any]? = nil,
+        forceTruncated: Bool = false,
+        truncationDetail: String? = nil
     ) {
         var meta = result["_meta"] as? [String: Any] ?? [:]
-        meta[metadataKey] = create(isError: isError, content: content, structuredContent: structuredContent, warnings: warnings)
+        meta[metadataKey] = create(
+            isError: isError,
+            content: content,
+            structuredContent: structuredContent,
+            warnings: warnings,
+            usage: usage,
+            forceTruncated: forceTruncated,
+            truncationDetail: truncationDetail
+        )
         result["_meta"] = meta
     }
 
@@ -76,20 +104,59 @@ enum ToolResultEnvelope {
         guard (truncated && reason != "none") || (!truncated && reason == "none") else {
             throw ToolResultEnvelopeError.invalid("Inconsistent tool result envelope truncation")
         }
+        if let detail = truncation["detail"] {
+            guard let detail = detail as? String,
+                  !detail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  detail.count <= 64 else {
+                throw ToolResultEnvelopeError.invalid("Malformed tool result envelope truncation detail")
+            }
+        }
         if status == "partial" && !truncated {
             throw ToolResultEnvelopeError.invalid("Partial tool result envelope must be truncated")
         }
         if status == "success" && truncated {
             throw ToolResultEnvelopeError.invalid("Successful tool result envelope cannot be truncated")
         }
+
         guard let usage = envelope["usage"] as? [String: Any],
-              let contentItems = usage["contentItems"] as? Int, contentItems >= 0 else {
+              let contentItems = integer(usage["contentItems"]), contentItems >= 0 else {
             throw ToolResultEnvelopeError.invalid("Malformed tool result envelope usage")
         }
+        for key in ["visitedEntries", "filesScanned", "outputItems"] {
+            if let raw = usage[key], (integer(raw) ?? -1) < 0 {
+                throw ToolResultEnvelopeError.invalid("Malformed tool result envelope usage field: \(key)")
+            }
+        }
+        if let raw = usage["bytesScanned"], (int64(raw) ?? -1) < 0 {
+            throw ToolResultEnvelopeError.invalid("Malformed tool result envelope usage field: bytesScanned")
+        }
+        if let raw = usage["truncated"], !(raw is Bool) {
+            throw ToolResultEnvelopeError.invalid("Malformed tool result envelope usage field: truncated")
+        }
+        if let raw = usage["truncationReason"] {
+            guard let reason = raw as? String,
+                  !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  reason.count <= 64 else {
+                throw ToolResultEnvelopeError.invalid("Malformed tool result envelope usage field: truncationReason")
+            }
+        }
+
         guard let warnings = envelope["warnings"] as? [String],
               warnings.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
             throw ToolResultEnvelopeError.invalid("Malformed tool result envelope warnings")
         }
+    }
+
+    private static func integer(_ value: Any?) -> Int? {
+        guard let value, !(value is Bool), let number = value as? NSNumber else { return nil }
+        let result = number.intValue
+        return number.doubleValue == Double(result) ? result : nil
+    }
+
+    private static func int64(_ value: Any?) -> Int64? {
+        guard let value, !(value is Bool), let number = value as? NSNumber else { return nil }
+        let result = number.int64Value
+        return number.doubleValue == Double(result) ? result : nil
     }
 
     private static func isOperationID(_ value: String) -> Bool {

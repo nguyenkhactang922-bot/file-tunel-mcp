@@ -28,6 +28,10 @@ internal sealed partial class LocalTools
         "write_file", "delete_file", "delete_directory", "run_command",
         "git_init", "git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push",
     };
+    private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
+    {
+        "list_files", "search_content", "search_filenames",
+    };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
         ".git", ".venv", "node_modules", "__pycache__", "build", "dist",
@@ -55,14 +59,16 @@ internal sealed partial class LocalTools
     public JsonArray ToolDefinitions => _policy.FilterDefinitions(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true));
 
     public bool HasTool(string name) => HandlerToolNames.Contains(name) && _policy.IsAllowed(name);
+    internal bool SupportsBudget(string name) => BudgetedToolNames.Contains(name);
 
-    public async Task<ToolCallOutput> CallAsync(string name, JsonObject arguments, CancellationToken cancellationToken = default)
+    public async Task<ToolCallOutput> CallAsync(string name, JsonObject arguments, CancellationToken cancellationToken = default, ToolExecutionContext? executionContext = null)
     {
-        await _toolSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var effectiveCancellation = executionContext?.CancellationToken ?? cancellationToken;
+        await _toolSlots.WaitAsync(effectiveCancellation).ConfigureAwait(false);
         var serialize = SerializedToolNames.Contains(name);
         if (serialize)
         {
-            await _serializedSlot.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await _serializedSlot.WaitAsync(effectiveCancellation).ConfigureAwait(false);
         }
         try
         {
@@ -73,7 +79,7 @@ internal sealed partial class LocalTools
             _policy.Authorize(name, preparedPolicy);
             return name switch
             {
-                "list_files" => StringArrayOutput(ListFiles(GetString(arguments, "subpath", ""))),
+                "list_files" => StringArrayOutput(ListFiles(GetString(arguments, "subpath", ""), executionContext)),
                 "read_file" => StringOutput(ReadFile(GetRequiredString(arguments, "relative_path"))),
                 "read_file_range" => ObjectOutput(ReadFileRange(
                     GetRequiredString(arguments, "relative_path"),
@@ -84,8 +90,9 @@ internal sealed partial class LocalTools
                     GetString(arguments, "path", ""),
                     GetBool(arguments, "case_sensitive", false),
                     GetInt(arguments, "context_lines", 2),
-                    GetInt(arguments, "max_results", 20))),
-                "search_filenames" => StringArrayOutput(SearchFilenames(GetRequiredString(arguments, "query"))),
+                    GetInt(arguments, "max_results", 20),
+                    executionContext)),
+                "search_filenames" => StringArrayOutput(SearchFilenames(GetRequiredString(arguments, "query"), executionContext)),
                 "write_file" => StringOutput(WriteFile(
                     GetRequiredString(arguments, "relative_path"),
                     GetRequiredString(arguments, "content"),
@@ -112,15 +119,49 @@ internal sealed partial class LocalTools
         }
     }
 
-    private (IReadOnlyList<string> Values, bool Truncated) ListFiles(string subpath)
+    private (IReadOnlyList<string> Values, bool Truncated) ListFiles(string subpath, ToolExecutionContext? context)
     {
         var directory = _resolver.Resolve(subpath);
         if (!Directory.Exists(directory)) return ([], false);
-        var entries = new DirectoryInfo(directory).EnumerateFileSystemInfos()
-            .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase).ToList();
-        return (entries.Take(FileMcpConstants.MaxListEntries)
-            .Select(entry => entry.Name + ((entry.Attributes & FileAttributes.Directory) != 0 ? "/" : "")).ToList(),
-            entries.Count > FileMcpConstants.MaxListEntries);
+
+        var collected = new List<FileSystemInfo>();
+        var truncated = false;
+        try
+        {
+            foreach (var entry in new DirectoryInfo(directory).EnumerateFileSystemInfos())
+            {
+                if (context is not null && !context.TryVisitEntry())
+                {
+                    truncated = true;
+                    break;
+                }
+                collected.Add(entry);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            context?.MarkTruncated("cancelled");
+            truncated = true;
+        }
+
+        var entries = collected.OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase);
+        var result = new List<string>();
+        foreach (var entry in entries)
+        {
+            if (result.Count >= FileMcpConstants.MaxListEntries)
+            {
+                context?.MarkTruncated("output_items");
+                truncated = true;
+                break;
+            }
+            if (context is not null && !context.TryOutputItem())
+            {
+                truncated = true;
+                break;
+            }
+            result.Add(entry.Name + ((entry.Attributes & FileAttributes.Directory) != 0 ? "/" : ""));
+        }
+        return (result, truncated || (context?.Truncated ?? false));
     }
 
     private string ReadFile(string relativePath)
@@ -180,100 +221,282 @@ internal sealed partial class LocalTools
         };
     }
 
-    private JsonObject SearchContent(string query, string path, bool caseSensitive, int contextLines, int maxResults)
+    private JsonObject SearchContent(
+        string query,
+        string path,
+        bool caseSensitive,
+        int contextLines,
+        int maxResults,
+        ToolExecutionContext? context)
     {
         if (string.IsNullOrEmpty(query)) throw new FileMcpException("query must not be empty");
         var searchRoot = _resolver.Resolve(path);
         if (!Directory.Exists(searchRoot)) throw new FileMcpException($"No such search directory: {(string.IsNullOrEmpty(path) ? "." : path)}");
-        var context = Math.Clamp(contextLines, 0, 10);
+        var contextLinesEffective = Math.Clamp(contextLines, 0, 10);
         var max = Math.Clamp(maxResults, 1, FileMcpConstants.MaxSearchContentResults);
+        if (context is not null) max = Math.Min(max, context.Limits.MaxOutputItems);
+
         var matches = new JsonArray();
-        var visited = 0; var filesScanned = 0; long bytesScanned = 0; var previewChars = 0; var truncated = false;
-        var pending = new Stack<string>(); pending.Push(searchRoot);
+        var visited = 0;
+        var filesScanned = 0;
+        long bytesScanned = 0;
+        var previewChars = 0;
+        var truncated = false;
+        var pending = new Stack<string>();
+        pending.Push(searchRoot);
+
         while (pending.Count > 0 && !truncated)
         {
+            if (context is not null && !context.TryContinue())
+            {
+                truncated = true;
+                break;
+            }
+
             var dir = pending.Pop();
             IEnumerable<FileSystemInfo> entries;
-            try { entries = new DirectoryInfo(dir).EnumerateFileSystemInfos().ToList(); } catch { continue; }
-            foreach (var entry in entries)
+            try { entries = new DirectoryInfo(dir).EnumerateFileSystemInfos(); }
+            catch { continue; }
+
+            try
             {
-                visited++;
-                if (visited > FileMcpConstants.MaxSearchVisited) { truncated = true; break; }
-                var isDir = (entry.Attributes & FileAttributes.Directory) != 0;
-                if (isDir)
+                foreach (var entry in entries)
                 {
-                    if (SkippedSearchDirectories.Contains(entry.Name) || (entry.Attributes & FileAttributes.ReparsePoint) != 0) continue;
-                    if (_resolver.Contains(entry.FullName)) pending.Push(entry.FullName);
-                    continue;
-                }
-                if (entry is not FileInfo file || file.Length > FileMcpConstants.MaxSearchContentFileBytes) continue;
-                if (bytesScanned + file.Length > FileMcpConstants.MaxSearchContentBytesScanned) { truncated = true; break; }
-                string safe;
-                try { safe = _resolver.Resolve(_resolver.RelativePath(file.FullName)); } catch { continue; }
-                byte[] data;
-                try { data = File.ReadAllBytes(safe); } catch { continue; }
-                if (data.Length > FileMcpConstants.MaxSearchContentFileBytes) continue;
-                if (bytesScanned + data.Length > FileMcpConstants.MaxSearchContentBytesScanned) { truncated = true; break; }
-                bytesScanned += data.Length;
-                if (data.Take(Math.Min(8192, data.Length)).Contains((byte)0)) continue;
-                filesScanned++;
-                var text = Encoding.UTF8.GetString(data); var lines = SplitTextLines(text);
-                for (var index = 0; index < lines.Count; index++)
-                {
-                    var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-                    if (!lines[index].Contains(query, comparison)) continue;
-                    var lineNumber = index + 1; var previewStart = Math.Max(1, lineNumber - context); var previewEnd = Math.Min(lines.Count, lineNumber + context);
-                    var previewLines = new List<string>();
-                    for (var number = previewStart; number <= previewEnd; number++)
+                    if (context is not null)
                     {
-                        var value = lines[number - 1];
-                        if (value.Length > FileMcpConstants.MaxSearchPreviewLineChars) value = value[..FileMcpConstants.MaxSearchPreviewLineChars] + "...";
-                        previewLines.Add($"{number}: {value}");
+                        if (!context.TryVisitEntry()) { truncated = true; break; }
                     }
-                    var preview = string.Join("\n", previewLines);
-                    if (previewChars + preview.Length > FileMcpConstants.MaxSearchPreviewChars) { truncated = true; break; }
-                    previewChars += preview.Length;
-                    matches.Add(new JsonObject { ["path"] = _resolver.RelativePath(file.FullName), ["line"] = lineNumber, ["preview_start_line"] = previewStart, ["preview_end_line"] = previewEnd, ["preview"] = preview });
-                    if (matches.Count >= max) { truncated = true; break; }
+                    visited++;
+                    if (context is null && visited > FileMcpConstants.MaxSearchVisited) { truncated = true; break; }
+
+                    var isDir = (entry.Attributes & FileAttributes.Directory) != 0;
+                    if (isDir)
+                    {
+                        if (SkippedSearchDirectories.Contains(entry.Name) || (entry.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                        if (_resolver.Contains(entry.FullName)) pending.Push(entry.FullName);
+                        continue;
+                    }
+
+                    if (entry is not FileInfo file || file.Length > FileMcpConstants.MaxSearchContentFileBytes) continue;
+                    if (bytesScanned + file.Length > FileMcpConstants.MaxSearchContentBytesScanned)
+                    {
+                        context?.MarkTruncated("bytes_scanned");
+                        truncated = true;
+                        break;
+                    }
+                    if (context is not null && (context.RemainingFiles <= 0 || file.Length > context.RemainingBytes))
+                    {
+                        context.MarkTruncated(context.RemainingFiles <= 0 ? "files_scanned" : "bytes_scanned");
+                        truncated = true;
+                        break;
+                    }
+
+                    string safe;
+                    try { safe = _resolver.Resolve(_resolver.RelativePath(file.FullName)); } catch { continue; }
+                    byte[] data;
+                    try
+                    {
+                        var readLimit = context is null
+                            ? FileMcpConstants.MaxSearchContentFileBytes
+                            : (int)Math.Min(FileMcpConstants.MaxSearchContentFileBytes, context.RemainingBytes);
+                        var bounded = ReadFileAtMost(safe, readLimit);
+                        if (bounded.Exceeded)
+                        {
+                            context?.MarkTruncated("bytes_scanned");
+                            truncated = true;
+                            break;
+                        }
+                        data = bounded.Data;
+                    }
+                    catch { continue; }
+                    if (data.Length > FileMcpConstants.MaxSearchContentFileBytes) continue;
+                    if (bytesScanned + data.Length > FileMcpConstants.MaxSearchContentBytesScanned)
+                    {
+                        context?.MarkTruncated("bytes_scanned");
+                        truncated = true;
+                        break;
+                    }
+                    if (context is not null && !context.TryScanFile(data.Length))
+                    {
+                        truncated = true;
+                        break;
+                    }
+
+                    bytesScanned += data.Length;
+                    if (data.Take(Math.Min(8192, data.Length)).Contains((byte)0)) continue;
+                    filesScanned++;
+
+                    var text = Encoding.UTF8.GetString(data);
+                    var lines = SplitTextLines(text);
+                    for (var index = 0; index < lines.Count; index++)
+                    {
+                        if (context is not null && !context.TryContinue())
+                        {
+                            truncated = true;
+                            break;
+                        }
+
+                        var comparison = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+                        if (!lines[index].Contains(query, comparison)) continue;
+
+                        var lineNumber = index + 1;
+                        var previewStart = Math.Max(1, lineNumber - contextLinesEffective);
+                        var previewEnd = Math.Min(lines.Count, lineNumber + contextLinesEffective);
+                        var previewLines = new List<string>();
+                        for (var number = previewStart; number <= previewEnd; number++)
+                        {
+                            var value = lines[number - 1];
+                            if (value.Length > FileMcpConstants.MaxSearchPreviewLineChars)
+                                value = value[..FileMcpConstants.MaxSearchPreviewLineChars] + "...";
+                            previewLines.Add($"{number}: {value}");
+                        }
+
+                        var preview = string.Join("\n", previewLines);
+                        if (previewChars + preview.Length > FileMcpConstants.MaxSearchPreviewChars)
+                        {
+                            context?.MarkTruncated("server_limit");
+                            truncated = true;
+                            break;
+                        }
+                        if (context is not null && !context.TryOutputItem())
+                        {
+                            truncated = true;
+                            break;
+                        }
+
+                        previewChars += preview.Length;
+                        matches.Add(new JsonObject
+                        {
+                            ["path"] = _resolver.RelativePath(file.FullName),
+                            ["line"] = lineNumber,
+                            ["preview_start_line"] = previewStart,
+                            ["preview_end_line"] = previewEnd,
+                            ["preview"] = preview,
+                        });
+
+                        if (matches.Count >= max)
+                        {
+                            context?.MarkTruncated("output_items");
+                            truncated = true;
+                            break;
+                        }
+                    }
+                    if (truncated) break;
                 }
-                if (truncated) break;
+            }
+            catch (OperationCanceledException)
+            {
+                context?.MarkTruncated("cancelled");
+                truncated = true;
             }
         }
+
         return new JsonObject
         {
-            ["query"] = query, ["path"] = path, ["case_sensitive"] = caseSensitive, ["matches"] = matches,
-            ["truncated"] = truncated, ["visited_entries"] = Math.Min(visited, FileMcpConstants.MaxSearchVisited),
-            ["files_scanned"] = filesScanned, ["bytes_scanned"] = bytesScanned,
+            ["query"] = query,
+            ["path"] = path,
+            ["case_sensitive"] = caseSensitive,
+            ["matches"] = matches,
+            ["truncated"] = truncated || (context?.Truncated ?? false),
+            ["visited_entries"] = Math.Min(visited, FileMcpConstants.MaxSearchVisited),
+            ["files_scanned"] = filesScanned,
+            ["bytes_scanned"] = bytesScanned,
         };
     }
 
-    private (IReadOnlyList<string> Values, bool Truncated) SearchFilenames(string query)
+    private static (byte[] Data, bool Exceeded) ReadFileAtMost(string path, int maxBytes)
+    {
+        if (maxBytes < 0) return ([], true);
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var output = new MemoryStream(Math.Min(maxBytes, 64 * 1024));
+        var buffer = new byte[Math.Min(64 * 1024, Math.Max(1, maxBytes + 1))];
+        var remainingPlusSentinel = (long)maxBytes + 1;
+        while (remainingPlusSentinel > 0)
+        {
+            var requested = (int)Math.Min(buffer.Length, remainingPlusSentinel);
+            var read = stream.Read(buffer, 0, requested);
+            if (read == 0) break;
+            output.Write(buffer, 0, read);
+            remainingPlusSentinel -= read;
+            if (output.Length > maxBytes) return ([], true);
+        }
+        return (output.ToArray(), false);
+    }
+
+    private (IReadOnlyList<string> Values, bool Truncated) SearchFilenames(string query, ToolExecutionContext? context)
     {
         if (string.IsNullOrEmpty(query)) throw new FileMcpException("query must not be empty");
-        var matches = new List<string>(); var visited = 0; var truncated = false;
-        var pending = new Stack<string>(); pending.Push(_resolver.Root);
+
+        var matches = new List<string>();
+        var visited = 0;
+        var truncated = false;
+        var pending = new Stack<string>();
+        pending.Push(_resolver.Root);
+
         while (pending.Count > 0 && !truncated)
         {
+            if (context is not null && !context.TryContinue())
+            {
+                truncated = true;
+                break;
+            }
+
             var dir = pending.Pop();
             IEnumerable<FileSystemInfo> entries;
-            try { entries = new DirectoryInfo(dir).EnumerateFileSystemInfos().ToList(); } catch { continue; }
-            foreach (var entry in entries)
+            try { entries = new DirectoryInfo(dir).EnumerateFileSystemInfos(); }
+            catch { continue; }
+
+            try
             {
-                visited++; if (visited > FileMcpConstants.MaxSearchVisited) { truncated = true; break; }
-                if ((entry.Attributes & FileAttributes.Directory) != 0)
+                foreach (var entry in entries)
                 {
-                    if (SkippedSearchDirectories.Contains(entry.Name) || (entry.Attributes & FileAttributes.ReparsePoint) != 0) continue;
-                    if (_resolver.Contains(entry.FullName)) pending.Push(entry.FullName);
-                }
-                else if (entry.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
-                {
-                    var relative = _resolver.RelativePath(entry.FullName);
-                    if (!string.IsNullOrEmpty(relative)) matches.Add(relative);
-                    if (matches.Count >= FileMcpConstants.MaxSearchResults) { truncated = true; break; }
+                    if (context is not null)
+                    {
+                        if (!context.TryVisitEntry()) { truncated = true; break; }
+                    }
+                    visited++;
+                    if (context is null && visited > FileMcpConstants.MaxSearchVisited) { truncated = true; break; }
+
+                    if ((entry.Attributes & FileAttributes.Directory) != 0)
+                    {
+                        if (SkippedSearchDirectories.Contains(entry.Name) || (entry.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                        if (_resolver.Contains(entry.FullName)) pending.Push(entry.FullName);
+                    }
+                    else if (entry.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var relative = _resolver.RelativePath(entry.FullName);
+                        if (string.IsNullOrEmpty(relative)) continue;
+
+                        if (matches.Count >= FileMcpConstants.MaxSearchResults)
+                        {
+                            context?.MarkTruncated("output_items");
+                            truncated = true;
+                            break;
+                        }
+                        if (context is not null && !context.TryOutputItem())
+                        {
+                            truncated = true;
+                            break;
+                        }
+
+                        matches.Add(relative);
+                        if (matches.Count >= FileMcpConstants.MaxSearchResults)
+                        {
+                            context?.MarkTruncated("output_items");
+                            truncated = true;
+                            break;
+                        }
+                    }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                context?.MarkTruncated("cancelled");
+                truncated = true;
+            }
         }
-        return (matches, truncated);
+
+        return (matches, truncated || (context?.Truncated ?? false));
     }
 
     private string WriteFile(string relativePath, string content, bool append)
