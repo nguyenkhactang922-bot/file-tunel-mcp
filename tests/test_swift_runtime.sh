@@ -1434,18 +1434,21 @@ fi
 printf '%s' "$EXEC_ARGV" | plutil -extract result.structuredContent.terminal_state raw -expect string -o - - | grep -qx 'exited'
 printf '%s' "$EXEC_ARGV" | plutil -extract result.structuredContent.exit_code raw -expect integer -o - - | grep -qx '0'
 printf '%s' "$EXEC_ARGV" | plutil -extract result.structuredContent.stdout raw -expect string -o - - | grep -Fqx '$HOME;echo hacked'
+echo "mcp-exec-argv: ok"
 
 EXEC_CWD="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":431,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/bin/pwd","arguments":[],"cwd":"exec-work","timeout_seconds":5}}}')"
 printf '%s' "$EXEC_CWD" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
 printf '%s' "$EXEC_CWD" | plutil -extract result.structuredContent.stdout raw -expect string -o - - | tr -d '\r' | grep -qx "$SERVER_ROOT/exec-work"
+echo "mcp-exec-cwd: ok"
 
 EXEC_CWD_ESCAPE="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":432,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/bin/pwd","arguments":[],"cwd":"../filemcp-server-outside","timeout_seconds":5}}}')"
 printf '%s' "$EXEC_CWD_ESCAPE" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
 printf '%s' "$EXEC_CWD_ESCAPE" | grep -q 'outside the shared directory'
+echo "mcp-exec-cwd-escape: ok"
 
 EXEC_NONZERO="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1453,6 +1456,7 @@ EXEC_NONZERO="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$EXEC_NONZERO" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
 printf '%s' "$EXEC_NONZERO" | plutil -extract result.structuredContent.terminal_state raw -expect string -o - - | grep -qx 'exited'
 printf '%s' "$EXEC_NONZERO" | plutil -extract result.structuredContent.exit_code raw -expect integer -o - - | grep -qx '1'
+echo "mcp-exec-nonzero: ok"
 
 EXEC_TIMEOUT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1460,6 +1464,7 @@ EXEC_TIMEOUT="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$EXEC_TIMEOUT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
 printf '%s' "$EXEC_TIMEOUT" | plutil -extract result.structuredContent.terminal_state raw -expect string -o - - | grep -qx 'timed_out'
 printf '%s' "$EXEC_TIMEOUT" | plutil -extract result.structuredContent.timed_out raw -expect bool -o - - | grep -qx 'true'
+echo "mcp-exec-timeout: ok"
 
 EXEC_CANCELLED="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1467,6 +1472,7 @@ EXEC_CANCELLED="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$EXEC_CANCELLED" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
 printf '%s' "$EXEC_CANCELLED" | plutil -extract result.structuredContent.terminal_state raw -expect string -o - - | grep -qx 'cancelled'
 printf '%s' "$EXEC_CANCELLED" | plutil -extract result.structuredContent.cancelled raw -expect bool -o - - | grep -qx 'true'
+echo "mcp-exec-budget-cancel: ok"
 
 EXEC_BOUNDED="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -1475,12 +1481,14 @@ printf '%s' "$EXEC_BOUNDED" | plutil -extract result.isError raw -expect bool -o
 printf '%s' "$EXEC_BOUNDED" | plutil -extract result.structuredContent.stdout_truncated raw -expect bool -o - - | grep -qx 'true'
 EXEC_OMITTED="$(printf '%s' "$EXEC_BOUNDED" | plutil -extract result.structuredContent.stdout_omitted_bytes raw -expect integer -o - -)"
 [ "$EXEC_OMITTED" -gt 0 ]
+echo "mcp-exec-output-bound: ok"
 
 EXEC_NUL="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":436,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/printf","arguments":["bad\u0000argument"],"timeout_seconds":5}}}')"
 printf '%s' "$EXEC_NUL" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
 printf '%s' "$EXEC_NUL" | grep -q 'NUL byte'
+echo "mcp-exec-nul: ok"
 
 EXEC_ARGV_LIMIT_BODY="$(python3 - <<'PY'
 import json
@@ -1490,18 +1498,21 @@ PY
 EXEC_ARGV_LIMIT="$(curl -fsS -X POST "$BASE_URL" -H 'Content-Type: application/json' --data-binary "$EXEC_ARGV_LIMIT_BODY")"
 printf '%s' "$EXEC_ARGV_LIMIT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
 printf '%s' "$EXEC_ARGV_LIMIT" | grep -q 'total argument size'
+echo "mcp-exec-argv-limit: ok"
 
 EXEC_ENV_FORBIDDEN="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":437,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/env","arguments":[],"environment":{"FMG005_FORBIDDEN":"blocked"},"timeout_seconds":5}}}')"
 printf '%s' "$EXEC_ENV_FORBIDDEN" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
 printf '%s' "$EXEC_ENV_FORBIDDEN" | grep -q 'not locally allowed'
+echo "mcp-exec-env-deny: ok"
 
 EXEC_ENV_ALLOWED="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":438,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/env","arguments":[],"environment":{"FMG005_OVERRIDE":"request-value"},"timeout_seconds":5}}}')"
 printf '%s' "$EXEC_ENV_ALLOWED" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
 printf '%s' "$EXEC_ENV_ALLOWED" | plutil -extract result.structuredContent.stdout raw -expect string -o - - | grep -q '^FMG005_OVERRIDE=request-value$'
+echo "mcp-exec-env-allow: ok"
 
 echo "macos-exec-process: ok"
 

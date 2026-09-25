@@ -17,6 +17,13 @@ internal static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "exec-cancel-parent-fixture")
+            return await RunExecCancelParentFixtureAsync(args);
+        if (args.Length > 0 && args[0] == "exec-child-sleeper-fixture")
+        {
+            await Task.Delay(TimeSpan.FromSeconds(20));
+            return 0;
+        }
         if (args.Length > 0 && args[0] is "init" or "doctor" or "run")
             return await RunFakeTunnelClientAsync(args);
 
@@ -1956,6 +1963,26 @@ internal static class Program
         Console.WriteLine("windows-process-runner: ok");
     }
 
+    private static async Task<int> RunExecCancelParentFixtureAsync(string[] args)
+    {
+        if (args.Length != 2 || string.IsNullOrWhiteSpace(args[1])) return 91;
+        var assembly = typeof(Program).Assembly.Location;
+        var testHost = Path.ChangeExtension(assembly, ".exe");
+        if (string.IsNullOrWhiteSpace(assembly) || !File.Exists(testHost)) return 92;
+        var start = new ProcessStartInfo
+        {
+            FileName = testHost,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        start.ArgumentList.Add("exec-child-sleeper-fixture");
+        using var child = Process.Start(start);
+        if (child is null) return 93;
+        File.WriteAllText(args[1], child.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        await Task.Delay(TimeSpan.FromSeconds(20));
+        return 0;
+    }
+
     private static async Task TestExecProcessAsync(string root)
     {
         var workspace = Path.Combine(root, "exec-process");
@@ -2113,15 +2140,14 @@ internal static class Program
         }
 
         var childPidFile = Path.Combine(workspace, "cancel-child.pid");
-        var escapedPidFile = childPidFile.Replace("'", "''", StringComparison.Ordinal);
-        var cancelScript = "$p=Start-Process powershell.exe -ArgumentList '-NoLogo','-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 20' -PassThru; Set-Content -LiteralPath '" +
-            escapedPidFile + "' -Value $p.Id; Start-Sleep -Seconds 20";
+        var testHost = Path.ChangeExtension(typeof(Program).Assembly.Location, ".exe");
+        Assert(File.Exists(testHost), "exec_process cancellation apphost fixture exists");
         using var cancelCts = new CancellationTokenSource();
         var cancelTask = tools.CallAsync(
             "exec_process",
-            ExecArgs(powerShell, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", cancelScript], timeoutSeconds: 30),
+            ExecArgs(testHost, ["exec-cancel-parent-fixture", childPidFile], timeoutSeconds: 30),
             cancelCts.Token);
-        Assert(await WaitUntilAsync(() => File.Exists(childPidFile), TimeSpan.FromSeconds(5)), "exec_process cancellation child fixture started");
+        Assert(await WaitUntilAsync(() => File.Exists(childPidFile), TimeSpan.FromSeconds(8)), "exec_process cancellation child fixture started");
         cancelCts.Cancel();
         var cancelled = await cancelTask;
         Assert(cancelled.StructuredContent["terminal_state"]!.GetValue<string>() == "cancelled", "exec_process cancellation terminal state");
