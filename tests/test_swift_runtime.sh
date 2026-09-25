@@ -245,6 +245,9 @@ let budgetMeta: [String: Any] = [ToolExecutionContext.budgetMetadataKey: [
 ]]
 let budget = try ToolExecutionContext(meta: budgetMeta)
 precondition(budget.limits.maxVisitedEntries == 3 && budget.limits.maxFilesScanned == 2)
+let parsedBudgetJSON = try JSONSerialization.jsonObject(with: Data("{\"io.filemcp/budget\":{\"maxOutputItems\":1}}".utf8)) as! [String: Any]
+let parsedBudget = try ToolExecutionContext(meta: parsedBudgetJSON)
+precondition(parsedBudget.limits.maxOutputItems == 1, "JSONSerialization NSNumber budget must not be confused with Bool")
 precondition(budget.limits.maxBytesScanned == 20 && budget.limits.maxOutputItems == 2)
 precondition(budget.tryVisitEntry() && budget.tryVisitEntry() && budget.tryVisitEntry())
 precondition(!budget.tryVisitEntry() && budget.truncated && budget.truncationReason == "visited_entries")

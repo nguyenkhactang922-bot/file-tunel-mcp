@@ -142,7 +142,8 @@ final class ToolExecutionContext {
 
     private static func lowerInt(_ budget: [String: Any], _ key: String, _ serverCap: Int) throws -> Int {
         guard let raw = budget[key] else { return serverCap }
-        guard !(raw is Bool), let number = raw as? NSNumber else {
+        guard let number = raw as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else {
             throw ToolExecutionContextError.invalid("Budget field \(key) must be a positive integer")
         }
         let value = number.intValue
@@ -157,7 +158,8 @@ final class ToolExecutionContext {
 
     private static func lowerInt64(_ budget: [String: Any], _ key: String, _ serverCap: Int64) throws -> Int64 {
         guard let raw = budget[key] else { return serverCap }
-        guard !(raw is Bool), let number = raw as? NSNumber else {
+        guard let number = raw as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID() else {
             throw ToolExecutionContextError.invalid("Budget field \(key) must be a positive integer")
         }
         let value = number.int64Value
