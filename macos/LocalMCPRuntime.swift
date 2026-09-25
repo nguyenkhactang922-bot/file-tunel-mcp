@@ -13,6 +13,31 @@ struct LocalMCPConfiguration {
     let gitUserName: String
     let gitUserEmail: String
     let enableCommands: Bool
+    let policyConfiguration: LocalPolicyConfiguration?
+
+    init(
+        tunnelID: String,
+        apiKey: String,
+        profile: String,
+        port: UInt16,
+        allowedDirectory: String,
+        healthAddress: String,
+        gitUserName: String,
+        gitUserEmail: String,
+        enableCommands: Bool,
+        policyConfiguration: LocalPolicyConfiguration? = nil
+    ) {
+        self.tunnelID = tunnelID
+        self.apiKey = apiKey
+        self.profile = profile
+        self.port = port
+        self.allowedDirectory = allowedDirectory
+        self.healthAddress = healthAddress
+        self.gitUserName = gitUserName
+        self.gitUserEmail = gitUserEmail
+        self.enableCommands = enableCommands
+        self.policyConfiguration = policyConfiguration
+    }
 }
 
 enum LocalMCPRuntimeState: Equatable {
@@ -213,7 +238,8 @@ final class LocalMCPRuntime {
                 gitUserEmail: configuration.gitUserEmail,
                 enableCommands: configuration.enableCommands,
                 localAuthToken: localAuthToken,
-                log: { [weak self] text in self?.emitLog(text) }
+                log: { [weak self] text in self?.emitLog(text) },
+                policyConfiguration: configuration.policyConfiguration
             )
             try server.start()
             self.server = server
@@ -290,7 +316,14 @@ final class LocalMCPRuntime {
             restartPolicy.reset()
             try startTunnelProcess(launch)
             setState(.running)
-            emitLog("OpenAI Secure MCP Tunnel started. Command execution: \(configuration.enableCommands ? "enabled" : "disabled").\n")
+            let effectivePolicy: String
+            if let configuredPolicy = configuration.policyConfiguration,
+               let normalizedPolicy = try? configuredPolicy.normalized() {
+                effectivePolicy = normalizedPolicy.profile
+            } else {
+                effectivePolicy = LocalPolicyConfiguration.fromLegacy(enableCommands: configuration.enableCommands).profile
+            }
+            emitLog("OpenAI Secure MCP Tunnel started. Policy: \(effectivePolicy).\n")
         } catch {
             if isStopRequested {
                 finishStop()

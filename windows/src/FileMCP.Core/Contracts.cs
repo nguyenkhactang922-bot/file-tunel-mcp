@@ -41,7 +41,8 @@ public sealed record LocalMcpConfiguration(
     string HealthAddress,
     string GitUserName,
     string GitUserEmail,
-    bool EnableCommands);
+    bool EnableCommands,
+    LocalPolicyConfiguration? PolicyConfiguration = null);
 
 public enum LocalMcpRuntimeStatus
 {
@@ -97,6 +98,11 @@ public sealed class FileMcpSettings
     public string GitUserName { get; set; } = "";
     public string GitUserEmail { get; set; } = "";
     public bool EnableCommands { get; set; }
+    public string PolicyProfile { get; set; } = FileMcpPolicyProfiles.Restricted;
+    public string CustomPolicyMaxRisk { get; set; } = "low";
+    public List<string> CustomPolicyAllowedEffects { get; set; } = ["read", "metadata"];
+    public bool CustomPolicyAllowNetworkOpenWorld { get; set; }
+    public bool CustomPolicyAllowShell { get; set; }
     public bool OtlpEnabled { get; set; }
     public string OtlpEndpoint { get; set; } = OtlpTelemetrySettings.DefaultEndpoint;
 }

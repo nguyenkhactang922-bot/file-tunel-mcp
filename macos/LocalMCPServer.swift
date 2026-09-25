@@ -127,6 +127,7 @@ private final class LocalTools {
     private let gitUserName: String
     private let gitUserEmail: String
     private let enableCommands: Bool
+    private let policy: ServerPolicy
     private let toolSlots = DispatchSemaphore(value: 8)
     private let mutationSlot = DispatchSemaphore(value: 1)
     private let commandSlots = DispatchSemaphore(value: 2)
@@ -139,30 +140,47 @@ private final class LocalTools {
         ".git", ".venv", "node_modules", "__pycache__", "build", "dist"
     ]
 
-    init(resolver: SafePathResolver, gitUserName: String, gitUserEmail: String, enableCommands: Bool) throws {
+    convenience init(resolver: SafePathResolver, gitUserName: String, gitUserEmail: String, enableCommands: Bool) throws {
+        try self.init(
+            resolver: resolver,
+            gitUserName: gitUserName,
+            gitUserEmail: gitUserEmail,
+            policy: ServerPolicy.fromLegacy(enableCommands: enableCommands)
+        )
+    }
+
+    init(resolver: SafePathResolver, gitUserName: String, gitUserEmail: String, policy: ServerPolicy) throws {
         self.resolver = resolver
         self.gitUserName = gitUserName
         self.gitUserEmail = gitUserEmail
-        self.enableCommands = enableCommands
+        self.policy = policy
+        self.enableCommands = policy.legacyUnsafeGitCompatibility
         try CanonicalToolCatalog.shared.validateHandlerCoverage(handler: "local_tools", runtimeHandlerNames: Self.handlerToolNames)
     }
 
     var toolDefinitions: [[String: Any]] {
-        CanonicalToolCatalog.shared.toolDefinitions(handler: "local_tools", commandsEnabled: enableCommands)
+        try! policy.filterDefinitions(CanonicalToolCatalog.shared.toolDefinitions(handler: "local_tools", commandsEnabled: true))
     }
 
     func hasTool(named name: String) -> Bool {
-        Self.handlerToolNames.contains(name) && (name != "run_command" || enableCommands)
+        Self.handlerToolNames.contains(name) && policy.isAllowed(name)
     }
 
     func call(name: String, arguments: [String: Any]) throws -> LocalToolCallOutput {
         toolSlots.wait()
         defer { toolSlots.signal() }
-        try validateArguments(arguments, for: name)
+        guard Self.handlerToolNames.contains(name) else {
+            throw MCPServerError.operationFailed("Unknown tool: \(name)")
+        }
 
         let needsSerialization = serializedToolNames.contains(name)
         if needsSerialization { mutationSlot.wait() }
         defer { if needsSerialization { mutationSlot.signal() } }
+
+        let preparedPolicy = policy.capture()
+        try policy.authorize(name, prepared: preparedPolicy)
+        try validateArguments(arguments, for: name)
+        try policy.authorize(name, prepared: preparedPolicy)
 
         switch name {
         case "list_files":
@@ -198,9 +216,6 @@ private final class LocalTools {
         case "delete_directory":
             return stringOutput(try deleteDirectory(relativePath: requiredString(arguments, "relative_path")))
         case "run_command":
-            guard enableCommands else {
-                throw MCPServerError.operationFailed("Command execution is disabled")
-            }
             return stringOutput(try runCommand(
                 command: requiredString(arguments, "command"),
                 cwd: string(arguments, "cwd", default: ""),
@@ -1300,6 +1315,7 @@ final class LocalMCPServer {
     private let port: UInt16
     private let localAuthToken: String
     private let tools: LocalTools
+    private let policy: ServerPolicy
     private let skills: CodexSkillRegistry
     private let chatCorrelation = LogicalChatCorrelationService()
     private let log: (String) -> Void
@@ -1320,7 +1336,8 @@ final class LocalMCPServer {
         enableCommands: Bool,
         localAuthToken: String,
         log: @escaping (String) -> Void,
-        limits: LocalMCPServerLimits = .standard
+        limits: LocalMCPServerLimits = .standard,
+        policyConfiguration: LocalPolicyConfiguration? = nil
     ) throws {
         guard localAuthToken.utf8.count >= 32 else {
             throw MCPServerError.invalidArguments("Local MCP authentication token is too short")
@@ -1335,11 +1352,18 @@ final class LocalMCPServer {
         try catalog.validateProtocolContract(modern: mcpModernProtocolVersion, legacy: mcpLegacySupportedVersions)
         try catalog.validateHandlerCoverage(handler: "server", runtimeHandlerNames: Self.handlerToolNames)
         let resolver = try SafePathResolver(rootPath: allowedDirectory)
+        let activePolicy: ServerPolicy
+        if let policyConfiguration {
+            activePolicy = try ServerPolicy(configuration: policyConfiguration)
+        } else {
+            activePolicy = try ServerPolicy.fromLegacy(enableCommands: enableCommands)
+        }
+        self.policy = activePolicy
         self.tools = try LocalTools(
             resolver: resolver,
             gitUserName: gitUserName,
             gitUserEmail: gitUserEmail,
-            enableCommands: enableCommands
+            policy: activePolicy
         )
         self.skills = try CodexSkillRegistry(rootPath: allowedDirectory, log: log)
     }
@@ -1711,6 +1735,7 @@ final class LocalMCPServer {
         [
             "tools": allToolDefinitions(),
             "catalog": CanonicalToolCatalog.shared.metadata(buildIdentity: mcpServerVersion),
+            "policy": policy.metadata(),
         ]
     }
 
@@ -1718,7 +1743,7 @@ final class LocalMCPServer {
         var result = tools.toolDefinitions.map(withCorrelationFacadeMetadata)
         result.append(contentsOf: skills.toolDefinitions.map(withCorrelationFacadeMetadata))
         result.append(observabilityConnectToolDefinition())
-        return result
+        return try! policy.filterDefinitions(result)
     }
 
     private func withCorrelationFacadeMetadata(_ source: [String: Any]) -> [String: Any] {
@@ -1768,6 +1793,7 @@ final class LocalMCPServer {
                 "capabilities": serverCapabilities(),
                 "instructions": CanonicalToolCatalog.shared.instructions(includeObservability: true),
                 "catalog": CanonicalToolCatalog.shared.metadata(buildIdentity: mcpServerVersion),
+                "policy": policy.metadata(),
             ])
             addCacheMetadata(to: &result, ttlMs: 60_000)
             return jsonRPCResult(id: id, result: result)
@@ -1818,6 +1844,8 @@ final class LocalMCPServer {
         }
 
         do {
+            let preparedPolicy = policy.capture()
+            try policy.authorize(toolName, prepared: preparedPolicy)
             if isObservabilityConnect {
                 for key in arguments.keys where key != "chat_instance_id" {
                     throw MCPServerError.invalidArguments("Unknown argument: \(key)")
@@ -1833,6 +1861,7 @@ final class LocalMCPServer {
                     requested = nil
                 }
 
+                try policy.authorize(toolName, prepared: preparedPolicy)
                 let connection = try chatCorrelation.connect(chatInstanceID: requested)
                 let structuredContent: [String: Any] = [
                     "chat_instance_id": connection.chatInstanceID,
@@ -1850,6 +1879,7 @@ final class LocalMCPServer {
             let correlationHandle = correlationValue as? String
             _ = chatCorrelation.tryResolve(correlationHandle)
 
+            try policy.authorize(toolName, prepared: preparedPolicy)
             let content: [[String: Any]]
             let structuredContent: [String: Any]
             if skills.hasTool(named: toolName) {

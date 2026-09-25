@@ -61,6 +61,7 @@ chmod 755 "$APP/Contents/MacOS/tunnel-client"
     "$ROOT/macos/ProcessRunner.swift" \
     "$ROOT/macos/LogicalChatCorrelation.swift" \
     "$ROOT/macos/ToolCatalog.swift" \
+    "$ROOT/macos/ServerPolicy.swift" \
     "$ROOT/macos/ToolResultEnvelope.swift" \
     "$ROOT/macos/LocalMCPServer.swift" \
     "$ROOT/macos/TunnelSupervisor.swift" \

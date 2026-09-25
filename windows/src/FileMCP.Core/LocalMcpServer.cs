@@ -40,6 +40,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private readonly ushort _port;
     private readonly string _localAuthToken;
     private readonly LocalTools _tools;
+    private readonly ServerPolicy _policy;
     private readonly CodexSkillRegistry _skills;
     private readonly Action<string> _log;
     private readonly WorkspaceUsageMeter? _usageMeter;
@@ -53,23 +54,32 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _acceptLoop;
 
-    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null, LogicalSessionRegistry? sessions = null, string? workspaceKey = null, McpStandardTelemetry? standardTelemetry = null)
-        : this(port, allowedDirectory, gitUserName, gitUserEmail, enableCommands, localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, LocalMcpServerLimits.Default)
+    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null, LogicalSessionRegistry? sessions = null, string? workspaceKey = null, McpStandardTelemetry? standardTelemetry = null, LocalPolicyConfiguration? policyConfiguration = null)
+        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicyFor(enableCommands, policyConfiguration), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, LocalMcpServerLimits.Default)
     {
     }
 
     internal LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter, LogicalChatCorrelationService? chatCorrelation, LogicalSessionRegistry? sessions, string? workspaceKey, McpStandardTelemetry? standardTelemetry, LocalMcpServerLimits limits)
+        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, limits)
+    {
+    }
+
+    private LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter, LogicalChatCorrelationService? chatCorrelation, LogicalSessionRegistry? sessions, string? workspaceKey, McpStandardTelemetry? standardTelemetry, LocalMcpServerLimits limits)
     {
         if (Encoding.UTF8.GetByteCount(localAuthToken) < 32) throw new FileMcpException("Local MCP authentication token is too short");
         limits.Validate();
         _port = port; _localAuthToken = localAuthToken; _log = log; _usageMeter = usageMeter; _chatCorrelation = chatCorrelation; _sessions = sessions; _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey) ? null : workspaceKey.Trim().ToUpperInvariant(); _standardTelemetry = standardTelemetry;
         _limits = limits;
+        _policy = policy;
         _connectionSlots = new SemaphoreSlim(limits.MaxConcurrentConnections, limits.MaxConcurrentConnections);
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
         CanonicalToolCatalog.ValidateHandlerCoverage("server", ServerHandlerToolNames);
-        _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, enableCommands);
+        _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, _policy);
         _skills = new CodexSkillRegistry(allowedDirectory, log);
     }
+
+    private static ServerPolicy ServerPolicyFor(bool enableCommands, LocalPolicyConfiguration? configuration) =>
+        configuration is null ? ServerPolicy.FromLegacy(enableCommands) : new ServerPolicy(configuration);
 
     public bool IsReady { get; private set; }
 
@@ -312,6 +322,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 ["capabilities"] = ServerCapabilities(),
                 ["instructions"] = CanonicalToolCatalog.Instructions(_chatCorrelation is not null),
                 ["catalog"] = CanonicalToolCatalog.Metadata(FileMcpConstants.ServerVersion),
+                ["policy"] = _policy.Metadata(),
             });
             result["ttlMs"] = 60_000; result["cacheScope"] = "private"; return JsonRpcResult(id, result);
         }
@@ -325,6 +336,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
     {
         ["tools"] = AllToolDefinitions(),
         ["catalog"] = CanonicalToolCatalog.Metadata(FileMcpConstants.ServerVersion),
+        ["policy"] = _policy.Metadata(),
     };
 
     private JsonArray AllToolDefinitions()
@@ -333,7 +345,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
         foreach (var tool in _tools.ToolDefinitions) result.Add(WithCorrelationFacadeMetadata(tool));
         foreach (var tool in _skills.ToolDefinitions) result.Add(WithCorrelationFacadeMetadata(tool));
         if (_chatCorrelation is not null) result.Add(ObservabilityConnectToolDefinition());
-        return result;
+        return _policy.FilterDefinitions(result);
     }
 
     private JsonNode? WithCorrelationFacadeMetadata(JsonNode? source)
@@ -377,6 +389,8 @@ public sealed class LocalMcpServer : IAsyncDisposable
 
             try
             {
+                var preparedPolicy = _policy.Capture();
+                _policy.Authorize(name, preparedPolicy);
                 if (isObservabilityConnect)
                 {
                     foreach (var key in arguments.Select(pair => pair.Key).ToArray())
@@ -389,6 +403,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
                             throw new FileMcpException("Argument chat_instance_id must be a string");
                     }
 
+                    _policy.Authorize(name, preparedPolicy);
                     var connection = _chatCorrelation!.Connect(requested);
                     if (_sessions is not null && _workspaceKey is not null)
                     {
@@ -423,6 +438,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 if (_sessions is not null && _workspaceKey is not null)
                     sessionCall = _sessions.BeginToolCall(_workspaceKey, sessionHashForCall, requestBytes, name);
 
+                _policy.Authorize(name, preparedPolicy);
                 var output = _skills.HasTool(name)
                     ? _skills.Call(name, arguments)
                     : await _tools.CallAsync(name, arguments, cancellationToken).ConfigureAwait(false);

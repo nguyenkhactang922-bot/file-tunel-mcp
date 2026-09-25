@@ -293,7 +293,8 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
                     _observability?.ChatCorrelation,
                     _observability?.Sessions,
                     _workspaceKey,
-                    _observability?.StandardTelemetry);
+                    _observability?.StandardTelemetry,
+                    configuration.PolicyConfiguration);
                 await _server.StartAsync(cancellationToken).ConfigureAwait(false);
                 lock (_stateGate) _localServerReady = true;
 
@@ -336,7 +337,9 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
                     healthUrlFilePath);
                 StartTunnelProcessUnsafe(_tunnelLaunch, countAsRestart: false);
                 SetState(LocalMcpRuntimeState.Running);
-                EmitLog($"[Runtime] OpenAI Secure MCP Tunnel started. Command execution: {(configuration.EnableCommands ? "enabled" : "disabled")}.\n");
+                var effectivePolicy = configuration.PolicyConfiguration?.CloneNormalized().Profile
+                    ?? LocalPolicyConfiguration.FromLegacy(configuration.EnableCommands).Profile;
+                EmitLog($"[Runtime] OpenAI Secure MCP Tunnel started. Policy: {effectivePolicy}.\n");
             }
             catch (OperationCanceledException) when (_requestedStop || _startupCts?.IsCancellationRequested == true)
             {

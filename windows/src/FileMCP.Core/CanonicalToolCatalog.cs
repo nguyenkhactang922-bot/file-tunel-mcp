@@ -5,6 +5,15 @@ using System.Text.Json.Nodes;
 
 namespace FileMCP.Core;
 
+
+internal sealed record ToolPolicyMetadata(
+    string Name,
+    string Risk,
+    string Effect,
+    IReadOnlyList<string> Capabilities,
+    bool RequiresCommands,
+    bool RequiresObservability);
+
 internal static class CanonicalToolCatalog
 {
     private const string ResourceName = "FileMCP.Contracts.tool_catalog.v1.json";
@@ -61,6 +70,16 @@ internal static class CanonicalToolCatalog
             ? throw new FileMcpException($"Canonical tool catalog is missing tool: {name}")
             : (JsonObject)match.Definition.DeepClone();
     }
+
+    public static ToolPolicyMetadata ToolPolicyMetadata(string name)
+    {
+        var match = State.Value.Tools.FirstOrDefault(tool => string.Equals(tool.Name, name, StringComparison.Ordinal));
+        return match is null
+            ? throw new FileMcpException($"Canonical tool catalog is missing tool: {name}")
+            : new ToolPolicyMetadata(match.Name, match.Risk, match.Effect, match.Capabilities, match.RequiresCommands, match.RequiresObservability);
+    }
+
+    public static bool ContainsTool(string name) => State.Value.Tools.Any(tool => string.Equals(tool.Name, name, StringComparison.Ordinal));
 
     public static void ValidateHandlerCoverage(string handler, IEnumerable<string> runtimeHandlerNames)
     {
@@ -166,7 +185,7 @@ internal static class CanonicalToolCatalog
             _ = RequiredObject(definition, "inputSchema");
             _ = RequiredObject(definition, "outputSchema");
             _ = RequiredObject(definition, "annotations");
-            tools.Add(new CatalogTool(name, handler, requiresCommands, requiresObservability, (JsonObject)definition.DeepClone()));
+            tools.Add(new CatalogTool(name, handler, risk, effect, capabilities, requiresCommands, requiresObservability, (JsonObject)definition.DeepClone()));
         }
 
         return new CatalogState(
@@ -224,7 +243,7 @@ internal static class CanonicalToolCatalog
 
     private static string Sha256Hex(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
-    private sealed record CatalogTool(string Name, string Handler, bool RequiresCommands, bool RequiresObservability, JsonObject Definition);
+    private sealed record CatalogTool(string Name, string Handler, string Risk, string Effect, IReadOnlyList<string> Capabilities, bool RequiresCommands, bool RequiresObservability, JsonObject Definition);
     private sealed record CatalogState(
         string CatalogVersion,
         string CatalogHash,

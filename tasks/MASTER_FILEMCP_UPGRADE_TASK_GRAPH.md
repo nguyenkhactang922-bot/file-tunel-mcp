@@ -108,7 +108,7 @@ Evidence:
 
 ## FMG-002 — Structured Result Envelope
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: FMG-001
 
 Scope:
@@ -129,7 +129,7 @@ Negative tests:
 
 ## FMG-003 — Server-Owned Policy + Migration
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-001
 
 Scope:

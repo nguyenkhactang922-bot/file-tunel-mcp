@@ -155,6 +155,75 @@ SWIFT
 swiftc -o "$TMP_DIR/result-envelope-test" macos/ToolResultEnvelope.swift "$TMP_DIR/main.swift"
 "$TMP_DIR/result-envelope-test"
 
+cat >"$TMP_DIR/main.swift" <<'SWIFT'
+import Foundation
+
+func expectDenied(_ policy: ServerPolicy, _ tool: String) {
+    do {
+        try policy.authorize(tool)
+        fatalError("expected policy denial for \(tool)")
+    } catch {
+        precondition(error.localizedDescription.lowercased().contains("denied"))
+    }
+}
+
+let restricted = try ServerPolicy.fromLegacy(enableCommands: false)
+precondition(restricted.profile == FileMCPPolicyProfiles.restricted)
+precondition(restricted.isAllowed("read_file"))
+precondition(restricted.isAllowed("write_file"))
+precondition(restricted.isAllowed("git_push"))
+precondition(!restricted.isAllowed("run_command"))
+precondition(!restricted.legacyUnsafeGitCompatibility)
+precondition(restricted.hash == "174b1d27efe868c387b87923665b8d53270f40b48e890e67f40720620d729156")
+expectDenied(restricted, "run_command")
+
+let legacy = try ServerPolicy.fromLegacy(enableCommands: true)
+precondition(legacy.profile == FileMCPPolicyProfiles.legacyCommandCompatible)
+precondition(legacy.isAllowed("run_command"))
+precondition(legacy.legacyUnsafeGitCompatibility)
+precondition(!FileMCPPolicyProfiles.isUserSelectable(FileMCPPolicyProfiles.legacyCommandCompatible))
+
+let workspaceAuto = try ServerPolicy(configuration: LocalPolicyConfiguration(profile: FileMCPPolicyProfiles.workspaceAuto))
+precondition(workspaceAuto.isAllowed("write_file"))
+precondition(workspaceAuto.isAllowed("git_commit"))
+precondition(!workspaceAuto.isAllowed("git_push"))
+precondition(!workspaceAuto.isAllowed("run_command"))
+let workspaceDefs = try workspaceAuto.filterDefinitions(CanonicalToolCatalog.shared.toolDefinitions(handler: "local_tools", commandsEnabled: true))
+let workspaceNames = Set(workspaceDefs.compactMap { $0["name"] as? String })
+precondition(!workspaceNames.contains("run_command") && !workspaceNames.contains("git_push") && workspaceNames.contains("write_file"))
+
+let custom = try ServerPolicy(configuration: LocalPolicyConfiguration(
+    profile: FileMCPPolicyProfiles.custom,
+    customMaxRisk: "low",
+    customAllowedEffects: ["read", "metadata"]
+))
+precondition(custom.isAllowed("read_file"))
+precondition(custom.isAllowed("filemcp_observability_connect"))
+precondition(!custom.isAllowed("write_file"))
+precondition(!custom.isAllowed("git_push"))
+precondition(!custom.isAllowed("run_command"))
+
+let prepared = custom.capture()
+let generation = custom.generation
+let oldHash = custom.hash
+try custom.update(LocalPolicyConfiguration(
+    profile: FileMCPPolicyProfiles.custom,
+    customMaxRisk: "high",
+    customAllowedEffects: ["read", "metadata", "write"]
+))
+precondition(custom.generation == generation + 1)
+precondition(custom.hash != oldHash)
+do {
+    try custom.authorize("read_file", prepared: prepared)
+    fatalError("stale prepared policy snapshot must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("stale"))
+}
+print("swift-server-policy: ok")
+SWIFT
+swiftc -framework CryptoKit -o "$TMP_DIR/server-policy-test" macos/ToolCatalog.swift macos/ServerPolicy.swift "$TMP_DIR/main.swift"
+"$TMP_DIR/server-policy-test"
+
 case "$(uname -m)" in
     arm64|aarch64) TUNNEL_TARGET="darwin-arm64" ;;
     x86_64|amd64) TUNNEL_TARGET="darwin-amd64" ;;
@@ -827,6 +896,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ProcessRunner.swift \
     macos/LogicalChatCorrelation.swift \
     macos/ToolCatalog.swift \
+    macos/ServerPolicy.swift \
     macos/ToolResultEnvelope.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
@@ -972,6 +1042,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ProcessRunner.swift \
     macos/LogicalChatCorrelation.swift \
     macos/ToolCatalog.swift \
+    macos/ServerPolicy.swift \
     macos/ToolResultEnvelope.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"

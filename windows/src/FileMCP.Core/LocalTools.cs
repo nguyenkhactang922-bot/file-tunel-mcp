@@ -9,6 +9,7 @@ internal sealed partial class LocalTools
     private readonly SafePathResolver _resolver;
     private readonly string _gitUserName;
     private readonly string _gitUserEmail;
+    private readonly ServerPolicy _policy;
     private readonly bool _enableCommands;
     private readonly string? _safeGitEmptyFile;
     private readonly string? _safeGitHooksDirectory;
@@ -33,21 +34,27 @@ internal sealed partial class LocalTools
     };
 
     public LocalTools(string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands)
+        : this(allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands))
+    {
+    }
+
+    internal LocalTools(string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _gitUserName = gitUserName;
         _gitUserEmail = gitUserEmail;
-        _enableCommands = enableCommands;
+        _policy = policy;
+        _enableCommands = _policy.LegacyUnsafeGitCompatibility;
         CanonicalToolCatalog.ValidateHandlerCoverage("local_tools", HandlerToolNames);
-        if (!enableCommands)
+        if (!_enableCommands)
         {
             (_safeGitEmptyFile, _safeGitHooksDirectory) = PrepareSafeGitResources();
         }
     }
 
-    public JsonArray ToolDefinitions => CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: _enableCommands);
+    public JsonArray ToolDefinitions => _policy.FilterDefinitions(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true));
 
-    public bool HasTool(string name) => HandlerToolNames.Contains(name) && (name != "run_command" || _enableCommands);
+    public bool HasTool(string name) => HandlerToolNames.Contains(name) && _policy.IsAllowed(name);
 
     public async Task<ToolCallOutput> CallAsync(string name, JsonObject arguments, CancellationToken cancellationToken = default)
     {
@@ -59,7 +66,11 @@ internal sealed partial class LocalTools
         }
         try
         {
+            if (!HandlerToolNames.Contains(name)) throw new FileMcpException($"Unknown tool: {name}");
+            var preparedPolicy = _policy.Capture();
+            _policy.Authorize(name, preparedPolicy);
             ValidateArguments(name, arguments);
+            _policy.Authorize(name, preparedPolicy);
             return name switch
             {
                 "list_files" => StringArrayOutput(ListFiles(GetString(arguments, "subpath", ""))),
@@ -81,10 +92,9 @@ internal sealed partial class LocalTools
                     GetBool(arguments, "append", false))),
                 "delete_file" => StringOutput(DeleteFile(GetRequiredString(arguments, "relative_path"))),
                 "delete_directory" => StringOutput(DeleteDirectory(GetRequiredString(arguments, "relative_path"))),
-                "run_command" when _enableCommands => StringOutput(await RunCommandAsync(
+                "run_command" => StringOutput(await RunCommandAsync(
                     GetRequiredString(arguments, "command"), GetString(arguments, "cwd", ""),
                     GetInt(arguments, "timeout_seconds", ProcessRunner.DefaultCommandTimeoutSeconds), cancellationToken).ConfigureAwait(false)),
-                "run_command" => throw new FileMcpException("Command execution is disabled"),
                 "git_init" => StringOutput(await GitInitAsync(GetString(arguments, "repo_path", ""), cancellationToken).ConfigureAwait(false)),
                 "git_status" => StringOutput(await GitStatusAsync(GetString(arguments, "repo_path", ""), cancellationToken).ConfigureAwait(false)),
                 "git_log" => StringOutput(await GitLogAsync(GetString(arguments, "repo_path", ""), GetInt(arguments, "count", 10), cancellationToken).ConfigureAwait(false)),
