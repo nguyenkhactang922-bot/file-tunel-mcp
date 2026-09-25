@@ -1440,7 +1440,12 @@ EXEC_CWD="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":431,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/bin/pwd","arguments":[],"cwd":"exec-work","timeout_seconds":5}}}')"
 printf '%s' "$EXEC_CWD" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
-printf '%s' "$EXEC_CWD" | plutil -extract result.structuredContent.stdout raw -expect string -o - - | tr -d '\r' | grep -qx "$SERVER_ROOT/exec-work"
+EXEC_CWD_ACTUAL="$(printf '%s' "$EXEC_CWD" | plutil -extract result.structuredContent.stdout raw -expect string -o - - | tr -d '\r\n')"
+EXEC_CWD_EXPECTED="$(cd "$SERVER_ROOT/exec-work" && pwd -P)"
+if [ "$EXEC_CWD_ACTUAL" != "$EXEC_CWD_EXPECTED" ]; then
+    echo "exec_process cwd mismatch: actual=$EXEC_CWD_ACTUAL expected=$EXEC_CWD_EXPECTED" >&2
+    exit 1
+fi
 echo "mcp-exec-cwd: ok"
 
 EXEC_CWD_ESCAPE="$(curl -fsS -X POST "$BASE_URL" \
