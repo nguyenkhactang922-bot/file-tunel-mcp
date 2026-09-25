@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-003-server-policy`
+Active branch: `chatgpt/FMG-004-toolbudget-cursor`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -135,12 +135,18 @@ Later dependent tasks remain BLOCKED by the frozen dependency graph.
 
 ## FMG-003 implementation
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-003-server-policy`.
-Depends: FMG-001 DONE / MAIN VERIFIED.
-Scope: Server-Owned Policy + Migration only.
-Local proof: Windows runtime 539 assertions PASS; catalog/parity PASS; Release build 0 warnings / 0 errors; `git diff --check` PASS.
-macOS local proof: environment-blocked on Windows host; native GitHub Verify required.
+Candidate head: `facbd35acc1c629138556af02c300be9f12822b2`.
+Merge main: `8259fd6e0d4d35b6a54498c9d91156b05d2424cc`.
+Native merged-main Verify: run `36097504088` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Local merged-main proof: Windows runtime 539 assertions PASS; Release build 0 warnings / 0 errors.
 Evidence: `docs/evidence/FMG-003_SERVER_POLICY_EVIDENCE.md`.
-Next gate: exact-head native Verify -> review -> merge fork main -> MAIN VERIFIED.
+
+## FMG-004 implementation
+
+State: ACTIVE / CLAIMED.
+Branch: `chatgpt/FMG-004-toolbudget-cursor`.
+Depends: FMG-002 DONE / MAIN VERIFIED.
+Scope: ToolBudget / Cancellation / Cursor Core only.
 Later dependent tasks remain BLOCKED by frozen graph.

@@ -72,13 +72,13 @@ Detailed specification: foundation graph FMG-002.
 
 ## FMG-003 - Server-Owned Policy + Migration
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: FMG-001
 Detailed specification: foundation graph FMG-003.
 
 ## FMG-004 - ToolBudget / Cancellation / Cursor Core
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-002
 Detailed specification: foundation graph FMG-004.
 

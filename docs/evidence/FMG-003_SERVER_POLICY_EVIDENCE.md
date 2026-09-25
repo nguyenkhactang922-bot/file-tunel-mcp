@@ -3,7 +3,7 @@
 Date: 2026-09-25
 Task: FMG-003
 Branch: `chatgpt/FMG-003-server-policy`
-Status: LOCAL VERIFIED / NATIVE CI PENDING
+Status: DONE / MAIN VERIFIED
 
 ## Implemented scope
 
@@ -50,6 +50,11 @@ Native Swift wiring is present in:
 
 `tests/test_swift_runtime.sh` includes a dedicated ServerPolicy Swift compile/test fixture plus full runtime wiring. Native macOS GitHub Verify on the exact pushed head is mandatory before FMG-003 can be DONE.
 
-## Remaining gate
+## Final closure
 
-Commit exact candidate -> push -> PR to fork main -> native Verify macOS + Windows x64 + Windows ARM64 -> scoped review -> merge -> verify merged main -> mark FMG-003 MAIN VERIFIED -> claim next READY task according to dependency graph.
+- candidate exact head: `facbd35acc1c629138556af02c300be9f12822b2`;
+- PR #6 merged to fork `main` as `8259fd6e0d4d35b6a54498c9d91156b05d2424cc`;
+- merged-main native Verify run `36097504088`: macOS SUCCESS, Windows x64 SUCCESS, Windows ARM64 SUCCESS;
+- merged-main local Windows runtime: 539 assertions PASS;
+- merged-main Release build: 0 warnings / 0 errors;
+- FMG-003: DONE / MAIN VERIFIED.
