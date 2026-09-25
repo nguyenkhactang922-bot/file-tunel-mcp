@@ -58,6 +58,7 @@ internal static class Program
             await TestProcessRunnerAsync(root);
             await TestExecProcessAsync(root);
             await TestFileVersionAndSourceStateAsync(root);
+            await TestAuthorizedPathSnapshotAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -2279,6 +2280,73 @@ internal static class Program
         Console.WriteLine("windows-file-version-source-state: ok");
     }
 
+    private static async Task TestAuthorizedPathSnapshotAsync(string root)
+    {
+        var workspace = Path.Combine(root, "mutation-guard");
+        Directory.CreateDirectory(workspace);
+        var resolver = new SafePathResolver(workspace);
+        var guard = new AuthorizedPathSnapshotService(resolver);
+
+        var stableParent = Path.Combine(workspace, "stable");
+        Directory.CreateDirectory(stableParent);
+        File.WriteAllText(Path.Combine(stableParent, "file.txt"), "stable\n", new UTF8Encoding(false));
+        var stable = guard.CaptureExisting("stable/file.txt");
+        Assert(Path.GetFullPath(guard.Verify(stable)) == Path.GetFullPath(Path.Combine(stableParent, "file.txt")), "Mutation Guard verifies unchanged target");
+        Assert(stable.Ancestors.Count >= 2 && stable.TargetIdentity is not null && !stable.ExpectedLeafAbsent, "Mutation Guard snapshot binds root/ancestor/target identities");
+
+        var targetParent = Path.Combine(workspace, "target-replace");
+        Directory.CreateDirectory(targetParent);
+        var targetPath = Path.Combine(targetParent, "file.txt");
+        File.WriteAllText(targetPath, "same-content\n", new UTF8Encoding(false));
+        var targetSnapshot = guard.CaptureExisting("target-replace/file.txt");
+        File.Delete(targetPath);
+        File.WriteAllText(targetPath, "same-content\n", new UTF8Encoding(false));
+        AssertThrows(() => guard.Verify(targetSnapshot), "target identity changed", "Mutation Guard rejects target replacement at identical path");
+
+        var parentPath = Path.Combine(workspace, "parent-replace");
+        Directory.CreateDirectory(parentPath);
+        File.WriteAllText(Path.Combine(parentPath, "child.txt"), "child\n", new UTF8Encoding(false));
+        var parentSnapshot = guard.CaptureExisting("parent-replace/child.txt");
+        var parentOld = Path.Combine(workspace, "parent-replace-old");
+        Directory.Move(parentPath, parentOld);
+        Directory.CreateDirectory(parentPath);
+        File.WriteAllText(Path.Combine(parentPath, "child.txt"), "child\n", new UTF8Encoding(false));
+        AssertThrows(() => guard.Verify(parentSnapshot), "ancestor identity changed", "Mutation Guard rejects parent replacement at identical path");
+
+        var newParent = Path.Combine(workspace, "new-target");
+        Directory.CreateDirectory(newParent);
+        var newSnapshot = guard.CaptureNewTarget("new-target/created.txt");
+        Assert(newSnapshot.ExpectedLeafAbsent && newSnapshot.TargetIdentity is null, "Mutation Guard new-target snapshot binds expected leaf absence");
+        File.WriteAllText(Path.Combine(newParent, "created.txt"), "inserted\n", new UTF8Encoding(false));
+        AssertThrows(() => guard.Verify(newSnapshot), "expected target leaf absence", "Mutation Guard rejects leaf inserted after new-target authorization");
+        AssertThrows(() => guard.CaptureNewTarget("missing-parent/created.txt"), "disappeared", "Mutation Guard fails closed when new-target parent identity is unavailable");
+
+        var junctionParent = Path.Combine(workspace, "junction-parent");
+        Directory.CreateDirectory(junctionParent);
+        File.WriteAllText(Path.Combine(junctionParent, "child.txt"), "junction\n", new UTF8Encoding(false));
+        var junctionSnapshot = guard.CaptureExisting("junction-parent/child.txt");
+        var junctionReal = Path.Combine(workspace, "junction-parent-real");
+        Directory.Move(junctionParent, junctionReal);
+        var mklink = await ProcessRunner.RunAsync("cmd.exe", ["/d", "/c", "mklink", "/J", junctionParent, junctionReal], timeoutSeconds: 5);
+        Assert(mklink.ExitCode == 0, $"Mutation Guard junction fixture: exit={mklink.ExitCode} stdout={mklink.Stdout} stderr={mklink.Stderr}");
+        AssertThrows(() => guard.Verify(junctionSnapshot), "reparse point", "Mutation Guard rejects ancestor junction swap");
+        Directory.Delete(junctionParent, false);
+
+        var rootSwap = Path.Combine(root, "mutation-guard-root-swap");
+        Directory.CreateDirectory(Path.Combine(rootSwap, "parent"));
+        File.WriteAllText(Path.Combine(rootSwap, "parent", "file.txt"), "root\n", new UTF8Encoding(false));
+        var rootResolver = new SafePathResolver(rootSwap);
+        var rootGuard = new AuthorizedPathSnapshotService(rootResolver);
+        var rootSnapshot = rootGuard.CaptureExisting("parent/file.txt");
+        var oldRoot = rootSwap + "-old";
+        Directory.Move(rootSwap, oldRoot);
+        Directory.CreateDirectory(Path.Combine(rootSwap, "parent"));
+        File.WriteAllText(Path.Combine(rootSwap, "parent", "file.txt"), "root\n", new UTF8Encoding(false));
+        AssertThrows(() => rootGuard.Verify(rootSnapshot), "ancestor identity changed", "Mutation Guard rejects shared-root authority replacement");
+
+        Console.WriteLine("windows-mutation-guard: ok");
+    }
+
     private static async Task TestFilesystemAndToolsAsync(string root)
     {
         var workspace = Path.Combine(root, "files"); Directory.CreateDirectory(workspace);
@@ -3219,6 +3287,7 @@ internal static class Program
     }
 
     private static void Assert(bool condition, string message) { _assertions++; if (!condition) throw new Exception("Assertion failed: " + message); }
+    private static void AssertThrows(Action action, string contains, string message) { try { action(); } catch (Exception ex) when (ex.Message.Contains(contains, StringComparison.OrdinalIgnoreCase)) { Assert(true, message); return; } throw new Exception("Assertion failed: " + message); }
     private static async Task AssertThrowsAsync(Func<Task> action, string contains, string message) { try { await action(); } catch (Exception ex) when (ex.Message.Contains(contains, StringComparison.OrdinalIgnoreCase)) { Assert(true, message); return; } throw new Exception("Assertion failed: " + message); }
     private static int FreePort() { var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start(); var port = ((IPEndPoint)listener.LocalEndpoint).Port; listener.Stop(); return port; }
     private static Dictionary<string, string> AuthHeaders(string token) => new(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = "application/json", [FileMcpConstants.LocalAuthHeaderName] = token };

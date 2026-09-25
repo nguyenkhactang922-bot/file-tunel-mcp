@@ -220,7 +220,7 @@ Negative tests:
 
 ## FMG-006 — Strong File Version + SourceStateRef
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-001, FMG-002
 
 Scope:
@@ -246,7 +246,7 @@ Negative tests:
 
 ## FMG-007 — AuthorizedPathSnapshot / Mutation Guard
 
-State: BLOCKED
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-006
 
 Scope:

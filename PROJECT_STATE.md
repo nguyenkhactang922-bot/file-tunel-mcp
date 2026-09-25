@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-006-file-version-source-state`
+Active branch: `chatgpt/FMG-007-mutation-guard`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -166,11 +166,23 @@ Evidence: `docs/evidence/FMG-005_EXEC_PROCESS_ENVIRONMENT_AUTHORITY_EVIDENCE.md`
 
 ## FMG-006 implementation
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-006-file-version-source-state`.
-Depends: FMG-001, FMG-002 DONE / MAIN VERIFIED.
-Scope: Strong File Version + SourceStateRef only.
-Later dependent tasks remain BLOCKED by frozen graph.
+Primary candidate head: `b0e66b08f743a3e2c13c4e2c7a9f19e577900b54`.
+Primary PR: #9 -> main `03365ef6051d309aa276b1322f6013eb485ae6df`.
+Test-only follow-up: `406e7dbeb2e458c6ace0705b0680476ede7e3f9d`, PR #10.
+Final main: `4ce571a8fd22448701cc6ad135a828c2328d12fe`.
+Final merged-main native Verify: run `36164398847` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Local proof: catalog/parity/FMG-006 contract PASS; Windows runtime 627 assertions PASS; Release build 0 warnings / 0 errors.
 Evidence: `docs/evidence/FMG-006_FILE_VERSION_SOURCE_STATE_EVIDENCE.md`.
-Local proof: catalog/parity/FM??G-006 contract PASS; Windows runtime 627 assertions PASS; Release build 0 warnings / 0 errors.
-Native macOS: pending GitHub Verify because local Windows host has no swiftc.
+
+## FMG-007 implementation
+
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+Branch: `chatgpt/FMG-007-mutation-guard`.
+Depends: FMG-006 DONE / MAIN VERIFIED.
+Scope: AuthorizedPathSnapshot / Mutation Guard only.
+NEXT_EXACT_ACTION: implement stable root/parent/target identity snapshots, new-target parent + expected leaf absence, and final no-follow/reparse-safe recheck on Windows/macOS. Add adversarial tests for ancestor/target replacement, symlink/junction swap, new-file leaf insertion and root authority change. Do not begin FMG-008 before FMG-007 MAIN VERIFIED.
+Evidence: `docs/evidence/FMG-007_MUTATION_GUARD_EVIDENCE.md`.
+Local proof: Mutation Guard contract PASS; Windows runtime 637 assertions PASS; Release build 0 warnings / 0 errors; catalog/parity/prerequisite/state/diff gates PASS.
+Native macOS: pending GitHub Verify because local Windows host has no `swiftc`.

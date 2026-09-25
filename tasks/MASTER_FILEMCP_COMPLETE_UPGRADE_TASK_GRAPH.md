@@ -90,13 +90,13 @@ Detailed specification: foundation graph FMG-005.
 
 ## FMG-006 - Strong File Version + SourceStateRef
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-001, FMG-002
 Detailed specification: foundation graph FMG-006.
 
 ## FMG-007 - AuthorizedPathSnapshot / Mutation Guard
 
-State: BLOCKED
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-006
 Detailed specification: foundation graph FMG-007.
 

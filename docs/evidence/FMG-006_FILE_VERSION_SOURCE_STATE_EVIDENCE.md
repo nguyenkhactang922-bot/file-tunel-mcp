@@ -1,6 +1,6 @@
 # FMG-006 Strong File Version + SourceStateRef Evidence
 
-Status: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+Status: DONE / MAIN VERIFIED
 
 Branch: `chatgpt/FMG-006-file-version-source-state`
 Baseline main: `ec4f762c811be658cf9d5a82e0300ee7e79ef2ba`
@@ -48,6 +48,13 @@ macOS native test harness contains equivalent assertions and is wired into GitHu
 - `git diff --check`: PASS;
 - Git-for-Windows Bash syntax for macOS build/dev/runtime harness: PASS.
 
-## Remaining gate
+## Final verification
 
-Commit/push exact candidate -> native Verify macOS + Windows x64 + Windows ARM64 -> fix only exact failing stage if any -> scoped security/privacy review -> PR/merge exact green head -> merged-main local + native verification -> mark FMG-006 DONE / MAIN VERIFIED -> only then claim FMG-007.
+- Primary candidate head: `b0e66b08f743a3e2c13c4e2c7a9f19e577900b54`.
+- PR #9 merged as main `03365ef6051d309aa276b1322f6013eb485ae6df`.
+- First merged-main Verify `36163250987`: macOS SUCCESS, Windows ARM64 SUCCESS; Windows x64 exposed a nondeterministic **test-only** defect in the tampered-token assertion. Production file-version logic was not changed.
+- Root cause: mutating the final Base64URL signature character can alter only unused padding bits and decode to the same 32-byte HMAC for some signatures.
+- Test-only hotfix `406e7dbeb2e458c6ace0705b0680476ede7e3f9d` changes a byte-significant signature character on both Windows and Swift harnesses; local Windows runtime returned 627 assertions PASS.
+- Hotfix PR #10 merged as final main `4ce571a8fd22448701cc6ad135a828c2328d12fe`.
+- Final merged-main Verify `36164398847`: SUCCESS on macOS, Windows x64 and Windows ARM64.
+- Final main is therefore FMG-006 DONE / MAIN VERIFIED.
