@@ -123,6 +123,9 @@ private final class LocalTools {
         "write_file", "delete_file", "delete_directory", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "run_command",
     ]
+    private static let budgetedToolNames: Set<String> = [
+        "list_files", "search_content", "search_filenames",
+    ]
     private let resolver: SafePathResolver
     private let gitUserName: String
     private let gitUserEmail: String
@@ -166,7 +169,15 @@ private final class LocalTools {
         Self.handlerToolNames.contains(name) && policy.isAllowed(name)
     }
 
-    func call(name: String, arguments: [String: Any]) throws -> LocalToolCallOutput {
+    func supportsBudget(named name: String) -> Bool {
+        Self.budgetedToolNames.contains(name)
+    }
+
+    func call(
+        name: String,
+        arguments: [String: Any],
+        executionContext: ToolExecutionContext? = nil
+    ) throws -> LocalToolCallOutput {
         toolSlots.wait()
         defer { toolSlots.signal() }
         guard Self.handlerToolNames.contains(name) else {
@@ -184,7 +195,7 @@ private final class LocalTools {
 
         switch name {
         case "list_files":
-            let result = try listFiles(subpath: string(arguments, "subpath", default: ""))
+            let result = try listFiles(subpath: string(arguments, "subpath", default: ""), context: executionContext)
             return stringArrayOutput(result.values, truncated: result.truncated)
         case "read_file":
             return stringOutput(try readFile(relativePath: requiredString(arguments, "relative_path")))
@@ -200,10 +211,11 @@ private final class LocalTools {
                 path: string(arguments, "path", default: ""),
                 caseSensitive: bool(arguments, "case_sensitive", default: false),
                 contextLines: int(arguments, "context_lines", default: 2),
-                maxResults: int(arguments, "max_results", default: 20)
+                maxResults: int(arguments, "max_results", default: 20),
+                context: executionContext
             ))
         case "search_filenames":
-            let result = try searchFilenames(query: requiredString(arguments, "query"))
+            let result = try searchFilenames(query: requiredString(arguments, "query"), context: executionContext)
             return stringArrayOutput(result.values, truncated: result.truncated)
         case "write_file":
             return stringOutput(try writeFile(
@@ -252,26 +264,60 @@ private final class LocalTools {
         }
     }
 
-    private func listFiles(subpath: String) throws -> (values: [String], truncated: Bool) {
+    private func listFiles(
+        subpath: String,
+        context: ToolExecutionContext?
+    ) throws -> (values: [String], truncated: Bool) {
         let directory = try resolver.resolve(subpath)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
             return ([], false)
         }
 
-        let urls = try FileManager.default.contentsOfDirectory(
+        guard let enumerator = FileManager.default.enumerator(
             at: directory,
             includingPropertiesForKeys: [.isDirectoryKey],
-            options: []
-        )
-        let sorted = urls.sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+            options: [.skipsPackageDescendants],
+            errorHandler: { _, _ in true }
+        ) else {
+            return ([], false)
+        }
+
+        var collected: [(name: String, isDirectory: Bool)] = []
+        var truncated = false
+        while let item = enumerator.nextObject() as? URL {
+            let values = try? item.resourceValues(forKeys: [.isDirectoryKey])
+            if values?.isDirectory == true { enumerator.skipDescendants() }
+
+            if let context, !context.tryVisitEntry() {
+                truncated = true
+                break
+            }
+
+            // `enumerator` is rooted at `directory`; directories are pruned immediately above,
+            // so every yielded item here is an immediate child. Do not derive depth by string
+            // prefix: macOS can spell the same temp root as /var/... or /private/var/....
+            collected.append((item.lastPathComponent, values?.isDirectory ?? false))
+        }
+
+        let sorted = collected.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
         var entries: [String] = []
         entries.reserveCapacity(min(sorted.count, maxListEntries))
-        for url in sorted.prefix(maxListEntries) {
-            let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
-            entries.append(url.lastPathComponent + ((values?.isDirectory ?? false) ? "/" : ""))
+        for entry in sorted {
+            if entries.count >= maxListEntries {
+                context?.markTruncated("server_limit")
+                truncated = true
+                break
+            }
+            if let context, !context.tryOutputItem() {
+                truncated = true
+                break
+            }
+            entries.append(entry.name + (entry.isDirectory ? "/" : ""))
         }
-        return (entries, sorted.count > maxListEntries)
+        return (entries, truncated || (context?.truncated ?? false))
     }
 
     private func readFile(relativePath: String) throws -> String {
@@ -371,7 +417,8 @@ private final class LocalTools {
         path: String,
         caseSensitive: Bool,
         contextLines: Int,
-        maxResults: Int
+        maxResults: Int,
+        context: ToolExecutionContext?
     ) throws -> [String: Any] {
         guard !query.isEmpty else {
             throw MCPServerError.invalidArguments("query must not be empty")
@@ -383,7 +430,8 @@ private final class LocalTools {
         }
 
         let effectiveContext = max(0, min(contextLines, 10))
-        let effectiveMaxResults = max(1, min(maxResults, maxSearchContentResults))
+        let hardMaxResults = max(1, min(maxResults, maxSearchContentResults))
+        let effectiveMaxResults = min(hardMaxResults, context?.limits.maxOutputItems ?? hardMaxResults)
         guard let enumerator = FileManager.default.enumerator(
             at: searchRoot,
             includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey],
@@ -405,17 +453,25 @@ private final class LocalTools {
         var matches: [[String: Any]] = []
         var visited = 0
         var filesScanned = 0
-        var bytesScanned = 0
+        var bytesScanned: Int64 = 0
         var previewChars = 0
         var truncated = false
         let needle = caseSensitive ? query : query.lowercased()
 
         searchLoop: while let item = enumerator.nextObject() as? URL {
-            visited += 1
-            if visited > maxSearchVisited {
-                truncated = true
-                break
+            if let context {
+                guard context.tryVisitEntry() else {
+                    truncated = true
+                    break
+                }
+            } else {
+                visited += 1
+                if visited > maxSearchVisited {
+                    truncated = true
+                    break
+                }
             }
+            if context != nil { visited += 1 }
 
             var itemIsDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: item.path, isDirectory: &itemIsDirectory) else { continue }
@@ -427,31 +483,55 @@ private final class LocalTools {
             }
 
             let attributes = try? FileManager.default.attributesOfItem(atPath: item.path)
-            let fileSize = (attributes?[.size] as? NSNumber)?.intValue ?? 0
-            if fileSize > maxSearchContentFileBytes { continue }
-            if bytesScanned + fileSize > maxSearchContentBytesScanned {
+            let fileSize = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+            if fileSize > Int64(maxSearchContentFileBytes) { continue }
+            if bytesScanned + fileSize > Int64(maxSearchContentBytesScanned) {
+                context?.markTruncated("bytes_scanned")
+                truncated = true
+                break
+            }
+            if let context, context.remainingFiles <= 0 || fileSize > context.remainingBytes {
+                context.markTruncated(context.remainingFiles <= 0 ? "files_scanned" : "bytes_scanned")
                 truncated = true
                 break
             }
 
             let relative = relativePath(for: item)
-            guard let safeItem = try? resolver.resolve(relative), safeItem.path == item.resolvingSymlinksInPath().standardizedFileURL.path else {
+            guard let safeItem = try? resolver.resolve(relative),
+                  safeItem.path == item.resolvingSymlinksInPath().standardizedFileURL.path else {
                 continue
             }
-            guard let data = try? Data(contentsOf: safeItem, options: [.mappedIfSafe]) else { continue }
-            if data.count > maxSearchContentFileBytes { continue }
-            if bytesScanned + data.count > maxSearchContentBytesScanned {
+            let readLimit = context.map { Int(min(Int64(maxSearchContentFileBytes), $0.remainingBytes)) } ?? maxSearchContentFileBytes
+            guard let bounded = try? readFileAtMost(safeItem, maxBytes: readLimit) else { continue }
+            if bounded.exceeded {
+                context?.markTruncated("bytes_scanned")
                 truncated = true
                 break
             }
-            bytesScanned += data.count
-            if data.prefix(8_192).contains(0) { continue }
+            let data = bounded.data
+            if data.count > maxSearchContentFileBytes { continue }
+            if bytesScanned + Int64(data.count) > Int64(maxSearchContentBytesScanned) {
+                context?.markTruncated("bytes_scanned")
+                truncated = true
+                break
+            }
+            if let context, !context.tryScanFile(bytes: Int64(data.count)) {
+                truncated = true
+                break
+            }
 
+            bytesScanned += Int64(data.count)
+            if data.prefix(8_192).contains(0) { continue }
             filesScanned += 1
             let text = String(decoding: data, as: UTF8.self)
             let lines = splitTextLines(text)
 
             for (index, line) in lines.enumerated() {
+                if let context, !context.tryContinue() {
+                    truncated = true
+                    break searchLoop
+                }
+
                 let haystack = caseSensitive ? line : line.lowercased()
                 guard haystack.contains(needle) else { continue }
 
@@ -468,12 +548,18 @@ private final class LocalTools {
                     }
                     return "\(previewStart + offset): \(clipped)"
                 }.joined(separator: "\n")
+
                 if previewChars + preview.count > maxSearchPreviewChars {
+                    context?.markTruncated("server_limit")
                     truncated = true
                     break searchLoop
                 }
-                previewChars += preview.count
+                if let context, !context.tryOutputItem() {
+                    truncated = true
+                    break searchLoop
+                }
 
+                previewChars += preview.count
                 matches.append([
                     "path": relative,
                     "line": matchLine,
@@ -482,6 +568,7 @@ private final class LocalTools {
                     "preview": preview,
                 ])
                 if matches.count >= effectiveMaxResults {
+                    context?.markTruncated((context?.limits.maxOutputItems ?? hardMaxResults) < hardMaxResults ? "output_items" : "server_limit")
                     truncated = true
                     break searchLoop
                 }
@@ -493,11 +580,27 @@ private final class LocalTools {
             "path": path,
             "case_sensitive": caseSensitive,
             "matches": matches,
-            "truncated": truncated,
+            "truncated": truncated || (context?.truncated ?? false),
             "visited_entries": min(visited, maxSearchVisited),
             "files_scanned": filesScanned,
             "bytes_scanned": bytesScanned,
         ]
+    }
+
+    private func readFileAtMost(_ url: URL, maxBytes: Int) throws -> (data: Data, exceeded: Bool) {
+        guard maxBytes >= 0 else { return (Data(), true) }
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var output = Data()
+        var remainingPlusSentinel = maxBytes + 1
+        while remainingPlusSentinel > 0 {
+            let chunkSize = min(64 * 1024, remainingPlusSentinel)
+            guard let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty else { break }
+            output.append(chunk)
+            remainingPlusSentinel -= chunk.count
+            if output.count > maxBytes { return (Data(), true) }
+        }
+        return (output, false)
     }
 
     private func relativePath(for url: URL) -> String {
@@ -515,7 +618,10 @@ private final class LocalTools {
         return String(decoding: data, as: UTF8.self)
     }
 
-    private func searchFilenames(query: String) throws -> (values: [String], truncated: Bool) {
+    private func searchFilenames(
+        query: String,
+        context: ToolExecutionContext?
+    ) throws -> (values: [String], truncated: Bool) {
         let needle = query.lowercased()
         guard !needle.isEmpty else {
             throw MCPServerError.invalidArguments("query must not be empty")
@@ -533,11 +639,19 @@ private final class LocalTools {
         var visited = 0
         var truncated = false
         while let item = enumerator.nextObject() as? URL {
-            visited += 1
-            if visited > maxSearchVisited {
-                truncated = true
-                break
+            if let context {
+                guard context.tryVisitEntry() else {
+                    truncated = true
+                    break
+                }
+            } else {
+                visited += 1
+                if visited > maxSearchVisited {
+                    truncated = true
+                    break
+                }
             }
+            if context != nil { visited += 1 }
 
             let values = try? item.resourceValues(forKeys: [.isDirectoryKey])
             if values?.isDirectory == true, skippedSearchDirectories.contains(item.lastPathComponent) {
@@ -547,14 +661,25 @@ private final class LocalTools {
             if values?.isDirectory == false, item.lastPathComponent.lowercased().contains(needle) {
                 let relative = relativePath(for: item)
                 guard !relative.isEmpty else { continue }
+
+                if matches.count >= maxSearchResults {
+                    context?.markTruncated("server_limit")
+                    truncated = true
+                    break
+                }
+                if let context, !context.tryOutputItem() {
+                    truncated = true
+                    break
+                }
                 matches.append(relative)
                 if matches.count >= maxSearchResults {
+                    context?.markTruncated("server_limit")
                     truncated = true
                     break
                 }
             }
         }
-        return (matches, truncated)
+        return (matches, truncated || (context?.truncated ?? false))
     }
 
     private func writeFile(relativePath: String, content: String, append: Bool) throws -> String {
@@ -1879,6 +2004,16 @@ final class LocalMCPServer {
             let correlationHandle = correlationValue as? String
             _ = chatCorrelation.tryResolve(correlationHandle)
 
+            let callMeta = params["_meta"] as? [String: Any]
+            let budgetedTool = tools.supportsBudget(named: toolName)
+            if ToolExecutionContext.hasBudget(callMeta), !budgetedTool {
+                throw MCPServerError.invalidArguments("Tool budget metadata is not supported for tool: \(toolName)")
+            }
+            if callMeta?[AuthenticatedCursorCodec.cursorMetadataKey] != nil {
+                throw MCPServerError.invalidArguments("Cursor metadata is not supported for tool: \(toolName)")
+            }
+            let executionContext = budgetedTool ? try ToolExecutionContext(meta: callMeta) : nil
+
             try policy.authorize(toolName, prepared: preparedPolicy)
             let content: [[String: Any]]
             let structuredContent: [String: Any]
@@ -1887,11 +2022,16 @@ final class LocalMCPServer {
                 content = output.content
                 structuredContent = output.structuredContent
             } else {
-                let output = try tools.call(name: toolName, arguments: arguments)
+                let output = try tools.call(name: toolName, arguments: arguments, executionContext: executionContext)
                 content = output.content
                 structuredContent = output.structuredContent
             }
-            var result = toolCallResult(content: content, structuredContent: structuredContent, isError: false)
+            var result = toolCallResult(
+                content: content,
+                structuredContent: structuredContent,
+                isError: false,
+                executionContext: executionContext
+            )
             if modern { result = modernCompleteResult(result) }
             return jsonRPCResult(id: id, result: result)
         } catch {
@@ -1908,18 +2048,29 @@ final class LocalMCPServer {
     private func toolCallResult(
         content: [[String: Any]],
         structuredContent: [String: Any]?,
-        isError: Bool
+        isError: Bool,
+        executionContext: ToolExecutionContext? = nil
     ) -> [String: Any] {
+        var effectiveStructured = structuredContent
+        if executionContext?.truncated == true {
+            var value = effectiveStructured ?? [:]
+            value["truncated"] = true
+            effectiveStructured = value
+        }
+
         var result: [String: Any] = [
             "content": content,
             "isError": isError,
         ]
-        if let structuredContent { result["structuredContent"] = structuredContent }
+        if let effectiveStructured { result["structuredContent"] = effectiveStructured }
         ToolResultEnvelope.attach(
             to: &result,
             isError: isError,
             content: content,
-            structuredContent: structuredContent
+            structuredContent: effectiveStructured,
+            usage: executionContext?.usage(),
+            forceTruncated: executionContext?.truncated == true,
+            truncationDetail: executionContext?.truncationReason
         )
         return result
     }

@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-003-server-policy`
+Branch: `chatgpt/FMG-004-toolbudget-cursor`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -149,3 +149,25 @@ FMG-002: DONE / MAIN VERIFIED on merge `dcbc55f7685e91c804ab14500df752a0c6f3be62
 FMG-003: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-003-server-policy`.
 
 NEXT_EXACT_ACTION: commit/push the exact FMG-003 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, perform scoped review, merge only on green exact-head evidence, verify merged main, then claim the next READY task from the frozen graph.
+
+## FMG-003 closure / FMG-004 claim
+
+FMG-003: DONE / MAIN VERIFIED on merge `8259fd6e0d4d35b6a54498c9d91156b05d2424cc`; merged-main native Verify run `36097504088` SUCCESS on macOS + Windows x64 + Windows ARM64.
+
+FMG-004: CLAIMED / ACTIVE on `chatgpt/FMG-004-toolbudget-cursor`.
+
+NEXT_EXACT_ACTION: implement FMG-004 ToolBudget / Cancellation / Cursor Core only: common caller-lowerable budgets, cooperative cancellation, usage/truncation metadata, and authenticated read cursor core with root/options/generation/expiry binding. Do not begin FMG-005 before FMG-004 MAIN VERIFIED.
+
+## FMG-004 local verification
+
+FMG-004: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-004-toolbudget-cursor`.
+
+Local Windows evidence: 576 assertions PASS; catalog/parity PASS; Release 0 warnings/errors; state contract/diff check PASS. Swift build/runtime wiring is complete, but native macOS execution is environment-blocked on this Windows host.
+
+NEXT_EXACT_ACTION: commit/push the exact FMG-004 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, perform scoped review, merge only on green exact-head evidence, verify merged main, then mark FMG-004 MAIN VERIFIED and claim the next READY task from the frozen dependency graph. Do not start FMG-005 before FMG-004 MAIN VERIFIED.
+
+
+## FMG-004 active implementation
+
+FMG-004: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+NEXT_EXACT_ACTION: commit/push exact candidate and require native GitHub Verify.
