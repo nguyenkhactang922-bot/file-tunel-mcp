@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-006 Strong File Version + SourceStateRef on chatgpt/FMG-006-file-version-source-state; do not begin FMG-007 before FMG-006 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-007 AuthorizedPathSnapshot / Mutation Guard on chatgpt/FMG-007-mutation-guard; do not begin FMG-008 before FMG-007 MAIN VERIFIED.
 
 FPA-004 product/release scope is resolved by ADR-0003. V11-009 upstream integration remains an external authority gate and does not block the active FMG complete-upgrade implementation program.

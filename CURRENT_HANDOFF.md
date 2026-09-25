@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-006-file-version-source-state`
+Branch: `chatgpt/FMG-007-mutation-guard`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -213,3 +213,11 @@ FMG-006: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-006-file-ve
 Local evidence: catalog/parity PASS at 20 tools / `d39a11012ad61a6d35ae472c5776d0a8488ded080212f72168505e41e11619c3`; FMG-006 file-version/source-state contract PASS; Windows runtime 627 assertions PASS; Release build 0 warnings/errors; diff/state checks PASS. macOS native code/tests are wired but local execution is environment-blocked because this Windows host has no `swiftc`.
 
 NEXT_EXACT_ACTION: commit/push the exact FMG-006 candidate, require native GitHub Verify on macOS + Windows x64 + Windows ARM64, fix only the exact failing stage if any, perform scoped security/privacy review, merge only exact green head, verify merged main, mark FMG-006 DONE / MAIN VERIFIED, then claim FMG-007.
+
+## FMG-006 closure / FMG-007 claim
+
+FMG-006: DONE / MAIN VERIFIED. Primary PR #9 merged strong file version + SourceStateRef; test-only PR #10 hardened Base64URL tamper verification. Final main `4ce571a8fd22448701cc6ad135a828c2328d12fe`; final merged-main Verify `36164398847` SUCCESS on macOS + Windows x64 + Windows ARM64; local Windows runtime 627 assertions PASS.
+
+FMG-007: CLAIMED / ACTIVE on `chatgpt/FMG-007-mutation-guard`.
+
+NEXT_EXACT_ACTION: implement AuthorizedPathSnapshot / Mutation Guard only: stable native root/parent/target identity, new-target parent + expected leaf absence, final no-follow/reparse-safe recheck, equivalent Windows/macOS semantics, and adversarial path-swap tests. Do not begin FMG-008 before FMG-007 MAIN VERIFIED.
