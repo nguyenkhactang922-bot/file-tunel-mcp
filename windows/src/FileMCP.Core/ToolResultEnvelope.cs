@@ -32,7 +32,8 @@ internal static class ToolResultEnvelope
             ["truncated"] = truncated,
             ["reason"] = truncated ? "server_limit" : "none",
         };
-        if (truncated && !string.IsNullOrWhiteSpace(truncationDetail))
+        if (truncated && !string.IsNullOrWhiteSpace(truncationDetail) &&
+            !string.Equals(truncationDetail, "server_limit", StringComparison.Ordinal))
             truncation["detail"] = truncationDetail;
 
         var usageObject = new JsonObject { ["contentItems"] = content.Count };

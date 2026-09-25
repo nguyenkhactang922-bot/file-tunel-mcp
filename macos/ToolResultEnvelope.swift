@@ -29,7 +29,10 @@ enum ToolResultEnvelope {
             "truncated": truncated,
             "reason": truncated ? "server_limit" : "none",
         ]
-        if truncated, let detail = truncationDetail?.trimmingCharacters(in: .whitespacesAndNewlines), !detail.isEmpty {
+        if truncated,
+           let detail = truncationDetail?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !detail.isEmpty,
+           detail != "server_limit" {
             truncation["detail"] = detail
         }
 

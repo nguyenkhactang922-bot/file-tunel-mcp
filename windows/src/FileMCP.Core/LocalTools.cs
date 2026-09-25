@@ -150,7 +150,7 @@ internal sealed partial class LocalTools
         {
             if (result.Count >= FileMcpConstants.MaxListEntries)
             {
-                context?.MarkTruncated("output_items");
+                context?.MarkTruncated("server_limit");
                 truncated = true;
                 break;
             }
@@ -233,8 +233,8 @@ internal sealed partial class LocalTools
         var searchRoot = _resolver.Resolve(path);
         if (!Directory.Exists(searchRoot)) throw new FileMcpException($"No such search directory: {(string.IsNullOrEmpty(path) ? "." : path)}");
         var contextLinesEffective = Math.Clamp(contextLines, 0, 10);
-        var max = Math.Clamp(maxResults, 1, FileMcpConstants.MaxSearchContentResults);
-        if (context is not null) max = Math.Min(max, context.Limits.MaxOutputItems);
+        var hardMax = Math.Clamp(maxResults, 1, FileMcpConstants.MaxSearchContentResults);
+        var max = context is null ? hardMax : Math.Min(hardMax, context.Limits.MaxOutputItems);
 
         var matches = new JsonArray();
         var visited = 0;
@@ -376,7 +376,7 @@ internal sealed partial class LocalTools
 
                         if (matches.Count >= max)
                         {
-                            context?.MarkTruncated("output_items");
+                            context?.MarkTruncated(context.Limits.MaxOutputItems < hardMax ? "output_items" : "server_limit");
                             truncated = true;
                             break;
                         }
@@ -469,7 +469,7 @@ internal sealed partial class LocalTools
 
                         if (matches.Count >= FileMcpConstants.MaxSearchResults)
                         {
-                            context?.MarkTruncated("output_items");
+                            context?.MarkTruncated("server_limit");
                             truncated = true;
                             break;
                         }
@@ -482,7 +482,7 @@ internal sealed partial class LocalTools
                         matches.Add(relative);
                         if (matches.Count >= FileMcpConstants.MaxSearchResults)
                         {
-                            context?.MarkTruncated("output_items");
+                            context?.MarkTruncated("server_limit");
                             truncated = true;
                             break;
                         }

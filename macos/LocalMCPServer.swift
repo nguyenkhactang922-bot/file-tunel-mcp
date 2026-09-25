@@ -307,7 +307,7 @@ private final class LocalTools {
         entries.reserveCapacity(min(sorted.count, maxListEntries))
         for entry in sorted {
             if entries.count >= maxListEntries {
-                context?.markTruncated("output_items")
+                context?.markTruncated("server_limit")
                 truncated = true
                 break
             }
@@ -568,7 +568,7 @@ private final class LocalTools {
                     "preview": preview,
                 ])
                 if matches.count >= effectiveMaxResults {
-                    context?.markTruncated("output_items")
+                    context?.markTruncated((context?.limits.maxOutputItems ?? hardMaxResults) < hardMaxResults ? "output_items" : "server_limit")
                     truncated = true
                     break searchLoop
                 }
@@ -663,7 +663,7 @@ private final class LocalTools {
                 guard !relative.isEmpty else { continue }
 
                 if matches.count >= maxSearchResults {
-                    context?.markTruncated("output_items")
+                    context?.markTruncated("server_limit")
                     truncated = true
                     break
                 }
@@ -673,7 +673,7 @@ private final class LocalTools {
                 }
                 matches.append(relative)
                 if matches.count >= maxSearchResults {
-                    context?.markTruncated("output_items")
+                    context?.markTruncated("server_limit")
                     truncated = true
                     break
                 }
