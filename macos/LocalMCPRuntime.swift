@@ -13,7 +13,31 @@ struct LocalMCPConfiguration {
     let gitUserName: String
     let gitUserEmail: String
     let enableCommands: Bool
-    let policyConfiguration: LocalPolicyConfiguration? = nil
+    let policyConfiguration: LocalPolicyConfiguration?
+
+    init(
+        tunnelID: String,
+        apiKey: String,
+        profile: String,
+        port: UInt16,
+        allowedDirectory: String,
+        healthAddress: String,
+        gitUserName: String,
+        gitUserEmail: String,
+        enableCommands: Bool,
+        policyConfiguration: LocalPolicyConfiguration? = nil
+    ) {
+        self.tunnelID = tunnelID
+        self.apiKey = apiKey
+        self.profile = profile
+        self.port = port
+        self.allowedDirectory = allowedDirectory
+        self.healthAddress = healthAddress
+        self.gitUserName = gitUserName
+        self.gitUserEmail = gitUserEmail
+        self.enableCommands = enableCommands
+        self.policyConfiguration = policyConfiguration
+    }
 }
 
 enum LocalMCPRuntimeState: Equatable {
