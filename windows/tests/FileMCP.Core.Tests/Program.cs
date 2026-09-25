@@ -1985,13 +1985,17 @@ internal static class Program
         Assert(argv.StructuredContent["exit_code"]!.GetValue<int>() == 0, "exec_process direct argv exit code");
         Assert(argv.StructuredContent["stdout"]!.GetValue<string>() == literal, "exec_process preserves argv literally without FileMCP shell interpolation");
 
+        var commandPrompt = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
         var cwdResult = await tools.CallAsync("exec_process", ExecArgs(
-            powerShell,
-            ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Out.Write((Get-Location).Path)"],
-            "work"));
+            commandPrompt,
+            ["/d", "/c", "cd"],
+            "work",
+            timeoutSeconds: 5));
+        Assert(cwdResult.StructuredContent["terminal_state"]!.GetValue<string>() == "exited" && cwdResult.StructuredContent["exit_code"]!.GetValue<int>() == 0,
+            "exec_process cwd fixture exits normally: " + cwdResult.StructuredContent["stderr"]!.GetValue<string>());
+        var cwdOutput = cwdResult.StructuredContent["stdout"]!.GetValue<string>().Trim();
         Assert(
-            Path.GetFullPath(cwdResult.StructuredContent["stdout"]!.GetValue<string>()).TrimEnd('\\') ==
-            Path.GetFullPath(working).TrimEnd('\\'),
+            cwdOutput.Length > 0 && Path.GetFullPath(cwdOutput).TrimEnd('\\') == Path.GetFullPath(working).TrimEnd('\\'),
             "exec_process contained cwd");
         await AssertThrowsAsync(
             () => tools.CallAsync("exec_process", ExecArgs(powerShell, ["-NoLogo"], "..\\exec-process-outside")),

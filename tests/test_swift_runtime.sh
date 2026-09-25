@@ -1426,8 +1426,11 @@ echo "logical-chat-facade-legacy: ok"
 
 EXEC_ARGV="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","id":430,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/printf","arguments":["%s","$HOME;echo hacked"],"timeout_seconds":5,"output_limit_bytes":10000}}}')"
-printf '%s' "$EXEC_ARGV" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+    -d '{"jsonrpc":"2.0","id":430,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/bin/echo","arguments":["$HOME;echo hacked"],"timeout_seconds":5,"output_limit_bytes":10000}}}')"
+if ! printf '%s' "$EXEC_ARGV" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'; then
+    echo "exec_process argv response: $EXEC_ARGV" >&2
+    exit 1
+fi
 printf '%s' "$EXEC_ARGV" | plutil -extract result.structuredContent.terminal_state raw -expect string -o - - | grep -qx 'exited'
 printf '%s' "$EXEC_ARGV" | plutil -extract result.structuredContent.exit_code raw -expect integer -o - - | grep -qx '0'
 printf '%s' "$EXEC_ARGV" | plutil -extract result.structuredContent.stdout raw -expect string -o - - | grep -Fqx '$HOME;echo hacked'
