@@ -84,13 +84,13 @@ Detailed specification: foundation graph FMG-004.
 
 ## FMG-005 - Structured exec_process + Environment Authority
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-002, FMG-003, FMG-004
 Detailed specification: foundation graph FMG-005.
 
 ## FMG-006 - Strong File Version + SourceStateRef
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-001, FMG-002
 Detailed specification: foundation graph FMG-006.
 

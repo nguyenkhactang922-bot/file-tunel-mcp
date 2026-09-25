@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-005-exec-process`
+Branch: `chatgpt/FMG-006-file-version-source-state`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -197,3 +197,11 @@ FMG-005: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-005-exec-pr
 Local evidence: Windows runtime 609 assertions PASS; canonical catalog/parity PASS at 20 tools / `d03c6cd0c4d6582a89e408078e5f4053039f7178d172614256d510f86c137895`; exec-process contract PASS; Release 0 warnings/errors; project-state/diff checks PASS. Native Swift execution is environment-blocked on this Windows host and must be proven by GitHub macOS Verify.
 
 NEXT_EXACT_ACTION: commit/push the exact FMG-005 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, perform scoped review, merge only on green exact-head evidence, verify merged main, then mark FMG-005 DONE / MAIN VERIFIED and claim the next READY task. Do not start FMG-006 before FMG-005 MAIN VERIFIED.
+
+## FMG-005 closure / FMG-006 claim
+
+FMG-005: DONE / MAIN VERIFIED. Final candidate `e7c3e1764a3bd229ac1060f628a19c5049d256cf` merged by PR #8 as main `ec4f762c811be658cf9d5a82e0300ee7e79ef2ba`; merged-main Verify `36121843677` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows runtime 611 assertions and Release build PASS.
+
+FMG-006: CLAIMED / ACTIVE on `chatgpt/FMG-006-file-version-source-state`.
+
+NEXT_EXACT_ACTION: implement FMG-006 Strong File Version + SourceStateRef only: authenticated/opaque strong file version identity; read/stat exposure; versioned SourceStateRef provider; Git-backed repository fingerprint components; narrow relevant-file dependency support; negative tests for same size/mtime content changes, replacement object, dirty tracked/relevant untracked changes and excluded unrelated changes. Do not begin FMG-007 before FMG-006 MAIN VERIFIED.
