@@ -220,7 +220,7 @@ Negative tests:
 
 ## FMG-006 — Strong File Version + SourceStateRef
 
-State: ACTIVE / CLAIMED
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-001, FMG-002
 
 Scope:

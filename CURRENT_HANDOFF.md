@@ -205,3 +205,11 @@ FMG-005: DONE / MAIN VERIFIED. Final candidate `e7c3e1764a3bd229ac1060f628a19c50
 FMG-006: CLAIMED / ACTIVE on `chatgpt/FMG-006-file-version-source-state`.
 
 NEXT_EXACT_ACTION: implement FMG-006 Strong File Version + SourceStateRef only: authenticated/opaque strong file version identity; read/stat exposure; versioned SourceStateRef provider; Git-backed repository fingerprint components; narrow relevant-file dependency support; negative tests for same size/mtime content changes, replacement object, dirty tracked/relevant untracked changes and excluded unrelated changes. Do not begin FMG-007 before FMG-006 MAIN VERIFIED.
+
+## FMG-006 local verification
+
+FMG-006: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-006-file-version-source-state`.
+
+Local evidence: catalog/parity PASS at 20 tools / `d39a11012ad61a6d35ae472c5776d0a8488ded080212f72168505e41e11619c3`; FMG-006 file-version/source-state contract PASS; Windows runtime 627 assertions PASS; Release build 0 warnings/errors; diff/state checks PASS. macOS native code/tests are wired but local execution is environment-blocked because this Windows host has no `swiftc`.
+
+NEXT_EXACT_ACTION: commit/push the exact FMG-006 candidate, require native GitHub Verify on macOS + Windows x64 + Windows ARM64, fix only the exact failing stage if any, perform scoped security/privacy review, merge only exact green head, verify merged main, mark FMG-006 DONE / MAIN VERIFIED, then claim FMG-007.

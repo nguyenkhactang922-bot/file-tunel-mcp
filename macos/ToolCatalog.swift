@@ -17,7 +17,7 @@ enum ToolCatalogError: LocalizedError {
 
 final class CanonicalToolCatalog {
     private static let supportedSchemaVersion = 1
-    private static let supportedCatalogVersion = "1.0.0"
+    private static let supportedCatalogVersion = "1.1.0"
     private static let supportedInstructionVersion = "1.0.0"
     private static let supportedRisks: Set<String> = ["low", "medium", "high"]
     private static let supportedEffects: Set<String> = ["read", "write", "delete", "execute", "external", "metadata"]

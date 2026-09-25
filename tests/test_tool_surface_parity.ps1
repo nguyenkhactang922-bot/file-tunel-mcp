@@ -10,7 +10,7 @@ if (-not (Test-Path -LiteralPath $CatalogPath -PathType Leaf)) {
 }
 $Catalog = Get-Content $CatalogPath -Raw | ConvertFrom-Json
 if ($Catalog.schemaVersion -ne 1) { throw "Unexpected catalog schemaVersion: $($Catalog.schemaVersion)" }
-if ($Catalog.catalogVersion -ne "1.0.0") { throw "Unexpected catalogVersion: $($Catalog.catalogVersion)" }
+if ($Catalog.catalogVersion -ne "1.1.0") { throw "Unexpected catalogVersion: $($Catalog.catalogVersion)" }
 if ($Catalog.instructionVersion -ne "1.0.0") { throw "Unexpected instructionVersion: $($Catalog.instructionVersion)" }
 if ($Catalog.protocolVersions.modern -ne "2026-07-28") { throw "Canonical modern protocol drifted." }
 $Tools = @($Catalog.tools)

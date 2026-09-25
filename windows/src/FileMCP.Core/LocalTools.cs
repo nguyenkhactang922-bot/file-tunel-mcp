@@ -11,6 +11,7 @@ internal sealed partial class LocalTools
     private readonly string _gitUserEmail;
     private readonly ServerPolicy _policy;
     private readonly ExecProcessEnvironmentAuthority _execEnvironment;
+    private readonly FileVersionService _fileVersions;
     private readonly bool _enableCommands;
     private readonly string? _safeGitEmptyFile;
     private readonly string? _safeGitHooksDirectory;
@@ -46,6 +47,7 @@ internal sealed partial class LocalTools
     internal LocalTools(string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy, IReadOnlyList<string>? execEnvironmentAllowList = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
+        _fileVersions = new FileVersionService(_resolver);
         _gitUserName = gitUserName;
         _gitUserEmail = gitUserEmail;
         _policy = policy;
@@ -82,7 +84,7 @@ internal sealed partial class LocalTools
             return name switch
             {
                 "list_files" => StringArrayOutput(ListFiles(GetString(arguments, "subpath", ""), executionContext)),
-                "read_file" => StringOutput(ReadFile(GetRequiredString(arguments, "relative_path"))),
+                "read_file" => VersionedStringOutput(ReadFile(GetRequiredString(arguments, "relative_path"))),
                 "read_file_range" => ObjectOutput(ReadFileRange(
                     GetRequiredString(arguments, "relative_path"),
                     GetRequiredInt(arguments, "start_line"),
@@ -175,36 +177,27 @@ internal sealed partial class LocalTools
         return (result, truncated || (context?.Truncated ?? false));
     }
 
-    private string ReadFile(string relativePath)
+    private JsonObject ReadFile(string relativePath)
     {
-        var target = _resolver.Resolve(relativePath);
-        var info = new FileInfo(target);
-        if (!info.Exists || (info.Attributes & FileAttributes.Directory) != 0)
-            throw new FileMcpException($"No such file: {relativePath}");
-        if (info.Length > FileMcpConstants.MaxFileBytes)
-            throw new FileMcpException("File is larger than the 5 MB limit for this tool");
-        var data = File.ReadAllBytes(target);
-        if (data.Length > FileMcpConstants.MaxFileBytes)
-            throw new FileMcpException("File is larger than the 5 MB limit for this tool");
-        var text = Encoding.UTF8.GetString(data);
-        return text.Length > FileMcpConstants.MaxCharsReturned
+        var versioned = _fileVersions.ReadVersioned(relativePath, FileMcpConstants.MaxFileBytes);
+        var text = Encoding.UTF8.GetString(versioned.Data);
+        var result = text.Length > FileMcpConstants.MaxCharsReturned
             ? text[..FileMcpConstants.MaxCharsReturned] + "\n\n[...truncated...]" : text;
+        return new JsonObject
+        {
+            ["result"] = result,
+            ["version"] = versioned.VersionToken,
+            ["version_strength"] = "content",
+            ["size_bytes"] = versioned.SizeBytes,
+        };
     }
 
     private JsonObject ReadFileRange(string relativePath, int startLine, int endLine)
     {
         if (startLine < 1 || endLine < startLine)
             throw new FileMcpException("start_line and end_line must define a valid 1-based inclusive range");
-        var target = _resolver.Resolve(relativePath);
-        var info = new FileInfo(target);
-        if (!info.Exists || (info.Attributes & FileAttributes.Directory) != 0)
-            throw new FileMcpException($"No such file: {relativePath}");
-        if (info.Length > FileMcpConstants.MaxFileBytes)
-            throw new FileMcpException("File is larger than the 5 MB limit for this tool");
-        var data = File.ReadAllBytes(target);
-        if (data.Length > FileMcpConstants.MaxFileBytes)
-            throw new FileMcpException("File is larger than the 5 MB limit for this tool");
-        var lines = SplitTextLines(Encoding.UTF8.GetString(data));
+        var versioned = _fileVersions.ReadVersioned(relativePath, FileMcpConstants.MaxFileBytes);
+        var lines = SplitTextLines(Encoding.UTF8.GetString(versioned.Data));
         var totalLines = Math.Max(1, lines.Count);
         if (startLine > totalLines)
             throw new FileMcpException($"start_line {startLine} is beyond the end of the file ({totalLines} lines)");
@@ -229,6 +222,7 @@ internal sealed partial class LocalTools
             ["requested_end_line"] = endLine, ["total_lines"] = totalLines,
             ["has_before"] = startLine > 1, ["has_after"] = actualEnd < totalLines,
             ["truncated"] = actualEnd < requestedEnd, ["content"] = string.Join("\n", returned),
+            ["version"] = versioned.VersionToken, ["version_strength"] = "content", ["size_bytes"] = versioned.SizeBytes,
         };
     }
 
@@ -647,6 +641,14 @@ internal sealed partial class LocalTools
 
     private static ToolCallOutput StringOutput(string value) => new(
         new JsonArray(new JsonObject { ["type"] = "text", ["text"] = value }), new JsonObject { ["result"] = value });
+
+    private static ToolCallOutput VersionedStringOutput(JsonObject value)
+    {
+        var text = value["result"]?.GetValue<string>() ?? "";
+        return new ToolCallOutput(
+            new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }),
+            value);
+    }
 
     private static ToolCallOutput StringArrayOutput((IReadOnlyList<string> Values, bool Truncated) value)
     {

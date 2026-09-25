@@ -57,6 +57,7 @@ internal static class Program
             await TestDesktopSingleInstanceCoordinatorAsync();
             await TestProcessRunnerAsync(root);
             await TestExecProcessAsync(root);
+            await TestFileVersionAndSourceStateAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -85,7 +86,7 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.0.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.1.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
@@ -2159,6 +2160,120 @@ internal static class Program
         Assert(!childAlive, "exec_process cancellation cleans descendant process tree");
 
         Console.WriteLine("windows-exec-process: ok");
+    }
+
+    private static async Task TestFileVersionAndSourceStateAsync(string root)
+    {
+        var workspace = Path.Combine(root, "fmg006");
+        Directory.CreateDirectory(workspace);
+        var resolver = new SafePathResolver(workspace);
+        var versionService = new FileVersionService(resolver, Enumerable.Repeat((byte)0x5A, 32).ToArray());
+
+        var samePath = Path.Combine(workspace, "same.txt");
+        File.WriteAllText(samePath, "AAAA", new UTF8Encoding(false));
+        var sameModified = File.GetLastWriteTimeUtc(samePath);
+        var first = versionService.ReadVersioned("same.txt", FileMcpConstants.MaxFileBytes);
+        var repeat = versionService.ReadVersioned("same.txt", FileMcpConstants.MaxFileBytes);
+        Assert(first.VersionToken == repeat.VersionToken && first.VersionFingerprint == repeat.VersionFingerprint, "strong file version is deterministic for unchanged file within process");
+        File.WriteAllText(samePath, "BBBB", new UTF8Encoding(false));
+        File.SetLastWriteTimeUtc(samePath, sameModified);
+        try
+        {
+            _ = versionService.VerifyExpectedVersion("same.txt", first.VersionToken);
+            throw new Exception("same-size same-mtime content change must stale the strong version");
+        }
+        catch (FileMcpException ex)
+        {
+            Assert(ex.Message.Contains("changed", StringComparison.OrdinalIgnoreCase), "strong file version detects same-size content change with restored mtime");
+        }
+
+        var replacePath = Path.Combine(workspace, "replace.txt");
+        File.WriteAllText(replacePath, "same-content", new UTF8Encoding(false));
+        var replaceModified = File.GetLastWriteTimeUtc(replacePath);
+        var replacementVersion = versionService.ReadVersioned("replace.txt", FileMcpConstants.MaxFileBytes);
+        var replacementTemp = Path.Combine(workspace, "replace-new.txt");
+        File.WriteAllText(replacementTemp, "same-content", new UTF8Encoding(false));
+        File.SetLastWriteTimeUtc(replacementTemp, replaceModified);
+        File.Delete(replacePath);
+        File.Move(replacementTemp, replacePath);
+        try
+        {
+            _ = versionService.VerifyExpectedVersion("replace.txt", replacementVersion.VersionToken);
+            throw new Exception("replacement object must stale the strong version");
+        }
+        catch (FileMcpException ex)
+        {
+            Assert(ex.Message.Contains("replaced", StringComparison.OrdinalIgnoreCase), "strong file version detects target replacement with same content/mtime");
+        }
+
+        var tokenPath = Path.Combine(workspace, "token.txt");
+        var otherPath = Path.Combine(workspace, "other.txt");
+        File.WriteAllText(tokenPath, "token-state", new UTF8Encoding(false));
+        File.WriteAllText(otherPath, "token-state", new UTF8Encoding(false));
+        var tokenRead = versionService.ReadVersioned("token.txt", FileMcpConstants.MaxFileBytes);
+        var tampered = tokenRead.VersionToken[..^1] + (tokenRead.VersionToken[^1] == 'A' ? 'B' : 'A');
+        try
+        {
+            _ = versionService.VerifyExpectedVersion("token.txt", tampered);
+            throw new Exception("tampered file version token must fail authentication");
+        }
+        catch (FileMcpException ex)
+        {
+            Assert(ex.Message.Contains("authentication", StringComparison.OrdinalIgnoreCase), "file version token tamper fails closed");
+        }
+        try
+        {
+            _ = versionService.VerifyExpectedVersion("other.txt", tokenRead.VersionToken);
+            throw new Exception("file version token replay on another path must fail");
+        }
+        catch (FileMcpException ex)
+        {
+            Assert(ex.Message.Contains("different path", StringComparison.OrdinalIgnoreCase), "file version token is path scoped");
+        }
+
+        var tools = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
+        await tools.CallAsync("write_file", Obj(("relative_path", "read.txt"), ("content", "one\ntwo\nthree\n")));
+        var read = await tools.CallAsync("read_file", Obj(("relative_path", "read.txt")));
+        var range = await tools.CallAsync("read_file_range", Obj(("relative_path", "read.txt"), ("start_line", 2), ("end_line", 3)));
+        var readVersion = read.StructuredContent["version"]!.GetValue<string>();
+        Assert(read.StructuredContent["result"]!.GetValue<string>().Contains("two", StringComparison.Ordinal), "versioned read preserves legacy text result");
+        Assert(read.StructuredContent["version_strength"]!.GetValue<string>() == "content" && read.StructuredContent["size_bytes"]!.GetValue<long>() > 0, "read_file exposes strong version metadata");
+        Assert(range.StructuredContent["version"]!.GetValue<string>() == readVersion && range.StructuredContent["version_strength"]!.GetValue<string>() == "content", "read_file_range exposes the same complete-file strong version");
+
+        await tools.CallAsync("git_init", Obj(("repo_path", "repo")));
+        await tools.CallAsync("write_file", Obj(("relative_path", "repo/a.txt"), ("content", "alpha\n")));
+        await tools.CallAsync("write_file", Obj(("relative_path", "repo/b.txt"), ("content", "bravo\n")));
+        await tools.CallAsync("git_add", Obj(("repo_path", "repo"), ("paths", ".")));
+        await tools.CallAsync("git_commit", Obj(("repo_path", "repo"), ("message", "source-state baseline")));
+
+        var repositoryBaseline = await tools.CaptureSourceStateRefAsync("repo");
+        var narrowBaseline = await tools.CaptureSourceStateRefAsync("repo", ["a.txt"]);
+        Assert(repositoryBaseline["provider_version"]!.GetValue<string>() == LocalTools.SourceStateProviderVersion, "SourceStateRef provider version is explicit");
+        Assert(narrowBaseline["scope"]!.GetValue<string>() == "relevant_files" && narrowBaseline["head_oid"] is null, "narrow SourceStateRef excludes global HEAD identity");
+        var serializedNarrow = narrowBaseline.ToJsonString();
+        Assert(!serializedNarrow.Contains("alpha", StringComparison.Ordinal) && !serializedNarrow.Contains("a.txt", StringComparison.Ordinal), "SourceStateRef persists no raw source content or path names");
+
+        await tools.CallAsync("write_file", Obj(("relative_path", "repo/b.txt"), ("content", "BRAVO\n")));
+        var narrowAfterUnrelatedTracked = await tools.CaptureSourceStateRefAsync("repo", ["a.txt"]);
+        var repositoryAfterTracked = await tools.CaptureSourceStateRefAsync("repo");
+        Assert(narrowAfterUnrelatedTracked["source_state_id"]!.GetValue<string>() == narrowBaseline["source_state_id"]!.GetValue<string>(), "unrelated tracked change does not invalidate narrow SourceStateRef");
+        Assert(repositoryAfterTracked["source_state_id"]!.GetValue<string>() != repositoryBaseline["source_state_id"]!.GetValue<string>(), "repository SourceStateRef detects tracked dirty change");
+
+        await tools.CallAsync("write_file", Obj(("relative_path", "repo/a.txt"), ("content", "ALPHA\n")));
+        var narrowAfterRelevantTracked = await tools.CaptureSourceStateRefAsync("repo", ["a.txt"]);
+        Assert(narrowAfterRelevantTracked["source_state_id"]!.GetValue<string>() != narrowBaseline["source_state_id"]!.GetValue<string>(), "relevant tracked change invalidates narrow SourceStateRef");
+
+        var missingRelevant = await tools.CaptureSourceStateRefAsync("repo", ["u.txt"]);
+        await tools.CallAsync("write_file", Obj(("relative_path", "repo/u.txt"), ("content", "untracked relevant\n")));
+        var relevantUntracked = await tools.CaptureSourceStateRefAsync("repo", ["u.txt"]);
+        Assert(relevantUntracked["source_state_id"]!.GetValue<string>() != missingRelevant["source_state_id"]!.GetValue<string>(), "relevant untracked change invalidates narrow SourceStateRef");
+
+        var narrowBeforeUnrelatedUntracked = await tools.CaptureSourceStateRefAsync("repo", ["a.txt"]);
+        await tools.CallAsync("write_file", Obj(("relative_path", "repo/unrelated.txt"), ("content", "unrelated untracked\n")));
+        var narrowAfterUnrelatedUntracked = await tools.CaptureSourceStateRefAsync("repo", ["a.txt"]);
+        Assert(narrowAfterUnrelatedUntracked["source_state_id"]!.GetValue<string>() == narrowBeforeUnrelatedUntracked["source_state_id"]!.GetValue<string>(), "unrelated untracked change does not invalidate narrow SourceStateRef");
+
+        Console.WriteLine("windows-file-version-source-state: ok");
     }
 
     private static async Task TestFilesystemAndToolsAsync(string root)

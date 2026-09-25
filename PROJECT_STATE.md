@@ -166,8 +166,11 @@ Evidence: `docs/evidence/FMG-005_EXEC_PROCESS_ENVIRONMENT_AUTHORITY_EVIDENCE.md`
 
 ## FMG-006 implementation
 
-State: ACTIVE / CLAIMED.
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
 Branch: `chatgpt/FMG-006-file-version-source-state`.
 Depends: FMG-001, FMG-002 DONE / MAIN VERIFIED.
 Scope: Strong File Version + SourceStateRef only.
 Later dependent tasks remain BLOCKED by frozen graph.
+Evidence: `docs/evidence/FMG-006_FILE_VERSION_SOURCE_STATE_EVIDENCE.md`.
+Local proof: catalog/parity/FM??G-006 contract PASS; Windows runtime 627 assertions PASS; Release build 0 warnings / 0 errors.
+Native macOS: pending GitHub Verify because local Windows host has no swiftc.

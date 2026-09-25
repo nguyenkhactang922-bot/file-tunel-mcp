@@ -53,7 +53,7 @@ private enum MCPServerError: LocalizedError {
     }
 }
 
-private final class SafePathResolver {
+final class SafePathResolver {
     let root: URL
     private let rootPath: String
 
@@ -117,7 +117,7 @@ private struct LocalToolCallOutput {
     let structuredContent: [String: Any]
 }
 
-private final class LocalTools {
+fileprivate final class LocalTools {
     private static let handlerToolNames: Set<String> = [
         "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "git_init", "git_status", "git_log", "git_diff",
@@ -132,6 +132,7 @@ private final class LocalTools {
     private let enableCommands: Bool
     private let policy: ServerPolicy
     private let execEnvironment: ExecProcessEnvironmentAuthority
+    private let fileVersions: FileVersionService
     private let toolSlots = DispatchSemaphore(value: 8)
     private let mutationSlot = DispatchSemaphore(value: 1)
     private let commandSlots = DispatchSemaphore(value: 2)
@@ -162,6 +163,7 @@ private final class LocalTools {
         execEnvironmentAllowList: [String] = []
     ) throws {
         self.resolver = resolver
+        self.fileVersions = try FileVersionService(resolver: resolver)
         self.gitUserName = gitUserName
         self.gitUserEmail = gitUserEmail
         self.policy = policy
@@ -207,7 +209,7 @@ private final class LocalTools {
             let result = try listFiles(subpath: string(arguments, "subpath", default: ""), context: executionContext)
             return stringArrayOutput(result.values, truncated: result.truncated)
         case "read_file":
-            return stringOutput(try readFile(relativePath: requiredString(arguments, "relative_path")))
+            return versionedStringOutput(try readFile(relativePath: requiredString(arguments, "relative_path")))
         case "read_file_range":
             return objectOutput(try readFileRange(
                 relativePath: requiredString(arguments, "relative_path"),
@@ -340,26 +342,19 @@ private final class LocalTools {
         return (entries, truncated || (context?.truncated ?? false))
     }
 
-    private func readFile(relativePath: String) throws -> String {
-        let target = try resolver.resolve(relativePath)
-        let attributes = try FileManager.default.attributesOfItem(atPath: target.path)
-        guard attributes[.type] as? FileAttributeType == .typeRegular else {
-            throw MCPServerError.notFound("No such file: \(relativePath)")
-        }
-        let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
-        guard size <= maxFileBytes else {
-            throw MCPServerError.operationFailed("File is larger than the 5 MB limit for this tool")
-        }
-        let data = try Data(contentsOf: target, options: [.mappedIfSafe])
-        guard data.count <= maxFileBytes else {
-            throw MCPServerError.operationFailed("File is larger than the 5 MB limit for this tool")
-        }
-        var text = String(decoding: data, as: UTF8.self)
+    private func readFile(relativePath: String) throws -> [String: Any] {
+        let versioned = try fileVersions.readVersioned(relativePath: relativePath, maxBytes: maxFileBytes)
+        var text = String(decoding: versioned.data, as: UTF8.self)
         if text.count > maxCharsReturned {
             let end = text.index(text.startIndex, offsetBy: maxCharsReturned)
             text = String(text[..<end]) + "\n\n[...truncated...]"
         }
-        return text
+        return [
+            "result": text,
+            "version": versioned.versionToken,
+            "version_strength": "content",
+            "size_bytes": versioned.sizeBytes,
+        ]
     }
 
     private func splitTextLines(_ text: String) -> [String] {
@@ -375,21 +370,8 @@ private final class LocalTools {
             throw MCPServerError.invalidArguments("start_line and end_line must define a valid 1-based inclusive range")
         }
 
-        let target = try resolver.resolve(relativePath)
-        let attributes = try FileManager.default.attributesOfItem(atPath: target.path)
-        guard attributes[.type] as? FileAttributeType == .typeRegular else {
-            throw MCPServerError.notFound("No such file: \(relativePath)")
-        }
-        let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
-        guard size <= maxFileBytes else {
-            throw MCPServerError.operationFailed("File is larger than the 5 MB limit for this tool")
-        }
-
-        let data = try Data(contentsOf: target, options: [.mappedIfSafe])
-        guard data.count <= maxFileBytes else {
-            throw MCPServerError.operationFailed("File is larger than the 5 MB limit for this tool")
-        }
-        let text = String(decoding: data, as: UTF8.self)
+        let versioned = try fileVersions.readVersioned(relativePath: relativePath, maxBytes: maxFileBytes)
+        let text = String(decoding: versioned.data, as: UTF8.self)
         let lines = splitTextLines(text)
         let totalLines = max(1, lines.count)
         guard startLine <= totalLines else {
@@ -429,6 +411,9 @@ private final class LocalTools {
             "has_after": actualEndLine < totalLines,
             "truncated": actualEndLine < requestedEnd,
             "content": content,
+            "version": versioned.versionToken,
+            "version_strength": "content",
+            "size_bytes": versioned.sizeBytes,
         ]
     }
 
@@ -846,6 +831,181 @@ private final class LocalTools {
             throw MCPServerError.operationFailed(partial)
         }
         return formatProcessResult(result)
+    }
+
+    fileprivate func captureSourceStateRef(repoPath: String, relevantPaths: [String] = []) throws -> [String: Any] {
+        let repo = try gitRepo(repoPath)
+        let scopes = try normalizeSourceStateScopes(repo: repo, relevantPaths: relevantPaths)
+        let narrow = !scopes.isEmpty
+        let repoRelative = relativePath(for: repo)
+        let pathspecSuffix = narrow ? ["--"] + scopes : []
+
+        var headOID: String?
+        let headScopeFingerprint: String
+        do {
+            let rawHead = try runGit(repo: repo, arguments: ["rev-parse", "--verify", "HEAD"], outputLimitBytes: maxGitSafetyOutputBytes)
+            let candidate = rawHead.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard candidate.count >= 7, candidate.count <= 128, candidate.allSatisfy({ $0.isHexDigit }) else {
+                throw MCPServerError.operationFailed("Could not validate Git HEAD identity for SourceStateRef")
+            }
+            headOID = candidate
+            if narrow {
+                let raw = try runGit(
+                    repo: repo,
+                    arguments: ["ls-tree", "-r", "-z", "HEAD"] + pathspecSuffix,
+                    outputLimitBytes: maxGitSafetyOutputBytes,
+                    trimOutput: false
+                )
+                try ensureCompleteGitSafetyOutput(raw, operation: "SourceStateRef HEAD scope")
+                headScopeFingerprint = FileVersionService.sha256Tagged(raw)
+            } else {
+                headScopeFingerprint = FileVersionService.sha256Tagged(candidate)
+            }
+        } catch {
+            let description = error.localizedDescription.lowercased()
+            guard description.contains("needed a single revision") || description.contains("unknown revision") ||
+                  description.contains("ambiguous argument") || description.contains("bad revision") else { throw error }
+            headOID = nil
+            headScopeFingerprint = FileVersionService.sha256Tagged("unborn")
+        }
+
+        var indexArgs = ["ls-files", "-s", "-z"]
+        if narrow { indexArgs += pathspecSuffix }
+        let indexRaw = try runGit(repo: repo, arguments: indexArgs, outputLimitBytes: maxGitSafetyOutputBytes, trimOutput: false)
+        try ensureCompleteGitSafetyOutput(indexRaw, operation: "SourceStateRef index scan")
+
+        var trackedArgs = ["diff", "--name-only", "-z"]
+        if headOID != nil { trackedArgs.append("HEAD") }
+        trackedArgs.append("--")
+        if narrow { trackedArgs += scopes }
+        let trackedRaw = try runGit(repo: repo, arguments: trackedArgs, outputLimitBytes: maxGitSafetyOutputBytes, trimOutput: false)
+        try ensureCompleteGitSafetyOutput(trackedRaw, operation: "SourceStateRef tracked scan")
+
+        var untrackedArgs = ["ls-files", "--others", "--exclude-standard", "-z", "--"]
+        if narrow { untrackedArgs += scopes }
+        let untrackedRaw = try runGit(repo: repo, arguments: untrackedArgs, outputLimitBytes: maxGitSafetyOutputBytes, trimOutput: false)
+        try ensureCompleteGitSafetyOutput(untrackedRaw, operation: "SourceStateRef untracked scan")
+
+        var hashedBytes: Int64 = 0
+        let trackedFingerprint = try hashSourceStatePaths(repoRelative: repoRelative, paths: splitNulPaths(trackedRaw), hashedBytes: &hashedBytes)
+        let untrackedFingerprint = try hashSourceStatePaths(repoRelative: repoRelative, paths: splitNulPaths(untrackedRaw), hashedBytes: &hashedBytes)
+        let fileVersionRefs = narrow ? try captureScopedFileVersionRefs(repoRelative: repoRelative, scopes: scopes) : []
+        let policySnapshot = policy.capture()
+        let headValue: Any = narrow ? NSNull() : (headOID.map { $0 as Any } ?? NSNull())
+
+        var state: [String: Any] = [
+            "provider_version": "source-state-v1",
+            "scope": narrow ? "relevant_files" : "repository",
+            "scope_fingerprint": FileVersionService.sha256Tagged(narrow ? scopes.joined(separator: "\n") : "repository"),
+            "worktree_fingerprint": FileVersionService.sha256Tagged(repo.path),
+            "head_oid": headValue,
+            "head_scope_fingerprint": headScopeFingerprint,
+            "index_fingerprint": FileVersionService.sha256Tagged(indexRaw),
+            "tracked_dirty_fingerprint": trackedFingerprint,
+            "untracked_fingerprint": untrackedFingerprint,
+            "catalog_hash": CanonicalToolCatalog.shared.catalogHash,
+            "policy_generation": policySnapshot.generation,
+            "policy_hash": policySnapshot.hash,
+            "file_versions": fileVersionRefs,
+        ]
+        state["source_state_id"] = try sourceStateID(state)
+        return state
+    }
+
+    private func normalizeSourceStateScopes(repo: URL, relevantPaths: [String]) throws -> [String] {
+        guard relevantPaths.count <= 4096 else {
+            throw MCPServerError.invalidArguments("SourceStateRef supports at most 4096 relevant paths")
+        }
+        if relevantPaths.isEmpty { return [] }
+        var normalized = Set<String>()
+        let repoPath = repo.path
+        for raw in relevantPaths {
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !(trimmed as NSString).isAbsolutePath else {
+                throw MCPServerError.invalidArguments("SourceStateRef relevant paths must be relative repository paths")
+            }
+            let candidate = repo.appendingPathComponent(trimmed).standardizedFileURL
+            guard candidate.path != repoPath, candidate.path.hasPrefix(repoPath + "/") else {
+                throw MCPServerError.invalidPath("SourceStateRef relevant path is outside the repository")
+            }
+            let relative = String(candidate.path.dropFirst(repoPath.count + 1))
+            let sharedRelative = relativePath(for: candidate)
+            _ = try resolver.resolve(sharedRelative)
+            normalized.insert(relative)
+        }
+        return normalized.sorted()
+    }
+
+    private func hashSourceStatePaths(repoRelative: String, paths: [String], hashedBytes: inout Int64) throws -> String {
+        var material = Data()
+        for path in paths.sorted() {
+            let normalized = path.replacingOccurrences(of: "\\", with: "/")
+            let pathFingerprint = FileVersionService.sha256Tagged(normalized)
+            let sharedRelative = repoRelative.isEmpty ? normalized : repoRelative.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/" + normalized
+            let target = try resolver.resolve(sharedRelative)
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(atPath: target.path, isDirectory: &isDirectory)
+            let state: String
+            if exists, !isDirectory.boolValue {
+                let attributes = try FileManager.default.attributesOfItem(atPath: target.path)
+                let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+                guard size >= 0, size <= 50_000_000 - hashedBytes else {
+                    throw MCPServerError.operationFailed("SourceStateRef file hashing exceeded the 50 MB aggregate limit")
+                }
+                let hashed = try FileVersionService.sha256File(target, maxBytes: 50_000_000 - hashedBytes)
+                hashedBytes += hashed.bytesRead
+                state = "file:" + hashed.hash
+            } else if exists, isDirectory.boolValue {
+                state = "directory"
+            } else {
+                state = "missing"
+            }
+            material.append(Data((pathFingerprint + "\0" + state + "\0").utf8))
+        }
+        return FileVersionService.sha256Tagged(material)
+    }
+
+    private func captureScopedFileVersionRefs(repoRelative: String, scopes: [String]) throws -> [[String: Any]] {
+        var result: [[String: Any]] = []
+        for scope in scopes {
+            let sharedRelative = repoRelative.isEmpty ? scope : repoRelative.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/" + scope
+            let target = try resolver.resolve(sharedRelative)
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(atPath: target.path, isDirectory: &isDirectory)
+            var item: [String: Any] = ["path_fingerprint": FileVersionService.sha256Tagged(scope)]
+            if exists, !isDirectory.boolValue {
+                let attributes = try FileManager.default.attributesOfItem(atPath: target.path)
+                let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+                item["size_bytes"] = size
+                if size <= Int64(maxFileBytes) {
+                    let versioned = try fileVersions.readVersioned(relativePath: sharedRelative, maxBytes: maxFileBytes)
+                    item["state"] = "file"
+                    item["version_ref"] = versioned.versionFingerprint
+                } else {
+                    item["state"] = "file_large"
+                }
+            } else if exists, isDirectory.boolValue {
+                item["state"] = "directory"
+            } else {
+                item["state"] = "missing"
+            }
+            result.append(item)
+        }
+        return result
+    }
+
+    private func splitNulPaths(_ value: String) -> [String] {
+        Array(Set(value.split(separator: "\0", omittingEmptySubsequences: true).map { String($0).replacingOccurrences(of: "\\", with: "/") })).sorted()
+    }
+
+    private func sourceStateID(_ state: [String: Any]) throws -> String {
+        var copy = state
+        copy.removeValue(forKey: "source_state_id")
+        guard JSONSerialization.isValidJSONObject(copy) else {
+            throw MCPServerError.operationFailed("SourceStateRef metadata is not serializable")
+        }
+        let data = try JSONSerialization.data(withJSONObject: copy, options: [.sortedKeys])
+        return FileVersionService.sha256Tagged(data)
     }
 
     private func gitInit(repoPath: String) throws -> String {
@@ -1413,6 +1573,14 @@ private final class LocalTools {
         )
     }
 
+    private func versionedStringOutput(_ value: [String: Any]) -> LocalToolCallOutput {
+        let text = value["result"] as? String ?? ""
+        return LocalToolCallOutput(
+            content: [["type": "text", "text": text]],
+            structuredContent: value
+        )
+    }
+
     private func stringArrayOutput(_ values: [String], truncated: Bool) -> LocalToolCallOutput {
         LocalToolCallOutput(
             content: values.map { ["type": "text", "text": $0] },
@@ -1618,6 +1786,10 @@ final class LocalMCPServer {
         stateLock.lock()
         defer { stateLock.unlock() }
         return ready
+    }
+
+    func captureSourceStateRefForTest(repoPath: String, relevantPaths: [String] = []) throws -> [String: Any] {
+        try tools.captureSourceStateRef(repoPath: repoPath, relevantPaths: relevantPaths)
     }
 
     func start(timeoutSeconds: TimeInterval = 5) throws {
