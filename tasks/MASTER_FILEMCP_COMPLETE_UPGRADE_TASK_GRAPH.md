@@ -66,13 +66,13 @@ Detailed specification: `tasks/MASTER_FILEMCP_UPGRADE_TASK_GRAPH.md` FMG-001.
 
 ## FMG-002 - Structured Result Envelope
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: FMG-001
 Detailed specification: foundation graph FMG-002.
 
 ## FMG-003 - Server-Owned Policy + Migration
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-001
 Detailed specification: foundation graph FMG-003.
 

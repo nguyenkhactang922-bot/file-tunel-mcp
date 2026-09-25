@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-002-structured-result-envelope`
+Branch: `chatgpt/FMG-003-server-policy`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -128,10 +128,16 @@ State: CLAIMED / ACTIVE.
 
 Branch: `chatgpt/FMG-001-canonical-catalog`.
 
-NEXT_EXACT_ACTION: implement FMG-002 Structured Result Envelope only: versioned result metadata, status/warnings/truncation/usage/operation identity, backward-compatible content, Windows/macOS parity, fail-closed validation and negative tests. Do not begin FMG-003 or later tasks.
+NEXT_EXACT_ACTION: implement FMG-003 Server-Owned Policy + Migration only: restricted/workspace-auto/custom profiles, legacy EnableCommands migration, policy generation/hash, risk/effect authorization, effective catalog filtering and runtime reauthorization. Do not begin FMG-004 or later tasks.
 
 ## FMG-001 closure / FMG-002 claim
 
 FMG-001: DONE / MAIN VERIFIED on merge commit `71d658131342581f14407276bcfe18164a0afa37`; native Verify run `35988856441` SUCCESS.
 
 FMG-002: CLAIMED / ACTIVE on `chatgpt/FMG-002-structured-result-envelope`.
+
+## FMG-002 closure / FMG-003 claim
+
+FMG-002: DONE / MAIN VERIFIED on final merge `dcbc55f7685e91c804ab14500df752a0c6f3be62`; native Verify run `35994263967` SUCCESS.
+
+FMG-003: CLAIMED / ACTIVE on `chatgpt/FMG-003-server-policy`.

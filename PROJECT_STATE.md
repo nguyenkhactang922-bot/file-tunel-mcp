@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-002-structured-result-envelope`
+Active branch: `chatgpt/FMG-003-server-policy`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -127,8 +127,16 @@ Later FMG tasks remain BLOCKED by dependency graph.
 
 ## FMG-002 implementation
 
-State: ACTIVE / CLAIMED.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-002-structured-result-envelope`.
 Depends: FMG-001 DONE / MAIN VERIFIED.
 Scope: Structured Result Envelope only.
 Later dependent tasks remain BLOCKED by the frozen dependency graph.
+
+## FMG-003 implementation
+
+State: ACTIVE / CLAIMED.
+Branch: `chatgpt/FMG-003-server-policy`.
+Depends: FMG-001 DONE / MAIN VERIFIED.
+Scope: Server-Owned Policy + Migration only.
+Later dependent tasks remain BLOCKED by frozen graph.
