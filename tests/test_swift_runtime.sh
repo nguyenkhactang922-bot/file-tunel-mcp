@@ -1347,7 +1347,26 @@ mkdir -p "$TMP_DIR/git-template"
 printf 'outside-template-marker\n' > "$TMP_DIR/git-template/copied-from-template"
 GIT_TEMPLATE_DIR="$TMP_DIR/git-template" "$TMP_DIR/server-test" &
 SERVER_PID=$!
-sleep 1
+python3 - <<'PY'
+import socket
+import time
+
+ports = (18088, 18089, 18090)
+deadline = time.monotonic() + 15.0
+pending = set(ports)
+while pending and time.monotonic() < deadline:
+    for port in tuple(pending):
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                pending.remove(port)
+        except OSError:
+            pass
+    if pending:
+        time.sleep(0.05)
+if pending:
+    raise SystemExit(f"macOS server fixtures did not become ready on ports: {sorted(pending)}")
+print("macos-server-fixture-ready: ok")
+PY
 
 BASE_URL="http://127.0.0.1:18088/mcp"
 SAFE_BASE_URL="http://127.0.0.1:18089/mcp"
