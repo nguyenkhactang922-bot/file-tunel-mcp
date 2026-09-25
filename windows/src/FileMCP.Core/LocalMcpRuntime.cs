@@ -294,7 +294,8 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
                     _observability?.Sessions,
                     _workspaceKey,
                     _observability?.StandardTelemetry,
-                    configuration.PolicyConfiguration);
+                    configuration.PolicyConfiguration,
+                    configuration.ExecEnvironmentAllowList);
                 await _server.StartAsync(cancellationToken).ConfigureAwait(false);
                 lock (_stateGate) _localServerReady = true;
 

@@ -39,6 +39,7 @@ echo "Compiling full Swift macOS app ..."
     -framework Security \
     -o "$UI_BIN" \
     "$ROOT/macos/ProcessRunner.swift" \
+    "$ROOT/macos/ExecProcessEnvironmentAuthority.swift" \
     "$ROOT/macos/LogicalChatCorrelation.swift" \
     "$ROOT/macos/ToolCatalog.swift" \
     "$ROOT/macos/ServerPolicy.swift" \

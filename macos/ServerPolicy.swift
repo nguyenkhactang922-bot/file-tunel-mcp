@@ -153,7 +153,8 @@ final class ServerPolicy {
     private static func isAllowed(_ configuration: LocalPolicyConfiguration, metadata: ToolPolicyMetadata) -> Bool {
         switch configuration.profile {
         case FileMCPPolicyProfiles.restricted:
-            return !metadata.capabilities.contains("process.shell")
+            return !metadata.capabilities.contains("process.shell") &&
+                !metadata.capabilities.contains("process.exec")
         case FileMCPPolicyProfiles.legacyCommandCompatible:
             return true
         case FileMCPPolicyProfiles.workspaceAuto:

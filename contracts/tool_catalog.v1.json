@@ -832,6 +832,128 @@
       }
     },
     {
+      "name": "exec_process",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "execute",
+      "capabilities": [
+        "process.exec",
+        "network.open_world"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "exec_process",
+        "description": "Execute an executable directly with an argv array. No shell interpolation is performed. cwd must stay inside the shared root. The process receives only the FileMCP minimal environment baseline, locally allowlisted pass-through variables, and bounded locally-authorized request overrides.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "executable": {
+              "type": "string",
+              "description": "Executable path or executable name to launch directly without a shell."
+            },
+            "arguments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "default": [],
+              "description": "Argument vector passed directly to the executable."
+            },
+            "cwd": {
+              "type": "string",
+              "description": "Working directory relative to the shared root."
+            },
+            "environment": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "maxProperties": 32,
+              "default": {},
+              "description": "Explicit environment overrides. Names must be permitted by the local exec environment allowlist or the minimal baseline."
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 120,
+              "default": 30
+            },
+            "output_limit_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 100000
+            }
+          },
+          "required": [
+            "executable"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "terminal_state": {
+              "type": "string",
+              "enum": [
+                "exited",
+                "timed_out",
+                "cancelled"
+              ]
+            },
+            "exit_code": {
+              "type": "integer"
+            },
+            "stdout": {
+              "type": "string"
+            },
+            "stderr": {
+              "type": "string"
+            },
+            "timed_out": {
+              "type": "boolean"
+            },
+            "cancelled": {
+              "type": "boolean"
+            },
+            "stdout_truncated": {
+              "type": "boolean"
+            },
+            "stderr_truncated": {
+              "type": "boolean"
+            },
+            "stdout_omitted_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stderr_omitted_bytes": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "terminal_state",
+            "exit_code",
+            "stdout",
+            "stderr",
+            "timed_out",
+            "cancelled",
+            "stdout_truncated",
+            "stderr_truncated",
+            "stdout_omitted_bytes",
+            "stderr_omitted_bytes"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": true
+        }
+      }
+    },
+    {
       "name": "run_command",
       "handler": "local_tools",
       "risk": "high",

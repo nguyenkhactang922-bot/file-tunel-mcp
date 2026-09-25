@@ -155,8 +155,12 @@ Evidence: `docs/evidence/FMG-004_TOOL_BUDGET_CURSOR_EVIDENCE.md`.
 
 ## FMG-005 implementation
 
-State: ACTIVE / CLAIMED.
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
 Branch: `chatgpt/FMG-005-exec-process`.
 Depends: FMG-002, FMG-003, FMG-004 DONE / MAIN VERIFIED.
 Scope: Structured `exec_process` + Environment Authority only.
-Later dependent tasks remain BLOCKED by frozen graph.
+Canonical catalog: 20 tools, SHA-256 `d03c6cd0c4d6582a89e408078e5f4053039f7178d172614256d510f86c137895`.
+Local proof: Windows runtime 609 assertions PASS; exec-process contract PASS; catalog/parity PASS; Release build 0 warnings / 0 errors; state contract/diff check PASS.
+Native macOS execution: local Windows host environment-blocked; GitHub native Verify required before merge.
+Evidence: `docs/evidence/FMG-005_EXEC_PROCESS_ENVIRONMENT_AUTHORITY_EVIDENCE.md`.
+Later dependent tasks remain BLOCKED until FMG-005 MAIN VERIFIED.

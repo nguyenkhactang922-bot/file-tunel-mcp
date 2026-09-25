@@ -6,7 +6,16 @@ using Microsoft.Win32.SafeHandles;
 
 namespace FileMCP.Core;
 
-public sealed record ProcessResult(int ExitCode, string Stdout, string Stderr, bool TimedOut);
+public sealed record ProcessResult(
+    int ExitCode,
+    string Stdout,
+    string Stderr,
+    bool TimedOut,
+    bool Cancelled = false,
+    bool StdoutTruncated = false,
+    bool StderrTruncated = false,
+    long StdoutOmittedBytes = 0,
+    long StderrOmittedBytes = 0);
 
 internal sealed class BoundedTextBuffer
 {
@@ -43,6 +52,9 @@ internal sealed class BoundedTextBuffer
             }
         }
     }
+
+    public long OmittedBytes { get { lock (_gate) return _omittedBytes; } }
+    public bool Truncated => OmittedBytes > 0;
 
     public override string ToString()
     {
@@ -102,6 +114,7 @@ public static class ProcessRunner
 
         var timeout = Math.Max(1, Math.Min(timeoutSeconds, MaxCommandTimeoutSeconds));
         var timedOut = false;
+        var cancelled = false;
         try
         {
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -119,6 +132,7 @@ public static class ProcessRunner
             }
             catch (OperationCanceledException)
             {
+                cancelled = true;
                 job?.Terminate(1);
                 KillProcessTree(process);
             }
@@ -142,7 +156,12 @@ public static class ProcessRunner
             process.HasExited ? process.ExitCode : -1,
             stdout.ToString(),
             stderr.ToString(),
-            timedOut);
+            timedOut,
+            cancelled,
+            stdout.Truncated,
+            stderr.Truncated,
+            stdout.OmittedBytes,
+            stderr.OmittedBytes);
     }
 
     public static ManagedProcess StartManaged(

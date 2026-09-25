@@ -445,6 +445,13 @@
                                     <TextBox x:Name="GitEmailBox" Grid.Row="2" Grid.Column="1"/>
                                 </Grid>
 
+                                <StackPanel Margin="0,16,0,0">
+                                    <TextBlock Text="Exec environment allowlist" FontWeight="SemiBold"/>
+                                    <TextBox x:Name="ExecEnvironmentAllowListBox" Margin="0,6,0,0"/>
+                                    <TextBlock Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
+                                               Text="Comma-separated environment names or glob patterns allowed for exec_process pass-through/request overrides. Empty by default. Secret-like names require an exact entry; wildcard matches never forward them."/>
+                                </StackPanel>
+
                                 <Border Margin="0,16,0,0" Padding="12" BorderBrush="#22000000" BorderThickness="1" CornerRadius="6">
                                     <StackPanel>
                                         <CheckBox x:Name="OtlpEnabledCheckBox" Content="Enable optional OTLP telemetry export (HTTP/Protobuf)"/>

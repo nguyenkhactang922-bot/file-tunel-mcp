@@ -145,6 +145,7 @@ The common workflow and terminology are kept aligned across macOS and Windows. T
 | MCP port | Local loopback port used by the MCP server. |
 | Health listener | Loopback-only `tunnel-client` health/admin listener. Port `0` requests an ephemeral port; Windows discovers the resolved loopback endpoint via tunnel-client health URL-file output and probes it automatically. |
 | Git name / Git email | Optional Git identity used by `git_commit`. |
+| Exec environment allowlist | Local names/glob patterns that `exec_process` may pass through or accept as request overrides. Empty by default; secret-like variables require an exact entry and are never forwarded by wildcard. |
 
 Closing the main window does not stop an active tunnel:
 
@@ -180,18 +181,35 @@ Use **Quit FileMCP** (or the platform quit shortcut) to terminate the app and st
 | `git_commit` | Create a commit. |
 | `git_push` | Push the current branch to its configured upstream. |
 
-### Optional command execution
+### Optional process and command execution
+
+```text
+exec_process(
+  executable,
+  arguments=[],
+  cwd="",
+  environment={},
+  timeout_seconds=30,
+  output_limit_bytes=100000
+)
+```
+
+`exec_process` is the structured high-risk execution tool. FileMCP launches the executable directly with the supplied argv array; FileMCP does **not** insert an implicit shell or interpolate shell syntax. The working directory remains inside the shared root. The child receives a minimal platform environment plus locally allowlisted pass-through variables and policy-checked request overrides. Secret-like environment names are never passed by a wildcard and require an exact local allowlist entry.
+
+`exec_process` still runs with the normal permissions of the signed-in OS user and can reach the network when the local policy permits it. Timeout, cancellation, descendant cleanup, stdout/stderr limits, truncation metadata, and nonzero exit codes are returned as structured result fields.
+
+The legacy compatibility path remains:
 
 ```text
 run_command(command, cwd="", timeout_seconds=30)
 ```
 
-`run_command` is exposed only when shell-command permission is enabled in FileMCP settings. It is intentionally not placed inside an OS-level sandbox.
+`run_command` is the **high-risk shell compatibility tool**. It performs shell interpretation and is retained for migrated/trusted workflows; new automation should prefer `exec_process` whenever direct executable + argv semantics are sufficient.
 
-- macOS executes through the user's configured shell, falling back to `/bin/sh`.
-- Windows executes through Windows PowerShell with `-NoProfile -NonInteractive`.
+- macOS `run_command` executes through the user's configured shell, falling back to `/bin/sh`.
+- Windows `run_command` executes through Windows PowerShell with `-NoProfile -NonInteractive`.
 
-Only the working directory is constrained to the shared root. Once command execution is enabled, the command itself has the normal permissions of the signed-in user.
+Both execution paths constrain only the working directory to the shared root; they are not OS-level sandboxes.
 
 ## Security model
 

@@ -31,6 +31,7 @@ private enum ConfigKey {
     static let customPolicyAllowedEffects = "customPolicyAllowedEffects"
     static let customPolicyAllowNetworkOpenWorld = "customPolicyAllowNetworkOpenWorld"
     static let customPolicyAllowShell = "customPolicyAllowShell"
+    static let execEnvironmentAllowList = "execEnvironmentAllowList"
 }
 
 private final class LoadingButton: NSButton {
@@ -202,6 +203,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let healthAddressField = NSTextField()
     private let gitUserNameField = NSTextField()
     private let gitUserEmailField = NSTextField()
+    private let execEnvironmentAllowListField = NSTextField()
     private let enableCommandsCheckbox = NSButton(checkboxWithTitle: "Allow shell commands", target: nil, action: nil)
     private let policyProfilePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let logView = NSTextView()
@@ -237,6 +239,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         healthAddressField.toolTip = "Loopback-only tunnel-client health/admin listener. Use port 0 for an ephemeral port."
         configure(gitUserNameField, placeholder: "Git name for commits (optional)")
         configure(gitUserEmailField, placeholder: "Git email for commits (optional)")
+        configure(execEnvironmentAllowListField, placeholder: "VAR_NAME, PREFIX_*")
+        execEnvironmentAllowListField.toolTip = "Comma-separated environment names/glob patterns allowed for exec_process. Secret-like names require an exact entry."
 
         let chooseImage = NSImage(systemSymbolName: "folder", accessibilityDescription: "Choose directory")!
         let chooseButton = NSButton(image: chooseImage, target: self, action: #selector(chooseDirectory))
@@ -436,12 +440,13 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         let healthRow = fieldRow("Health listener", healthAddressField)
         let gitNameRow = fieldRow("Git name", gitUserNameField)
         let gitEmailRow = fieldRow("Git email", gitUserEmailField)
+        let execEnvironmentRow = fieldRow("Exec env allowlist", execEnvironmentAllowListField)
 
         advancedSettingsGroup.orientation = .vertical
         advancedSettingsGroup.alignment = .leading
         advancedSettingsGroup.spacing = 8
         advancedSettingsGroup.detachesHiddenViews = true
-        [profileRow, portRow, healthRow, gitNameRow, gitEmailRow].forEach {
+        [profileRow, portRow, healthRow, gitNameRow, gitEmailRow, execEnvironmentRow].forEach {
             advancedSettingsGroup.addArrangedSubview($0)
         }
         advancedSettingsGroup.isHidden = true
@@ -558,6 +563,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             healthAddressField.widthAnchor.constraint(equalToConstant: Layout.fieldWidth),
             gitUserNameField.widthAnchor.constraint(equalToConstant: Layout.fieldWidth),
             gitUserEmailField.widthAnchor.constraint(equalToConstant: Layout.fieldWidth),
+            execEnvironmentAllowListField.widthAnchor.constraint(equalToConstant: Layout.fieldWidth),
         ])
     }
 
@@ -581,6 +587,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         healthAddressField.stringValue = defaults.string(forKey: ConfigKey.healthAddress) ?? "127.0.0.1:0"
         gitUserNameField.stringValue = defaults.string(forKey: ConfigKey.gitUserName) ?? ""
         gitUserEmailField.stringValue = defaults.string(forKey: ConfigKey.gitUserEmail) ?? ""
+        execEnvironmentAllowListField.stringValue = (defaults.stringArray(forKey: ConfigKey.execEnvironmentAllowList) ?? []).joined(separator: ", ")
         let storedPolicy = defaults.string(forKey: ConfigKey.policyProfile)
         let policyProfile = storedPolicy ?? (defaults.bool(forKey: ConfigKey.enableCommands)
             ? FileMCPPolicyProfiles.legacyCommandCompatible
@@ -616,9 +623,17 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         defaults.set(healthAddressField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: ConfigKey.healthAddress)
         defaults.set(gitUserNameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: ConfigKey.gitUserName)
         defaults.set(gitUserEmailField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: ConfigKey.gitUserEmail)
+        defaults.set(execEnvironmentAllowList(), forKey: ConfigKey.execEnvironmentAllowList)
         let policyProfile = policyProfilePopup.selectedItem?.representedObject as? String ?? FileMCPPolicyProfiles.restricted
         defaults.set(policyProfile, forKey: ConfigKey.policyProfile)
         defaults.set(policyProfile == FileMCPPolicyProfiles.legacyCommandCompatible, forKey: ConfigKey.enableCommands)
+    }
+
+    private func execEnvironmentAllowList() -> [String] {
+        execEnvironmentAllowListField.stringValue
+            .components(separatedBy: CharacterSet(charactersIn: ",;\r\n"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 
     private func localPolicyConfiguration() -> LocalPolicyConfiguration {
@@ -683,7 +698,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
                 gitUserName: gitUserNameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                 gitUserEmail: gitUserEmailField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                 enableCommands: policyConfiguration.profile == FileMCPPolicyProfiles.legacyCommandCompatible,
-                policyConfiguration: policyConfiguration
+                policyConfiguration: policyConfiguration,
+                execEnvironmentAllowList: execEnvironmentAllowList()
             ))
         } catch { showError(error.localizedDescription) }
     }
@@ -740,6 +756,14 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         guard let portNumber = UInt16(port), portNumber > 0 else { tabs.selectTabViewItem(withIdentifier: "settings"); setAdvancedSettingsExpanded(true); showError("MCP port must be between 1 and 65535."); return false }
         let healthAddress = healthAddressField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard LocalMCPRuntime.normalizedHealthAddress(healthAddress) != nil else { tabs.selectTabViewItem(withIdentifier: "settings"); setAdvancedSettingsExpanded(true); showError("Health listener must use localhost, 127.0.0.1, or [::1] with a port from 0 to 65535."); return false }
+        do {
+            _ = try ExecProcessEnvironmentAuthority.normalizePatterns(execEnvironmentAllowList())
+        } catch {
+            tabs.selectTabViewItem(withIdentifier: "settings")
+            setAdvancedSettingsExpanded(true)
+            showError(error.localizedDescription)
+            return false
+        }
         return true
     }
 

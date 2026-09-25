@@ -84,7 +84,7 @@ Detailed specification: foundation graph FMG-004.
 
 ## FMG-005 - Structured exec_process + Environment Authority
 
-State: ACTIVE / CLAIMED
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-002, FMG-003, FMG-004
 Detailed specification: foundation graph FMG-005.
 
