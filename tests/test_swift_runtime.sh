@@ -1453,7 +1453,7 @@ printf '%s' "$LIST_RESULT" | plutil -extract result.structuredContent.truncated 
 
 BUDGET_LIST_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
-    -d '{"jsonrpc":"2.0","id":309,"method":"tools/call","params":{"name":"list_files","arguments":{},"_meta":{"io.filemcp/budget":{"maxVisitedEntries":10,"maxOutputItems":1}}}}')"
+    -d '{"jsonrpc":"2.0","id":309,"method":"tools/call","params":{"name":"list_files","arguments":{},"_meta":{"io.filemcp/budget":{"maxOutputItems":1}}}}')"
 printf '%s' "$BUDGET_LIST_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
 printf '%s' "$BUDGET_LIST_RESULT" | plutil -extract result.structuredContent.result raw -expect array -o - - | grep -qx '1'
 printf '%s' "$BUDGET_LIST_RESULT" | plutil -extract result.structuredContent.truncated raw -expect bool -o - - | grep -qx 'true'
