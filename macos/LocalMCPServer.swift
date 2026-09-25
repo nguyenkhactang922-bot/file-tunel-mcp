@@ -294,8 +294,9 @@ private final class LocalTools {
                 break
             }
 
-            let relative = item.path.replacingOccurrences(of: directory.path + "/", with: "")
-            if relative.contains("/") { continue }
+            // `enumerator` is rooted at `directory`; directories are pruned immediately above,
+            // so every yielded item here is an immediate child. Do not derive depth by string
+            // prefix: macOS can spell the same temp root as /var/... or /private/var/....
             collected.append((item.lastPathComponent, values?.isDirectory ?? false))
         }
 
