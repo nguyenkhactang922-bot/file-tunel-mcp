@@ -280,7 +280,8 @@ let key = Data(repeating: 0x5a, count: 32)
 let codec = try AuthenticatedCursorCodec(keyData: key, nowProvider: { now })
 let expiry = now.addingTimeInterval(60)
 let cursor = try codec.encode(tool: "search_filenames", optionsHash: "opts", rootAuthorityID: "root", generation: 7, position: "pos-42", expiresAt: expiry)
-precondition(try codec.decode(cursor, expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now) == "pos-42")
+let decodedCursorPosition = try codec.decode(cursor, expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
+precondition(decodedCursorPosition == "pos-42")
 expectFailure("tamper", containing: "cursor") {
     _ = try codec.decode(cursor + "x", expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
 }
