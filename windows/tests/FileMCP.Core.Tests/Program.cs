@@ -2211,7 +2211,10 @@ internal static class Program
         File.WriteAllText(tokenPath, "token-state", new UTF8Encoding(false));
         File.WriteAllText(otherPath, "token-state", new UTF8Encoding(false));
         var tokenRead = versionService.ReadVersioned("token.txt", FileMcpConstants.MaxFileBytes);
-        var tampered = tokenRead.VersionToken[..^1] + (tokenRead.VersionToken[^1] == 'A' ? 'B' : 'A');
+        var tokenParts = tokenRead.VersionToken.Split(':');
+        var signature = tokenParts[2];
+        signature = (signature[0] == 'A' ? 'B' : 'A') + signature[1..];
+        var tampered = tokenParts[0] + ":" + tokenParts[1] + ":" + signature;
         try
         {
             _ = versionService.VerifyExpectedVersion("token.txt", tampered);
