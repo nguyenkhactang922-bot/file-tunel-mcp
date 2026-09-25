@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.0.0",
+  "catalogVersion": "1.1.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -103,10 +103,27 @@
           "properties": {
             "result": {
               "type": "string"
+            },
+            "version": {
+              "type": "string",
+              "description": "Opaque authenticated strong file-version token for optimistic concurrency."
+            },
+            "version_strength": {
+              "type": "string",
+              "enum": [
+                "content"
+              ]
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 0
             }
           },
           "required": [
-            "result"
+            "result",
+            "version",
+            "version_strength",
+            "size_bytes"
           ],
           "additionalProperties": false
         },
@@ -183,6 +200,20 @@
             },
             "content": {
               "type": "string"
+            },
+            "version": {
+              "type": "string",
+              "description": "Opaque authenticated strong file-version token for the complete file."
+            },
+            "version_strength": {
+              "type": "string",
+              "enum": [
+                "content"
+              ]
+            },
+            "size_bytes": {
+              "type": "integer",
+              "minimum": 0
             }
           },
           "required": [
@@ -194,7 +225,10 @@
             "has_before",
             "has_after",
             "truncated",
-            "content"
+            "content",
+            "version",
+            "version_strength",
+            "size_bytes"
           ],
           "additionalProperties": false
         },

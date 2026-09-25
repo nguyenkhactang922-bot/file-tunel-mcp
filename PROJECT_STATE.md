@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-005-exec-process`
+Active branch: `chatgpt/FMG-006-file-version-source-state`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -155,12 +155,22 @@ Evidence: `docs/evidence/FMG-004_TOOL_BUDGET_CURSOR_EVIDENCE.md`.
 
 ## FMG-005 implementation
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-005-exec-process`.
-Depends: FMG-002, FMG-003, FMG-004 DONE / MAIN VERIFIED.
-Scope: Structured `exec_process` + Environment Authority only.
-Canonical catalog: 20 tools, SHA-256 `d03c6cd0c4d6582a89e408078e5f4053039f7178d172614256d510f86c137895`.
-Local proof: Windows runtime 609 assertions PASS; exec-process contract PASS; catalog/parity PASS; Release build 0 warnings / 0 errors; state contract/diff check PASS.
-Native macOS execution: local Windows host environment-blocked; GitHub native Verify required before merge.
+Final candidate head: `e7c3e1764a3bd229ac1060f628a19c5049d256cf`.
+PR: #8.
+Merge main: `ec4f762c811be658cf9d5a82e0300ee7e79ef2ba`.
+Native merged-main Verify: run `36121843677` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Local merged-main proof: Windows runtime 611 assertions PASS; catalog/parity/exec-process contract PASS; Release build 0 warnings / 0 errors.
 Evidence: `docs/evidence/FMG-005_EXEC_PROCESS_ENVIRONMENT_AUTHORITY_EVIDENCE.md`.
-Later dependent tasks remain BLOCKED until FMG-005 MAIN VERIFIED.
+
+## FMG-006 implementation
+
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+Branch: `chatgpt/FMG-006-file-version-source-state`.
+Depends: FMG-001, FMG-002 DONE / MAIN VERIFIED.
+Scope: Strong File Version + SourceStateRef only.
+Later dependent tasks remain BLOCKED by frozen graph.
+Evidence: `docs/evidence/FMG-006_FILE_VERSION_SOURCE_STATE_EVIDENCE.md`.
+Local proof: catalog/parity/FM??G-006 contract PASS; Windows runtime 627 assertions PASS; Release build 0 warnings / 0 errors.
+Native macOS: pending GitHub Verify because local Windows host has no swiftc.

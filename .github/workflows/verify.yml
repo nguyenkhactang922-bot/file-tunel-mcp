@@ -45,6 +45,7 @@ jobs:
             macos/ToolResultEnvelope.swift \
             macos/ToolExecutionContext.swift \
             macos/AuthenticatedCursorCodec.swift \
+            macos/FileVersionService.swift \
             macos/LocalMCPServer.swift \
             macos/TunnelSupervisor.swift \
             macos/LocalMCPRuntime.swift \
@@ -117,6 +118,10 @@ jobs:
       - name: Verify structured exec_process contract
         shell: pwsh
         run: ./tests/test_exec_process_contract.ps1
+
+      - name: Verify file version and source-state contract
+        shell: pwsh
+        run: ./tests/test_file_version_source_state_contract.ps1
 
       - name: Verify macOS supervisor contract
         shell: pwsh
@@ -200,6 +205,10 @@ jobs:
       - name: Verify structured exec_process contract
         shell: pwsh
         run: ./tests/test_exec_process_contract.ps1
+
+      - name: Verify file version and source-state contract
+        shell: pwsh
+        run: ./tests/test_file_version_source_state_contract.ps1
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v5

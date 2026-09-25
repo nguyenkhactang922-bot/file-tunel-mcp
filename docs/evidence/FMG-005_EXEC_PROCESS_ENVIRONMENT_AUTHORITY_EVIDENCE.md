@@ -1,6 +1,6 @@
 # FMG-005 Structured exec_process + Environment Authority Evidence
 
-Status: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+Status: DONE / MAIN VERIFIED
 
 Branch: `chatgpt/FMG-005-exec-process`
 
@@ -96,6 +96,17 @@ macOS native test coverage is wired into `tests/test_swift_runtime.sh` and GitHu
 
 Local native Swift execution is environment-blocked on this Windows host because `/bin/bash`/Swift are unavailable. This is not classified PASS or FAIL; native macOS GitHub Verify is mandatory before merge.
 
-## Remaining gate
+## Historical pre-merge gate (completed)
 
-Commit the exact candidate -> push -> PR -> require native Verify macOS + Windows x64 + Windows ARM64 -> scoped review -> merge only the exact green head -> verify merged main -> mark FMG-005 DONE / MAIN VERIFIED -> claim next READY task. Do not start FMG-006 before FMG-005 MAIN VERIFIED.
+The candidate/PR/native/merged-main gate below is complete; see Final closure.
+## Final closure
+
+- final candidate head: `e7c3e1764a3bd229ac1060f628a19c5049d256cf`;
+- PR #8 merged to fork `main` as `ec4f762c811be658cf9d5a82e0300ee7e79ef2ba`;
+- exact-head Verify run `36121187232`: macOS SUCCESS, Windows x64 SUCCESS, Windows ARM64 SUCCESS;
+- duplicate exact-head Verify run `36121182404`: macOS SUCCESS, Windows ARM64 SUCCESS, Windows x64 SUCCESS after rerunning only the flaky failed x64 job;
+- merged-main native Verify run `36121843677`: macOS SUCCESS, Windows x64 SUCCESS, Windows ARM64 SUCCESS;
+- merged-main local Windows runtime: 611 assertions PASS;
+- merged-main canonical catalog/parity/exec-process contracts: PASS;
+- merged-main Release build: 0 warnings / 0 errors;
+- FMG-005: DONE / MAIN VERIFIED.

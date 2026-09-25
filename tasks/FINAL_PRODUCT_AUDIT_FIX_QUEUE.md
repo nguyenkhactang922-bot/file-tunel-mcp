@@ -2,7 +2,7 @@
 
 Source audit: `docs/audit/FINAL_PRODUCT_INDEPENDENT_REPOSITORY_AUDIT_2026-09-22.md`
 
-Status: TECHNICAL REMEDIATION COMPLETE - FPA-004 OUT-OF-SCOPE FOR CURRENT UNSIGNED DISTRIBUTION; V11-009 AWAITS UPSTREAM INTEGRATION
+Status: TECHNICAL REMEDIATION COMPLETE; V11-009 UPSTREAM MERGE REMAINS EXTERNAL/NON-BLOCKING; FMG COMPLETE-UPGRADE PROGRAM ACTIVE
 
 | ID | Severity | State | Depends | Acceptance |
 |---|---|---|---|---|
@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: upstream WRITE/MAINTAIN authority merges PR #2; then fetch/pull upstream main and perform final merged-main confirmation for V11-009.
+AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-006 Strong File Version + SourceStateRef on chatgpt/FMG-006-file-version-source-state; do not begin FMG-007 before FMG-006 MAIN VERIFIED.
 
-FPA-004 product/release scope is resolved by ADR-0003. V11-009 is now the only remaining whole-app gate.
+FPA-004 product/release scope is resolved by ADR-0003. V11-009 upstream integration remains an external authority gate and does not block the active FMG complete-upgrade implementation program.

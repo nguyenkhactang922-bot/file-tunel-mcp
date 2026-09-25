@@ -1,6 +1,6 @@
 # FMG-005 Structured exec_process + Environment Authority Candidate Evidence
 
-Status: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+Status: DONE / MAIN VERIFIED
 Branch: chatgpt/FMG-005-exec-process
 Baseline main: 9e65230a672cac533f74d6b007f2f08ce83d8687
 
@@ -62,3 +62,7 @@ Native GitHub Verify must succeed on the exact candidate head for:
 - verify-windows-arm64.
 
 After exact-head native success: scoped review, merge to fork main, rerun merged-main Verify, then mark FMG-005 DONE / MAIN VERIFIED. FMG-006 must not start before that.
+
+## Final closure
+
+Final candidate `e7c3e1764a3bd229ac1060f628a19c5049d256cf` merged through PR #8 as main `ec4f762c811be658cf9d5a82e0300ee7e79ef2ba`. Merged-main Verify run `36121843677` succeeded on macOS, Windows x64 and Windows ARM64.

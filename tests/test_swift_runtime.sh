@@ -1084,6 +1084,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ToolResultEnvelope.swift \
     macos/ToolExecutionContext.swift \
     macos/AuthenticatedCursorCodec.swift \
+    macos/FileVersionService.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -1169,6 +1170,81 @@ try FileManager.default.createSymbolicLink(
     withDestinationURL: outside.appendingPathComponent("secret.txt")
 )
 
+func runGitFixture(_ repo: URL, _ arguments: [String]) throws {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    process.arguments = ["-C", repo.path] + arguments
+    let stderr = Pipe()
+    process.standardError = stderr
+    try process.run()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        let data = stderr.fileHandleForReading.readDataToEndOfFile()
+        throw NSError(domain: "FMG006GitFixture", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: String(decoding: data, as: UTF8.self)])
+    }
+}
+
+let versionResolver = try SafePathResolver(rootPath: root.path)
+let versionService = try FileVersionService(resolver: versionResolver, keyData: Data(repeating: 0x5A, count: 32))
+let sameURL = root.appendingPathComponent("fmg006-same.txt")
+try "AAAA".write(to: sameURL, atomically: true, encoding: .utf8)
+let sameModified = try FileManager.default.attributesOfItem(atPath: sameURL.path)[.modificationDate] as! Date
+let sameVersion = try versionService.readVersioned(relativePath: "fmg006-same.txt", maxBytes: 5_000_000)
+let sameRepeat = try versionService.readVersioned(relativePath: "fmg006-same.txt", maxBytes: 5_000_000)
+precondition(sameVersion.versionToken == sameRepeat.versionToken && sameVersion.versionFingerprint == sameRepeat.versionFingerprint)
+try "BBBB".write(to: sameURL, atomically: false, encoding: .utf8)
+try FileManager.default.setAttributes([.modificationDate: sameModified], ofItemAtPath: sameURL.path)
+do {
+    _ = try versionService.verifyExpectedVersion(relativePath: "fmg006-same.txt", token: sameVersion.versionToken, maxBytes: 5_000_000)
+    preconditionFailure("same-size same-mtime content change must stale the strong version")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("changed"), "unexpected same-size version error: \(error)")
+}
+
+let replaceURL = root.appendingPathComponent("fmg006-replace.txt")
+try "same-content".write(to: replaceURL, atomically: true, encoding: .utf8)
+let replaceModified = try FileManager.default.attributesOfItem(atPath: replaceURL.path)[.modificationDate] as! Date
+let replaceVersion = try versionService.readVersioned(relativePath: "fmg006-replace.txt", maxBytes: 5_000_000)
+let replaceNewURL = root.appendingPathComponent("fmg006-replace-new.txt")
+try "same-content".write(to: replaceNewURL, atomically: true, encoding: .utf8)
+try FileManager.default.setAttributes([.modificationDate: replaceModified], ofItemAtPath: replaceNewURL.path)
+try FileManager.default.removeItem(at: replaceURL)
+try FileManager.default.moveItem(at: replaceNewURL, to: replaceURL)
+do {
+    _ = try versionService.verifyExpectedVersion(relativePath: "fmg006-replace.txt", token: replaceVersion.versionToken, maxBytes: 5_000_000)
+    preconditionFailure("replacement object must stale the strong version")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("replaced"), "unexpected replacement version error: \(error)")
+}
+
+let tokenURL = root.appendingPathComponent("fmg006-token.txt")
+let otherURL = root.appendingPathComponent("fmg006-other.txt")
+try "token-state".write(to: tokenURL, atomically: true, encoding: .utf8)
+try "token-state".write(to: otherURL, atomically: true, encoding: .utf8)
+let tokenVersion = try versionService.readVersioned(relativePath: "fmg006-token.txt", maxBytes: 5_000_000)
+let last = tokenVersion.versionToken.last!
+let tamperedToken = String(tokenVersion.versionToken.dropLast()) + (last == "A" ? "B" : "A")
+do {
+    _ = try versionService.verifyExpectedVersion(relativePath: "fmg006-token.txt", token: tamperedToken, maxBytes: 5_000_000)
+    preconditionFailure("tampered file version token must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("authentication"), "unexpected token authentication error: \(error)")
+}
+do {
+    _ = try versionService.verifyExpectedVersion(relativePath: "fmg006-other.txt", token: tokenVersion.versionToken, maxBytes: 5_000_000)
+    preconditionFailure("file version token path replay must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("different path"), "unexpected path replay error: \(error)")
+}
+
+let sourceRepo = root.appendingPathComponent("source-state-repo")
+try FileManager.default.createDirectory(at: sourceRepo, withIntermediateDirectories: true)
+try runGitFixture(sourceRepo, ["init", "-b", "main", "--template="])
+try "alpha\n".write(to: sourceRepo.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+try "bravo\n".write(to: sourceRepo.appendingPathComponent("b.txt"), atomically: true, encoding: .utf8)
+try runGitFixture(sourceRepo, ["add", "."])
+try runGitFixture(sourceRepo, ["-c", "user.name=FileMCP Test", "-c", "user.email=filemcp@example.invalid", "commit", "-m", "source-state baseline"])
+
 let localAuthToken = String(repeating: "a", count: 64)
 
 do {
@@ -1191,6 +1267,35 @@ let safeGitServer = try LocalMCPServer(
     localAuthToken: localAuthToken,
     log: { _ in }
 )
+let repositorySourceBaseline = try safeGitServer.captureSourceStateRefForTest(repoPath: "source-state-repo")
+let narrowSourceBaseline = try safeGitServer.captureSourceStateRefForTest(repoPath: "source-state-repo", relevantPaths: ["a.txt"])
+precondition(repositorySourceBaseline["provider_version"] as? String == "source-state-v1")
+precondition(narrowSourceBaseline["scope"] as? String == "relevant_files")
+precondition(narrowSourceBaseline["head_oid"] is NSNull)
+let narrowJSON = String(decoding: try JSONSerialization.data(withJSONObject: narrowSourceBaseline, options: [.sortedKeys]), as: UTF8.self)
+precondition(!narrowJSON.contains("alpha") && !narrowJSON.contains("a.txt"), "SourceStateRef must persist no raw source content/path")
+
+try "BRAVO\n".write(to: sourceRepo.appendingPathComponent("b.txt"), atomically: true, encoding: .utf8)
+let narrowAfterUnrelatedTracked = try safeGitServer.captureSourceStateRefForTest(repoPath: "source-state-repo", relevantPaths: ["a.txt"])
+let repositoryAfterTracked = try safeGitServer.captureSourceStateRefForTest(repoPath: "source-state-repo")
+precondition(narrowAfterUnrelatedTracked["source_state_id"] as? String == narrowSourceBaseline["source_state_id"] as? String)
+precondition(repositoryAfterTracked["source_state_id"] as? String != repositorySourceBaseline["source_state_id"] as? String)
+
+try "ALPHA\n".write(to: sourceRepo.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+let narrowAfterRelevantTracked = try safeGitServer.captureSourceStateRefForTest(repoPath: "source-state-repo", relevantPaths: ["a.txt"])
+precondition(narrowAfterRelevantTracked["source_state_id"] as? String != narrowSourceBaseline["source_state_id"] as? String)
+
+let missingRelevant = try safeGitServer.captureSourceStateRefForTest(repoPath: "source-state-repo", relevantPaths: ["u.txt"])
+try "untracked relevant\n".write(to: sourceRepo.appendingPathComponent("u.txt"), atomically: true, encoding: .utf8)
+let relevantUntracked = try safeGitServer.captureSourceStateRefForTest(repoPath: "source-state-repo", relevantPaths: ["u.txt"])
+precondition(relevantUntracked["source_state_id"] as? String != missingRelevant["source_state_id"] as? String)
+
+let narrowBeforeUnrelatedUntracked = try safeGitServer.captureSourceStateRefForTest(repoPath: "source-state-repo", relevantPaths: ["a.txt"])
+try "unrelated untracked\n".write(to: sourceRepo.appendingPathComponent("unrelated.txt"), atomically: true, encoding: .utf8)
+let narrowAfterUnrelatedUntracked = try safeGitServer.captureSourceStateRefForTest(repoPath: "source-state-repo", relevantPaths: ["a.txt"])
+precondition(narrowAfterUnrelatedUntracked["source_state_id"] as? String == narrowBeforeUnrelatedUntracked["source_state_id"] as? String)
+print("swift-file-version-source-state: ok")
+
 let server = try LocalMCPServer(
     port: 18088,
     allowedDirectory: root.path,
@@ -1235,20 +1340,40 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ToolResultEnvelope.swift \
     macos/ToolExecutionContext.swift \
     macos/AuthenticatedCursorCodec.swift \
+    macos/FileVersionService.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"
 printf 'outside-template-marker\n' > "$TMP_DIR/git-template/copied-from-template"
 GIT_TEMPLATE_DIR="$TMP_DIR/git-template" "$TMP_DIR/server-test" &
 SERVER_PID=$!
-sleep 1
+python3 - <<'PY'
+import socket
+import time
+
+ports = (18088, 18089, 18090)
+deadline = time.monotonic() + 15.0
+pending = set(ports)
+while pending and time.monotonic() < deadline:
+    for port in tuple(pending):
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                pending.remove(port)
+        except OSError:
+            pass
+    if pending:
+        time.sleep(0.05)
+if pending:
+    raise SystemExit(f"macOS server fixtures did not become ready on ports: {sorted(pending)}")
+print("macos-server-fixture-ready: ok")
+PY
 
 BASE_URL="http://127.0.0.1:18088/mcp"
 SAFE_BASE_URL="http://127.0.0.1:18089/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.0.0"
+CATALOG_VERSION="1.1.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
@@ -1643,6 +1768,9 @@ READ_RESULT="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$READ_RESULT" | grep -q 'hello swift'
 
 printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.result raw -expect string -o - - | grep -qx 'hello swift'
+printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.version raw -expect string -o - - | grep -Eq '^v1:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'
+printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.version_strength raw -expect string -o - - | grep -qx 'content'
+printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.size_bytes raw -expect integer -o - - | grep -qx '11'
 printf '%s' "$READ_RESULT" | python3 -c 'import json,sys,re; d=json.load(sys.stdin); e=d["result"]["_meta"]["io.filemcp/result"]; assert e["schemaVersion"]=="1.0.0" and e["status"]=="success"; assert re.fullmatch(r"op_[0-9a-f]{32}", e["operationId"]); assert e["truncation"]=={"truncated":False,"reason":"none"}; assert e["usage"]["contentItems"]==1 and e["warnings"]==[]'
 echo "mcp-legacy-read-envelope: ok"
 
@@ -1802,6 +1930,8 @@ printf '%s' "$RANGE_RESULT" | grep -q 'needle-target'
 printf '%s' "$RANGE_RESULT" | grep -q 'func beta'
 printf '%s' "$RANGE_RESULT" | plutil -extract result.structuredContent.start_line raw -expect integer -o - - | grep -qx '3'
 printf '%s' "$RANGE_RESULT" | plutil -extract result.structuredContent.end_line raw -expect integer -o - - | grep -qx '7'
+printf '%s' "$RANGE_RESULT" | plutil -extract result.structuredContent.version raw -expect string -o - - | grep -Eq '^v1:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'
+printf '%s' "$RANGE_RESULT" | plutil -extract result.structuredContent.version_strength raw -expect string -o - - | grep -qx 'content'
 
 RANGE_LIMIT_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
