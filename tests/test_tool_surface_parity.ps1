@@ -14,7 +14,7 @@ if ($Catalog.catalogVersion -ne "1.0.0") { throw "Unexpected catalogVersion: $($
 if ($Catalog.instructionVersion -ne "1.0.0") { throw "Unexpected instructionVersion: $($Catalog.instructionVersion)" }
 if ($Catalog.protocolVersions.modern -ne "2026-07-28") { throw "Canonical modern protocol drifted." }
 $Tools = @($Catalog.tools)
-if ($Tools.Count -ne 19) { throw "Expected 19 canonical tools, got $($Tools.Count)." }
+if ($Tools.Count -ne 20) { throw "Expected 20 canonical tools, got $($Tools.Count)." }
 $Names = @($Tools | ForEach-Object { [string]$_.name })
 if (($Names | Sort-Object -Unique).Count -ne $Names.Count) { throw "Canonical tool names are not unique." }
 

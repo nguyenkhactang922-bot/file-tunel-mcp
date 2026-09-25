@@ -140,7 +140,8 @@ internal sealed class ServerPolicy
         switch (configuration.Profile)
         {
             case FileMcpPolicyProfiles.Restricted:
-                return !metadata.Capabilities.Contains("process.shell", StringComparer.Ordinal);
+                return !metadata.Capabilities.Contains("process.shell", StringComparer.Ordinal) &&
+                       !metadata.Capabilities.Contains("process.exec", StringComparer.Ordinal);
             case FileMcpPolicyProfiles.LegacyCommandCompatible:
                 return true;
             case FileMcpPolicyProfiles.WorkspaceAuto:

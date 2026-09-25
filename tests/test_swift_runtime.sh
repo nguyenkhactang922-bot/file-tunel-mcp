@@ -173,13 +173,16 @@ precondition(restricted.isAllowed("read_file"))
 precondition(restricted.isAllowed("write_file"))
 precondition(restricted.isAllowed("git_push"))
 precondition(!restricted.isAllowed("run_command"))
+precondition(!restricted.isAllowed("exec_process"))
 precondition(!restricted.legacyUnsafeGitCompatibility)
 precondition(restricted.hash == "174b1d27efe868c387b87923665b8d53270f40b48e890e67f40720620d729156")
 expectDenied(restricted, "run_command")
+expectDenied(restricted, "exec_process")
 
 let legacy = try ServerPolicy.fromLegacy(enableCommands: true)
 precondition(legacy.profile == FileMCPPolicyProfiles.legacyCommandCompatible)
 precondition(legacy.isAllowed("run_command"))
+precondition(legacy.isAllowed("exec_process"))
 precondition(legacy.legacyUnsafeGitCompatibility)
 precondition(!FileMCPPolicyProfiles.isUserSelectable(FileMCPPolicyProfiles.legacyCommandCompatible))
 
@@ -188,9 +191,10 @@ precondition(workspaceAuto.isAllowed("write_file"))
 precondition(workspaceAuto.isAllowed("git_commit"))
 precondition(!workspaceAuto.isAllowed("git_push"))
 precondition(!workspaceAuto.isAllowed("run_command"))
+precondition(!workspaceAuto.isAllowed("exec_process"))
 let workspaceDefs = try workspaceAuto.filterDefinitions(CanonicalToolCatalog.shared.toolDefinitions(handler: "local_tools", commandsEnabled: true))
 let workspaceNames = Set(workspaceDefs.compactMap { $0["name"] as? String })
-precondition(!workspaceNames.contains("run_command") && !workspaceNames.contains("git_push") && workspaceNames.contains("write_file"))
+precondition(!workspaceNames.contains("run_command") && !workspaceNames.contains("exec_process") && !workspaceNames.contains("git_push") && workspaceNames.contains("write_file"))
 
 let custom = try ServerPolicy(configuration: LocalPolicyConfiguration(
     profile: FileMCPPolicyProfiles.custom,
@@ -202,6 +206,17 @@ precondition(custom.isAllowed("filemcp_observability_connect"))
 precondition(!custom.isAllowed("write_file"))
 precondition(!custom.isAllowed("git_push"))
 precondition(!custom.isAllowed("run_command"))
+precondition(!custom.isAllowed("exec_process"))
+
+let customExec = try ServerPolicy(configuration: LocalPolicyConfiguration(
+    profile: FileMCPPolicyProfiles.custom,
+    customMaxRisk: "high",
+    customAllowedEffects: ["execute"],
+    customAllowNetworkOpenWorld: true,
+    customAllowShell: false
+))
+precondition(customExec.isAllowed("exec_process"))
+precondition(!customExec.isAllowed("run_command"))
 
 let prepared = custom.capture()
 let generation = custom.generation
@@ -370,6 +385,22 @@ usleep(200_000)
 precondition(childPID <= 0 || kill(childPID, 0) != 0, "timed-out child process survived")
 print("process-tree-timeout: ok")
 
+let cancelPIDFile = FileManager.default.temporaryDirectory.appendingPathComponent("filemcp-test-cancel-child.pid").path
+try? FileManager.default.removeItem(atPath: cancelPIDFile)
+let cancelCommand = "sh -c 'sleep 20 & echo $! > \(cancelPIDFile); wait'"
+let cancelled = try ProcessRunner.run(
+    executable: "/bin/sh",
+    arguments: ["-lc", cancelCommand],
+    timeoutSeconds: 20,
+    shouldCancel: { FileManager.default.fileExists(atPath: cancelPIDFile) }
+)
+precondition(cancelled.cancelled && !cancelled.timedOut, "cooperative process cancellation state")
+let cancelChildText = try String(contentsOfFile: cancelPIDFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+let cancelChildPID = pid_t(Int(cancelChildText) ?? 0)
+usleep(200_000)
+precondition(cancelChildPID <= 0 || kill(cancelChildPID, 0) != 0, "cancelled child process survived")
+print("process-tree-cancellation: ok")
+
 let backgroundPIDFile = FileManager.default.temporaryDirectory.appendingPathComponent("filemcp-test-background-child.pid").path
 try? FileManager.default.removeItem(atPath: backgroundPIDFile)
 let background = try ProcessRunner.run(
@@ -446,6 +477,61 @@ swiftc -o "$TMP_DIR/process-test" \
     "$TMP_DIR/main.swift"
 
 "$TMP_DIR/process-test"
+
+cat >"$TMP_DIR/main.swift" <<'SWIFT'
+import Foundation
+
+let host = [
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/tmp/home",
+    "FMG005_PLAIN": "plain-pass",
+    "FMG005_SECRET_TOKEN": "secret-pass",
+]
+let wildcard = try ExecProcessEnvironmentAuthority(patterns: ["FMG005_*"])
+let wildcardEnvironment = try wildcard.build(host: host)
+precondition(wildcardEnvironment["FMG005_PLAIN"] == "plain-pass", "wildcard pass-through keeps ordinary host environment")
+precondition(wildcardEnvironment["FMG005_SECRET_TOKEN"] == nil, "wildcard pass-through suppresses secret-like host environment")
+
+let exact = try ExecProcessEnvironmentAuthority(patterns: ["FMG005_SECRET_TOKEN", "FMG005_OVERRIDE"])
+let exactEnvironment = try exact.build(overrides: ["FMG005_OVERRIDE": "request-value"], host: host)
+precondition(exactEnvironment["FMG005_SECRET_TOKEN"] == "secret-pass", "exact allowlist permits secret-like host variable")
+precondition(exactEnvironment["FMG005_OVERRIDE"] == "request-value", "exact allowlist permits bounded request override")
+
+do {
+    _ = try exact.build(overrides: ["FMG005_FORBIDDEN": "blocked"], host: host)
+    preconditionFailure("forbidden environment override must be rejected")
+} catch {
+    precondition(error.localizedDescription.contains("not locally allowed"), "unexpected forbidden override error: \(error)")
+}
+
+do {
+    _ = try exact.build(overrides: ["PATH": "/tmp/untrusted"], host: host)
+    preconditionFailure("minimal baseline override must require explicit local authority")
+} catch {
+    precondition(error.localizedDescription.contains("not locally allowed"), "unexpected baseline override error: \(error)")
+}
+
+do {
+    _ = try ExecProcessEnvironmentAuthority(patterns: ["BAD PATTERN"])
+    preconditionFailure("invalid allowlist pattern must be rejected")
+} catch {
+    precondition(error.localizedDescription.contains("Invalid exec_process environment allowlist pattern"), "unexpected pattern error: \(error)")
+}
+
+let manyHost = Dictionary(uniqueKeysWithValues: (0...ExecProcessEnvironmentAuthority.maxForwardedVariables).map { ("FMG005_MANY_\($0)", "x") })
+let broad = try ExecProcessEnvironmentAuthority(patterns: ["FMG005_MANY_*"])
+do {
+    _ = try broad.build(host: manyHost)
+    preconditionFailure("wildcard pass-through count bound was not enforced")
+} catch {
+    precondition(error.localizedDescription.contains("forwarded variables"), "unexpected environment count error: \(error)")
+}
+
+print("exec-process-environment-authority: ok")
+SWIFT
+
+swiftc -o "$TMP_DIR/exec-env-test"     macos/ExecProcessEnvironmentAuthority.swift     "$TMP_DIR/main.swift"
+"$TMP_DIR/exec-env-test"
 
 cat >"$TMP_DIR/main.swift" <<'SWIFT'
 import Foundation
@@ -991,6 +1077,7 @@ SWIFT
 
 swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ProcessRunner.swift \
+    macos/ExecProcessEnvironmentAuthority.swift \
     macos/LogicalChatCorrelation.swift \
     macos/ToolCatalog.swift \
     macos/ServerPolicy.swift \
@@ -1009,6 +1096,7 @@ import Foundation
 let root = FileManager.default.temporaryDirectory.appendingPathComponent("filemcp-server-test")
 try? FileManager.default.removeItem(at: root)
 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+try FileManager.default.createDirectory(at: root.appendingPathComponent("exec-work"), withIntermediateDirectories: true)
 try "hello swift".write(to: root.appendingPathComponent("hello.txt"), atomically: true, encoding: .utf8)
 try """
 import Foundation
@@ -1110,7 +1198,8 @@ let server = try LocalMCPServer(
     gitUserEmail: "test@example.com",
     enableCommands: true,
     localAuthToken: localAuthToken,
-    log: { _ in }
+    log: { _ in },
+    execEnvironmentAllowList: ["FMG005_OVERRIDE"]
 )
 let boundedServer = try LocalMCPServer(
     port: 18090,
@@ -1139,6 +1228,7 @@ SWIFT
 
 swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ProcessRunner.swift \
+    macos/ExecProcessEnvironmentAuthority.swift \
     macos/LogicalChatCorrelation.swift \
     macos/ToolCatalog.swift \
     macos/ServerPolicy.swift \
@@ -1290,6 +1380,14 @@ if printf '%s' "$SAFE_TOOLS" | grep -q '"name":"run_command"'; then
     echo "run_command must not be exposed while command execution is disabled" >&2
     exit 1
 fi
+if printf '%s' "$SAFE_TOOLS" | grep -q '"name":"exec_process"'; then
+    echo "exec_process must not be exposed while restricted policy is active" >&2
+    exit 1
+fi
+
+FULL_TOOLS="$(curl -fsS -X POST "$BASE_URL"     -H 'Content-Type: application/json'     -d '{"jsonrpc":"2.0","id":3891,"method":"tools/list","params":{}}')"
+printf '%s' "$FULL_TOOLS" | grep -q '"name":"exec_process"'
+printf '%s' "$FULL_TOOLS" | grep -q '"name":"run_command"'
 
 printf '%s' "$SAFE_TOOLS" | grep -q '"name":"filemcp_observability_connect"'
 printf '%s' "$SAFE_TOOLS" | grep -q '"_filemcp_chat"'
@@ -1325,6 +1423,103 @@ UNBOUND_READ="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$UNBOUND_READ" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
 printf '%s' "$UNBOUND_READ" | plutil -extract result.structuredContent.result raw -expect string -o - - | grep -qx 'hello swift'
 echo "logical-chat-facade-legacy: ok"
+
+EXEC_ARGV="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":430,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/bin/echo","arguments":["$HOME;echo hacked"],"timeout_seconds":5,"output_limit_bytes":10000}}}')"
+if ! printf '%s' "$EXEC_ARGV" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'; then
+    echo "exec_process argv response: $EXEC_ARGV" >&2
+    exit 1
+fi
+printf '%s' "$EXEC_ARGV" | plutil -extract result.structuredContent.terminal_state raw -expect string -o - - | grep -qx 'exited'
+printf '%s' "$EXEC_ARGV" | plutil -extract result.structuredContent.exit_code raw -expect integer -o - - | grep -qx '0'
+printf '%s' "$EXEC_ARGV" | plutil -extract result.structuredContent.stdout raw -expect string -o - - | grep -Fqx '$HOME;echo hacked'
+echo "mcp-exec-argv: ok"
+
+EXEC_CWD="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":431,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/bin/pwd","arguments":[],"cwd":"exec-work","timeout_seconds":5}}}')"
+printf '%s' "$EXEC_CWD" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+EXEC_CWD_ACTUAL="$(printf '%s' "$EXEC_CWD" | plutil -extract result.structuredContent.stdout raw -expect string -o - - | tr -d '\r\n')"
+EXEC_CWD_EXPECTED="$(cd "$SERVER_ROOT/exec-work" && pwd -P)"
+if [ "$EXEC_CWD_ACTUAL" != "$EXEC_CWD_EXPECTED" ]; then
+    echo "exec_process cwd mismatch: actual=$EXEC_CWD_ACTUAL expected=$EXEC_CWD_EXPECTED" >&2
+    exit 1
+fi
+echo "mcp-exec-cwd: ok"
+
+EXEC_CWD_ESCAPE="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":432,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/bin/pwd","arguments":[],"cwd":"../filemcp-server-outside","timeout_seconds":5}}}')"
+printf '%s' "$EXEC_CWD_ESCAPE" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$EXEC_CWD_ESCAPE" | grep -q 'outside the shared directory'
+echo "mcp-exec-cwd-escape: ok"
+
+EXEC_NONZERO="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":433,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/false","arguments":[],"timeout_seconds":5}}}')"
+printf '%s' "$EXEC_NONZERO" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$EXEC_NONZERO" | plutil -extract result.structuredContent.terminal_state raw -expect string -o - - | grep -qx 'exited'
+printf '%s' "$EXEC_NONZERO" | plutil -extract result.structuredContent.exit_code raw -expect integer -o - - | grep -qx '1'
+echo "mcp-exec-nonzero: ok"
+
+EXEC_TIMEOUT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":434,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/bin/sleep","arguments":["5"],"timeout_seconds":1}}}')"
+printf '%s' "$EXEC_TIMEOUT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$EXEC_TIMEOUT" | plutil -extract result.structuredContent.terminal_state raw -expect string -o - - | grep -qx 'timed_out'
+printf '%s' "$EXEC_TIMEOUT" | plutil -extract result.structuredContent.timed_out raw -expect bool -o - - | grep -qx 'true'
+echo "mcp-exec-timeout: ok"
+
+EXEC_CANCELLED="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":4341,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/bin/sleep","arguments":["5"],"timeout_seconds":5},"_meta":{"io.filemcp/budget":{"timeoutMs":100}}}}')"
+printf '%s' "$EXEC_CANCELLED" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$EXEC_CANCELLED" | plutil -extract result.structuredContent.terminal_state raw -expect string -o - - | grep -qx 'cancelled'
+printf '%s' "$EXEC_CANCELLED" | plutil -extract result.structuredContent.cancelled raw -expect bool -o - - | grep -qx 'true'
+echo "mcp-exec-budget-cancel: ok"
+
+EXEC_BOUNDED="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":435,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/yes","arguments":["FMG005"],"timeout_seconds":1,"output_limit_bytes":1000}}}')"
+printf '%s' "$EXEC_BOUNDED" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$EXEC_BOUNDED" | plutil -extract result.structuredContent.stdout_truncated raw -expect bool -o - - | grep -qx 'true'
+EXEC_OMITTED="$(printf '%s' "$EXEC_BOUNDED" | plutil -extract result.structuredContent.stdout_omitted_bytes raw -expect integer -o - -)"
+[ "$EXEC_OMITTED" -gt 0 ]
+echo "mcp-exec-output-bound: ok"
+
+EXEC_NUL="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":436,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/printf","arguments":["bad\u0000argument"],"timeout_seconds":5}}}')"
+printf '%s' "$EXEC_NUL" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$EXEC_NUL" | grep -q 'NUL byte'
+echo "mcp-exec-nul: ok"
+
+EXEC_ARGV_LIMIT_BODY="$(python3 - <<'PY'
+import json
+print(json.dumps({"jsonrpc":"2.0","id":4361,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/printf","arguments":["a"*20000,"b"*20000],"timeout_seconds":5}}}))
+PY
+)"
+EXEC_ARGV_LIMIT="$(curl -fsS -X POST "$BASE_URL" -H 'Content-Type: application/json' --data-binary "$EXEC_ARGV_LIMIT_BODY")"
+printf '%s' "$EXEC_ARGV_LIMIT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$EXEC_ARGV_LIMIT" | grep -q 'total argument size'
+echo "mcp-exec-argv-limit: ok"
+
+EXEC_ENV_FORBIDDEN="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":437,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/env","arguments":[],"environment":{"FMG005_FORBIDDEN":"blocked"},"timeout_seconds":5}}}')"
+printf '%s' "$EXEC_ENV_FORBIDDEN" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$EXEC_ENV_FORBIDDEN" | grep -q 'not locally allowed'
+echo "mcp-exec-env-deny: ok"
+
+EXEC_ENV_ALLOWED="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":438,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/env","arguments":[],"environment":{"FMG005_OVERRIDE":"request-value"},"timeout_seconds":5}}}')"
+printf '%s' "$EXEC_ENV_ALLOWED" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$EXEC_ENV_ALLOWED" | plutil -extract result.structuredContent.stdout raw -expect string -o - - | grep -q '^FMG005_OVERRIDE=request-value$'
+echo "mcp-exec-env-allow: ok"
+
+echo "macos-exec-process: ok"
 
 NEGATIVE_LENGTH="$(printf 'POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:18088\r\nContent-Type: application/json\r\nContent-Length: -1\r\n\r\n' | nc 127.0.0.1 18088)"
 printf '%s' "$NEGATIVE_LENGTH" | grep -q 'HTTP/1.1 400 Bad Request'

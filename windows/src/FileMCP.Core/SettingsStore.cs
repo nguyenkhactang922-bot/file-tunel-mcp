@@ -99,6 +99,7 @@ public sealed class SettingsStore
         settings.CustomPolicyAllowNetworkOpenWorld = normalizedPolicy.CustomAllowNetworkOpenWorld;
         settings.CustomPolicyAllowShell = normalizedPolicy.CustomAllowShell;
         settings.EnableCommands = normalizedPolicy.Profile == FileMcpPolicyProfiles.LegacyCommandCompatible;
+        settings.ExecEnvironmentAllowList = ExecProcessEnvironmentAuthority.NormalizePatterns(settings.ExecEnvironmentAllowList);
 
         var existing = settings.Workspaces
             .Where(item => !string.IsNullOrWhiteSpace(item.Key))

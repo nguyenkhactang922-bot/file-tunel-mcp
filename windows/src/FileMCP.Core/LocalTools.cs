@@ -10,6 +10,7 @@ internal sealed partial class LocalTools
     private readonly string _gitUserName;
     private readonly string _gitUserEmail;
     private readonly ServerPolicy _policy;
+    private readonly ExecProcessEnvironmentAuthority _execEnvironment;
     private readonly bool _enableCommands;
     private readonly string? _safeGitEmptyFile;
     private readonly string? _safeGitHooksDirectory;
@@ -21,7 +22,7 @@ internal sealed partial class LocalTools
     {
         "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "git_init", "git_status", "git_log", "git_diff",
-        "git_add", "git_commit", "git_push", "run_command",
+        "git_add", "git_commit", "git_push", "exec_process", "run_command",
     };
     private static readonly HashSet<string> SerializedToolNames = new(StringComparer.Ordinal)
     {
@@ -30,7 +31,7 @@ internal sealed partial class LocalTools
     };
     private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "search_content", "search_filenames",
+        "list_files", "search_content", "search_filenames", "exec_process",
     };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -38,16 +39,17 @@ internal sealed partial class LocalTools
     };
 
     public LocalTools(string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands)
-        : this(allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands))
+        : this(allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands), null)
     {
     }
 
-    internal LocalTools(string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy)
+    internal LocalTools(string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy, IReadOnlyList<string>? execEnvironmentAllowList = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _gitUserName = gitUserName;
         _gitUserEmail = gitUserEmail;
         _policy = policy;
+        _execEnvironment = new ExecProcessEnvironmentAuthority(execEnvironmentAllowList);
         _enableCommands = _policy.LegacyUnsafeGitCompatibility;
         CanonicalToolCatalog.ValidateHandlerCoverage("local_tools", HandlerToolNames);
         if (!_enableCommands)
@@ -99,6 +101,15 @@ internal sealed partial class LocalTools
                     GetBool(arguments, "append", false))),
                 "delete_file" => StringOutput(DeleteFile(GetRequiredString(arguments, "relative_path"))),
                 "delete_directory" => StringOutput(DeleteDirectory(GetRequiredString(arguments, "relative_path"))),
+                "exec_process" => ObjectOutput(await ExecProcessAsync(
+                    GetRequiredString(arguments, "executable"),
+                    GetStringArray(arguments, "arguments"),
+                    GetString(arguments, "cwd", ""),
+                    GetStringDictionary(arguments, "environment"),
+                    GetInt(arguments, "timeout_seconds", ProcessRunner.DefaultCommandTimeoutSeconds),
+                    GetInt(arguments, "output_limit_bytes", FileMcpConstants.MaxToolProcessOutputBytes),
+                    preparedPolicy,
+                    effectiveCancellation).ConfigureAwait(false)),
                 "run_command" => StringOutput(await RunCommandAsync(
                     GetRequiredString(arguments, "command"), GetString(arguments, "cwd", ""),
                     GetInt(arguments, "timeout_seconds", ProcessRunner.DefaultCommandTimeoutSeconds), cancellationToken).ConfigureAwait(false)),
@@ -542,6 +553,60 @@ internal sealed partial class LocalTools
         return $"Deleted directory {relativePath}";
     }
 
+    private async Task<JsonObject> ExecProcessAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string cwd,
+        IReadOnlyDictionary<string, string> environmentOverrides,
+        int timeoutSeconds,
+        int outputLimitBytes,
+        PolicySnapshot preparedPolicy,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(executable)) throw new FileMcpException("executable must not be empty");
+        if (executable.Length > 4_096) throw new FileMcpException("executable is too long");
+        if (arguments.Count > 256) throw new FileMcpException("exec_process supports at most 256 arguments");
+        if (arguments.Any(value => value.Length > 32_768)) throw new FileMcpException("exec_process argument exceeds 32768 characters");
+        if (arguments.Sum(value => value.Length) > 32_768) throw new FileMcpException("exec_process total argument size exceeds 32768 characters");
+        if (timeoutSeconds is < 1 or > ProcessRunner.MaxCommandTimeoutSeconds) throw new FileMcpException($"timeout_seconds must be 1..{ProcessRunner.MaxCommandTimeoutSeconds}");
+        if (outputLimitBytes is < 1 or > FileMcpConstants.MaxToolProcessOutputBytes) throw new FileMcpException($"output_limit_bytes must be 1..{FileMcpConstants.MaxToolProcessOutputBytes}");
+
+        var workdir = _resolver.Resolve(cwd);
+        if (!Directory.Exists(workdir)) throw new FileMcpException($"No such working directory: {(string.IsNullOrEmpty(cwd) ? "." : cwd)}");
+        var environment = _execEnvironment.Build(environmentOverrides);
+
+        await _commandSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // Re-authorize immediately before the side effect so a prepared request cannot execute
+            // after local policy generation/hash changes.
+            _policy.Authorize("exec_process", preparedPolicy);
+            var result = await ProcessRunner.RunAsync(
+                executable,
+                arguments,
+                workdir,
+                environment,
+                timeoutSeconds,
+                outputLimitBytes,
+                cancellationToken).ConfigureAwait(false);
+            var terminalState = result.Cancelled ? "cancelled" : result.TimedOut ? "timed_out" : "exited";
+            return new JsonObject
+            {
+                ["terminal_state"] = terminalState,
+                ["exit_code"] = result.ExitCode,
+                ["stdout"] = result.Stdout,
+                ["stderr"] = result.Stderr,
+                ["timed_out"] = result.TimedOut,
+                ["cancelled"] = result.Cancelled,
+                ["stdout_truncated"] = result.StdoutTruncated,
+                ["stderr_truncated"] = result.StderrTruncated,
+                ["stdout_omitted_bytes"] = result.StdoutOmittedBytes,
+                ["stderr_omitted_bytes"] = result.StderrOmittedBytes,
+            };
+        }
+        finally { _commandSlots.Release(); }
+    }
+
     private async Task<string> RunCommandAsync(string command, string cwd, int timeoutSeconds, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command)) throw new FileMcpException("command must not be empty");
@@ -599,6 +664,36 @@ internal sealed partial class LocalTools
     private static bool GetBool(JsonObject args, string key, bool fallback) => args[key] is JsonValue value && value.TryGetValue<bool>(out var result) ? result : fallback;
     private static int GetInt(JsonObject args, string key, int fallback) => args[key] is JsonValue value && value.TryGetValue<int>(out var result) ? result : fallback;
 
+    private static IReadOnlyList<string> GetStringArray(JsonObject args, string key)
+    {
+        if (args[key] is null) return [];
+        if (args[key] is not JsonArray array) throw new FileMcpException($"Missing or invalid argument: {key}");
+        if (array.Count > 256) throw new FileMcpException($"Argument {key} supports at most 256 items");
+        var result = new List<string>(array.Count);
+        foreach (var node in array)
+        {
+            if (node is not JsonValue value || !value.TryGetValue<string>(out var item) || item is null)
+                throw new FileMcpException($"Missing or invalid argument: {key}");
+            result.Add(item);
+        }
+        return result;
+    }
+
+    private static IReadOnlyDictionary<string, string> GetStringDictionary(JsonObject args, string key)
+    {
+        if (args[key] is null) return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (args[key] is not JsonObject obj) throw new FileMcpException($"Missing or invalid argument: {key}");
+        if (obj.Count > ExecProcessEnvironmentAuthority.MaxOverrides) throw new FileMcpException($"Argument {key} supports at most {ExecProcessEnvironmentAuthority.MaxOverrides} entries");
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in obj)
+        {
+            if (pair.Value is not JsonValue value || !value.TryGetValue<string>(out var item) || item is null)
+                throw new FileMcpException($"Missing or invalid argument: {key}");
+            result[pair.Key] = item;
+        }
+        return result;
+    }
+
     private void ValidateArguments(string toolName, JsonObject arguments)
     {
         var definition = ToolDefinitions.OfType<JsonObject>().FirstOrDefault(tool => tool["name"]?.GetValue<string>() == toolName)
@@ -615,9 +710,16 @@ internal sealed partial class LocalTools
         }
         foreach (var pair in arguments)
         {
-            var property = properties[pair.Key]!.AsObject(); var type = property["type"]!.GetValue<string>(); var valid = pair.Value is JsonValue v && type switch
+            var property = properties[pair.Key]!.AsObject();
+            var type = property["type"]!.GetValue<string>();
+            var valid = type switch
             {
-                "string" => v.TryGetValue<string>(out _), "boolean" => v.TryGetValue<bool>(out _), "integer" => v.TryGetValue<int>(out _), _ => true,
+                "string" => pair.Value is JsonValue stringValue && stringValue.TryGetValue<string>(out _),
+                "boolean" => pair.Value is JsonValue boolValue && boolValue.TryGetValue<bool>(out _),
+                "integer" => pair.Value is JsonValue intValue && intValue.TryGetValue<int>(out _),
+                "array" => pair.Value is JsonArray,
+                "object" => pair.Value is JsonObject,
+                _ => true,
             };
             if (!valid) throw new FileMcpException($"Missing or invalid argument: {pair.Key}");
             if (type == "integer")
@@ -625,6 +727,14 @@ internal sealed partial class LocalTools
                 var number = pair.Value!.GetValue<int>();
                 if (property["minimum"] is JsonValue min && number < min.GetValue<int>()) throw new FileMcpException($"Argument {pair.Key} must be >= {min.GetValue<int>()}");
                 if (property["maximum"] is JsonValue max && number > max.GetValue<int>()) throw new FileMcpException($"Argument {pair.Key} must be <= {max.GetValue<int>()}");
+            }
+            else if (type == "array" && pair.Value is JsonArray array && property["maxItems"] is JsonValue maxItems && array.Count > maxItems.GetValue<int>())
+            {
+                throw new FileMcpException($"Argument {pair.Key} supports at most {maxItems.GetValue<int>()} items");
+            }
+            else if (type == "object" && pair.Value is JsonObject obj && property["maxProperties"] is JsonValue maxProperties && obj.Count > maxProperties.GetValue<int>())
+            {
+                throw new FileMcpException($"Argument {pair.Key} supports at most {maxProperties.GetValue<int>()} entries");
             }
         }
     }

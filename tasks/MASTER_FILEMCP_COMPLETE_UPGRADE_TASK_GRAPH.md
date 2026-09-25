@@ -78,13 +78,13 @@ Detailed specification: foundation graph FMG-003.
 
 ## FMG-004 - ToolBudget / Cancellation / Cursor Core
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: FMG-002
 Detailed specification: foundation graph FMG-004.
 
 ## FMG-005 - Structured exec_process + Environment Authority
 
-State: BLOCKED
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-002, FMG-003, FMG-004
 Detailed specification: foundation graph FMG-005.
 

@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-004-toolbudget-cursor`
+Active branch: `chatgpt/FMG-005-exec-process`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -145,12 +145,22 @@ Evidence: `docs/evidence/FMG-003_SERVER_POLICY_EVIDENCE.md`.
 
 ## FMG-004 implementation
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-004-toolbudget-cursor`.
-Depends: FMG-002 DONE / MAIN VERIFIED.
-Scope: ToolBudget / Cancellation / Cursor Core only.
-Local proof: Windows runtime 576 assertions PASS; catalog/parity PASS; Release build 0 warnings / 0 errors; state contract + diff check PASS.
-macOS local proof: environment-blocked on Windows host; native GitHub Verify required.
+Final candidate head: `6e90b2c049e9a85ac408853c9e593a76d8617f54`.
+Merge main: `9e65230a672cac533f74d6b007f2f08ce83d8687`.
+Native merged-main Verify: run `36114335810` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Local merged-main proof: Windows runtime 576 assertions PASS; Release build 0 warnings / 0 errors.
 Evidence: `docs/evidence/FMG-004_TOOL_BUDGET_CURSOR_EVIDENCE.md`.
-Next gate: exact-head native Verify -> review -> merge fork main -> MAIN VERIFIED.
-Later dependent tasks remain BLOCKED by frozen graph.
+
+## FMG-005 implementation
+
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+Branch: `chatgpt/FMG-005-exec-process`.
+Depends: FMG-002, FMG-003, FMG-004 DONE / MAIN VERIFIED.
+Scope: Structured `exec_process` + Environment Authority only.
+Canonical catalog: 20 tools, SHA-256 `d03c6cd0c4d6582a89e408078e5f4053039f7178d172614256d510f86c137895`.
+Local proof: Windows runtime 609 assertions PASS; exec-process contract PASS; catalog/parity PASS; Release build 0 warnings / 0 errors; state contract/diff check PASS.
+Native macOS execution: local Windows host environment-blocked; GitHub native Verify required before merge.
+Evidence: `docs/evidence/FMG-005_EXEC_PROCESS_ENVIRONMENT_AUTHORITY_EVIDENCE.md`.
+Later dependent tasks remain BLOCKED until FMG-005 MAIN VERIFIED.

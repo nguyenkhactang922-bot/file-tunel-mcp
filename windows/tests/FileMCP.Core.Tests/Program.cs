@@ -17,6 +17,13 @@ internal static class Program
 
     public static async Task<int> Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "exec-cancel-parent-fixture")
+            return await RunExecCancelParentFixtureAsync(args);
+        if (args.Length > 0 && args[0] == "exec-child-sleeper-fixture")
+        {
+            await Task.Delay(TimeSpan.FromSeconds(20));
+            return 0;
+        }
         if (args.Length > 0 && args[0] is "init" or "doctor" or "run")
             return await RunFakeTunnelClientAsync(args);
 
@@ -49,6 +56,7 @@ internal static class Program
             await TestSettingsAndCredentialsAsync(root);
             await TestDesktopSingleInstanceCoordinatorAsync();
             await TestProcessRunnerAsync(root);
+            await TestExecProcessAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -82,8 +90,8 @@ internal static class Program
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 15, "catalog safe local tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 16, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 16, "catalog non-shell local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 17, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 1, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
@@ -204,12 +212,14 @@ internal static class Program
         Assert(restricted.IsAllowed("write_file"), "restricted preserves legacy workspace mutation");
         Assert(restricted.IsAllowed("git_push"), "restricted preserves legacy safe-mode git push availability");
         Assert(!restricted.IsAllowed("run_command"), "restricted denies shell command");
+        Assert(!restricted.IsAllowed("exec_process"), "restricted denies direct process execution");
         Assert(!restricted.LegacyUnsafeGitCompatibility, "restricted keeps Git safe mode");
         Assert(restricted.Hash == "174b1d27efe868c387b87923665b8d53270f40b48e890e67f40720620d729156", "restricted policy hash is canonical cross-platform");
 
         var legacy = ServerPolicy.FromLegacy(enableCommands: true);
         Assert(legacy.Profile == FileMcpPolicyProfiles.LegacyCommandCompatible, "legacy true maps migration-only command profile");
         Assert(legacy.IsAllowed("run_command"), "legacy profile preserves shell command");
+        Assert(legacy.IsAllowed("exec_process"), "legacy profile preserves direct process execution availability");
         Assert(legacy.LegacyUnsafeGitCompatibility, "legacy profile preserves prior Git compatibility behavior");
         Assert(!FileMcpPolicyProfiles.IsUserSelectable(FileMcpPolicyProfiles.LegacyCommandCompatible), "legacy migration profile is not user selectable");
 
@@ -217,6 +227,7 @@ internal static class Program
         Assert(workspaceAuto.IsAllowed("write_file") && workspaceAuto.IsAllowed("git_commit"), "workspace-auto allows local workspace mutations");
         Assert(!workspaceAuto.IsAllowed("git_push"), "workspace-auto denies external Git push");
         Assert(!workspaceAuto.IsAllowed("run_command"), "workspace-auto denies shell/open-world command");
+        Assert(!workspaceAuto.IsAllowed("exec_process"), "workspace-auto denies open-world direct process execution");
         var workspaceDefinitions = workspaceAuto.FilterDefinitions(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true));
         var workspaceNames = workspaceDefinitions.OfType<JsonObject>().Select(item => item["name"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal);
         Assert(!workspaceNames.Contains("run_command") && !workspaceNames.Contains("git_push") && workspaceNames.Contains("write_file"), "effective catalog filtering follows workspace-auto policy");
@@ -228,7 +239,17 @@ internal static class Program
             CustomAllowedEffects = ["read", "metadata"],
         });
         Assert(custom.IsAllowed("read_file") && custom.IsAllowed("filemcp_observability_connect"), "custom low read policy allows read/metadata");
-        Assert(!custom.IsAllowed("write_file") && !custom.IsAllowed("git_push") && !custom.IsAllowed("run_command"), "custom low read policy denies broader effects");
+        Assert(!custom.IsAllowed("write_file") && !custom.IsAllowed("git_push") && !custom.IsAllowed("run_command") && !custom.IsAllowed("exec_process"), "custom low read policy denies broader effects");
+
+        var customExec = new ServerPolicy(new LocalPolicyConfiguration
+        {
+            Profile = FileMcpPolicyProfiles.Custom,
+            CustomMaxRisk = "high",
+            CustomAllowedEffects = ["execute"],
+            CustomAllowNetworkOpenWorld = true,
+            CustomAllowShell = false,
+        });
+        Assert(customExec.IsAllowed("exec_process") && !customExec.IsAllowed("run_command"), "custom policy can authorize direct exec without shell authority");
 
         var customShell = new ServerPolicy(new LocalPolicyConfiguration
         {
@@ -1827,11 +1848,13 @@ internal static class Program
             TunnelId = "tunnel_" + new string('a', 32), Profile = "windows-test", Port = 18080,
             AllowedDirectory = Path.Combine(root, "workspace"), HealthAddress = "127.0.0.1:0",
             GitUserName = "FileMCP Test", GitUserEmail = "filemcp@example.invalid", EnableCommands = true,
+            ExecEnvironmentAllowList = ["NODE_*", "EXACT_SECRET_TOKEN"],
             OtlpEnabled = true, OtlpEndpoint = "http://127.0.0.1:4319",
         };
         store.Save(settings); var loaded = store.Load();
         Assert(loaded.TunnelId == settings.TunnelId && loaded.Profile == settings.Profile && loaded.EnableCommands, "settings roundtrip");
         Assert(loaded.PolicyProfile == FileMcpPolicyProfiles.LegacyCommandCompatible, "legacy EnableCommands caller persists migration-only policy profile");
+        Assert(loaded.ExecEnvironmentAllowList.SequenceEqual(new[] { "NODE_*", "EXACT_SECRET_TOKEN" }), "settings roundtrip preserves exec environment local authority");
         Assert(loaded.OtlpEnabled && loaded.OtlpEndpoint == "http://127.0.0.1:4319", "settings roundtrip preserves optional OTLP configuration");
         Assert(loaded.Workspaces.Count == 4 && loaded.Workspaces.Select(item => item.Key).SequenceEqual(new[] { "C", "D", "E", "F" }), "multi-workspace defaults");
         Assert(loaded.Workspaces.Count(item => item.Enabled) == 1 && loaded.Workspaces.Any(item => item.Enabled && item.AllowedDirectory == settings.AllowedDirectory), "legacy workspace mapped to matching drive");
@@ -1940,13 +1963,211 @@ internal static class Program
         Console.WriteLine("windows-process-runner: ok");
     }
 
+    private static async Task<int> RunExecCancelParentFixtureAsync(string[] args)
+    {
+        if (args.Length != 2 || string.IsNullOrWhiteSpace(args[1])) return 91;
+        var assembly = typeof(Program).Assembly.Location;
+        var testHost = Path.ChangeExtension(assembly, ".exe");
+        if (string.IsNullOrWhiteSpace(assembly) || !File.Exists(testHost)) return 92;
+        var start = new ProcessStartInfo
+        {
+            FileName = testHost,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        start.ArgumentList.Add("exec-child-sleeper-fixture");
+        using var child = Process.Start(start);
+        if (child is null) return 93;
+        File.WriteAllText(args[1], child.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        await Task.Delay(TimeSpan.FromSeconds(20));
+        return 0;
+    }
+
+    private static async Task TestExecProcessAsync(string root)
+    {
+        var workspace = Path.Combine(root, "exec-process");
+        Directory.CreateDirectory(workspace);
+        var working = Path.Combine(workspace, "work");
+        Directory.CreateDirectory(working);
+        var outside = Path.Combine(root, "exec-process-outside");
+        Directory.CreateDirectory(outside);
+
+        var powerShell = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe");
+        Assert(File.Exists(powerShell), "exec_process PowerShell fixture exists");
+
+        var policy = ServerPolicy.FromLegacy(enableCommands: true);
+        var tools = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", policy);
+
+        var argvFixture = Path.Combine(workspace, "argv-fixture.ps1");
+        File.WriteAllText(argvFixture, "param([string]$Value) [Console]::Out.Write($Value)");
+        var literal = "$env:FMG005_SHOULD_NOT_EXPAND;Write-Output hacked";
+        var argv = await tools.CallAsync("exec_process", ExecArgs(
+            powerShell,
+            ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", argvFixture, literal]));
+        Assert(argv.StructuredContent["terminal_state"]!.GetValue<string>() == "exited", "exec_process direct argv exits normally");
+        Assert(argv.StructuredContent["exit_code"]!.GetValue<int>() == 0, "exec_process direct argv exit code");
+        Assert(argv.StructuredContent["stdout"]!.GetValue<string>() == literal, "exec_process preserves argv literally without FileMCP shell interpolation");
+
+        var commandPrompt = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
+        var cwdResult = await tools.CallAsync("exec_process", ExecArgs(
+            commandPrompt,
+            ["/d", "/c", "cd"],
+            "work",
+            timeoutSeconds: 5));
+        Assert(cwdResult.StructuredContent["terminal_state"]!.GetValue<string>() == "exited" && cwdResult.StructuredContent["exit_code"]!.GetValue<int>() == 0,
+            "exec_process cwd fixture exits normally: " + cwdResult.StructuredContent["stderr"]!.GetValue<string>());
+        var cwdOutput = cwdResult.StructuredContent["stdout"]!.GetValue<string>().Trim();
+        Assert(
+            cwdOutput.Length > 0 && Path.GetFullPath(cwdOutput).TrimEnd('\\') == Path.GetFullPath(working).TrimEnd('\\'),
+            "exec_process contained cwd");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("exec_process", ExecArgs(powerShell, ["-NoLogo"], "..\\exec-process-outside")),
+            "outside the shared directory",
+            "exec_process cwd escape rejected");
+
+        var nonzero = await tools.CallAsync("exec_process", ExecArgs(
+            powerShell,
+            ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Error.Write('expected-nonzero'); exit 7"]));
+        Assert(nonzero.StructuredContent["terminal_state"]!.GetValue<string>() == "exited", "exec_process nonzero exit remains transport success");
+        Assert(nonzero.StructuredContent["exit_code"]!.GetValue<int>() == 7, "exec_process preserves nonzero exit code");
+        Assert(nonzero.StructuredContent["stderr"]!.GetValue<string>().Contains("expected-nonzero", StringComparison.Ordinal), "exec_process preserves nonzero stderr");
+
+        var bounded = await tools.CallAsync("exec_process", ExecArgs(
+            powerShell,
+            ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Out.Write('x' * 5000); [Console]::Error.Write('y' * 4000)"],
+            outputLimitBytes: 1_000));
+        Assert(bounded.StructuredContent["stdout_truncated"]!.GetValue<bool>(), "exec_process stdout bounded");
+        Assert(bounded.StructuredContent["stderr_truncated"]!.GetValue<bool>(), "exec_process stderr bounded");
+        Assert(bounded.StructuredContent["stdout_omitted_bytes"]!.GetValue<long>() > 0, "exec_process stdout omitted byte count");
+        Assert(bounded.StructuredContent["stderr_omitted_bytes"]!.GetValue<long>() > 0, "exec_process stderr omitted byte count");
+
+        var timed = await tools.CallAsync("exec_process", ExecArgs(
+            powerShell,
+            ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 5"],
+            timeoutSeconds: 1));
+        Assert(timed.StructuredContent["terminal_state"]!.GetValue<string>() == "timed_out", "exec_process timeout terminal state");
+        Assert(timed.StructuredContent["timed_out"]!.GetValue<bool>() && !timed.StructuredContent["cancelled"]!.GetValue<bool>(), "exec_process timeout flags");
+
+        using (var budgetCancellation = ToolExecutionContext.Create(new JsonObject
+        {
+            [ToolExecutionContext.BudgetMetadataKey] = new JsonObject { ["timeoutMs"] = 100 },
+        }))
+        {
+            var budgetCancelled = await tools.CallAsync(
+                "exec_process",
+                ExecArgs(
+                    powerShell,
+                    ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 5"],
+                    timeoutSeconds: 5),
+                executionContext: budgetCancellation);
+            Assert(budgetCancelled.StructuredContent["terminal_state"]!.GetValue<string>() == "cancelled", "exec_process budget cancellation terminal state");
+            Assert(budgetCancelled.StructuredContent["cancelled"]!.GetValue<bool>(), "exec_process budget cancellation flag");
+        }
+
+        await AssertThrowsAsync(
+            () => tools.CallAsync("exec_process", ExecArgs(powerShell, ["bad\0argument"])),
+            "NUL",
+            "exec_process NUL argv rejected");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("exec_process", ExecArgs(powerShell, [new string('a', 20_000), new string('b', 20_000)])),
+            "total argument size",
+            "exec_process total argv bounded");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("exec_process", ExecArgs(
+                powerShell,
+                ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "exit 0"],
+                environment: new Dictionary<string, string> { ["FMG005_FORBIDDEN"] = "blocked" })),
+            "not locally allowed",
+            "exec_process forbidden environment override rejected");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("exec_process", ExecArgs(
+                powerShell,
+                ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "exit 0"],
+                environment: new Dictionary<string, string> { ["PATH"] = "C:\\untrusted" })),
+            "not locally allowed",
+            "exec_process minimal baseline cannot be request-overridden without local authority");
+
+        var previousPlain = Environment.GetEnvironmentVariable("FMG005_PLAIN");
+        var previousSecret = Environment.GetEnvironmentVariable("FMG005_SECRET_TOKEN");
+        try
+        {
+            Environment.SetEnvironmentVariable("FMG005_PLAIN", "plain-pass");
+            Environment.SetEnvironmentVariable("FMG005_SECRET_TOKEN", "secret-pass");
+
+            var wildcardTools = new LocalTools(
+                workspace,
+                "FileMCP Test",
+                "filemcp@example.invalid",
+                ServerPolicy.FromLegacy(enableCommands: true),
+                ["FMG005_*"]);
+            var wildcard = await wildcardTools.CallAsync("exec_process", ExecArgs(
+                powerShell,
+                ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Out.Write(([string]$env:FMG005_PLAIN) + '|' + ([string]$env:FMG005_SECRET_TOKEN))"]));
+            Assert(wildcard.StructuredContent["stdout"]!.GetValue<string>() == "plain-pass|", "exec_process wildcard pass-through suppresses secret-like host env");
+            var manyHost = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < ExecProcessEnvironmentAuthority.MaxForwardedVariables + 1; i++) manyHost[$"FMG005_MANY_{i}"] = "x";
+            var wildcardAuthority = new ExecProcessEnvironmentAuthority(["FMG005_MANY_*"]);
+            try
+            {
+                _ = wildcardAuthority.BuildForTest(manyHost);
+                throw new Exception("exec_process wildcard pass-through count bound was not enforced");
+            }
+            catch (FileMcpException ex)
+            {
+                Assert(ex.Message.Contains("forwarded variables", StringComparison.OrdinalIgnoreCase), "exec_process wildcard pass-through count bounded");
+            }
+
+            var exactSecretTools = new LocalTools(
+                workspace,
+                "FileMCP Test",
+                "filemcp@example.invalid",
+                ServerPolicy.FromLegacy(enableCommands: true),
+                ["FMG005_SECRET_TOKEN", "FMG005_OVERRIDE"]);
+            var exactSecret = await exactSecretTools.CallAsync("exec_process", ExecArgs(
+                powerShell,
+                ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Out.Write(([string]$env:FMG005_SECRET_TOKEN) + '|' + ([string]$env:FMG005_OVERRIDE))"],
+                environment: new Dictionary<string, string> { ["FMG005_OVERRIDE"] = "request-value" }));
+            Assert(exactSecret.StructuredContent["stdout"]!.GetValue<string>() == "secret-pass|request-value", "exec_process exact local authority permits explicit secret-like pass-through and bounded request override");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("FMG005_PLAIN", previousPlain);
+            Environment.SetEnvironmentVariable("FMG005_SECRET_TOKEN", previousSecret);
+        }
+
+        var childPidFile = Path.Combine(workspace, "cancel-child.pid");
+        var testHost = Path.ChangeExtension(typeof(Program).Assembly.Location, ".exe");
+        Assert(File.Exists(testHost), "exec_process cancellation apphost fixture exists");
+        using var cancelCts = new CancellationTokenSource();
+        var cancelTask = tools.CallAsync(
+            "exec_process",
+            ExecArgs(testHost, ["exec-cancel-parent-fixture", childPidFile], timeoutSeconds: 30),
+            cancelCts.Token);
+        Assert(await WaitUntilAsync(() => File.Exists(childPidFile), TimeSpan.FromSeconds(8)), "exec_process cancellation child fixture started");
+        cancelCts.Cancel();
+        var cancelled = await cancelTask;
+        Assert(cancelled.StructuredContent["terminal_state"]!.GetValue<string>() == "cancelled", "exec_process cancellation terminal state");
+        Assert(cancelled.StructuredContent["cancelled"]!.GetValue<bool>() && !cancelled.StructuredContent["timed_out"]!.GetValue<bool>(), "exec_process cancellation flags");
+        var childPid = int.Parse(File.ReadAllText(childPidFile).Trim());
+        await Task.Delay(300);
+        var childAlive = false;
+        try { using var child = Process.GetProcessById(childPid); childAlive = !child.HasExited; } catch (ArgumentException) { }
+        Assert(!childAlive, "exec_process cancellation cleans descendant process tree");
+
+        Console.WriteLine("windows-exec-process: ok");
+    }
+
     private static async Task TestFilesystemAndToolsAsync(string root)
     {
         var workspace = Path.Combine(root, "files"); Directory.CreateDirectory(workspace);
         var safe = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
         var full = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", true);
         Assert(safe.ToolDefinitions.Count == 15 && !safe.HasTool("run_command"), "safe tool count");
-        Assert(full.ToolDefinitions.Count == 16 && full.HasTool("run_command"), "full tool count");
+        Assert(full.ToolDefinitions.Count == 17 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
 
         var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
         var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);
@@ -2840,6 +3061,28 @@ internal static class Program
     }
     private static string ValueAfter(string[] args, string key) { var index = Array.IndexOf(args, key); return index >= 0 && index + 1 < args.Length ? args[index + 1] : throw new InvalidOperationException("missing " + key); }
     private static async Task GitCli(string repo, string[] args) { var all = new List<string> { "-C", repo }; all.AddRange(args); var result = await ProcessRunner.RunAsync("git.exe", all, timeoutSeconds: 20); if (result.ExitCode != 0) throw new Exception("git fixture failed: " + result.Stderr); }
+    private static JsonObject ExecArgs(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string cwd = "",
+        IReadOnlyDictionary<string, string>? environment = null,
+        int timeoutSeconds = ProcessRunner.DefaultCommandTimeoutSeconds,
+        int outputLimitBytes = FileMcpConstants.MaxToolProcessOutputBytes)
+    {
+        var argumentArray = new JsonArray();
+        foreach (var argument in arguments) argumentArray.Add(argument);
+        var environmentObject = new JsonObject();
+        foreach (var pair in environment ?? new Dictionary<string, string>()) environmentObject[pair.Key] = pair.Value;
+        return new JsonObject
+        {
+            ["executable"] = executable,
+            ["arguments"] = argumentArray,
+            ["cwd"] = cwd,
+            ["environment"] = environmentObject,
+            ["timeout_seconds"] = timeoutSeconds,
+            ["output_limit_bytes"] = outputLimitBytes,
+        };
+    }
     private static JsonObject Obj(params (string Key, object Value)[] values) { var obj = new JsonObject(); foreach (var (key, value) in values) obj[key] = JsonValue.Create(value); return obj; }
     private static void AssertToolPayloadEquivalentIgnoringOperationId(string leftResponse, string rightResponse, string message)
     {

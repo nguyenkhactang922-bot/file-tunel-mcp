@@ -566,6 +566,7 @@ public partial class MainWindow : Window
         PolicyProfileComboBox.SelectedValue = settings.PolicyProfile;
         if (PolicyProfileComboBox.SelectedValue is null) PolicyProfileComboBox.SelectedValue = FileMcpPolicyProfiles.Restricted;
         EnableCommandsCheckBox.IsChecked = settings.PolicyProfile == FileMcpPolicyProfiles.LegacyCommandCompatible;
+        ExecEnvironmentAllowListBox.Text = string.Join(", ", settings.ExecEnvironmentAllowList);
         OtlpEnabledCheckBox.IsChecked = settings.OtlpEnabled;
         OtlpEndpointBox.Text = string.IsNullOrWhiteSpace(settings.OtlpEndpoint) ? OtlpTelemetrySettings.DefaultEndpoint : settings.OtlpEndpoint;
     }
@@ -875,6 +876,7 @@ public partial class MainWindow : Window
         _settings.GitUserEmail = GitEmailBox.Text.Trim();
         _settings.PolicyProfile = PolicyProfileComboBox.SelectedValue as string ?? FileMcpPolicyProfiles.Restricted;
         _settings.EnableCommands = _settings.PolicyProfile == FileMcpPolicyProfiles.LegacyCommandCompatible;
+        _settings.ExecEnvironmentAllowList = ParseEnvironmentAllowList(ExecEnvironmentAllowListBox.Text);
         _settings.OtlpEnabled = OtlpEnabledCheckBox.IsChecked == true;
         var otlpEndpoint = OtlpEndpointBox.Text.Trim();
         _settings.OtlpEndpoint = otlpEndpoint.Length == 0 ? OtlpTelemetrySettings.DefaultEndpoint : otlpEndpoint;
@@ -907,7 +909,13 @@ public partial class MainWindow : Window
                 CustomAllowedEffects = _settings.CustomPolicyAllowedEffects,
                 CustomAllowNetworkOpenWorld = _settings.CustomPolicyAllowNetworkOpenWorld,
                 CustomAllowShell = _settings.CustomPolicyAllowShell,
-            });
+            },
+            _settings.ExecEnvironmentAllowList);
+
+    private static List<string> ParseEnvironmentAllowList(string value) => value
+        .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Where(item => item.Length > 0)
+        .ToList();
 
     private async Task StopAllAsync()
     {

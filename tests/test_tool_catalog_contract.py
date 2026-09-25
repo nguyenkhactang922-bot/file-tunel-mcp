@@ -109,10 +109,17 @@ def validate_catalog(catalog: dict) -> None:
             if not isinstance(annotations.get(key), bool):
                 fail(f"annotation {key} missing/invalid for {name}")
 
-    if len(tools) != 19:
-        fail(f"expected 19 tools, got {len(tools)}")
+    if len(tools) != 20:
+        fail(f"expected 20 tools, got {len(tools)}")
 
     by_name = {item["name"]: item for item in tools}
+    exec_process = by_name["exec_process"]
+    if exec_process["risk"] != "high" or exec_process["effect"] != "execute":
+        fail("exec_process risk/effect mismatch")
+    if exec_process["capabilities"] != ["process.exec", "network.open_world"]:
+        fail("exec_process capabilities mismatch")
+    if exec_process["availability"] != {}:
+        fail("exec_process must be governed by policy rather than legacy requiresCommands")
     if by_name["run_command"]["availability"] != {"requiresCommands": True}:
         fail("run_command availability mismatch")
     if by_name["filemcp_observability_connect"]["availability"] != {"requiresObservability": True}:

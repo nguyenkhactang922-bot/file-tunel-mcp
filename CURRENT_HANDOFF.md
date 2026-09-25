@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-004-toolbudget-cursor`
+Branch: `chatgpt/FMG-005-exec-process`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -171,3 +171,29 @@ NEXT_EXACT_ACTION: commit/push the exact FMG-004 candidate, require native GitHu
 
 FMG-004: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
 NEXT_EXACT_ACTION: commit/push exact candidate and require native GitHub Verify.
+
+## FMG-004 closure / FMG-005 claim
+
+FMG-004: DONE / MAIN VERIFIED on merge `9e65230a672cac533f74d6b007f2f08ce83d8687`; merged-main native Verify run `36114335810` SUCCESS on macOS + Windows x64 + Windows ARM64.
+
+FMG-005: CLAIMED / ACTIVE on `chatgpt/FMG-005-exec-process`.
+
+NEXT_EXACT_ACTION: implement FMG-005 Structured `exec_process` + Environment Authority only: executable + argv, contained cwd, minimal platform environment baseline, locally configured pass-through, policy-checked request overrides, timeout/output budget, structured result, and reuse existing native ProcessRunner. Preserve `run_command` as compatibility/high-risk path. Do not begin FMG-006 before FMG-005 MAIN VERIFIED.
+
+
+## FMG-005 local verification
+
+FMG-005: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-005-exec-process`.
+
+Local evidence: canonical tool count 20; exec_process contract PASS; Release build 0 warnings/errors; Windows runtime 609 assertions PASS; macOS compile/test wiring complete.
+Evidence: `docs/evidence/FMG-005_EXEC_PROCESS_ENVIRONMENT_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: commit/push exact FMG-005 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, perform scoped review, merge only on green exact-head evidence, verify merged main, then mark FMG-005 MAIN VERIFIED. Do not start FMG-006 first.
+
+## FMG-005 local verification
+
+FMG-005: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-005-exec-process`.
+
+Local evidence: Windows runtime 609 assertions PASS; canonical catalog/parity PASS at 20 tools / `d03c6cd0c4d6582a89e408078e5f4053039f7178d172614256d510f86c137895`; exec-process contract PASS; Release 0 warnings/errors; project-state/diff checks PASS. Native Swift execution is environment-blocked on this Windows host and must be proven by GitHub macOS Verify.
+
+NEXT_EXACT_ACTION: commit/push the exact FMG-005 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, perform scoped review, merge only on green exact-head evidence, verify merged main, then mark FMG-005 DONE / MAIN VERIFIED and claim the next READY task. Do not start FMG-006 before FMG-005 MAIN VERIFIED.

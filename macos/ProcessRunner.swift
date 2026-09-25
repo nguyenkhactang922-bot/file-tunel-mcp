@@ -6,6 +6,11 @@ struct ProcessResult {
     let stdout: String
     let stderr: String
     let timedOut: Bool
+    let cancelled: Bool
+    let stdoutTruncated: Bool
+    let stderrTruncated: Bool
+    let stdoutOmittedBytes: Int
+    let stderrOmittedBytes: Int
 }
 
 enum ProcessRunnerError: LocalizedError {
@@ -44,6 +49,14 @@ private final class BoundedDataBuffer {
             omittedBytes += chunk.count - remaining
         }
     }
+
+    var omittedByteCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return omittedBytes
+    }
+
+    var truncated: Bool { omittedByteCount > 0 }
 
     func string() -> String {
         lock.lock()
@@ -148,7 +161,12 @@ final class ProcessRunner {
             exitCode: decodeExitCode(status),
             stdout: stdoutBuffer.string(),
             stderr: stderrBuffer.string(),
-            timedOut: timedOut
+            timedOut: timedOut,
+            cancelled: cancellationRequested,
+            stdoutTruncated: stdoutBuffer.truncated,
+            stderrTruncated: stderrBuffer.truncated,
+            stdoutOmittedBytes: stdoutBuffer.omittedByteCount,
+            stderrOmittedBytes: stderrBuffer.omittedByteCount
         )
     }
 

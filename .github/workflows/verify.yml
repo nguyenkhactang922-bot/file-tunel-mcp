@@ -38,6 +38,7 @@ jobs:
             -framework Network \
             -framework Security \
             macos/ProcessRunner.swift \
+            macos/ExecProcessEnvironmentAuthority.swift \
             macos/LogicalChatCorrelation.swift \
             macos/ToolCatalog.swift \
             macos/ServerPolicy.swift \
@@ -112,6 +113,10 @@ jobs:
       - name: Verify canonical tool catalog contract
         shell: pwsh
         run: python tests/test_tool_catalog_contract.py
+
+      - name: Verify structured exec_process contract
+        shell: pwsh
+        run: ./tests/test_exec_process_contract.ps1
 
       - name: Verify macOS supervisor contract
         shell: pwsh
@@ -191,6 +196,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      - name: Verify structured exec_process contract
+        shell: pwsh
+        run: ./tests/test_exec_process_contract.ps1
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v5

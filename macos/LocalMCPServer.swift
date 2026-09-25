@@ -121,16 +121,17 @@ private final class LocalTools {
     private static let handlerToolNames: Set<String> = [
         "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "git_init", "git_status", "git_log", "git_diff",
-        "git_add", "git_commit", "git_push", "run_command",
+        "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
-        "list_files", "search_content", "search_filenames",
+        "list_files", "search_content", "search_filenames", "exec_process",
     ]
     private let resolver: SafePathResolver
     private let gitUserName: String
     private let gitUserEmail: String
     private let enableCommands: Bool
     private let policy: ServerPolicy
+    private let execEnvironment: ExecProcessEnvironmentAuthority
     private let toolSlots = DispatchSemaphore(value: 8)
     private let mutationSlot = DispatchSemaphore(value: 1)
     private let commandSlots = DispatchSemaphore(value: 2)
@@ -148,15 +149,23 @@ private final class LocalTools {
             resolver: resolver,
             gitUserName: gitUserName,
             gitUserEmail: gitUserEmail,
-            policy: ServerPolicy.fromLegacy(enableCommands: enableCommands)
+            policy: ServerPolicy.fromLegacy(enableCommands: enableCommands),
+            execEnvironmentAllowList: []
         )
     }
 
-    init(resolver: SafePathResolver, gitUserName: String, gitUserEmail: String, policy: ServerPolicy) throws {
+    init(
+        resolver: SafePathResolver,
+        gitUserName: String,
+        gitUserEmail: String,
+        policy: ServerPolicy,
+        execEnvironmentAllowList: [String] = []
+    ) throws {
         self.resolver = resolver
         self.gitUserName = gitUserName
         self.gitUserEmail = gitUserEmail
         self.policy = policy
+        self.execEnvironment = try ExecProcessEnvironmentAuthority(patterns: execEnvironmentAllowList)
         self.enableCommands = policy.legacyUnsafeGitCompatibility
         try CanonicalToolCatalog.shared.validateHandlerCoverage(handler: "local_tools", runtimeHandlerNames: Self.handlerToolNames)
     }
@@ -227,6 +236,17 @@ private final class LocalTools {
             return stringOutput(try deleteFile(relativePath: requiredString(arguments, "relative_path")))
         case "delete_directory":
             return stringOutput(try deleteDirectory(relativePath: requiredString(arguments, "relative_path")))
+        case "exec_process":
+            return objectOutput(try execProcess(
+                executable: requiredString(arguments, "executable"),
+                arguments: try stringArray(arguments, "arguments"),
+                cwd: string(arguments, "cwd", default: ""),
+                environmentOverrides: try stringDictionary(arguments, "environment"),
+                timeoutSeconds: int(arguments, "timeout_seconds", default: ProcessRunner.defaultCommandTimeoutSeconds),
+                outputLimitBytes: int(arguments, "output_limit_bytes", default: maxToolProcessOutputBytes),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
+            ))
         case "run_command":
             return stringOutput(try runCommand(
                 command: requiredString(arguments, "command"),
@@ -738,6 +758,64 @@ private final class LocalTools {
             throw MCPServerError.operationFailed("Could not inspect \(url.lastPathComponent): \(String(cString: strerror(errno)))")
         }
         return info.st_mode
+    }
+
+    private func execProcess(
+        executable: String,
+        arguments: [String],
+        cwd: String,
+        environmentOverrides: [String: String],
+        timeoutSeconds: Int,
+        outputLimitBytes: Int,
+        preparedPolicy: PolicySnapshot,
+        executionContext: ToolExecutionContext?
+    ) throws -> [String: Any] {
+        guard !executable.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw MCPServerError.invalidArguments("executable must not be empty")
+        }
+        guard executable.count <= 4_096 else { throw MCPServerError.invalidArguments("executable is too long") }
+        guard arguments.count <= 256 else { throw MCPServerError.invalidArguments("exec_process supports at most 256 arguments") }
+        guard arguments.allSatisfy({ $0.count <= 32_768 }) else { throw MCPServerError.invalidArguments("exec_process argument exceeds 32768 characters") }
+        guard arguments.reduce(0, { $0 + $1.count }) <= 32_768 else { throw MCPServerError.invalidArguments("exec_process total argument size exceeds 32768 characters") }
+        guard (1...ProcessRunner.maxCommandTimeoutSeconds).contains(timeoutSeconds) else {
+            throw MCPServerError.invalidArguments("timeout_seconds must be 1...\(ProcessRunner.maxCommandTimeoutSeconds)")
+        }
+        guard (1...maxToolProcessOutputBytes).contains(outputLimitBytes) else {
+            throw MCPServerError.invalidArguments("output_limit_bytes must be 1...\(maxToolProcessOutputBytes)")
+        }
+
+        let workdir = try resolver.resolve(cwd)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: workdir.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw MCPServerError.invalidPath("No such working directory: \(cwd.isEmpty ? "." : cwd)")
+        }
+        let environment = try execEnvironment.build(overrides: environmentOverrides)
+
+        commandSlots.wait()
+        defer { commandSlots.signal() }
+        try policy.authorize("exec_process", prepared: preparedPolicy)
+        let result = try ProcessRunner.run(
+            executable: executable,
+            arguments: arguments,
+            cwd: workdir.path,
+            environment: environment,
+            timeoutSeconds: timeoutSeconds,
+            outputLimitBytes: outputLimitBytes,
+            shouldCancel: { executionContext.map { !$0.tryContinue() } ?? false }
+        )
+        let terminalState = result.cancelled ? "cancelled" : (result.timedOut ? "timed_out" : "exited")
+        return [
+            "terminal_state": terminalState,
+            "exit_code": Int(result.exitCode),
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "timed_out": result.timedOut,
+            "cancelled": result.cancelled,
+            "stdout_truncated": result.stdoutTruncated,
+            "stderr_truncated": result.stderrTruncated,
+            "stdout_omitted_bytes": result.stdoutOmittedBytes,
+            "stderr_omitted_bytes": result.stderrOmittedBytes,
+        ]
     }
 
     private func runCommand(command: String, cwd: String, timeoutSeconds: Int) throws -> String {
@@ -1265,6 +1343,33 @@ private final class LocalTools {
         return words
     }
 
+    private func stringArray(_ arguments: [String: Any], _ key: String) throws -> [String] {
+        guard let raw = arguments[key] else { return [] }
+        guard let values = raw as? [Any], values.count <= 256 else {
+            throw MCPServerError.invalidArguments("Missing or invalid argument: \(key)")
+        }
+        var result: [String] = []
+        result.reserveCapacity(values.count)
+        for value in values {
+            guard let string = value as? String else { throw MCPServerError.invalidArguments("Missing or invalid argument: \(key)") }
+            result.append(string)
+        }
+        return result
+    }
+
+    private func stringDictionary(_ arguments: [String: Any], _ key: String) throws -> [String: String] {
+        guard let raw = arguments[key] else { return [:] }
+        guard let values = raw as? [String: Any], values.count <= ExecProcessEnvironmentAuthority.maxOverrides else {
+            throw MCPServerError.invalidArguments("Missing or invalid argument: \(key)")
+        }
+        var result: [String: String] = [:]
+        for (name, value) in values {
+            guard let string = value as? String else { throw MCPServerError.invalidArguments("Missing or invalid argument: \(key)") }
+            result[name] = string
+        }
+        return result
+    }
+
     private func requiredString(_ arguments: [String: Any], _ key: String) throws -> String {
         guard let value = arguments[key] as? String else {
             throw MCPServerError.invalidArguments("Missing or invalid argument: \(key)")
@@ -1358,6 +1463,20 @@ private final class LocalTools {
                 }
                 if let maximum = property["maximum"] as? NSNumber, integer > maximum.intValue {
                     throw MCPServerError.invalidArguments("Argument \(key) must be <= \(maximum.intValue)")
+                }
+            case "array":
+                guard let array = value as? [Any] else {
+                    throw MCPServerError.invalidArguments("Missing or invalid argument: \(key)")
+                }
+                if let maximum = property["maxItems"] as? NSNumber, array.count > maximum.intValue {
+                    throw MCPServerError.invalidArguments("Argument \(key) supports at most \(maximum.intValue) items")
+                }
+            case "object":
+                guard let object = value as? [String: Any] else {
+                    throw MCPServerError.invalidArguments("Missing or invalid argument: \(key)")
+                }
+                if let maximum = property["maxProperties"] as? NSNumber, object.count > maximum.intValue {
+                    throw MCPServerError.invalidArguments("Argument \(key) supports at most \(maximum.intValue) entries")
                 }
             default:
                 break
@@ -1462,7 +1581,8 @@ final class LocalMCPServer {
         localAuthToken: String,
         log: @escaping (String) -> Void,
         limits: LocalMCPServerLimits = .standard,
-        policyConfiguration: LocalPolicyConfiguration? = nil
+        policyConfiguration: LocalPolicyConfiguration? = nil,
+        execEnvironmentAllowList: [String] = []
     ) throws {
         guard localAuthToken.utf8.count >= 32 else {
             throw MCPServerError.invalidArguments("Local MCP authentication token is too short")
@@ -1488,7 +1608,8 @@ final class LocalMCPServer {
             resolver: resolver,
             gitUserName: gitUserName,
             gitUserEmail: gitUserEmail,
-            policy: activePolicy
+            policy: activePolicy,
+            execEnvironmentAllowList: execEnvironmentAllowList
         )
         self.skills = try CodexSkillRegistry(rootPath: allowedDirectory, log: log)
     }
