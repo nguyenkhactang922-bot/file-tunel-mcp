@@ -221,3 +221,11 @@ FMG-006: DONE / MAIN VERIFIED. Primary PR #9 merged strong file version + Source
 FMG-007: CLAIMED / ACTIVE on `chatgpt/FMG-007-mutation-guard`.
 
 NEXT_EXACT_ACTION: implement AuthorizedPathSnapshot / Mutation Guard only: stable native root/parent/target identity, new-target parent + expected leaf absence, final no-follow/reparse-safe recheck, equivalent Windows/macOS semantics, and adversarial path-swap tests. Do not begin FMG-008 before FMG-007 MAIN VERIFIED.
+
+## FMG-007 local verification
+
+FMG-007: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-007-mutation-guard`.
+
+Local evidence: Windows runtime 637 assertions PASS including `windows-mutation-guard: ok`; Mutation Guard contract PASS; canonical catalog/parity and FMG-006 prerequisite contract PASS; Release build 0 warnings/errors; state/diff/shell syntax gates PASS. Native Swift implementation/test wiring is complete but requires GitHub macOS Verify because this Windows host has no `swiftc`.
+
+NEXT_EXACT_ACTION: commit/push the exact FMG-007 candidate, require native GitHub Verify on macOS + Windows x64 + Windows ARM64, fix only the exact failing stage if any, perform scoped security review, merge only exact green head, verify merged main, mark FMG-007 DONE / MAIN VERIFIED, then claim FMG-008.

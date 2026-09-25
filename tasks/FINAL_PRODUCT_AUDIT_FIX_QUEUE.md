@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-007 AuthorizedPathSnapshot / Mutation Guard on chatgpt/FMG-007-mutation-guard; do not begin FMG-008 before FMG-007 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the exact FMG-007 Mutation Guard candidate on chatgpt/FMG-007-mutation-guard, require native macOS + Windows x64 + Windows ARM64 Verify, then merge only exact green head and verify merged main; do not begin FMG-008 before FMG-007 MAIN VERIFIED.
 
 FPA-004 product/release scope is resolved by ADR-0003. V11-009 upstream integration remains an external authority gate and does not block the active FMG complete-upgrade implementation program.

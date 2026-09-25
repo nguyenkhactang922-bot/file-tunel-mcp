@@ -1085,6 +1085,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ToolExecutionContext.swift \
     macos/AuthenticatedCursorCodec.swift \
     macos/FileVersionService.swift \
+    macos/AuthorizedPathSnapshot.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -1248,6 +1249,96 @@ try "bravo\n".write(to: sourceRepo.appendingPathComponent("b.txt"), atomically: 
 try runGitFixture(sourceRepo, ["add", "."])
 try runGitFixture(sourceRepo, ["-c", "user.name=FileMCP Test", "-c", "user.email=filemcp@example.invalid", "commit", "-m", "source-state baseline"])
 
+let mutationGuardRoot = root.appendingPathComponent("mutation-guard")
+try FileManager.default.createDirectory(at: mutationGuardRoot.appendingPathComponent("stable"), withIntermediateDirectories: true)
+try "stable\n".write(to: mutationGuardRoot.appendingPathComponent("stable/file.txt"), atomically: true, encoding: .utf8)
+let mutationResolver = try SafePathResolver(rootPath: mutationGuardRoot.path)
+let mutationGuard = AuthorizedPathSnapshotService(resolver: mutationResolver)
+let stableMutationSnapshot = try mutationGuard.captureExisting(relativePath: "stable/file.txt")
+let stableMutationURL = try mutationGuard.verify(stableMutationSnapshot)
+precondition(stableMutationURL.path == mutationGuardRoot.appendingPathComponent("stable/file.txt").path)
+precondition(stableMutationSnapshot.ancestors.count >= 2 && stableMutationSnapshot.targetIdentity != nil && !stableMutationSnapshot.expectedLeafAbsent)
+
+let targetReplaceParent = mutationGuardRoot.appendingPathComponent("target-replace")
+try FileManager.default.createDirectory(at: targetReplaceParent, withIntermediateDirectories: true)
+let targetReplaceURL = targetReplaceParent.appendingPathComponent("file.txt")
+try "same-content\n".write(to: targetReplaceURL, atomically: true, encoding: .utf8)
+let targetReplaceSnapshot = try mutationGuard.captureExisting(relativePath: "target-replace/file.txt")
+try FileManager.default.removeItem(at: targetReplaceURL)
+try "same-content\n".write(to: targetReplaceURL, atomically: true, encoding: .utf8)
+do {
+    _ = try mutationGuard.verify(targetReplaceSnapshot)
+    preconditionFailure("Mutation Guard target replacement must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("target identity changed"), "unexpected target replacement error: \(error)")
+}
+
+let parentReplaceURL = mutationGuardRoot.appendingPathComponent("parent-replace")
+try FileManager.default.createDirectory(at: parentReplaceURL, withIntermediateDirectories: true)
+try "child\n".write(to: parentReplaceURL.appendingPathComponent("child.txt"), atomically: true, encoding: .utf8)
+let parentReplaceSnapshot = try mutationGuard.captureExisting(relativePath: "parent-replace/child.txt")
+let parentReplaceOld = mutationGuardRoot.appendingPathComponent("parent-replace-old")
+try FileManager.default.moveItem(at: parentReplaceURL, to: parentReplaceOld)
+try FileManager.default.createDirectory(at: parentReplaceURL, withIntermediateDirectories: true)
+try "child\n".write(to: parentReplaceURL.appendingPathComponent("child.txt"), atomically: true, encoding: .utf8)
+do {
+    _ = try mutationGuard.verify(parentReplaceSnapshot)
+    preconditionFailure("Mutation Guard parent replacement must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("ancestor identity changed"), "unexpected parent replacement error: \(error)")
+}
+
+let newTargetParent = mutationGuardRoot.appendingPathComponent("new-target")
+try FileManager.default.createDirectory(at: newTargetParent, withIntermediateDirectories: true)
+let newTargetSnapshot = try mutationGuard.captureNewTarget(relativePath: "new-target/created.txt")
+precondition(newTargetSnapshot.expectedLeafAbsent && newTargetSnapshot.targetIdentity == nil)
+try "inserted\n".write(to: newTargetParent.appendingPathComponent("created.txt"), atomically: true, encoding: .utf8)
+do {
+    _ = try mutationGuard.verify(newTargetSnapshot)
+    preconditionFailure("Mutation Guard inserted leaf must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("expected target leaf absence"), "unexpected inserted leaf error: \(error)")
+}
+do {
+    _ = try mutationGuard.captureNewTarget(relativePath: "missing-parent/created.txt")
+    preconditionFailure("Mutation Guard missing parent must fail closed")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("disappeared"), "unexpected missing parent error: \(error)")
+}
+
+let symlinkParent = mutationGuardRoot.appendingPathComponent("symlink-parent")
+try FileManager.default.createDirectory(at: symlinkParent, withIntermediateDirectories: true)
+try "symlink\n".write(to: symlinkParent.appendingPathComponent("child.txt"), atomically: true, encoding: .utf8)
+let symlinkSnapshot = try mutationGuard.captureExisting(relativePath: "symlink-parent/child.txt")
+let symlinkReal = mutationGuardRoot.appendingPathComponent("symlink-parent-real")
+try FileManager.default.moveItem(at: symlinkParent, to: symlinkReal)
+try FileManager.default.createSymbolicLink(at: symlinkParent, withDestinationURL: symlinkReal)
+do {
+    _ = try mutationGuard.verify(symlinkSnapshot)
+    preconditionFailure("Mutation Guard ancestor symlink swap must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("symlink"), "unexpected symlink swap error: \(error)")
+}
+try FileManager.default.removeItem(at: symlinkParent)
+
+let guardRootSwap = root.appendingPathComponent("mutation-guard-root-swap")
+try FileManager.default.createDirectory(at: guardRootSwap.appendingPathComponent("parent"), withIntermediateDirectories: true)
+try "root\n".write(to: guardRootSwap.appendingPathComponent("parent/file.txt"), atomically: true, encoding: .utf8)
+let rootSwapResolver = try SafePathResolver(rootPath: guardRootSwap.path)
+let rootSwapGuard = AuthorizedPathSnapshotService(resolver: rootSwapResolver)
+let rootSwapSnapshot = try rootSwapGuard.captureExisting(relativePath: "parent/file.txt")
+let guardRootSwapOld = root.appendingPathComponent("mutation-guard-root-swap-old")
+try FileManager.default.moveItem(at: guardRootSwap, to: guardRootSwapOld)
+try FileManager.default.createDirectory(at: guardRootSwap.appendingPathComponent("parent"), withIntermediateDirectories: true)
+try "root\n".write(to: guardRootSwap.appendingPathComponent("parent/file.txt"), atomically: true, encoding: .utf8)
+do {
+    _ = try rootSwapGuard.verify(rootSwapSnapshot)
+    preconditionFailure("Mutation Guard root authority replacement must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("ancestor identity changed"), "unexpected root replacement error: \(error)")
+}
+print("swift-mutation-guard: ok")
+
 let localAuthToken = String(repeating: "a", count: 64)
 
 do {
@@ -1344,6 +1435,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ToolExecutionContext.swift \
     macos/AuthenticatedCursorCodec.swift \
     macos/FileVersionService.swift \
+    macos/AuthorizedPathSnapshot.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"

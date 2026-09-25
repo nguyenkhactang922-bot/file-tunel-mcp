@@ -178,8 +178,11 @@ Evidence: `docs/evidence/FMG-006_FILE_VERSION_SOURCE_STATE_EVIDENCE.md`.
 
 ## FMG-007 implementation
 
-State: CLAIMED / ACTIVE.
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
 Branch: `chatgpt/FMG-007-mutation-guard`.
 Depends: FMG-006 DONE / MAIN VERIFIED.
 Scope: AuthorizedPathSnapshot / Mutation Guard only.
 NEXT_EXACT_ACTION: implement stable root/parent/target identity snapshots, new-target parent + expected leaf absence, and final no-follow/reparse-safe recheck on Windows/macOS. Add adversarial tests for ancestor/target replacement, symlink/junction swap, new-file leaf insertion and root authority change. Do not begin FMG-008 before FMG-007 MAIN VERIFIED.
+Evidence: `docs/evidence/FMG-007_MUTATION_GUARD_EVIDENCE.md`.
+Local proof: Mutation Guard contract PASS; Windows runtime 637 assertions PASS; Release build 0 warnings / 0 errors; catalog/parity/prerequisite/state/diff gates PASS.
+Native macOS: pending GitHub Verify because local Windows host has no `swiftc`.

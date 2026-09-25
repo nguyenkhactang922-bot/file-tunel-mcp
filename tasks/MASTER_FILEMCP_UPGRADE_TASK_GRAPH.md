@@ -246,7 +246,7 @@ Negative tests:
 
 ## FMG-007 — AuthorizedPathSnapshot / Mutation Guard
 
-State: CLAIMED / ACTIVE
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-006
 
 Scope:

@@ -96,7 +96,7 @@ Detailed specification: foundation graph FMG-006.
 
 ## FMG-007 - AuthorizedPathSnapshot / Mutation Guard
 
-State: CLAIMED / ACTIVE
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-006
 Detailed specification: foundation graph FMG-007.
 
