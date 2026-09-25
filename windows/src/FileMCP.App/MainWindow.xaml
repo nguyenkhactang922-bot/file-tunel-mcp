@@ -369,10 +369,18 @@
                             </Grid>
                         </Border>
 
-                        <CheckBox x:Name="EnableCommandsCheckBox" Margin="0,14,0,0" Content="Allow shell commands"
-                                  ToolTip="Allow FileMCP to run PowerShell/CLI commands with the current Windows user's permissions."/>
-                        <TextBlock Margin="24,5,0,0" Foreground="Gray" TextWrapping="Wrap"
-                                   Text="Allows ChatGPT to run PowerShell/CLI commands with the current Windows user's permissions. Enable only for workspaces you trust."/>
+                        <StackPanel Margin="0,14,0,0">
+                            <TextBlock Text="Execution policy" FontWeight="SemiBold"/>
+                            <ComboBox x:Name="PolicyProfileComboBox" Margin="0,6,0,0" SelectedValuePath="Tag">
+                                <ComboBoxItem Content="Restricted (legacy-safe compatibility)" Tag="restricted"/>
+                                <ComboBoxItem Content="Workspace auto" Tag="workspace-auto"/>
+                                <ComboBoxItem Content="Custom (advanced local policy)" Tag="custom"/>
+                                <ComboBoxItem Content="Legacy command compatible (migrated only)" Tag="legacy-command-compatible" IsEnabled="False"/>
+                            </ComboBox>
+                            <TextBlock Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
+                                       Text="Policy is owned by local settings. Workspace auto never enables shell or open-world network tools; legacy command mode appears only for migrated configurations."/>
+                            <CheckBox x:Name="EnableCommandsCheckBox" Visibility="Collapsed"/>
+                        </StackPanel>
 
                         <Expander x:Name="AdvancedExpander" Header="Advanced options" Margin="0,16,0,0">
                             <StackPanel Margin="0,12,0,0">

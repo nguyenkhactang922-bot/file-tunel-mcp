@@ -26,6 +26,11 @@ private enum ConfigKey {
     static let gitUserEmail = "gitUserEmail"
     static let apiKey = "apiKey"
     static let enableCommands = "enableCommands"
+    static let policyProfile = "policyProfile"
+    static let customPolicyMaxRisk = "customPolicyMaxRisk"
+    static let customPolicyAllowedEffects = "customPolicyAllowedEffects"
+    static let customPolicyAllowNetworkOpenWorld = "customPolicyAllowNetworkOpenWorld"
+    static let customPolicyAllowShell = "customPolicyAllowShell"
 }
 
 private final class LoadingButton: NSButton {
@@ -198,6 +203,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let gitUserNameField = NSTextField()
     private let gitUserEmailField = NSTextField()
     private let enableCommandsCheckbox = NSButton(checkboxWithTitle: "Allow shell commands", target: nil, action: nil)
+    private let policyProfilePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let logView = NSTextView()
     private let saveConnectionButton = LoadingButton(title: "Save connection", target: nil, action: nil)
     private let saveSettingsButton = LoadingButton(title: "Save settings", target: nil, action: nil)
@@ -402,13 +408,28 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         directoryField.setContentHuggingPriority(.defaultLow, for: .horizontal)
         directoryField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        enableCommandsCheckbox.toolTip = "Allow FileMCP to run shell/CLI commands with the current macOS user's permissions."
-        let commandWarning = NSTextField(wrappingLabelWithString: "Allows ChatGPT to run shell/CLI commands with the current macOS user's permissions. Enable only for workspaces you trust.")
-        commandWarning.font = .systemFont(ofSize: 10)
-        commandWarning.textColor = .secondaryLabelColor
-        commandWarning.maximumNumberOfLines = 0
-        commandWarning.preferredMaxLayoutWidth = Layout.contentWidth
+        enableCommandsCheckbox.isHidden = true
+        policyProfilePopup.removeAllItems()
+        let policyOptions: [(String, String, Bool)] = [
+            ("Restricted (legacy-safe compatibility)", FileMCPPolicyProfiles.restricted, true),
+            ("Workspace auto", FileMCPPolicyProfiles.workspaceAuto, true),
+            ("Custom (advanced local policy)", FileMCPPolicyProfiles.custom, true),
+            ("Legacy command compatible (migrated only)", FileMCPPolicyProfiles.legacyCommandCompatible, false),
+        ]
+        for (title, value, enabled) in policyOptions {
+            policyProfilePopup.addItem(withTitle: title)
+            if let item = policyProfilePopup.lastItem {
+                item.representedObject = value
+                item.isEnabled = enabled
+            }
+        }
+        let policyWarning = NSTextField(wrappingLabelWithString: "Policy is owned by local settings. Workspace auto never enables shell or open-world network tools; legacy command mode is retained only for migrated configurations.")
+        policyWarning.font = .systemFont(ofSize: 10)
+        policyWarning.textColor = .secondaryLabelColor
+        policyWarning.maximumNumberOfLines = 0
+        policyWarning.preferredMaxLayoutWidth = Layout.contentWidth
 
+        let policyRow = fieldRow("Policy", policyProfilePopup)
         let profileRow = fieldRow("Profile", profileField)
         let portRow = fieldRow("MCP port", portField)
         let directoryRow = fieldRow("Shared directory", directoryControls)
@@ -428,15 +449,15 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
 
         let settingsForm = NSStackView(views: [
             directoryRow,
-            enableCommandsCheckbox,
-            commandWarning,
+            policyRow,
+            policyWarning,
             advancedToggleButton,
             advancedSettingsGroup,
         ])
         settingsForm.orientation = .vertical
         settingsForm.alignment = .leading
         settingsForm.spacing = 8
-        settingsForm.setCustomSpacing(14, after: commandWarning)
+        settingsForm.setCustomSpacing(14, after: policyWarning)
         settingsForm.setCustomSpacing(10, after: advancedToggleButton)
         settingsForm.translatesAutoresizingMaskIntoConstraints = false
 
@@ -560,7 +581,16 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         healthAddressField.stringValue = defaults.string(forKey: ConfigKey.healthAddress) ?? "127.0.0.1:0"
         gitUserNameField.stringValue = defaults.string(forKey: ConfigKey.gitUserName) ?? ""
         gitUserEmailField.stringValue = defaults.string(forKey: ConfigKey.gitUserEmail) ?? ""
-        enableCommandsCheckbox.state = defaults.bool(forKey: ConfigKey.enableCommands) ? .on : .off
+        let storedPolicy = defaults.string(forKey: ConfigKey.policyProfile)
+        let policyProfile = storedPolicy ?? (defaults.bool(forKey: ConfigKey.enableCommands)
+            ? FileMCPPolicyProfiles.legacyCommandCompatible
+            : FileMCPPolicyProfiles.restricted)
+        if let index = policyProfilePopup.itemArray.firstIndex(where: { ($0.representedObject as? String) == policyProfile }) {
+            policyProfilePopup.selectItem(at: index)
+        } else {
+            policyProfilePopup.selectItem(at: 0)
+        }
+        enableCommandsCheckbox.state = policyProfile == FileMCPPolicyProfiles.legacyCommandCompatible ? .on : .off
     }
 
     private func updateAPIKeyPlaceholder() {
@@ -586,7 +616,21 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         defaults.set(healthAddressField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: ConfigKey.healthAddress)
         defaults.set(gitUserNameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: ConfigKey.gitUserName)
         defaults.set(gitUserEmailField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: ConfigKey.gitUserEmail)
-        defaults.set(enableCommandsCheckbox.state == .on, forKey: ConfigKey.enableCommands)
+        let policyProfile = policyProfilePopup.selectedItem?.representedObject as? String ?? FileMCPPolicyProfiles.restricted
+        defaults.set(policyProfile, forKey: ConfigKey.policyProfile)
+        defaults.set(policyProfile == FileMCPPolicyProfiles.legacyCommandCompatible, forKey: ConfigKey.enableCommands)
+    }
+
+    private func localPolicyConfiguration() -> LocalPolicyConfiguration {
+        let defaults = UserDefaults.standard
+        let profile = policyProfilePopup.selectedItem?.representedObject as? String ?? FileMCPPolicyProfiles.restricted
+        return LocalPolicyConfiguration(
+            profile: profile,
+            customMaxRisk: defaults.string(forKey: ConfigKey.customPolicyMaxRisk) ?? "low",
+            customAllowedEffects: defaults.stringArray(forKey: ConfigKey.customPolicyAllowedEffects) ?? ["read", "metadata"],
+            customAllowNetworkOpenWorld: defaults.bool(forKey: ConfigKey.customPolicyAllowNetworkOpenWorld),
+            customAllowShell: defaults.bool(forKey: ConfigKey.customPolicyAllowShell)
+        )
     }
 
     private func saveAllConfiguration() {
@@ -628,6 +672,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
                 return
             }
             appendLog("[Runtime] Connect requested.\n")
+            let policyConfiguration = try localPolicyConfiguration().normalized()
             runtime.start(LocalMCPConfiguration(
                 tunnelID: tunnelIDField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                 apiKey: apiKey,
@@ -637,7 +682,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
                 healthAddress: healthAddressField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                 gitUserName: gitUserNameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                 gitUserEmail: gitUserEmailField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
-                enableCommands: enableCommandsCheckbox.state == .on
+                enableCommands: policyConfiguration.profile == FileMCPPolicyProfiles.legacyCommandCompatible,
+                policyConfiguration: policyConfiguration
             ))
         } catch { showError(error.localizedDescription) }
     }

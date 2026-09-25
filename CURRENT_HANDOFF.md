@@ -141,3 +141,11 @@ FMG-002: CLAIMED / ACTIVE on `chatgpt/FMG-002-structured-result-envelope`.
 FMG-002: DONE / MAIN VERIFIED on final merge `dcbc55f7685e91c804ab14500df752a0c6f3be62`; native Verify run `35994263967` SUCCESS.
 
 FMG-003: CLAIMED / ACTIVE on `chatgpt/FMG-003-server-policy`.
+
+## FMG-003 active implementation
+
+FMG-002: DONE / MAIN VERIFIED on merge `dcbc55f7685e91c804ab14500df752a0c6f3be62`; native Verify run `35994263967` SUCCESS.
+
+FMG-003: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-003-server-policy`.
+
+NEXT_EXACT_ACTION: commit/push the exact FMG-003 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, perform scoped review, merge only on green exact-head evidence, verify merged main, then claim the next READY task from the frozen graph.

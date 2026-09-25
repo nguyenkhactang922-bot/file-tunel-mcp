@@ -563,7 +563,9 @@ public partial class MainWindow : Window
 
         GitNameBox.Text = settings.GitUserName;
         GitEmailBox.Text = settings.GitUserEmail;
-        EnableCommandsCheckBox.IsChecked = settings.EnableCommands;
+        PolicyProfileComboBox.SelectedValue = settings.PolicyProfile;
+        if (PolicyProfileComboBox.SelectedValue is null) PolicyProfileComboBox.SelectedValue = FileMcpPolicyProfiles.Restricted;
+        EnableCommandsCheckBox.IsChecked = settings.PolicyProfile == FileMcpPolicyProfiles.LegacyCommandCompatible;
         OtlpEnabledCheckBox.IsChecked = settings.OtlpEnabled;
         OtlpEndpointBox.Text = string.IsNullOrWhiteSpace(settings.OtlpEndpoint) ? OtlpTelemetrySettings.DefaultEndpoint : settings.OtlpEndpoint;
     }
@@ -871,7 +873,8 @@ public partial class MainWindow : Window
 
         _settings.GitUserName = GitNameBox.Text.Trim();
         _settings.GitUserEmail = GitEmailBox.Text.Trim();
-        _settings.EnableCommands = EnableCommandsCheckBox.IsChecked == true;
+        _settings.PolicyProfile = PolicyProfileComboBox.SelectedValue as string ?? FileMcpPolicyProfiles.Restricted;
+        _settings.EnableCommands = _settings.PolicyProfile == FileMcpPolicyProfiles.LegacyCommandCompatible;
         _settings.OtlpEnabled = OtlpEnabledCheckBox.IsChecked == true;
         var otlpEndpoint = OtlpEndpointBox.Text.Trim();
         _settings.OtlpEndpoint = otlpEndpoint.Length == 0 ? OtlpTelemetrySettings.DefaultEndpoint : otlpEndpoint;
@@ -896,7 +899,15 @@ public partial class MainWindow : Window
             workspace.HealthAddress,
             _settings.GitUserName,
             _settings.GitUserEmail,
-            _settings.EnableCommands);
+            _settings.EnableCommands,
+            new LocalPolicyConfiguration
+            {
+                Profile = _settings.PolicyProfile,
+                CustomMaxRisk = _settings.CustomPolicyMaxRisk,
+                CustomAllowedEffects = _settings.CustomPolicyAllowedEffects,
+                CustomAllowNetworkOpenWorld = _settings.CustomPolicyAllowNetworkOpenWorld,
+                CustomAllowShell = _settings.CustomPolicyAllowShell,
+            });
 
     private async Task StopAllAsync()
     {

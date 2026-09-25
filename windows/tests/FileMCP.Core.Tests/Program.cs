@@ -32,6 +32,7 @@ internal static class Program
         {
             TestObservabilityContracts();
             TestCanonicalToolCatalog();
+            TestServerPolicy();
             TestToolResultEnvelope();
             await TestMcpStandardTelemetryAsync(root);
             await TestMcpTraceContextAsync(root);
@@ -51,6 +52,7 @@ internal static class Program
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
             await TestHttpAndMcpAsync(root);
+            await TestServerPolicyMcpAsync(root);
             await TestHttpConnectionBoundsAsync(root);
             await TestRuntimeAsync(root);
             Console.WriteLine($"windows-core-tests: ok ({_assertions} assertions)");
@@ -190,6 +192,84 @@ internal static class Program
         catch (FileMcpException ex) when (ex.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase))
         {
             Assert(true, assertion);
+        }
+    }
+
+    private static void TestServerPolicy()
+    {
+        var restricted = ServerPolicy.FromLegacy(enableCommands: false);
+        Assert(restricted.Profile == FileMcpPolicyProfiles.Restricted, "legacy false maps restricted profile");
+        Assert(restricted.IsAllowed("read_file"), "restricted allows read");
+        Assert(restricted.IsAllowed("write_file"), "restricted preserves legacy workspace mutation");
+        Assert(restricted.IsAllowed("git_push"), "restricted preserves legacy safe-mode git push availability");
+        Assert(!restricted.IsAllowed("run_command"), "restricted denies shell command");
+        Assert(!restricted.LegacyUnsafeGitCompatibility, "restricted keeps Git safe mode");
+        Assert(restricted.Hash == "174b1d27efe868c387b87923665b8d53270f40b48e890e67f40720620d729156", "restricted policy hash is canonical cross-platform");
+
+        var legacy = ServerPolicy.FromLegacy(enableCommands: true);
+        Assert(legacy.Profile == FileMcpPolicyProfiles.LegacyCommandCompatible, "legacy true maps migration-only command profile");
+        Assert(legacy.IsAllowed("run_command"), "legacy profile preserves shell command");
+        Assert(legacy.LegacyUnsafeGitCompatibility, "legacy profile preserves prior Git compatibility behavior");
+        Assert(!FileMcpPolicyProfiles.IsUserSelectable(FileMcpPolicyProfiles.LegacyCommandCompatible), "legacy migration profile is not user selectable");
+
+        var workspaceAuto = new ServerPolicy(new LocalPolicyConfiguration { Profile = FileMcpPolicyProfiles.WorkspaceAuto });
+        Assert(workspaceAuto.IsAllowed("write_file") && workspaceAuto.IsAllowed("git_commit"), "workspace-auto allows local workspace mutations");
+        Assert(!workspaceAuto.IsAllowed("git_push"), "workspace-auto denies external Git push");
+        Assert(!workspaceAuto.IsAllowed("run_command"), "workspace-auto denies shell/open-world command");
+        var workspaceDefinitions = workspaceAuto.FilterDefinitions(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true));
+        var workspaceNames = workspaceDefinitions.OfType<JsonObject>().Select(item => item["name"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal);
+        Assert(!workspaceNames.Contains("run_command") && !workspaceNames.Contains("git_push") && workspaceNames.Contains("write_file"), "effective catalog filtering follows workspace-auto policy");
+
+        var custom = new ServerPolicy(new LocalPolicyConfiguration
+        {
+            Profile = FileMcpPolicyProfiles.Custom,
+            CustomMaxRisk = "low",
+            CustomAllowedEffects = ["read", "metadata"],
+        });
+        Assert(custom.IsAllowed("read_file") && custom.IsAllowed("filemcp_observability_connect"), "custom low read policy allows read/metadata");
+        Assert(!custom.IsAllowed("write_file") && !custom.IsAllowed("git_push") && !custom.IsAllowed("run_command"), "custom low read policy denies broader effects");
+
+        var customShell = new ServerPolicy(new LocalPolicyConfiguration
+        {
+            Profile = FileMcpPolicyProfiles.Custom,
+            CustomMaxRisk = "high",
+            CustomAllowedEffects = ["execute"],
+            CustomAllowNetworkOpenWorld = true,
+            CustomAllowShell = true,
+        });
+        Assert(customShell.IsAllowed("run_command"), "custom policy can explicitly authorize shell without enabling legacy Git compatibility");
+        Assert(!customShell.LegacyUnsafeGitCompatibility, "custom shell authorization does not weaken Git safe mode");
+        var customShellDefinitions = customShell.FilterDefinitions(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true));
+        Assert(customShellDefinitions.OfType<JsonObject>().Any(item => item["name"]!.GetValue<string>() == "run_command"), "effective catalog exposes explicitly authorized custom shell tool");
+
+        var snapshot = custom.Capture();
+        var initialGeneration = custom.Generation;
+        var initialHash = custom.Hash;
+        custom.Update(new LocalPolicyConfiguration
+        {
+            Profile = FileMcpPolicyProfiles.Custom,
+            CustomMaxRisk = "high",
+            CustomAllowedEffects = ["read", "metadata", "write"],
+        });
+        Assert(custom.Generation == initialGeneration + 1 && custom.Hash != initialHash, "policy update increments generation and hash");
+        try
+        {
+            custom.Authorize("read_file", snapshot);
+            throw new Exception("Assertion failed: stale prepared operation rejected after policy generation change");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains("stale", StringComparison.OrdinalIgnoreCase))
+        {
+            Assert(true, "stale prepared operation rejected after policy generation change");
+        }
+
+        try
+        {
+            restricted.Authorize("run_command");
+            throw new Exception("Assertion failed: hidden tool cannot bypass runtime policy denial");
+        }
+        catch (FileMcpException ex) when (ex.Message.Contains("denied", StringComparison.OrdinalIgnoreCase))
+        {
+            Assert(true, "hidden tool cannot bypass runtime policy denial");
         }
     }
 
@@ -1637,12 +1717,39 @@ internal static class Program
         };
         store.Save(settings); var loaded = store.Load();
         Assert(loaded.TunnelId == settings.TunnelId && loaded.Profile == settings.Profile && loaded.EnableCommands, "settings roundtrip");
+        Assert(loaded.PolicyProfile == FileMcpPolicyProfiles.LegacyCommandCompatible, "legacy EnableCommands caller persists migration-only policy profile");
         Assert(loaded.OtlpEnabled && loaded.OtlpEndpoint == "http://127.0.0.1:4319", "settings roundtrip preserves optional OTLP configuration");
         Assert(loaded.Workspaces.Count == 4 && loaded.Workspaces.Select(item => item.Key).SequenceEqual(new[] { "C", "D", "E", "F" }), "multi-workspace defaults");
         Assert(loaded.Workspaces.Count(item => item.Enabled) == 1 && loaded.Workspaces.Any(item => item.Enabled && item.AllowedDirectory == settings.AllowedDirectory), "legacy workspace mapped to matching drive");
         Assert(loaded.Workspaces.Select(item => item.Port).Distinct().Count() == 4, "workspace ports unique");
         Assert(loaded.Workspaces.Select(item => item.Profile).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 4, "workspace profiles unique");
         Assert(!File.ReadAllText(Path.Combine(settingsDir, "settings.json")).Contains("apiKey", StringComparison.OrdinalIgnoreCase), "settings contain no API key");
+
+        var migrationDir = Path.Combine(root, "settings-policy-migration");
+        Directory.CreateDirectory(migrationDir);
+        File.WriteAllText(Path.Combine(migrationDir, "settings.json"), new JsonObject
+        {
+            ["TunnelId"] = "tunnel_" + new string('b', 32),
+            ["Profile"] = "legacy-policy-test",
+            ["Port"] = 18081,
+            ["AllowedDirectory"] = Path.Combine(root, "legacy-workspace"),
+            ["HealthAddress"] = "127.0.0.1:0",
+            ["EnableCommands"] = false,
+        }.ToJsonString());
+        var migratedRestricted = new SettingsStore(migrationDir).Load();
+        Assert(migratedRestricted.PolicyProfile == FileMcpPolicyProfiles.Restricted && !migratedRestricted.EnableCommands, "legacy EnableCommands=false migrates to restricted-equivalent policy");
+
+        var explicitDir = Path.Combine(root, "settings-policy-explicit");
+        var explicitStore = new SettingsStore(explicitDir);
+        var explicitSettings = new FileMcpSettings
+        {
+            PolicyProfile = FileMcpPolicyProfiles.WorkspaceAuto,
+            CustomPolicyMaxRisk = "medium",
+            CustomPolicyAllowedEffects = ["read", "metadata", "write"],
+        };
+        explicitStore.Save(explicitSettings);
+        var explicitLoaded = explicitStore.Load();
+        Assert(explicitLoaded.PolicyProfile == FileMcpPolicyProfiles.WorkspaceAuto && !explicitLoaded.EnableCommands, "explicit workspace-auto persists without legacy shell elevation");
 
         var target = "FileMCP/tests/" + Guid.NewGuid().ToString("N");
         var credentials = new WindowsCredentialStore(target);
@@ -2087,6 +2194,41 @@ internal static class Program
         var badHost = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), "", host: "evil.example");
         Assert(badHost.StartsWith("HTTP/1.1 403 Forbidden", StringComparison.Ordinal), "host validation");
         Console.WriteLine("windows-http-mcp: ok");
+    }
+
+    private static async Task TestServerPolicyMcpAsync(string root)
+    {
+        var workspace = Path.Combine(root, "policy-mcp");
+        Directory.CreateDirectory(workspace);
+        var token = new string('p', 64);
+        var port = FreePort();
+        var policyConfiguration = new LocalPolicyConfiguration { Profile = FileMcpPolicyProfiles.WorkspaceAuto };
+        await using var server = new LocalMcpServer(
+            (ushort)port,
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            enableCommands: true,
+            localAuthToken: token,
+            log: _ => { },
+            policyConfiguration: policyConfiguration);
+        await server.StartAsync();
+
+        const string listBody = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}";
+        var listResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), listBody);
+        var listJson = JsonNode.Parse(HttpBody(listResponse))!.AsObject();
+        var policy = listJson["result"]!["policy"]!.AsObject();
+        Assert(policy["profile"]!.GetValue<string>() == FileMcpPolicyProfiles.WorkspaceAuto, "MCP tools/list exposes effective local policy profile");
+        Assert(policy["generation"]!.GetValue<long>() == 1, "MCP tools/list exposes policy generation");
+        var toolNames = listJson["result"]!["tools"]!.AsArray()
+            .Select(node => node!["name"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal);
+        Assert(toolNames.Contains("write_file") && !toolNames.Contains("run_command") && !toolNames.Contains("git_push"), "workspace-auto effective catalog hides denied open-world tools");
+
+        const string deniedBody = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"command\":\"Write-Output denied\"}}}";
+        var deniedResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), deniedBody);
+        var deniedJson = JsonNode.Parse(HttpBody(deniedResponse))!.AsObject();
+        Assert(deniedJson["error"]!["code"]!.GetValue<int>() == -32602, "hidden denied tool cannot bypass runtime policy by direct call");
+        Console.WriteLine("windows-server-policy-mcp: ok");
     }
 
     private static async Task TestHttpConnectionBoundsAsync(string root)

@@ -1,6 +1,13 @@
 import Foundation
 import CryptoKit
 
+struct ToolPolicyMetadata {
+    let name: String
+    let risk: String
+    let effect: String
+    let capabilities: [String]
+}
+
 enum ToolCatalogError: LocalizedError {
     case invalid(String)
     var errorDescription: String? {
@@ -134,6 +141,20 @@ final class CanonicalToolCatalog {
             throw ToolCatalogError.invalid("Canonical tool catalog is missing tool: \(name)")
         }
         return copy
+    }
+
+    func toolPolicyMetadata(named name: String) throws -> ToolPolicyMetadata {
+        guard let item = tools.first(where: { ($0["name"] as? String) == name }),
+              let risk = item["risk"] as? String,
+              let effect = item["effect"] as? String,
+              let capabilities = item["capabilities"] as? [String] else {
+            throw ToolCatalogError.invalid("Canonical tool catalog is missing policy metadata for: \(name)")
+        }
+        return ToolPolicyMetadata(name: name, risk: risk, effect: effect, capabilities: capabilities)
+    }
+
+    func containsTool(named name: String) -> Bool {
+        tools.contains { ($0["name"] as? String) == name }
     }
 
     func validateHandlerCoverage(handler: String, runtimeHandlerNames: Set<String>) throws {

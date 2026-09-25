@@ -19,7 +19,7 @@ public sealed class SettingsStore
         if (!File.Exists(_path))
         {
             var fresh = new FileMcpSettings();
-            Normalize(fresh, hadWorkspaceArray: false);
+            Normalize(fresh, hadWorkspaceArray: false, hadPolicyProfile: true);
             return fresh;
         }
 
@@ -29,6 +29,7 @@ public sealed class SettingsStore
             var settings = JsonSerializer.Deserialize<FileMcpSettings>(json, JsonOptions) ?? new FileMcpSettings();
 
             var hadWorkspaceArray = false;
+            var hadPolicyProfile = false;
             using (var document = JsonDocument.Parse(json))
             {
                 if (document.RootElement.TryGetProperty(nameof(FileMcpSettings.Workspaces), out var workspaces) &&
@@ -37,9 +38,12 @@ public sealed class SettingsStore
                 {
                     hadWorkspaceArray = true;
                 }
+                hadPolicyProfile = document.RootElement.TryGetProperty(nameof(FileMcpSettings.PolicyProfile), out var policyProfile) &&
+                    policyProfile.ValueKind == JsonValueKind.String &&
+                    !string.IsNullOrWhiteSpace(policyProfile.GetString());
             }
 
-            Normalize(settings, hadWorkspaceArray);
+            Normalize(settings, hadWorkspaceArray, hadPolicyProfile);
             return settings;
         }
         catch (JsonException ex)
@@ -50,7 +54,9 @@ public sealed class SettingsStore
 
     public void Save(FileMcpSettings settings)
     {
-        Normalize(settings, hadWorkspaceArray: settings.Workspaces.Count > 0);
+        if (settings.EnableCommands && string.Equals(settings.PolicyProfile, FileMcpPolicyProfiles.Restricted, StringComparison.OrdinalIgnoreCase))
+            settings.PolicyProfile = FileMcpPolicyProfiles.LegacyCommandCompatible;
+        Normalize(settings, hadWorkspaceArray: settings.Workspaces.Count > 0, hadPolicyProfile: true);
         SynchronizeLegacyFields(settings);
 
         var directory = Path.GetDirectoryName(_path)!;
@@ -67,7 +73,7 @@ public sealed class SettingsStore
         }
     }
 
-    private static void Normalize(FileMcpSettings settings, bool hadWorkspaceArray)
+    private static void Normalize(FileMcpSettings settings, bool hadWorkspaceArray, bool hadPolicyProfile)
     {
         if (settings.Port is < 1 or > 65535) settings.Port = 8008;
         if (string.IsNullOrWhiteSpace(settings.Profile)) settings.Profile = "filemcp";
@@ -76,6 +82,23 @@ public sealed class SettingsStore
         if (string.IsNullOrWhiteSpace(settings.HealthAddress)) settings.HealthAddress = "127.0.0.1:0";
         if (string.IsNullOrWhiteSpace(settings.OtlpEndpoint)) settings.OtlpEndpoint = OtlpTelemetrySettings.DefaultEndpoint;
         else settings.OtlpEndpoint = settings.OtlpEndpoint.Trim();
+
+        if (!hadPolicyProfile)
+            settings.PolicyProfile = settings.EnableCommands ? FileMcpPolicyProfiles.LegacyCommandCompatible : FileMcpPolicyProfiles.Restricted;
+        var normalizedPolicy = new LocalPolicyConfiguration
+        {
+            Profile = settings.PolicyProfile,
+            CustomMaxRisk = settings.CustomPolicyMaxRisk,
+            CustomAllowedEffects = settings.CustomPolicyAllowedEffects,
+            CustomAllowNetworkOpenWorld = settings.CustomPolicyAllowNetworkOpenWorld,
+            CustomAllowShell = settings.CustomPolicyAllowShell,
+        }.CloneNormalized();
+        settings.PolicyProfile = normalizedPolicy.Profile;
+        settings.CustomPolicyMaxRisk = normalizedPolicy.CustomMaxRisk;
+        settings.CustomPolicyAllowedEffects = normalizedPolicy.CustomAllowedEffects;
+        settings.CustomPolicyAllowNetworkOpenWorld = normalizedPolicy.CustomAllowNetworkOpenWorld;
+        settings.CustomPolicyAllowShell = normalizedPolicy.CustomAllowShell;
+        settings.EnableCommands = normalizedPolicy.Profile == FileMcpPolicyProfiles.LegacyCommandCompatible;
 
         var existing = settings.Workspaces
             .Where(item => !string.IsNullOrWhiteSpace(item.Key))
