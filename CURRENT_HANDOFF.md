@@ -237,3 +237,12 @@ FMG-007: DONE / MAIN VERIFIED. Candidate `2319488761c845df7be5010dca0283485a41a8
 FMG-008: CLAIMED / ACTIVE on `chatgpt/FMG-008-existing-mutation-hardening`.
 
 NEXT_EXACT_ACTION: harden existing write/delete mutations only: expected-version support, Mutation Guard immediately before commit/delete, commit-time policy reauthorization, cancellation-before-commit safety, and required dry-run semantics. Preserve root/link/backward-compatibility contracts. Do not begin FMG-009 before FMG-008 MAIN VERIFIED.
+
+## FMG-008 closure / FMG-009 claim
+
+FMG-008: DONE / MAIN VERIFIED. Final candidate `35ef237a0f4d32f0940491b9163a0dcbea7e6c61` merged by PR #12 as main `8a58a223814505518e581ebe79856846555cb4b4`; merged-main Verify `36212103370` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows core 655 assertions and Release build PASS. Evidence: `docs/evidence/FMG-008_EXISTING_MUTATION_HARDENING_EVIDENCE.md`.
+
+FMG-009: CLAIMED / ACTIVE on `chatgpt/FMG-009-apply-edits`.
+Branch: `chatgpt/FMG-009-apply-edits`
+
+NEXT_EXACT_ACTION: implement FMG-009 Atomic Versioned `apply_edits` only: canonical range-edit primitive, expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version/Mutation Guard/policy/cancellation rechecks, atomic publish, and adversarial/fault-injection coverage. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.

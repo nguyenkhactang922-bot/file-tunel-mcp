@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-008 Existing Mutation Hardening on chatgpt/FMG-008-existing-mutation-hardening; require native macOS + Windows x64 + Windows ARM64 Verify, exact-head review, merge main, and MAIN VERIFIED before FMG-009.
+AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-009 Atomic Versioned apply_edits on chatgpt/FMG-009-apply-edits; require native macOS + Windows x64 + Windows ARM64 Verify, exact-head review, merge main, and MAIN VERIFIED before claiming the next READY task.
 
 FPA-004 product/release scope is resolved by ADR-0003. V11-009 upstream integration remains an external authority gate and does not block the active FMG complete-upgrade implementation program.

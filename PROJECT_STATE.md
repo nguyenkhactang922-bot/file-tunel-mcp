@@ -197,3 +197,22 @@ NEXT_EXACT_ACTION: integrate expected-version + Mutation Guard + commit-time pol
 
 
 FMG-007 final main proof: merge `ad78b0f75564728c7a4aa5dae218d4e79d697569`; native Verify `36167404567` SUCCESS on all three platform jobs; local merged-main Windows runtime 637 assertions and Release build PASS.
+
+## FMG-008 implementation
+
+State: DONE / MAIN VERIFIED.
+Branch: `chatgpt/FMG-008-existing-mutation-hardening`.
+Final candidate: `35ef237a0f4d32f0940491b9163a0dcbea7e6c61`.
+PR: #12.
+Merge main: `8a58a223814505518e581ebe79856846555cb4b4`.
+Native merged-main Verify: run `36212103370` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Local merged-main proof: catalog/parity + FMG-005/FM??G-006/FM??G-007/FM??G-008 contracts PASS; Windows core 655 assertions PASS; Release build 0 warnings / 0 errors.
+Evidence: `docs/evidence/FMG-008_EXISTING_MUTATION_HARDENING_EVIDENCE.md`.
+
+## FMG-009 implementation
+
+State: ACTIVE / CLAIMED.
+Active branch: `chatgpt/FMG-009-apply-edits`.
+Depends: FMG-004 and FMG-008 DONE / MAIN VERIFIED.
+Scope: Atomic Versioned `apply_edits` only.
+NEXT_EXACT_ACTION: implement canonical range edits with expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version + Mutation Guard + policy/cancellation rechecks, atomic publish, and failure/cancellation tests. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.
