@@ -12,6 +12,8 @@ internal sealed partial class LocalTools
     private readonly ServerPolicy _policy;
     private readonly ExecProcessEnvironmentAuthority _execEnvironment;
     private readonly FileVersionService _fileVersions;
+    private readonly AuthorizedPathSnapshotService _mutationGuard;
+    private readonly Action<string>? _beforeMutationCommitForTests;
     private readonly bool _enableCommands;
     private readonly string? _safeGitEmptyFile;
     private readonly string? _safeGitHooksDirectory;
@@ -32,7 +34,7 @@ internal sealed partial class LocalTools
     };
     private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "search_content", "search_filenames", "exec_process",
+        "list_files", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "exec_process",
     };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -44,10 +46,18 @@ internal sealed partial class LocalTools
     {
     }
 
-    internal LocalTools(string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy, IReadOnlyList<string>? execEnvironmentAllowList = null)
+    internal LocalTools(
+        string allowedDirectory,
+        string gitUserName,
+        string gitUserEmail,
+        ServerPolicy policy,
+        IReadOnlyList<string>? execEnvironmentAllowList = null,
+        Action<string>? beforeMutationCommitForTests = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
+        _mutationGuard = new AuthorizedPathSnapshotService(_resolver);
+        _beforeMutationCommitForTests = beforeMutationCommitForTests;
         _gitUserName = gitUserName;
         _gitUserEmail = gitUserEmail;
         _policy = policy;
@@ -100,9 +110,21 @@ internal sealed partial class LocalTools
                 "write_file" => StringOutput(WriteFile(
                     GetRequiredString(arguments, "relative_path"),
                     GetRequiredString(arguments, "content"),
-                    GetBool(arguments, "append", false))),
-                "delete_file" => StringOutput(DeleteFile(GetRequiredString(arguments, "relative_path"))),
-                "delete_directory" => StringOutput(DeleteDirectory(GetRequiredString(arguments, "relative_path"))),
+                    GetBool(arguments, "append", false),
+                    GetString(arguments, "expected_version", ""),
+                    preparedPolicy,
+                    effectiveCancellation)),
+                "delete_file" => StringOutput(DeleteFile(
+                    GetRequiredString(arguments, "relative_path"),
+                    GetString(arguments, "expected_version", ""),
+                    GetBool(arguments, "dry_run", false),
+                    preparedPolicy,
+                    effectiveCancellation)),
+                "delete_directory" => StringOutput(DeleteDirectory(
+                    GetRequiredString(arguments, "relative_path"),
+                    GetBool(arguments, "dry_run", false),
+                    preparedPolicy,
+                    effectiveCancellation)),
                 "exec_process" => ObjectOutput(await ExecProcessAsync(
                     GetRequiredString(arguments, "executable"),
                     GetStringArray(arguments, "arguments"),
@@ -504,47 +526,137 @@ internal sealed partial class LocalTools
         return (matches, truncated || (context?.Truncated ?? false));
     }
 
-    private string WriteFile(string relativePath, string content, bool append)
+    private string WriteFile(
+        string relativePath,
+        string content,
+        bool append,
+        string expectedVersion,
+        PolicySnapshot preparedPolicy,
+        CancellationToken cancellationToken)
     {
         var data = Encoding.UTF8.GetBytes(content);
         if (data.Length > FileMcpConstants.MaxWriteBytes) throw new FileMcpException("Content is larger than the 5 MB write limit");
+        cancellationToken.ThrowIfCancellationRequested();
         var target = _resolver.Resolve(relativePath);
         if (Directory.Exists(target)) throw new FileMcpException($"Not a file: {relativePath}");
-        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        if (append && File.Exists(target))
+
+        var existed = File.Exists(target);
+        var normalizedExpected = NormalizeExpectedVersion(expectedVersion);
+        if (normalizedExpected is not null)
         {
-            using var stream = new FileStream(target, FileMode.Append, FileAccess.Write, FileShare.Read);
-            stream.Write(data);
+            if (!existed) throw new FileMcpException("expected_version requires an existing file target");
+            _ = _fileVersions.VerifyExpectedVersion(relativePath, normalizedExpected);
         }
-        else
+
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        var snapshot = existed
+            ? _mutationGuard.CaptureExisting(relativePath)
+            : _mutationGuard.CaptureNewTarget(relativePath);
+        var temp = target + ".filemcp-" + Guid.NewGuid().ToString("N") + ".tmp";
+        try
         {
-            var temp = target + ".filemcp-" + Guid.NewGuid().ToString("N") + ".tmp";
-            try { File.WriteAllBytes(temp, data); File.Move(temp, target, true); }
-            finally { try { if (File.Exists(temp)) File.Delete(temp); } catch { } }
+            if (append && existed)
+            {
+                File.Copy(target, temp, overwrite: false);
+                using var stream = new FileStream(temp, FileMode.Append, FileAccess.Write, FileShare.None);
+                stream.Write(data);
+            }
+            else
+            {
+                File.WriteAllBytes(temp, data);
+            }
+
+            PrepareMutationCommit("write_file", preparedPolicy, cancellationToken);
+            _ = _mutationGuard.Verify(snapshot);
+            if (normalizedExpected is not null)
+                _ = _fileVersions.VerifyExpectedVersion(relativePath, normalizedExpected);
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(temp, target, true);
+        }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { }
         }
         return $"{(append ? "Appended to" : "Wrote")} {relativePath} ({data.Length} bytes)";
     }
 
-    private string DeleteFile(string relativePath)
+    private string DeleteFile(
+        string relativePath,
+        string expectedVersion,
+        bool dryRun,
+        PolicySnapshot preparedPolicy,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var target = _resolver.ResolveForDeletion(relativePath);
         var attributes = _resolver.GetAttributesWithoutFollowingFinalTarget(target, $"No such file: {relativePath}");
         if ((attributes & FileAttributes.Directory) != 0 && (attributes & FileAttributes.ReparsePoint) == 0)
             throw new FileMcpException("delete_file only removes files or symlinks; use delete_directory for folders");
+
+        var normalizedExpected = NormalizeExpectedVersion(expectedVersion);
+        if (normalizedExpected is not null)
+        {
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+                throw new FileMcpException("expected_version is only supported for regular file targets");
+            _ = _fileVersions.VerifyExpectedVersion(relativePath, normalizedExpected);
+        }
+        var snapshot = _mutationGuard.CaptureExisting(relativePath);
+        if (dryRun)
+        {
+            _ = _mutationGuard.Verify(snapshot);
+            if (normalizedExpected is not null)
+                _ = _fileVersions.VerifyExpectedVersion(relativePath, normalizedExpected);
+            return $"Dry run: would delete {relativePath}";
+        }
+
+        PrepareMutationCommit("delete_file", preparedPolicy, cancellationToken);
+        _ = _mutationGuard.Verify(snapshot);
+        if (normalizedExpected is not null)
+            _ = _fileVersions.VerifyExpectedVersion(relativePath, normalizedExpected);
+        cancellationToken.ThrowIfCancellationRequested();
         if ((attributes & FileAttributes.Directory) != 0) Directory.Delete(target, false); else File.Delete(target);
         return $"Deleted {relativePath}";
     }
 
-    private string DeleteDirectory(string relativePath)
+    private string DeleteDirectory(
+        string relativePath,
+        bool dryRun,
+        PolicySnapshot preparedPolicy,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var target = _resolver.ResolveForDeletion(relativePath);
         if (string.Equals(Path.GetFullPath(target).TrimEnd('\\'), Path.GetFullPath(_resolver.Root).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
             throw new FileMcpException("Refusing to delete the shared root directory");
         var attributes = _resolver.GetAttributesWithoutFollowingFinalTarget(target, $"No such directory: {relativePath}");
         if ((attributes & FileAttributes.ReparsePoint) != 0 || (attributes & FileAttributes.Directory) == 0)
             throw new FileMcpException($"Not a directory: {relativePath}. Use delete_file for symlinks.");
+
+        var snapshot = _mutationGuard.CaptureExisting(relativePath);
+        if (dryRun)
+        {
+            _ = _mutationGuard.Verify(snapshot);
+            return $"Dry run: would delete directory {relativePath}";
+        }
+
+        PrepareMutationCommit("delete_directory", preparedPolicy, cancellationToken);
+        _ = _mutationGuard.Verify(snapshot);
+        cancellationToken.ThrowIfCancellationRequested();
         Directory.Delete(target, true);
         return $"Deleted directory {relativePath}";
+    }
+
+    private void PrepareMutationCommit(string toolName, PolicySnapshot preparedPolicy, CancellationToken cancellationToken)
+    {
+        _beforeMutationCommitForTests?.Invoke(toolName);
+        cancellationToken.ThrowIfCancellationRequested();
+        _policy.Authorize(toolName, preparedPolicy);
+    }
+
+    private static string? NormalizeExpectedVersion(string value)
+    {
+        var normalized = (value ?? "").Trim();
+        return normalized.Length == 0 ? null : normalized;
     }
 
     private async Task<JsonObject> ExecProcessAsync(

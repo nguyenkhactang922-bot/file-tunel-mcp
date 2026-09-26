@@ -1339,6 +1339,196 @@ do {
 }
 print("swift-mutation-guard: ok")
 
+let fmg008Root = root.appendingPathComponent("existing-mutation-hardening")
+try FileManager.default.createDirectory(at: fmg008Root, withIntermediateDirectories: true)
+let fmg008Resolver = try SafePathResolver(rootPath: fmg008Root.path)
+let fmg008Policy = try ServerPolicy.fromLegacy(enableCommands: false)
+let fmg008Tools = try LocalTools(
+    resolver: fmg008Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: fmg008Policy
+)
+
+// Backward-compatible calls without expected_version remain valid.
+_ = try fmg008Tools.call(name: "write_file", arguments: ["relative_path": "legacy.txt", "content": "one"])
+_ = try fmg008Tools.call(name: "write_file", arguments: ["relative_path": "legacy.txt", "content": "two"])
+_ = try fmg008Tools.call(name: "write_file", arguments: ["relative_path": "legacy.txt", "content": "+three", "append": true])
+let legacyMutationText = try String(contentsOf: fmg008Root.appendingPathComponent("legacy.txt"), encoding: .utf8)
+precondition(legacyMutationText == "two+three")
+
+// Stale overwrite rejects and preserves newer external content.
+_ = try fmg008Tools.call(name: "write_file", arguments: ["relative_path": "stale-write.txt", "content": "version-a"])
+let staleReadOutput = try fmg008Tools.call(name: "read_file", arguments: ["relative_path": "stale-write.txt"])
+let staleWriteVersion = staleReadOutput.structuredContent["version"] as! String
+try "version-b".write(to: fmg008Root.appendingPathComponent("stale-write.txt"), atomically: false, encoding: .utf8)
+do {
+    _ = try fmg008Tools.call(name: "write_file", arguments: [
+        "relative_path": "stale-write.txt",
+        "content": "must-not-land",
+        "expected_version": staleWriteVersion,
+    ])
+    preconditionFailure("FMG-008 stale expected_version overwrite must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("changed"), "unexpected stale write error: \(error)")
+}
+let staleWriteAfterReject = try String(contentsOf: fmg008Root.appendingPathComponent("stale-write.txt"), encoding: .utf8)
+precondition(staleWriteAfterReject == "version-b")
+let freshWriteOutput = try fmg008Tools.call(name: "read_file", arguments: ["relative_path": "stale-write.txt"])
+let freshWriteVersion = freshWriteOutput.structuredContent["version"] as! String
+_ = try fmg008Tools.call(name: "write_file", arguments: [
+    "relative_path": "stale-write.txt",
+    "content": "version-c",
+    "expected_version": freshWriteVersion,
+])
+let staleWriteAfterCommit = try String(contentsOf: fmg008Root.appendingPathComponent("stale-write.txt"), encoding: .utf8)
+precondition(staleWriteAfterCommit == "version-c")
+
+// Stale delete and dry-run semantics.
+_ = try fmg008Tools.call(name: "write_file", arguments: ["relative_path": "delete-me.txt", "content": "delete-a"])
+let staleDeleteOutput = try fmg008Tools.call(name: "read_file", arguments: ["relative_path": "delete-me.txt"])
+let staleDeleteVersion = staleDeleteOutput.structuredContent["version"] as! String
+try "delete-b".write(to: fmg008Root.appendingPathComponent("delete-me.txt"), atomically: false, encoding: .utf8)
+do {
+    _ = try fmg008Tools.call(name: "delete_file", arguments: [
+        "relative_path": "delete-me.txt",
+        "expected_version": staleDeleteVersion,
+    ])
+    preconditionFailure("FMG-008 stale expected_version delete must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("changed"), "unexpected stale delete error: \(error)")
+}
+precondition(FileManager.default.fileExists(atPath: fmg008Root.appendingPathComponent("delete-me.txt").path))
+let freshDeleteOutput = try fmg008Tools.call(name: "read_file", arguments: ["relative_path": "delete-me.txt"])
+let freshDeleteVersion = freshDeleteOutput.structuredContent["version"] as! String
+let dryDeleteOutput = try fmg008Tools.call(name: "delete_file", arguments: [
+    "relative_path": "delete-me.txt",
+    "expected_version": freshDeleteVersion,
+    "dry_run": true,
+])
+precondition((dryDeleteOutput.structuredContent["result"] as? String)?.hasPrefix("Dry run:") == true)
+precondition(FileManager.default.fileExists(atPath: fmg008Root.appendingPathComponent("delete-me.txt").path))
+_ = try fmg008Tools.call(name: "delete_file", arguments: [
+    "relative_path": "delete-me.txt",
+    "expected_version": freshDeleteVersion,
+])
+precondition(!FileManager.default.fileExists(atPath: fmg008Root.appendingPathComponent("delete-me.txt").path))
+
+let dryTree = fmg008Root.appendingPathComponent("delete-tree/nested")
+try FileManager.default.createDirectory(at: dryTree, withIntermediateDirectories: true)
+try "child".write(to: dryTree.appendingPathComponent("child.txt"), atomically: true, encoding: .utf8)
+let dryDirectoryOutput = try fmg008Tools.call(name: "delete_directory", arguments: ["relative_path": "delete-tree", "dry_run": true])
+precondition((dryDirectoryOutput.structuredContent["result"] as? String)?.hasPrefix("Dry run:") == true)
+precondition(FileManager.default.fileExists(atPath: fmg008Root.appendingPathComponent("delete-tree").path))
+_ = try fmg008Tools.call(name: "delete_directory", arguments: ["relative_path": "delete-tree"])
+precondition(!FileManager.default.fileExists(atPath: fmg008Root.appendingPathComponent("delete-tree").path))
+
+// Final Mutation Guard rejects a target swap after staging.
+let swapWriteURL = fmg008Root.appendingPathComponent("swap-write.txt")
+try "authorized".write(to: swapWriteURL, atomically: true, encoding: .utf8)
+var swapHookUsed = false
+let swapTools = try LocalTools(
+    resolver: fmg008Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    beforeMutationCommitForTests: { toolName in
+        guard toolName == "write_file", !swapHookUsed else { return }
+        swapHookUsed = true
+        try! FileManager.default.removeItem(at: swapWriteURL)
+        try! "attacker-replacement".write(to: swapWriteURL, atomically: true, encoding: .utf8)
+    }
+)
+do {
+    _ = try swapTools.call(name: "write_file", arguments: ["relative_path": "swap-write.txt", "content": "must-not-land"])
+    preconditionFailure("FMG-008 path swap must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("target identity changed"), "unexpected path swap error: \(error)")
+}
+let swapWriteAfterReject = try String(contentsOf: swapWriteURL, encoding: .utf8)
+precondition(swapWriteAfterReject == "attacker-replacement")
+
+// Delete race replacement is not deleted.
+let deleteRaceURL = fmg008Root.appendingPathComponent("delete-race.txt")
+try "authorized".write(to: deleteRaceURL, atomically: true, encoding: .utf8)
+var deleteRaceHookUsed = false
+let deleteRaceTools = try LocalTools(
+    resolver: fmg008Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    beforeMutationCommitForTests: { toolName in
+        guard toolName == "delete_file", !deleteRaceHookUsed else { return }
+        deleteRaceHookUsed = true
+        try! FileManager.default.removeItem(at: deleteRaceURL)
+        try! "replacement".write(to: deleteRaceURL, atomically: true, encoding: .utf8)
+    }
+)
+do {
+    _ = try deleteRaceTools.call(name: "delete_file", arguments: ["relative_path": "delete-race.txt"])
+    preconditionFailure("FMG-008 delete race must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("target identity changed"), "unexpected delete race error: \(error)")
+}
+precondition(FileManager.default.fileExists(atPath: deleteRaceURL.path))
+let deleteRaceAfterReject = try String(contentsOf: deleteRaceURL, encoding: .utf8)
+precondition(deleteRaceAfterReject == "replacement")
+
+// Cooperative cancellation exactly at the pre-commit boundary preserves the original.
+let cancelWriteURL = fmg008Root.appendingPathComponent("cancel-write.txt")
+try "original".write(to: cancelWriteURL, atomically: true, encoding: .utf8)
+var mutationCancelled = false
+let cancelContext = try ToolExecutionContext(meta: nil, cancellationProbe: { mutationCancelled })
+let cancelTools = try LocalTools(
+    resolver: fmg008Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    beforeMutationCommitForTests: { toolName in if toolName == "write_file" { mutationCancelled = true } }
+)
+do {
+    _ = try cancelTools.call(
+        name: "write_file",
+        arguments: ["relative_path": "cancel-write.txt", "content": "cancelled"],
+        executionContext: cancelContext
+    )
+    preconditionFailure("FMG-008 pre-commit cancellation must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("cancelled"), "unexpected cancellation error: \(error)")
+}
+let cancelWriteAfterReject = try String(contentsOf: cancelWriteURL, encoding: .utf8)
+precondition(cancelWriteAfterReject == "original")
+
+// Policy generation change exactly at pre-commit invalidates the prepared write.
+let policyWriteURL = fmg008Root.appendingPathComponent("policy-write.txt")
+try "original".write(to: policyWriteURL, atomically: true, encoding: .utf8)
+let mutableMutationPolicy = try ServerPolicy.fromLegacy(enableCommands: false)
+var policyHookUsed = false
+let policyMutationTools = try LocalTools(
+    resolver: fmg008Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: mutableMutationPolicy,
+    beforeMutationCommitForTests: { toolName in
+        guard toolName == "write_file", !policyHookUsed else { return }
+        policyHookUsed = true
+        try! mutableMutationPolicy.update(LocalPolicyConfiguration(
+            profile: FileMCPPolicyProfiles.custom,
+            customMaxRisk: "low",
+            customAllowedEffects: ["read", "metadata"]
+        ))
+    }
+)
+do {
+    _ = try policyMutationTools.call(name: "write_file", arguments: ["relative_path": "policy-write.txt", "content": "must-not-land"])
+    preconditionFailure("FMG-008 policy removal before commit must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("policy changed"), "unexpected policy reauthorization error: \(error)")
+}
+let policyWriteAfterReject = try String(contentsOf: policyWriteURL, encoding: .utf8)
+precondition(policyWriteAfterReject == "original")
+print("swift-existing-mutation-hardening: ok")
+
 let localAuthToken = String(repeating: "a", count: 64)
 
 do {
@@ -1468,7 +1658,7 @@ SAFE_BASE_URL="http://127.0.0.1:18089/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.1.0"
+CATALOG_VERSION="1.2.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'

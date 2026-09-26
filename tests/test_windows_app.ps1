@@ -49,7 +49,7 @@ if ($PackagedCatalogHash -ne $SourceCatalogHash) {
     throw "Packaged tool catalog hash does not match canonical source."
 }
 $PackagedCatalogJson = Get-Content $PackagedCatalog -Raw | ConvertFrom-Json
-if ($PackagedCatalogJson.schemaVersion -ne 1 -or $PackagedCatalogJson.catalogVersion -ne "1.1.0") {
+if ($PackagedCatalogJson.schemaVersion -ne 1 -or $PackagedCatalogJson.catalogVersion -ne "1.2.0") {
     throw "Packaged tool catalog version is invalid."
 }
 Write-Host "windows-packaged-tool-catalog-$Architecture`: ok (sha256=$($PackagedCatalogHash.ToLowerInvariant()))"

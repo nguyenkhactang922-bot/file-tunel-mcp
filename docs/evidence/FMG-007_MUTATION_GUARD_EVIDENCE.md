@@ -1,6 +1,6 @@
 # FMG-007 AuthorizedPathSnapshot / Mutation Guard Evidence
 
-Status: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+Status: DONE / MAIN VERIFIED
 
 Branch: `chatgpt/FMG-007-mutation-guard`
 Baseline main: `4ce571a8fd22448701cc6ad135a828c2328d12fe`
@@ -50,6 +50,25 @@ macOS native harness contains equivalent checks:
 - Git-for-Windows Bash syntax for macOS build/dev/runtime harness: PASS;
 - `git diff --check`: PASS.
 
-## Remaining gate
+## Final main verification
 
-Commit/push exact candidate -> native Verify on macOS + Windows x64 + Windows ARM64 -> fix only the exact failing stage if any -> scoped security review -> PR/merge exact green head -> merged-main verification -> mark FMG-007 DONE / MAIN VERIFIED -> only then begin FMG-008.
+- Candidate exact HEAD: `2319488761c845df7be5010dca0283485a41a8e9`.
+- Exact candidate push Verify `36166198999`: SUCCESS.
+- PR #11 exact-head Verify `36166975957`: macOS / Windows x64 / Windows ARM64 SUCCESS.
+- Scoped security review: PASS, no new blocker.
+- Merge main: `ad78b0f75564728c7a4aa5dae218d4e79d697569`.
+- Merged-main Verify `36167404567`: macOS / Windows x64 / Windows ARM64 SUCCESS.
+- Local merged-main: mutation-guard contract PASS; catalog/parity + FMG-006 prerequisite PASS; Release build 0 warnings / 0 errors; Windows runtime 637 assertions PASS.
+
+Result: FMG-007 DONE / MAIN VERIFIED.
+
+## Final closure
+
+- final candidate head: `2319488761c845df7be5010dca0283485a41a8e9`;
+- PR #11 merged as main `ad78b0f75564728c7a4aa5dae218d4e79d697569`;
+- exact-head Verify runs `36166198999` and `36166975957`: macOS / Windows x64 / Windows ARM64 SUCCESS;
+- merged-main native Verify run `36167404567`: macOS / Windows x64 / Windows ARM64 SUCCESS;
+- merged-main local Mutation Guard + catalog/parity/FMG-006 prerequisite contracts: PASS;
+- merged-main local Windows runtime: 637 assertions PASS;
+- merged-main Release build: 0 warnings / 0 errors;
+- FMG-007: DONE / MAIN VERIFIED.

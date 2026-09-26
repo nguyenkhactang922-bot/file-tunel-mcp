@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "contracts" / "tool_catalog.v1.json"
-EXPECTED_CATALOG_VERSION = "1.1.0"
+EXPECTED_CATALOG_VERSION = "1.2.0"
 EXPECTED_INSTRUCTION_VERSION = "1.0.0"
 EXPECTED_MODERN = "2026-07-28"
 EXPECTED_LEGACY = ["2025-11-25", "2025-06-18", "2025-03-26"]
