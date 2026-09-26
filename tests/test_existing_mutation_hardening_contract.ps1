@@ -66,4 +66,3 @@ Require-Marker "tests/test_swift_runtime.sh" @(
 )
 
 Write-Host "existing-mutation-hardening-contract: ok (catalog=1.2.0 tools=20 expected-version + guard + policy + cancellation + dry-run parity)"
-
