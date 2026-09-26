@@ -211,8 +211,11 @@ Evidence: `docs/evidence/FMG-008_EXISTING_MUTATION_HARDENING_EVIDENCE.md`.
 
 ## FMG-009 implementation
 
-State: ACTIVE / CLAIMED.
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
 Active branch: `chatgpt/FMG-009-apply-edits`.
 Depends: FMG-004 and FMG-008 DONE / MAIN VERIFIED.
 Scope: Atomic Versioned `apply_edits` only.
 NEXT_EXACT_ACTION: implement canonical range edits with expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version + Mutation Guard + policy/cancellation rechecks, atomic publish, and failure/cancellation tests. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.
+Evidence: `docs/evidence/FMG-009_APPLY_EDITS_EVIDENCE.md`.
+Local proof: catalog/parity + FMG-005..FMG-009 contracts PASS; Windows runtime 682 assertions PASS; Release build 0 warnings / 0 errors.
+Native macOS: pending GitHub Verify because local Windows host has no native swiftc.

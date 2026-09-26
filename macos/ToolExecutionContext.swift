@@ -39,6 +39,7 @@ final class ToolExecutionContext {
     private(set) var truncationReason = "none"
     var remainingFiles: Int { max(0, limits.maxFilesScanned - filesScanned) }
     var remainingBytes: Int64 { max(0, limits.maxBytesScanned - bytesScanned) }
+    var cancellationRequested: Bool { cancellationProbe() || nowProvider() >= deadline }
 
     init(
         meta: [String: Any]?,

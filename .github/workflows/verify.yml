@@ -132,6 +132,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_existing_mutation_hardening_contract.ps1
 
+      - name: Verify atomic apply_edits contract
+        shell: pwsh
+        run: ./tests/test_apply_edits_contract.ps1
+
       - name: Verify macOS supervisor contract
         shell: pwsh
         run: ./tests/test_macos_supervisor_contract.ps1
@@ -226,6 +230,10 @@ jobs:
       - name: Verify existing mutation hardening contract
         shell: pwsh
         run: ./tests/test_existing_mutation_hardening_contract.ps1
+
+      - name: Verify atomic apply_edits contract
+        shell: pwsh
+        run: ./tests/test_apply_edits_contract.ps1
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v5

@@ -60,6 +60,7 @@ internal static class Program
             await TestFileVersionAndSourceStateAsync(root);
             await TestAuthorizedPathSnapshotAsync(root);
             await TestExistingMutationHardeningAsync(root);
+            await TestApplyEditsAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -88,13 +89,13 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.2.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.3.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 16, "catalog non-shell local tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 17, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 17, "catalog non-shell local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 18, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 1, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
@@ -498,7 +499,7 @@ internal static class Program
         Assert(McpTelemetryAttributeAdapter.NormalizeMethod("tools/call") == "tools/call" && McpTelemetryAttributeAdapter.NormalizeMethod("private-method") == "other", "standard telemetry method dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeToolName("read_file") == "read_file" && McpTelemetryAttributeAdapter.NormalizeToolName("private-tool-name") == "unknown", "standard telemetry tool dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeWorkspace("d") == "D" && McpTelemetryAttributeAdapter.NormalizeWorkspace("private-workspace") == "other", "standard telemetry workspace dimensions are bounded");
-        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
+        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
         Assert(Encoding.UTF8.GetByteCount(boundedUtf8) <= McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes, "standard telemetry UTF-8 attribute bound never splits beyond byte cap");
 
         const string privateMarker = "PRIVATE_OTEL_MARKER_8A2DF991";
@@ -2496,13 +2497,226 @@ internal static class Program
         Console.WriteLine("windows-existing-mutation-hardening: ok");
     }
 
+    private static async Task TestApplyEditsAsync(string root)
+    {
+        var workspace = Path.Combine(root, "apply-edits");
+        Directory.CreateDirectory(workspace);
+        var tools = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
+
+        static JsonObject ByteEdit(int start, int end, string replacement) => new()
+        {
+            ["start_byte"] = start, ["end_byte"] = end, ["replacement"] = replacement,
+        };
+        static JsonObject LineEdit(int sl, int sc, int el, int ec, string replacement) => new()
+        {
+            ["start"] = new JsonObject { ["line"] = sl, ["column"] = sc },
+            ["end"] = new JsonObject { ["line"] = el, ["column"] = ec },
+            ["replacement"] = replacement,
+        };
+        static JsonObject ApplyArgs(string path, string version, string coordinate, JsonArray edits, bool dryRun = false, string columnEncoding = "")
+        {
+            var args = new JsonObject
+            {
+                ["relative_path"] = path,
+                ["expected_version"] = version,
+                ["coordinate_system"] = coordinate,
+                ["edits"] = edits,
+                ["dry_run"] = dryRun,
+                ["preserve_line_endings"] = true,
+                ["preserve_bom"] = true,
+            };
+            if (!string.IsNullOrEmpty(columnEncoding)) args["column_encoding"] = columnEncoding;
+            return args;
+        }
+        async Task<string> Version(string path)
+        {
+            var read = await tools.CallAsync("read_file", Obj(("relative_path", path)));
+            return read.StructuredContent["version"]!.GetValue<string>();
+        }
+
+        File.WriteAllBytes(Path.Combine(workspace, "byte.txt"), Encoding.UTF8.GetBytes("hello world\n"));
+        var byteVersion = await Version("byte.txt");
+        var byteResult = await tools.CallAsync("apply_edits", ApplyArgs("byte.txt", byteVersion, "byte", new JsonArray(ByteEdit(6, 11, "FileMCP"))));
+        Assert(File.ReadAllText(Path.Combine(workspace, "byte.txt")) == "hello FileMCP\n", "apply_edits byte range commits atomically");
+        Assert(byteResult.StructuredContent["committed"]!.GetValue<bool>() && byteResult.StructuredContent["edits_applied"]!.GetValue<int>() == 1, "apply_edits returns committed metadata");
+
+        File.WriteAllText(Path.Combine(workspace, "insert.txt"), "ab", new UTF8Encoding(false));
+        var insertVersion = await Version("insert.txt");
+        await tools.CallAsync("apply_edits", ApplyArgs("insert.txt", insertVersion, "byte", new JsonArray(
+            ByteEdit(1, 1, "X"), ByteEdit(1, 1, "Y"), ByteEdit(1, 1, "Z"))));
+        Assert(File.ReadAllText(Path.Combine(workspace, "insert.txt")) == "aXYZb", "same-offset insertions preserve request order");
+
+        var bomPath = Path.Combine(workspace, "unicode-crlf.txt");
+        File.WriteAllBytes(bomPath, [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("A\U0001F600B\r\nsecond\r\n")]);
+        var lineVersion = await Version("unicode-crlf.txt");
+        var lineResult = await tools.CallAsync("apply_edits", ApplyArgs(
+            "unicode-crlf.txt", lineVersion, "lineColumn",
+            new JsonArray(LineEdit(1, 2, 1, 3, "\U0001F642\nX")),
+            columnEncoding: "utf8CodePoint"));
+        var lineBytes = File.ReadAllBytes(bomPath);
+        Assert(lineBytes.Take(3).SequenceEqual(new byte[] { 0xEF, 0xBB, 0xBF }), "apply_edits preserves UTF-8 BOM");
+        var actualLineColumn = Encoding.UTF8.GetString(lineBytes[3..]);
+        Assert(actualLineColumn == "A\U0001F642\r\nXB\r\nsecond\r\n", $"lineColumn uses Unicode scalar columns and normalizes replacement line endings to CRLF actual={actualLineColumn.Replace("\r", "<CR>").Replace("\n", "<LF>")} hex={Convert.ToHexString(lineBytes)}");
+        Assert(lineResult.StructuredContent["line_ending"]!.GetValue<string>() == "crlf", "apply_edits reports detected line ending");
+
+        File.WriteAllText(Path.Combine(workspace, "dry.txt"), "before\n", new UTF8Encoding(false));
+        var dryPath = Path.Combine(workspace, "dry.txt");
+        var dryVersion = await Version("dry.txt");
+        var dryMtime = File.GetLastWriteTimeUtc(dryPath);
+        var dry = await tools.CallAsync("apply_edits", ApplyArgs("dry.txt", dryVersion, "byte", new JsonArray(ByteEdit(0, 6, "after")), dryRun: true));
+        Assert(File.ReadAllText(dryPath) == "before\n" && File.GetLastWriteTimeUtc(dryPath) == dryMtime, "apply_edits dry_run leaves content and mtime unchanged");
+        Assert(!dry.StructuredContent["committed"]!.GetValue<bool>() && dry.StructuredContent["preview"]!.GetValue<string>().Contains("after"), "apply_edits dry_run returns bounded preview");
+
+        var overlapVersion = await Version("dry.txt");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("apply_edits", ApplyArgs("dry.txt", overlapVersion, "byte", new JsonArray(ByteEdit(0, 3, "x"), ByteEdit(2, 4, "y")))),
+            "overlapping",
+            "apply_edits rejects overlapping edits");
+        Assert(File.ReadAllText(dryPath) == "before\n", "overlap rejection leaves target unchanged");
+
+        File.WriteAllText(Path.Combine(workspace, "utf8.txt"), "A\U0001F600B", new UTF8Encoding(false));
+        var utf8Version = await Version("utf8.txt");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("apply_edits", ApplyArgs("utf8.txt", utf8Version, "byte", new JsonArray(ByteEdit(2, 3, "x")))),
+            "UTF-8 boundary",
+            "apply_edits rejects byte offsets inside UTF-8 scalar");
+
+        File.WriteAllText(Path.Combine(workspace, "stale.txt"), "version-a", new UTF8Encoding(false));
+        var staleVersion = await Version("stale.txt");
+        File.WriteAllText(Path.Combine(workspace, "stale.txt"), "version-b", new UTF8Encoding(false));
+        await AssertThrowsAsync(
+            () => tools.CallAsync("apply_edits", ApplyArgs("stale.txt", staleVersion, "byte", new JsonArray(ByteEdit(0, 1, "V")))),
+            "changed",
+            "apply_edits rejects stale version before staging");
+        Assert(File.ReadAllText(Path.Combine(workspace, "stale.txt")) == "version-b", "stale apply_edits preserves newer target");
+
+        File.WriteAllText(Path.Combine(workspace, "budget.txt"), "0123456789", new UTF8Encoding(false));
+        var budgetVersion = await Version("budget.txt");
+        using (var budgetContext = ToolExecutionContext.Create(new JsonObject
+        {
+            [ToolExecutionContext.BudgetMetadataKey] = new JsonObject { ["maxBytesScanned"] = 5L },
+        }))
+        {
+            await AssertThrowsAsync(
+                () => tools.CallAsync("apply_edits", ApplyArgs("budget.txt", budgetVersion, "byte", new JsonArray(ByteEdit(0, 1, "x"))), executionContext: budgetContext),
+                "budget exhausted",
+                "apply_edits fails closed when source exceeds caller-lowered byte budget");
+        }
+        Assert(File.ReadAllText(Path.Combine(workspace, "budget.txt")) == "0123456789", "budget exhaustion leaves target unchanged");
+
+        // Staging failure injection occurs before any commit.
+        File.WriteAllText(Path.Combine(workspace, "stage-fail.txt"), "original", new UTF8Encoding(false));
+        var stageVersion = await Version("stage-fail.txt");
+        var stageTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid", ServerPolicy.FromLegacy(false),
+            applyEditsStageForTests: stage => { if (stage == "after_stage") throw new IOException("injected staging failure"); });
+        await AssertThrowsAsync(
+            () => stageTools.CallAsync("apply_edits", ApplyArgs("stage-fail.txt", stageVersion, "byte", new JsonArray(ByteEdit(0, 8, "changed")))),
+            "injected staging failure",
+            "apply_edits staging failure is surfaced");
+        Assert(File.ReadAllText(Path.Combine(workspace, "stage-fail.txt")) == "original", "staging failure leaves original intact");
+
+        // External writer between stage and commit invalidates expected version.
+        File.WriteAllText(Path.Combine(workspace, "writer.txt"), "original", new UTF8Encoding(false));
+        var writerVersion = await Version("writer.txt");
+        var writerUsed = false;
+        var writerTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid", ServerPolicy.FromLegacy(false),
+            applyEditsStageForTests: stage =>
+            {
+                if (stage != "before_commit" || writerUsed) return;
+                writerUsed = true;
+                File.WriteAllText(Path.Combine(workspace, "writer.txt"), "external", new UTF8Encoding(false));
+            });
+        await AssertThrowsAsync(
+            () => writerTools.CallAsync("apply_edits", ApplyArgs("writer.txt", writerVersion, "byte", new JsonArray(ByteEdit(0, 8, "changed")))),
+            "changed",
+            "apply_edits rejects external writer before commit");
+        Assert(File.ReadAllText(Path.Combine(workspace, "writer.txt")) == "external", "external writer content is not overwritten");
+
+        // Path replacement between stage and commit is caught by Mutation Guard.
+        File.WriteAllText(Path.Combine(workspace, "swap.txt"), "original", new UTF8Encoding(false));
+        var swapVersion = await Version("swap.txt");
+        var swapUsed = false;
+        var swapTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid", ServerPolicy.FromLegacy(false),
+            applyEditsStageForTests: stage =>
+            {
+                if (stage != "before_commit" || swapUsed) return;
+                swapUsed = true;
+                var path = Path.Combine(workspace, "swap.txt");
+                File.Delete(path);
+                File.WriteAllText(path, "replacement", new UTF8Encoding(false));
+            });
+        await AssertThrowsAsync(
+            () => swapTools.CallAsync("apply_edits", ApplyArgs("swap.txt", swapVersion, "byte", new JsonArray(ByteEdit(0, 8, "changed")))),
+            "target identity changed",
+            "apply_edits rejects path replacement before publish");
+        Assert(File.ReadAllText(Path.Combine(workspace, "swap.txt")) == "replacement", "path replacement remains intact");
+
+        // Cancellation before commit aborts; cancellation after commit is reported as committed.
+        File.WriteAllText(Path.Combine(workspace, "cancel-before.txt"), "original", new UTF8Encoding(false));
+        var cancelBeforeVersion = await Version("cancel-before.txt");
+        var cancelBefore = false;
+        using (var cancelContext = ToolExecutionContext.Create(null, cancellationProbe: () => cancelBefore))
+        {
+            var cancelTools = new LocalTools(
+                workspace, "FileMCP Test", "filemcp@example.invalid", ServerPolicy.FromLegacy(false),
+                applyEditsStageForTests: stage => { if (stage == "before_commit") cancelBefore = true; });
+            await AssertThrowsAsync(
+                () => cancelTools.CallAsync("apply_edits", ApplyArgs("cancel-before.txt", cancelBeforeVersion, "byte", new JsonArray(ByteEdit(0, 8, "changed"))), executionContext: cancelContext),
+                "cancelled before commit",
+                "apply_edits cancellation before commit aborts");
+        }
+        Assert(File.ReadAllText(Path.Combine(workspace, "cancel-before.txt")) == "original", "pre-commit cancellation leaves original intact");
+
+        File.WriteAllText(Path.Combine(workspace, "cancel-after.txt"), "original", new UTF8Encoding(false));
+        var cancelAfterVersion = await Version("cancel-after.txt");
+        var cancelAfter = false;
+        using (var cancelAfterContext = ToolExecutionContext.Create(null, cancellationProbe: () => cancelAfter))
+        {
+            var cancelAfterTools = new LocalTools(
+                workspace, "FileMCP Test", "filemcp@example.invalid", ServerPolicy.FromLegacy(false),
+                applyEditsStageForTests: stage => { if (stage == "after_commit") cancelAfter = true; });
+            var committed = await cancelAfterTools.CallAsync("apply_edits", ApplyArgs("cancel-after.txt", cancelAfterVersion, "byte", new JsonArray(ByteEdit(0, 8, "changed"))), executionContext: cancelAfterContext);
+            Assert(committed.StructuredContent["committed"]!.GetValue<bool>() && committed.StructuredContent["cancelled_after_commit"]!.GetValue<bool>(), "post-commit cancellation reports committed result");
+        }
+        Assert(File.ReadAllText(Path.Combine(workspace, "cancel-after.txt")) == "changed", "post-commit cancellation does not roll back committed content");
+
+        // Publish failure: hold target without delete sharing so atomic replacement cannot commit.
+        File.WriteAllText(Path.Combine(workspace, "publish-fail.txt"), "original", new UTF8Encoding(false));
+        var publishVersion = await Version("publish-fail.txt");
+        FileStream? publishLock = null;
+        var publishTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid", ServerPolicy.FromLegacy(false),
+            applyEditsStageForTests: stage =>
+            {
+                if (stage == "before_commit" && publishLock is null)
+                    publishLock = new FileStream(Path.Combine(workspace, "publish-fail.txt"), FileMode.Open, FileAccess.Read, FileShare.Read);
+            });
+        var publishFailed = false;
+        try
+        {
+            _ = await publishTools.CallAsync("apply_edits", ApplyArgs("publish-fail.txt", publishVersion, "byte", new JsonArray(ByteEdit(0, 8, "changed"))));
+        }
+        catch (Exception)
+        {
+            publishFailed = true;
+        }
+        finally { publishLock?.Dispose(); }
+        Assert(publishFailed, "apply_edits publish failure is surfaced");
+        Assert(File.ReadAllText(Path.Combine(workspace, "publish-fail.txt")) == "original", "publish failure leaves original intact");
+
+        Console.WriteLine("windows-apply-edits: ok");
+    }
+
     private static async Task TestFilesystemAndToolsAsync(string root)
     {
         var workspace = Path.Combine(root, "files"); Directory.CreateDirectory(workspace);
         var safe = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
         var full = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", true);
-        Assert(safe.ToolDefinitions.Count == 15 && !safe.HasTool("run_command"), "safe tool count");
-        Assert(full.ToolDefinitions.Count == 17 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
+        Assert(safe.ToolDefinitions.Count == 16 && !safe.HasTool("run_command"), "safe tool count");
+        Assert(full.ToolDefinitions.Count == 18 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
 
         var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
         var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);
@@ -2742,7 +2956,7 @@ internal static class Program
         var legacy = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}");
         var legacyBody = JsonNode.Parse(HttpBody(legacy))!.AsObject();
         var legacyTools = legacyBody["result"]!["tools"]!.AsArray();
-        Assert(legacyTools.Count == 17, "legacy tools list");
+        Assert(legacyTools.Count == 18, "legacy tools list");
         Assert(legacyTools.Any(t => t!["name"]!.GetValue<string>() == "list_codex_skills"), "legacy list_codex_skills exposed");
         Assert(legacyTools.Any(t => t!["name"]!.GetValue<string>() == "load_codex_skill"), "legacy load_codex_skill exposed");
         var legacyCatalog = legacyBody["result"]!["catalog"]!.AsObject();
@@ -2775,7 +2989,7 @@ internal static class Program
         var modern = await SendHttpAsync(port, "POST", "/mcp", modernHeaders, modernBody.ToJsonString());
         var modernJson = JsonNode.Parse(HttpBody(modern))!.AsObject();
         Assert(modernJson["result"]!["resultType"]!.GetValue<string>() == "complete", "modern result type");
-        Assert(modernJson["result"]!["tools"]!.AsArray().Count == 17, "modern tools list");
+        Assert(modernJson["result"]!["tools"]!.AsArray().Count == 18, "modern tools list");
         var modernCatalog = modernJson["result"]!["catalog"]!.AsObject();
         Assert(modernCatalog["catalogVersion"]!.GetValue<string>() == CanonicalToolCatalog.CatalogVersion, "modern catalog version exposed");
         Assert(modernCatalog["catalogHash"]!.GetValue<string>() == CanonicalToolCatalog.CatalogHash, "modern catalog hash exposed");
@@ -2835,7 +3049,7 @@ internal static class Program
         var correlatedList = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), meteredListBody);
         var correlatedListJson = JsonNode.Parse(HttpBody(correlatedList))!.AsObject();
         var correlatedTools = correlatedListJson["result"]!["tools"]!.AsArray();
-        Assert(correlatedTools.Count == 18, "logical correlation facade adds one connect tool");
+        Assert(correlatedTools.Count == 19, "logical correlation facade adds one connect tool");
         var connectDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "filemcp_observability_connect")!.AsObject();
         Assert(connectDefinition["annotations"]!["readOnlyHint"]!.GetValue<bool>(), "logical correlation connect tool is read-only metadata");
         var readDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "read_file")!.AsObject();

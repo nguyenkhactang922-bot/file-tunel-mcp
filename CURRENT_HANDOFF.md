@@ -246,3 +246,11 @@ FMG-009: CLAIMED / ACTIVE on `chatgpt/FMG-009-apply-edits`.
 Branch: `chatgpt/FMG-009-apply-edits`
 
 NEXT_EXACT_ACTION: implement FMG-009 Atomic Versioned `apply_edits` only: canonical range-edit primitive, expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version/Mutation Guard/policy/cancellation rechecks, atomic publish, and adversarial/fault-injection coverage. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.
+
+## FMG-009 local verification
+
+FMG-009: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-009-apply-edits`.
+
+Local evidence: canonical catalog/parity PASS at 21 tools / `a6d3914363267b165af5896b0b6456a71155faaafd4911a957818e1a1fd26b91`; apply-edits and prerequisite contracts PASS; Windows runtime 682 assertions PASS including `windows-apply-edits: ok`; Release build 0 warnings/errors; diff/state/shell-syntax gates PASS. macOS native implementation/test harness is wired but requires GitHub macOS Verify.
+
+NEXT_EXACT_ACTION: commit/push exact FMG-009 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, fix only exact failing stage, perform scoped atomicity/security review, merge only exact green head, verify merged main, mark FMG-009 DONE / MAIN VERIFIED, then claim FMG-010.

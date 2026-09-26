@@ -120,12 +120,12 @@ struct LocalToolCallOutput {
 final class LocalTools {
     private static let handlerToolNames: Set<String> = [
         "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
         "list_files", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "exec_process",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "exec_process",
     ]
     private let resolver: SafePathResolver
     private let gitUserName: String
@@ -136,12 +136,13 @@ final class LocalTools {
     private let fileVersions: FileVersionService
     private let mutationGuard: AuthorizedPathSnapshotService
     private let beforeMutationCommitForTests: ((String) -> Void)?
+    private let applyEditsStageForTests: ((String) -> Void)?
     private let toolSlots = DispatchSemaphore(value: 8)
     private let mutationSlot = DispatchSemaphore(value: 1)
     private let commandSlots = DispatchSemaphore(value: 2)
     private let gitSlots = DispatchSemaphore(value: 3)
     private let serializedToolNames: Set<String> = [
-        "write_file", "delete_file", "delete_directory", "run_command",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "run_command",
         "git_init", "git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push",
     ]
     private let skippedSearchDirectories: Set<String> = [
@@ -164,12 +165,14 @@ final class LocalTools {
         gitUserEmail: String,
         policy: ServerPolicy,
         execEnvironmentAllowList: [String] = [],
-        beforeMutationCommitForTests: ((String) -> Void)? = nil
+        beforeMutationCommitForTests: ((String) -> Void)? = nil,
+        applyEditsStageForTests: ((String) -> Void)? = nil
     ) throws {
         self.resolver = resolver
         self.fileVersions = try FileVersionService(resolver: resolver)
         self.mutationGuard = AuthorizedPathSnapshotService(resolver: resolver)
         self.beforeMutationCommitForTests = beforeMutationCommitForTests
+        self.applyEditsStageForTests = applyEditsStageForTests
         self.gitUserName = gitUserName
         self.gitUserEmail = gitUserEmail
         self.policy = policy
@@ -255,6 +258,19 @@ final class LocalTools {
             return stringOutput(try deleteDirectory(
                 relativePath: requiredString(arguments, "relative_path"),
                 dryRun: bool(arguments, "dry_run", default: false),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
+            ))
+        case "apply_edits":
+            return objectOutput(try applyEdits(
+                relativePath: requiredString(arguments, "relative_path"),
+                expectedVersion: requiredString(arguments, "expected_version"),
+                coordinateSystem: requiredString(arguments, "coordinate_system"),
+                columnEncoding: string(arguments, "column_encoding", default: ""),
+                edits: try anyArray(arguments, "edits", maximum: 1024),
+                dryRun: bool(arguments, "dry_run", default: false),
+                preserveLineEndings: bool(arguments, "preserve_line_endings", default: true),
+                preserveBom: bool(arguments, "preserve_bom", default: true),
                 preparedPolicy: preparedPolicy,
                 executionContext: executionContext
             ))
@@ -900,6 +916,316 @@ final class LocalTools {
     private func normalizeExpectedVersion(_ value: String) -> String? {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return normalized.isEmpty ? nil : normalized
+    }
+
+    private struct CompiledEdit {
+        let requestIndex: Int
+        let startByte: Int
+        let endByte: Int
+        let replacement: Data
+    }
+
+    private func applyEdits(
+        relativePath: String,
+        expectedVersion: String,
+        coordinateSystem: String,
+        columnEncoding: String,
+        edits: [Any],
+        dryRun: Bool,
+        preserveLineEndings: Bool,
+        preserveBom: Bool,
+        preparedPolicy: PolicySnapshot,
+        executionContext: ToolExecutionContext?
+    ) throws -> [String: Any] {
+        guard !expectedVersion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw MCPServerError.invalidArguments("expected_version must not be empty")
+        }
+        guard (1...1024).contains(edits.count) else {
+            throw MCPServerError.invalidArguments("apply_edits supports 1..1024 edits")
+        }
+        guard coordinateSystem == "byte" || coordinateSystem == "lineColumn" else {
+            throw MCPServerError.invalidArguments("coordinate_system must be byte or lineColumn")
+        }
+        if coordinateSystem == "lineColumn", columnEncoding != "utf8CodePoint" {
+            throw MCPServerError.invalidArguments("lineColumn coordinates require column_encoding=utf8CodePoint")
+        }
+        if coordinateSystem == "byte", !columnEncoding.isEmpty {
+            throw MCPServerError.invalidArguments("column_encoding is only valid with lineColumn coordinates")
+        }
+        try requireMutationContinuation(executionContext)
+
+        let versioned = try fileVersions.readExpectedVersioned(
+            relativePath: relativePath,
+            token: expectedVersion,
+            maxBytes: maxFileBytes
+        )
+        applyEditsStageForTests?("after_read")
+        try requireMutationContinuation(executionContext)
+        if let executionContext, !executionContext.tryScanFile(bytes: versioned.sizeBytes) {
+            throw MCPServerError.operationFailed("apply_edits budget exhausted while reading source")
+        }
+
+        let raw = versioned.data
+        let hasBom = raw.count >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF
+        let content = hasBom ? Data(raw.dropFirst(3)) : raw
+        guard let text = String(data: content, encoding: .utf8) else {
+            throw MCPServerError.operationFailed("apply_edits requires valid UTF-8 source text")
+        }
+        let newline = detectPreferredNewline(text)
+        let compiled = try compileEdits(
+            edits,
+            coordinateSystem: coordinateSystem,
+            text: text,
+            content: content,
+            normalizedNewline: preserveLineEndings ? newline : nil
+        )
+        let replacementBytes = compiled.reduce(Int64(0)) { $0 + Int64($1.replacement.count) }
+        let removedBytes = compiled.reduce(Int64(0)) { $0 + Int64($1.endByte - $1.startByte) }
+        let outputContentBytes = Int64(content.count) - removedBytes + replacementBytes
+        let outputSize = outputContentBytes + ((preserveBom && hasBom) ? 3 : 0)
+        guard outputSize <= Int64(maxWriteBytes) else {
+            throw MCPServerError.operationFailed("apply_edits result is larger than the 5 MB write limit")
+        }
+        if let executionContext, replacementBytes > executionContext.remainingBytes {
+            throw MCPServerError.operationFailed("apply_edits budget exhausted by replacement content")
+        }
+
+        let outputData = applyCompiledEdits(content, edits: compiled, includeBom: preserveBom && hasBom)
+        let snapshot = try mutationGuard.captureExisting(relativePath: relativePath)
+        var result: [String: Any] = [
+            "dry_run": dryRun,
+            "committed": false,
+            "edits_applied": compiled.count,
+            "bytes_before": raw.count,
+            "bytes_after": outputData.count,
+            "coordinate_system": coordinateSystem,
+            "column_encoding": coordinateSystem == "lineColumn" ? "utf8CodePoint" : NSNull(),
+            "before_version": versioned.versionToken,
+            "preserved_bom": preserveBom && hasBom,
+            "line_ending": newline == "\r\n" ? "crlf" : (newline == "\r" ? "cr" : "lf"),
+        ]
+
+        if dryRun {
+            try policy.authorize("apply_edits", prepared: preparedPolicy)
+            _ = try mutationGuard.verify(snapshot)
+            _ = try fileVersions.verifyExpectedVersion(
+                relativePath: relativePath,
+                token: expectedVersion,
+                maxBytes: maxFileBytes
+            )
+            result["preview"] = previewUtf8(outputData, maxBytes: 8192)
+            result["after_version"] = NSNull()
+            return result
+        }
+
+        let target = try resolver.resolve(relativePath)
+        let temp = target.deletingLastPathComponent().appendingPathComponent(
+            ".\(target.lastPathComponent).filemcp-edits-\(UUID().uuidString).tmp"
+        )
+        var committed = false
+        defer { try? FileManager.default.removeItem(at: temp) }
+        do {
+            try outputData.write(to: temp, options: [])
+            let handle = try FileHandle(forWritingTo: temp)
+            try handle.synchronize()
+            try handle.close()
+            applyEditsStageForTests?("after_stage")
+            try requireMutationContinuation(executionContext)
+
+            applyEditsStageForTests?("before_commit")
+            try requireMutationContinuation(executionContext)
+            try policy.authorize("apply_edits", prepared: preparedPolicy)
+            _ = try mutationGuard.verify(snapshot)
+            _ = try fileVersions.verifyExpectedVersion(
+                relativePath: relativePath,
+                token: expectedVersion,
+                maxBytes: maxFileBytes
+            )
+            try requireMutationContinuation(executionContext)
+            _ = try FileManager.default.replaceItemAt(target, withItemAt: temp)
+            committed = true
+            applyEditsStageForTests?("after_commit")
+
+            let after = try fileVersions.readVersioned(relativePath: relativePath, maxBytes: maxFileBytes)
+            result["committed"] = true
+            result["after_version"] = after.versionToken
+            result["cancelled_after_commit"] = executionContext?.cancellationRequested ?? false
+            return result
+        } catch {
+            if committed {
+                let after = try fileVersions.readVersioned(relativePath: relativePath, maxBytes: maxFileBytes)
+                result["committed"] = true
+                result["after_version"] = after.versionToken
+                result["cancelled_after_commit"] = true
+                return result
+            }
+            throw error
+        }
+    }
+
+    private func compileEdits(
+        _ edits: [Any],
+        coordinateSystem: String,
+        text: String,
+        content: Data,
+        normalizedNewline: String?
+    ) throws -> [CompiledEdit] {
+        var compiled: [CompiledEdit] = []
+        compiled.reserveCapacity(edits.count)
+        for (index, rawEdit) in edits.enumerated() {
+            guard let edit = rawEdit as? [String: Any], let rawReplacement = edit["replacement"] as? String else {
+                throw MCPServerError.invalidArguments("edits[\(index)].replacement must be a string")
+            }
+            let replacement = normalizedNewline.map { normalizeNewlines(rawReplacement, newline: $0) } ?? rawReplacement
+            let startByte: Int
+            let endByte: Int
+            if coordinateSystem == "byte" {
+                startByte = try requiredEditInt(edit, key: "start_byte", index: index)
+                endByte = try requiredEditInt(edit, key: "end_byte", index: index)
+                guard startByte >= 0, endByte >= startByte, endByte <= content.count else {
+                    throw MCPServerError.invalidArguments("edits[\(index)] byte range is out of bounds")
+                }
+                try ensureUtf8Boundary(content, offset: startByte, editIndex: index)
+                try ensureUtf8Boundary(content, offset: endByte, editIndex: index)
+            } else {
+                startByte = try lineColumnToByte(text, position: requiredPosition(edit, key: "start", index: index), editIndex: index, label: "start")
+                endByte = try lineColumnToByte(text, position: requiredPosition(edit, key: "end", index: index), editIndex: index, label: "end")
+                guard endByte >= startByte else {
+                    throw MCPServerError.invalidArguments("edits[\(index)] end precedes start")
+                }
+            }
+            compiled.append(CompiledEdit(
+                requestIndex: index,
+                startByte: startByte,
+                endByte: endByte,
+                replacement: Data(replacement.utf8)
+            ))
+        }
+        compiled.sort {
+            if $0.startByte != $1.startByte { return $0.startByte < $1.startByte }
+            if $0.endByte != $1.endByte { return $0.endByte < $1.endByte }
+            return $0.requestIndex < $1.requestIndex
+        }
+        for index in 1..<compiled.count {
+            let previous = compiled[index - 1]
+            let current = compiled[index]
+            if current.startByte < previous.endByte ||
+               (current.startByte == previous.startByte &&
+                (current.endByte != current.startByte || previous.endByte != previous.startByte)) {
+                throw MCPServerError.invalidArguments("apply_edits contains overlapping ranges")
+            }
+        }
+        return compiled
+    }
+
+    private func applyCompiledEdits(_ content: Data, edits: [CompiledEdit], includeBom: Bool) -> Data {
+        var output = Data()
+        if includeBom { output.append(contentsOf: [0xEF, 0xBB, 0xBF]) }
+        var cursor = 0
+        for edit in edits {
+            if cursor < edit.startByte { output.append(content.subdata(in: cursor..<edit.startByte)) }
+            output.append(edit.replacement)
+            cursor = edit.endByte
+        }
+        if cursor < content.count { output.append(content.subdata(in: cursor..<content.count)) }
+        return output
+    }
+
+    private func requiredEditInt(_ edit: [String: Any], key: String, index: Int) throws -> Int {
+        guard let number = edit[key] as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID(),
+              number.doubleValue == Double(number.intValue) else {
+            throw MCPServerError.invalidArguments("edits[\(index)].\(key) must be an integer")
+        }
+        return number.intValue
+    }
+
+    private func requiredPosition(_ edit: [String: Any], key: String, index: Int) throws -> (line: Int, column: Int) {
+        guard let position = edit[key] as? [String: Any] else {
+            throw MCPServerError.invalidArguments("edits[\(index)].\(key) must be an object")
+        }
+        return (
+            try requiredEditInt(position, key: "line", index: index),
+            try requiredEditInt(position, key: "column", index: index)
+        )
+    }
+
+    private func lineColumnToByte(
+        _ text: String,
+        position: (line: Int, column: Int),
+        editIndex: Int,
+        label: String
+    ) throws -> Int {
+        guard position.line >= 1, position.column >= 1 else {
+            throw MCPServerError.invalidArguments("edits[\(editIndex)].\(label) line/column are 1-based")
+        }
+        let scalars = Array(text.unicodeScalars)
+        var index = 0
+        var line = 1
+        var column = 1
+        var byteOffset = 0
+        while true {
+            if line == position.line && column == position.column { return byteOffset }
+            guard index < scalars.count else {
+                throw MCPServerError.invalidArguments("edits[\(editIndex)].\(label) position is out of bounds")
+            }
+            let scalar = scalars[index]
+            if scalar.value == 13 {
+                guard line < position.line else {
+                    throw MCPServerError.invalidArguments("edits[\(editIndex)].\(label) column is out of bounds")
+                }
+                byteOffset += String(scalar).utf8.count
+                index += 1
+                if index < scalars.count, scalars[index].value == 10 {
+                    byteOffset += String(scalars[index]).utf8.count
+                    index += 1
+                }
+                line += 1
+                column = 1
+            } else if scalar.value == 10 {
+                guard line < position.line else {
+                    throw MCPServerError.invalidArguments("edits[\(editIndex)].\(label) column is out of bounds")
+                }
+                byteOffset += String(scalar).utf8.count
+                index += 1
+                line += 1
+                column = 1
+            } else {
+                byteOffset += String(scalar).utf8.count
+                index += 1
+                column += 1
+            }
+        }
+    }
+
+    private func ensureUtf8Boundary(_ content: Data, offset: Int, editIndex: Int) throws {
+        if offset == 0 || offset == content.count { return }
+        if content[offset] & 0xC0 == 0x80 {
+            throw MCPServerError.invalidArguments("edits[\(editIndex)] byte offset is not a UTF-8 boundary")
+        }
+    }
+
+    private func normalizeNewlines(_ value: String, newline: String) -> String {
+        value.replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: "\n", with: newline)
+    }
+
+    private func detectPreferredNewline(_ text: String) -> String {
+        let scalars = Array(text.unicodeScalars)
+        for index in scalars.indices {
+            if scalars[index].value == 13 {
+                return index + 1 < scalars.count && scalars[index + 1].value == 10 ? "\r\n" : "\r"
+            }
+            if scalars[index].value == 10 { return "\n" }
+        }
+        return "\n"
+    }
+
+    private func previewUtf8(_ data: Data, maxBytes: Int) -> String {
+        let prefix = Data(data.prefix(maxBytes))
+        let preview = String(decoding: prefix, as: UTF8.self)
+        return data.count > maxBytes ? preview + "\n[...preview truncated...]" : preview
     }
 
     private func fileModeWithoutFollowingSymlink(_ url: URL, missingMessage: String) throws -> mode_t {
@@ -1686,6 +2012,13 @@ final class LocalTools {
             result.append(string)
         }
         return result
+    }
+
+    private func anyArray(_ arguments: [String: Any], _ key: String, maximum: Int) throws -> [Any] {
+        guard let raw = arguments[key], let values = raw as? [Any], !values.isEmpty, values.count <= maximum else {
+            throw MCPServerError.invalidArguments("Missing or invalid argument: \(key)")
+        }
+        return values
     }
 
     private func stringDictionary(_ arguments: [String: Any], _ key: String) throws -> [String: String] {
