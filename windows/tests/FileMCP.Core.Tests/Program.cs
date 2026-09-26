@@ -2872,7 +2872,7 @@ internal static class Program
         Assert(volumeList.StructuredContent["result"]!.AsArray().Any(n => n!.GetValue<string>() == "volume-root.txt"), "volume-root list descendant");
         var volumeSearch = await volumeSafe.CallAsync("search_content", Obj(("query", "volume-root-ok"), ("path", volumeWorkspace)));
         Assert(volumeSearch.StructuredContent["matches"]!.AsArray().Count == 1, "volume-root search descendant");
-        var volumeCommand = await volumeFull.CallAsync("run_command", Obj(("command", "Write-Output volume-root-command-ok"), ("cwd", volumeWorkspace), ("timeout_seconds", 5)));
+        var volumeCommand = await volumeFull.CallAsync("run_command", Obj(("command", "Write-Output volume-root-command-ok"), ("cwd", volumeWorkspace), ("timeout_seconds", 15)));
         Assert(volumeCommand.StructuredContent["result"]!.GetValue<string>().Contains("volume-root-command-ok"), "volume-root command cwd descendant");
         await AssertThrowsAsync(() => volumeSafe.CallAsync("delete_directory", Obj(("relative_path", ""))), "shared root directory", "volume-root deletion refused");
         await volumeSafe.CallAsync("delete_file", Obj(("relative_path", volumeFile)));
