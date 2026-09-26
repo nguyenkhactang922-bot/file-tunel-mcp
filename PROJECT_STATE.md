@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-008-existing-mutation-hardening`
+Active branch: `chatgpt/FMG-010-project-context`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -211,11 +211,19 @@ Evidence: `docs/evidence/FMG-008_EXISTING_MUTATION_HARDENING_EVIDENCE.md`.
 
 ## FMG-009 implementation
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
-Active branch: `chatgpt/FMG-009-apply-edits`.
-Depends: FMG-004 and FMG-008 DONE / MAIN VERIFIED.
-Scope: Atomic Versioned `apply_edits` only.
-NEXT_EXACT_ACTION: implement canonical range edits with expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version + Mutation Guard + policy/cancellation rechecks, atomic publish, and failure/cancellation tests. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.
+State: DONE / MAIN VERIFIED.
+Branch: `chatgpt/FMG-009-apply-edits`.
+Final candidate: `d7d5e5d45f79fc27f35bd0758ba6e1675bda6b92`.
+PR: #13.
+Merge main: `e054aee3d18196881fbb8033037441959b255b73`.
+Native merged-main Verify: run `36225126052` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Local merged-main proof: catalog/parity + FMG-005..FMG-009 contracts PASS; Windows runtime 682 assertions PASS; Release build 0 warnings / 0 errors.
 Evidence: `docs/evidence/FMG-009_APPLY_EDITS_EVIDENCE.md`.
-Local proof: catalog/parity + FMG-005..FMG-009 contracts PASS; Windows runtime 682 assertions PASS; Release build 0 warnings / 0 errors.
-Native macOS: pending GitHub Verify because local Windows host has no native swiftc.
+
+## FMG-010 implementation
+
+State: ACTIVE / CLAIMED.
+Branch: `chatgpt/FMG-010-project-context`.
+Depends: FMG-001, FMG-004, FMG-006 DONE / MAIN VERIFIED.
+Scope: Project Context Provenance / Digest only.
+NEXT_EXACT_ACTION: implement bounded instruction discovery, deterministic ordered provenance/scope, schema+digest, range continuation, no-authority marker and existing skill integration without a duplicate recipe engine. Add oversized/nested-conflict/malicious-authority/stale-range/path-escape/cancellation tests. Do not begin FMG-011 before FMG-010 MAIN VERIFIED.
