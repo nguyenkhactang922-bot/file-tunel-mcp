@@ -2956,8 +2956,7 @@ printf '%s' "$TOOLS" | plutil -extract result.tools.1.outputSchema.properties.re
 printf '%s' "$TOOLS" | plutil -extract result.tools.2.outputSchema.properties.content.type raw -expect string -o - - | grep -qx 'string'
 printf '%s' "$TOOLS" | plutil -extract result.tools.0.annotations.openWorldHint raw -expect bool -o - - | grep -qx 'false'
 printf '%s' "$TOOLS" | plutil -extract result.tools.5.annotations.destructiveHint raw -expect bool -o - - | grep -qx 'true'
-printf '%s' "$TOOLS" | plutil -extract result.tools.14.annotations.openWorldHint raw -expect bool -o - - | grep -qx 'true'
-printf '%s' "$TOOLS" | plutil -extract result.tools.15.annotations.openWorldHint raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$TOOLS" | python3 -c 'import json,sys; d=json.load(sys.stdin); by={t["name"]:t for t in d["result"]["tools"]}; assert by["exec_process"]["annotations"]["openWorldHint"] is True; assert by["run_command"]["annotations"]["openWorldHint"] is True'
 
 MODERN_CALL="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
