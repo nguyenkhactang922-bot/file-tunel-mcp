@@ -39,7 +39,7 @@ private let singleValueHTTPRequestHeaders: Set<String> = [
     fileMCPLocalAuthHeaderKey,
 ]
 
-private enum MCPServerError: LocalizedError {
+enum MCPServerError: LocalizedError {
     case invalidPath(String)
     case invalidArguments(String)
     case notFound(String)
