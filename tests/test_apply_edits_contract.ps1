@@ -6,7 +6,7 @@ Set-Location $Root
 
 $Catalog = Get-Content contracts/tool_catalog.v1.json -Raw | ConvertFrom-Json
 if ($Catalog.catalogVersion -ne "1.5.0") { throw "FMG-009 requires catalogVersion 1.5.0." }
-if ($Catalog.tools.Count -ne 22) { throw "FMG-009 requires exactly 21 canonical tools." }
+if ($Catalog.tools.Count -ne 22) { throw "FMG-009 contracts remain present in the current 22-tool canonical catalog." }
 $items = @($Catalog.tools | Where-Object name -eq "apply_edits")
 if ($items.Count -ne 1) { throw "Missing canonical apply_edits tool." }
 $tool = $items[0]
