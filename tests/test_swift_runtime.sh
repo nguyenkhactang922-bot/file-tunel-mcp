@@ -1615,7 +1615,8 @@ let fmg009Dry = try fmg009Tools.call(
 )
 let fmg009DryText = try String(contentsOf: fmg009DryURL, encoding: .utf8)
 precondition(fmg009DryText == "before\n")
-precondition((try FileManager.default.attributesOfItem(atPath: fmg009DryURL.path)[.modificationDate] as! Date) == fmg009DryMtime)
+let fmg009DryMtimeAfter = try FileManager.default.attributesOfItem(atPath: fmg009DryURL.path)[.modificationDate] as! Date
+precondition(fmg009DryMtimeAfter == fmg009DryMtime)
 precondition(fmg009Dry.structuredContent["committed"] as? Bool == false)
 
 let fmg009OverlapVersion = try fmg009Version("dry.txt")
