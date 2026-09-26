@@ -26,6 +26,11 @@ internal sealed class CodexSkillRegistry
 
     public bool HasTool(string name) => HandlerToolNames.Contains(name);
 
+    internal IReadOnlyList<CodexSkillMetadata> SnapshotMetadata()
+    {
+        lock (_gate) return _skills.Select(skill => new CodexSkillMetadata(skill.Name, skill.Description, skill.SkillFile)).ToArray();
+    }
+
     public int Refresh()
     {
         _log("[Skills] Scanning .agents/skills...\n");
@@ -204,5 +209,6 @@ internal sealed class CodexSkillRegistry
         new JsonArray(new JsonObject { ["type"] = "text", ["text"] = value.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) }),
         value);
 
+    internal sealed record CodexSkillMetadata(string Name, string Description, string SkillFile);
     private sealed record CodexSkillInfo(string Name, string Description, string SkillFile);
 }

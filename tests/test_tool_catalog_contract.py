@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "contracts" / "tool_catalog.v1.json"
-EXPECTED_CATALOG_VERSION = "1.3.0"
+EXPECTED_CATALOG_VERSION = "1.5.0"
 EXPECTED_INSTRUCTION_VERSION = "1.0.0"
 EXPECTED_MODERN = "2026-07-28"
 EXPECTED_LEGACY = ["2025-11-25", "2025-06-18", "2025-03-26"]
@@ -109,8 +109,8 @@ def validate_catalog(catalog: dict) -> None:
             if not isinstance(annotations.get(key), bool):
                 fail(f"annotation {key} missing/invalid for {name}")
 
-    if len(tools) != 21:
-        fail(f"expected 21 tools, got {len(tools)}")
+    if len(tools) != 22:
+        fail(f"expected 22 tools, got {len(tools)}")
 
     by_name = {item["name"]: item for item in tools}
     exec_process = by_name["exec_process"]

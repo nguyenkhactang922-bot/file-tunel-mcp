@@ -74,8 +74,8 @@ public sealed class LocalMcpServer : IAsyncDisposable
         _connectionSlots = new SemaphoreSlim(limits.MaxConcurrentConnections, limits.MaxConcurrentConnections);
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
         CanonicalToolCatalog.ValidateHandlerCoverage("server", ServerHandlerToolNames);
-        _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, _policy, execEnvironmentAllowList);
         _skills = new CodexSkillRegistry(allowedDirectory, log);
+        _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, _policy, execEnvironmentAllowList, skillRegistry: _skills);
     }
 
     private static ServerPolicy ServerPolicyFor(bool enableCommands, LocalPolicyConfiguration? configuration) =>

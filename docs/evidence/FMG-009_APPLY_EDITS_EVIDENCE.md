@@ -1,6 +1,6 @@
 # FMG-009 Atomic Versioned apply_edits Evidence
 
-Status: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+Status: DONE / MAIN VERIFIED
 
 Branch: `chatgpt/FMG-009-apply-edits`
 Baseline main: `8a58a223814505518e581ebe79856846555cb4b4`
@@ -56,3 +56,12 @@ macOS native Swift harness contains equivalent acceptance/adversarial assertions
 ## Remaining gate
 
 Commit/push exact candidate -> native GitHub Verify on macOS + Windows x64 + Windows ARM64 -> fix only exact failing stage if any -> scoped security/atomicity review -> PR exact green head -> merge -> merged-main local + native verification -> mark FMG-009 DONE / MAIN VERIFIED -> only then claim FMG-010.
+
+## Final closure
+
+- final candidate head: `d7d5e5d45f79fc27f35bd0758ba6e1675bda6b92`;
+- PR #13 merged to fork `main` as `e054aee3d18196881fbb8033037441959b255b73`;
+- exact-head Verify runs `36224787337` and `36224982574`: macOS SUCCESS, Windows x64 SUCCESS, Windows ARM64 SUCCESS;
+- merged-main native Verify run `36225126052`: macOS SUCCESS, Windows x64 SUCCESS, Windows ARM64 SUCCESS;
+- merged-main local proof: catalog/parity + FMG-005..FMG-009 contracts PASS; Windows runtime 682 assertions PASS; Release build 0 warnings / 0 errors;
+- FMG-009: DONE / MAIN VERIFIED.

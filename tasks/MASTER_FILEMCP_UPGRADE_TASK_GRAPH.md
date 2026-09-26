@@ -295,7 +295,7 @@ Negative tests:
 
 ## FMG-009 — Atomic Versioned apply_edits
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-004, FMG-008
 
 Scope:
@@ -326,7 +326,7 @@ Negative tests:
 
 ## FMG-010 — Project Context Provenance / Digest
 
-State: BLOCKED
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-001, FMG-004, FMG-006
 
 Scope:
