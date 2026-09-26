@@ -120,12 +120,12 @@ struct LocalToolCallOutput {
 final class LocalTools {
     private static let handlerToolNames: Set<String> = [
         "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "apply_edits", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
         "list_files", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "apply_edits", "exec_process",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "exec_process",
     ]
     private let resolver: SafePathResolver
     private let gitUserName: String
@@ -135,6 +135,7 @@ final class LocalTools {
     private let execEnvironment: ExecProcessEnvironmentAuthority
     private let fileVersions: FileVersionService
     private let mutationGuard: AuthorizedPathSnapshotService
+    private let projectContext: ProjectContextService
     private let beforeMutationCommitForTests: ((String) -> Void)?
     private let applyEditsStageForTests: ((String) -> Void)?
     private let toolSlots = DispatchSemaphore(value: 8)
@@ -166,11 +167,13 @@ final class LocalTools {
         policy: ServerPolicy,
         execEnvironmentAllowList: [String] = [],
         beforeMutationCommitForTests: ((String) -> Void)? = nil,
-        applyEditsStageForTests: ((String) -> Void)? = nil
+        applyEditsStageForTests: ((String) -> Void)? = nil,
+        skillRegistry: CodexSkillRegistry? = nil
     ) throws {
         self.resolver = resolver
         self.fileVersions = try FileVersionService(resolver: resolver)
         self.mutationGuard = AuthorizedPathSnapshotService(resolver: resolver)
+        self.projectContext = try ProjectContextService(resolver: resolver, policy: policy, skills: skillRegistry)
         self.beforeMutationCommitForTests = beforeMutationCommitForTests
         self.applyEditsStageForTests = applyEditsStageForTests
         self.gitUserName = gitUserName
@@ -273,6 +276,14 @@ final class LocalTools {
                 preserveBom: bool(arguments, "preserve_bom", default: true),
                 preparedPolicy: preparedPolicy,
                 executionContext: executionContext
+            ))
+        case "project_context":
+            return objectOutput(try projectContext.capture(
+                path: string(arguments, "path", default: ""),
+                cursor: string(arguments, "cursor", default: ""),
+                maxLines: int(arguments, "max_lines", default: ProjectContextService.defaultMaxLines),
+                includeSkills: bool(arguments, "include_skills", default: true),
+                context: executionContext
             ))
         case "exec_process":
             return objectOutput(try execProcess(
@@ -2276,14 +2287,16 @@ final class LocalMCPServer {
             activePolicy = try ServerPolicy.fromLegacy(enableCommands: enableCommands)
         }
         self.policy = activePolicy
+        let activeSkills = try CodexSkillRegistry(rootPath: allowedDirectory, log: log)
+        self.skills = activeSkills
         self.tools = try LocalTools(
             resolver: resolver,
             gitUserName: gitUserName,
             gitUserEmail: gitUserEmail,
             policy: activePolicy,
-            execEnvironmentAllowList: execEnvironmentAllowList
+            execEnvironmentAllowList: execEnvironmentAllowList,
+            skillRegistry: activeSkills
         )
-        self.skills = try CodexSkillRegistry(rootPath: allowedDirectory, log: log)
     }
 
     var isReady: Bool {
@@ -3108,6 +3121,12 @@ struct CodexSkillToolOutput {
     let structuredContent: [String: Any]
 }
 
+struct CodexSkillMetadata {
+    let name: String
+    let description: String
+    let skillFile: String
+}
+
 private struct CodexSkillInfo {
     let name: String
     let description: String
@@ -3143,6 +3162,12 @@ final class CodexSkillRegistry {
     }
 
     func hasTool(named name: String) -> Bool { Self.handlerToolNames.contains(name) }
+
+    func snapshotMetadata() -> [CodexSkillMetadata] {
+        lock.lock()
+        defer { lock.unlock() }
+        return skills.map { CodexSkillMetadata(name: $0.name, description: $0.description, skillFile: $0.skillFile) }
+    }
 
     @discardableResult
     func refresh() -> Int {

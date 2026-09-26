@@ -5,8 +5,8 @@ $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 $Catalog = Get-Content contracts/tool_catalog.v1.json -Raw | ConvertFrom-Json
-if ($Catalog.catalogVersion -ne "1.3.0") { throw "Current mutation schema requires catalogVersion 1.3.0 while FMG-006 version outputs remain compatible." }
-if ($Catalog.tools.Count -ne 21) { throw "Current catalog must retain FMG-006 contracts alongside later tools." }
+if ($Catalog.catalogVersion -ne "1.5.0") { throw "Current mutation schema requires catalogVersion 1.5.0 while FMG-006 version outputs remain compatible." }
+if ($Catalog.tools.Count -ne 22) { throw "Current catalog must retain FMG-006 contracts alongside later tools." }
 foreach ($Name in @("read_file", "read_file_range")) {
     $Tool = @($Catalog.tools | Where-Object name -eq $Name)
     if ($Tool.Count -ne 1) { throw "Missing canonical $Name tool." }
@@ -77,4 +77,4 @@ if ($WindowsSourceState -notmatch 'path_fingerprint' -or $WindowsSourceState -no
     throw "SourceStateRef must persist only fingerprinted scoped file-version metadata."
 }
 
-Write-Host "file-version-source-state-contract: ok (catalog=1.3.0 strong-version + scoped-digest parity)"
+Write-Host "file-version-source-state-contract: ok (catalog=1.5.0 strong-version + scoped-digest parity)"

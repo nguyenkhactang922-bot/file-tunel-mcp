@@ -114,7 +114,7 @@ Detailed specification: foundation graph FMG-009.
 
 ## FMG-010 - Project Context Provenance / Digest
 
-State: ACTIVE / CLAIMED
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-001, FMG-004, FMG-006
 Detailed specification: foundation graph FMG-010.
 

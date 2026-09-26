@@ -189,7 +189,7 @@ Evidence: `docs/evidence/FMG-007_MUTATION_GUARD_EVIDENCE.md`.
 
 ## FMG-008 implementation
 
-State: ACTIVE / CLAIMED.
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
 Branch: `chatgpt/FMG-008-existing-mutation-hardening`.
 Depends: FMG-007, FMG-003 DONE / MAIN VERIFIED.
 Scope: Harden existing `write_file`, `delete_file`, `delete_directory` mutations only.
@@ -226,4 +226,11 @@ State: ACTIVE / CLAIMED.
 Branch: `chatgpt/FMG-010-project-context`.
 Depends: FMG-001, FMG-004, FMG-006 DONE / MAIN VERIFIED.
 Scope: Project Context Provenance / Digest only.
-NEXT_EXACT_ACTION: implement bounded instruction discovery, deterministic ordered provenance/scope, schema+digest, range continuation, no-authority marker and existing skill integration without a duplicate recipe engine. Add oversized/nested-conflict/malicious-authority/stale-range/path-escape/cancellation tests. Do not begin FMG-011 before FMG-010 MAIN VERIFIED.
+NEXT_EXACT_ACTION: commit/push exact FMG-010 candidate, require native Verify on macOS + Windows x64 + Windows ARM64, fix only exact failing stage, perform scoped provenance/authority review, merge only exact green head, verify merged main, mark FMG-010 DONE / MAIN VERIFIED, then claim FMG-011.
+
+
+FMG-010 local candidate evidence:
+- catalog 1.5.0 / 22 tools / hash f717cf599faf112964a981e516de0898d4ce140c3f6daca15d732f13216a53aa;
+- Windows runtime 715 assertions PASS including windows-project-context: ok;
+- x64 isolated package/app smoke PASS; ZIP SHA-256 9ABA9428D8CD22F0FE29F30D3D3D05FAA3327D512DA95DDAC183EE28DE31ECFB;
+- evidence docs/evidence/FMG-010_PROJECT_CONTEXT_CANDIDATE_EVIDENCE.md.

@@ -262,3 +262,12 @@ FMG-009: DONE / MAIN VERIFIED. Final candidate `d7d5e5d45f79fc27f35bd0758ba6e167
 FMG-010: CLAIMED / ACTIVE on `chatgpt/FMG-010-project-context`.
 
 NEXT_EXACT_ACTION: implement Project Context Provenance / Digest only: bounded instruction discovery; deterministic ordered provenance/scope; schema+digest; range continuation; no-authority marker; existing skill integration without duplicate recipe engine; adversarial tests for oversized instructions, nested conflicts, malicious authority requests, stale range/version, path escape and cancellation. Do not begin FMG-011 before FMG-010 MAIN VERIFIED.
+
+
+## FMG-010 local verification
+
+FMG-010: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on chatgpt/FMG-010-project-context.
+
+Local evidence: catalog/parity + project-context/prerequisite contracts PASS at catalog 1.5.0, 22 tools, hash f717cf599faf112964a981e516de0898d4ce140c3f6daca15d732f13216a53aa; Windows Release build 0 warnings/errors; runtime 715 assertions PASS including windows-project-context: ok; isolated x64 package/app smoke PASS; ZIP SHA-256 9ABA9428D8CD22F0FE29F30D3D3D05FAA3327D512DA95DDAC183EE28DE31ECFB; macOS implementation/test harness/compile wiring present and shell syntax PASS.
+
+NEXT_EXACT_ACTION: commit/push exact FMG-010 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, fix only exact failing stage, perform scoped provenance/authority review, merge only exact green head, verify merged main, mark FMG-010 DONE / MAIN VERIFIED, then claim FMG-011.

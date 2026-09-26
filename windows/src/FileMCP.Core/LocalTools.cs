@@ -13,6 +13,7 @@ internal sealed partial class LocalTools
     private readonly ExecProcessEnvironmentAuthority _execEnvironment;
     private readonly FileVersionService _fileVersions;
     private readonly AuthorizedPathSnapshotService _mutationGuard;
+    private readonly ProjectContextService _projectContext;
     private readonly Action<string>? _beforeMutationCommitForTests;
     private readonly Action<string>? _applyEditsStageForTests;
     private readonly bool _enableCommands;
@@ -25,7 +26,7 @@ internal sealed partial class LocalTools
     private static readonly HashSet<string> HandlerToolNames = new(StringComparer.Ordinal)
     {
         "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "apply_edits", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     };
     private static readonly HashSet<string> SerializedToolNames = new(StringComparer.Ordinal)
@@ -35,7 +36,7 @@ internal sealed partial class LocalTools
     };
     private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "exec_process",
+        "list_files", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "exec_process",
     };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -54,11 +55,13 @@ internal sealed partial class LocalTools
         ServerPolicy policy,
         IReadOnlyList<string>? execEnvironmentAllowList = null,
         Action<string>? beforeMutationCommitForTests = null,
-        Action<string>? applyEditsStageForTests = null)
+        Action<string>? applyEditsStageForTests = null,
+        CodexSkillRegistry? skillRegistry = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
         _mutationGuard = new AuthorizedPathSnapshotService(_resolver);
+        _projectContext = new ProjectContextService(_resolver, policy, skillRegistry);
         _beforeMutationCommitForTests = beforeMutationCommitForTests;
         _applyEditsStageForTests = applyEditsStageForTests;
         _gitUserName = gitUserName;
@@ -139,6 +142,12 @@ internal sealed partial class LocalTools
                     GetBool(arguments, "preserve_bom", true),
                     preparedPolicy,
                     effectiveCancellation,
+                    executionContext)),
+                "project_context" => ObjectOutput(_projectContext.Capture(
+                    GetString(arguments, "path", ""),
+                    GetString(arguments, "cursor", ""),
+                    GetInt(arguments, "max_lines", ProjectContextService.DefaultMaxLines),
+                    GetBool(arguments, "include_skills", true),
                     executionContext)),
                 "exec_process" => ObjectOutput(await ExecProcessAsync(
                     GetRequiredString(arguments, "executable"),

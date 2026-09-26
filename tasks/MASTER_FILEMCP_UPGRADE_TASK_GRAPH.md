@@ -326,7 +326,7 @@ Negative tests:
 
 ## FMG-010 — Project Context Provenance / Digest
 
-State: ACTIVE / CLAIMED
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-001, FMG-004, FMG-006
 
 Scope:

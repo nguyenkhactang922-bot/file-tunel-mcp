@@ -5,8 +5,8 @@ $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 $Catalog = Get-Content contracts/tool_catalog.v1.json -Raw | ConvertFrom-Json
-if ($Catalog.catalogVersion -ne "1.3.0") { throw "FMG-009 requires catalogVersion 1.3.0." }
-if ($Catalog.tools.Count -ne 21) { throw "FMG-009 requires exactly 21 canonical tools." }
+if ($Catalog.catalogVersion -ne "1.5.0") { throw "FMG-009 requires catalogVersion 1.5.0." }
+if ($Catalog.tools.Count -ne 22) { throw "FMG-009 requires exactly 21 canonical tools." }
 $items = @($Catalog.tools | Where-Object name -eq "apply_edits")
 if ($items.Count -ne 1) { throw "Missing canonical apply_edits tool." }
 $tool = $items[0]
@@ -80,4 +80,4 @@ Require-Marker "tests/test_swift_runtime.sh" @(
     "staging failure"
 )
 
-Write-Host "apply-edits-contract: ok (catalog=1.3.0 tools=21 version+guard+atomic+dry-run parity)"
+Write-Host "apply-edits-contract: ok (catalog=1.5.0 tools=22 version+guard+atomic+dry-run parity)"
