@@ -112,7 +112,7 @@ final class SafePathResolver {
     }
 }
 
-private struct LocalToolCallOutput {
+struct LocalToolCallOutput {
     let content: [[String: Any]]
     let structuredContent: [String: Any]
 }

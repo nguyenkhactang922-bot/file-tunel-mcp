@@ -32,7 +32,6 @@ foreach ($Marker in @(
     'UseShellExecute = false',
     'startInfo.ArgumentList.Add(argument)',
     'startInfo.Environment.Clear()',
-    '"list_files", "search_content", "search_filenames", "exec_process"',
     'effectiveCancellation).ConfigureAwait(false)',
     'class ExecProcessEnvironmentAuthority',
     'MaxForwardedVariables',
@@ -47,7 +46,6 @@ foreach ($Marker in @(
     'case "exec_process":',
     'ProcessRunner.run(',
     'final class ExecProcessEnvironmentAuthority',
-    '"list_files", "search_content", "search_filenames", "exec_process"',
     'shouldCancel: { executionContext.map { !$0.tryContinue() } ?? false }',
     'posix_spawn',
     'maxForwardedVariables',
@@ -56,6 +54,15 @@ foreach ($Marker in @(
     if (($MacServer + $MacRunner + $MacAuthority).IndexOf($Marker, [StringComparison]::Ordinal) -lt 0) {
         throw "macOS exec_process marker missing: $Marker"
     }
+}
+
+$WindowsBudgetMatch = [regex]::Match($WindowsTools, '(?s)BudgetedToolNames\s*=\s*new\([^)]*\)\s*\{(?<body>.*?)\};')
+if (-not $WindowsBudgetMatch.Success -or $WindowsBudgetMatch.Groups['body'].Value.IndexOf('"exec_process"', [StringComparison]::Ordinal) -lt 0) {
+    throw "Windows exec_process must remain budgeted."
+}
+$MacBudgetMatch = [regex]::Match($MacServer, '(?s)budgetedToolNames:\s*Set<String>\s*=\s*\[(?<body>.*?)\]')
+if (-not $MacBudgetMatch.Success -or $MacBudgetMatch.Groups['body'].Value.IndexOf('"exec_process"', [StringComparison]::Ordinal) -lt 0) {
+    throw "macOS exec_process must remain budgeted."
 }
 
 foreach ($Text in @($Workflow, $MacBuild, $MacDev, $SwiftTests)) {
