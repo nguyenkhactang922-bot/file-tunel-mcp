@@ -59,6 +59,7 @@ internal static class Program
             await TestExecProcessAsync(root);
             await TestFileVersionAndSourceStateAsync(root);
             await TestAuthorizedPathSnapshotAsync(root);
+            await TestExistingMutationHardeningAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -87,7 +88,7 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.1.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.2.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
@@ -2345,6 +2346,154 @@ internal static class Program
         AssertThrows(() => rootGuard.Verify(rootSnapshot), "ancestor identity changed", "Mutation Guard rejects shared-root authority replacement");
 
         Console.WriteLine("windows-mutation-guard: ok");
+    }
+
+    private static async Task TestExistingMutationHardeningAsync(string root)
+    {
+        var workspace = Path.Combine(root, "existing-mutation-hardening");
+        Directory.CreateDirectory(workspace);
+        var tools = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
+
+        // Backward compatibility: callers that do not send expected_version still create/overwrite/append.
+        await tools.CallAsync("write_file", Obj(("relative_path", "legacy.txt"), ("content", "one")));
+        await tools.CallAsync("write_file", Obj(("relative_path", "legacy.txt"), ("content", "two")));
+        await tools.CallAsync("write_file", Obj(("relative_path", "legacy.txt"), ("content", "+three"), ("append", true)));
+        Assert(File.ReadAllText(Path.Combine(workspace, "legacy.txt")) == "two+three", "FMG-008 preserves legacy write/append behavior without expected_version");
+
+        // Stale overwrite fails before publish and preserves the newer external content.
+        await tools.CallAsync("write_file", Obj(("relative_path", "stale-write.txt"), ("content", "version-a")));
+        var staleRead = await tools.CallAsync("read_file", Obj(("relative_path", "stale-write.txt")));
+        var staleVersion = staleRead.StructuredContent["version"]!.GetValue<string>();
+        File.WriteAllText(Path.Combine(workspace, "stale-write.txt"), "version-b", new UTF8Encoding(false));
+        await AssertThrowsAsync(
+            () => tools.CallAsync("write_file", Obj(("relative_path", "stale-write.txt"), ("content", "should-not-land"), ("expected_version", staleVersion))),
+            "changed",
+            "FMG-008 rejects stale expected_version overwrite");
+        Assert(File.ReadAllText(Path.Combine(workspace, "stale-write.txt")) == "version-b", "stale overwrite leaves newer original intact");
+
+        var freshRead = await tools.CallAsync("read_file", Obj(("relative_path", "stale-write.txt")));
+        var freshVersion = freshRead.StructuredContent["version"]!.GetValue<string>();
+        await tools.CallAsync("write_file", Obj(("relative_path", "stale-write.txt"), ("content", "version-c"), ("expected_version", freshVersion)));
+        Assert(File.ReadAllText(Path.Combine(workspace, "stale-write.txt")) == "version-c", "fresh expected_version overwrite commits");
+
+        // Stale delete and dry-run semantics.
+        await tools.CallAsync("write_file", Obj(("relative_path", "delete-me.txt"), ("content", "delete-a")));
+        var deleteRead = await tools.CallAsync("read_file", Obj(("relative_path", "delete-me.txt")));
+        var deleteVersion = deleteRead.StructuredContent["version"]!.GetValue<string>();
+        File.WriteAllText(Path.Combine(workspace, "delete-me.txt"), "delete-b", new UTF8Encoding(false));
+        await AssertThrowsAsync(
+            () => tools.CallAsync("delete_file", Obj(("relative_path", "delete-me.txt"), ("expected_version", deleteVersion))),
+            "changed",
+            "FMG-008 rejects stale expected_version delete");
+        Assert(File.Exists(Path.Combine(workspace, "delete-me.txt")), "stale delete leaves file intact");
+        var deleteFresh = await tools.CallAsync("read_file", Obj(("relative_path", "delete-me.txt")));
+        var deleteFreshVersion = deleteFresh.StructuredContent["version"]!.GetValue<string>();
+        var dryDelete = await tools.CallAsync("delete_file", Obj(("relative_path", "delete-me.txt"), ("expected_version", deleteFreshVersion), ("dry_run", true)));
+        Assert(dryDelete.StructuredContent["result"]!.GetValue<string>().StartsWith("Dry run:", StringComparison.Ordinal) && File.Exists(Path.Combine(workspace, "delete-me.txt")), "delete_file dry_run validates without deleting");
+        await tools.CallAsync("delete_file", Obj(("relative_path", "delete-me.txt"), ("expected_version", deleteFreshVersion)));
+        Assert(!File.Exists(Path.Combine(workspace, "delete-me.txt")), "fresh expected_version delete commits");
+
+        Directory.CreateDirectory(Path.Combine(workspace, "delete-tree", "nested"));
+        File.WriteAllText(Path.Combine(workspace, "delete-tree", "nested", "child.txt"), "child", new UTF8Encoding(false));
+        var dryDirectory = await tools.CallAsync("delete_directory", Obj(("relative_path", "delete-tree"), ("dry_run", true)));
+        Assert(dryDirectory.StructuredContent["result"]!.GetValue<string>().StartsWith("Dry run:", StringComparison.Ordinal) && Directory.Exists(Path.Combine(workspace, "delete-tree")), "delete_directory dry_run validates without deleting");
+        await tools.CallAsync("delete_directory", Obj(("relative_path", "delete-tree")));
+        Assert(!Directory.Exists(Path.Combine(workspace, "delete-tree")), "legacy delete_directory still commits");
+
+        // Integration proof: a target object swap after staging is rejected by the final Mutation Guard.
+        var swapPath = Path.Combine(workspace, "swap-write.txt");
+        File.WriteAllText(swapPath, "authorized", new UTF8Encoding(false));
+        var swapPolicy = ServerPolicy.FromLegacy(enableCommands: false);
+        var swapHookUsed = false;
+        var swapTools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            swapPolicy,
+            beforeMutationCommitForTests: toolName =>
+            {
+                if (toolName != "write_file" || swapHookUsed) return;
+                swapHookUsed = true;
+                File.Delete(swapPath);
+                File.WriteAllText(swapPath, "attacker-replacement", new UTF8Encoding(false));
+            });
+        await AssertThrowsAsync(
+            () => swapTools.CallAsync("write_file", Obj(("relative_path", "swap-write.txt"), ("content", "must-not-land"))),
+            "target identity changed",
+            "FMG-008 write_file rejects target swap at final Mutation Guard");
+        Assert(File.ReadAllText(swapPath) == "attacker-replacement", "path-swap failure does not overwrite replacement target");
+
+        // Delete race: replacement object at identical path is not deleted.
+        var deleteRacePath = Path.Combine(workspace, "delete-race.txt");
+        File.WriteAllText(deleteRacePath, "authorized", new UTF8Encoding(false));
+        var deleteRaceHookUsed = false;
+        var deleteRaceTools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(enableCommands: false),
+            beforeMutationCommitForTests: toolName =>
+            {
+                if (toolName != "delete_file" || deleteRaceHookUsed) return;
+                deleteRaceHookUsed = true;
+                File.Delete(deleteRacePath);
+                File.WriteAllText(deleteRacePath, "replacement", new UTF8Encoding(false));
+            });
+        await AssertThrowsAsync(
+            () => deleteRaceTools.CallAsync("delete_file", Obj(("relative_path", "delete-race.txt"))),
+            "target identity changed",
+            "FMG-008 delete_file rejects delete race replacement");
+        Assert(File.Exists(deleteRacePath) && File.ReadAllText(deleteRacePath) == "replacement", "delete race leaves replacement object intact");
+
+        // Cancellation triggered exactly at pre-commit leaves the original unchanged.
+        var cancelPath = Path.Combine(workspace, "cancel-write.txt");
+        File.WriteAllText(cancelPath, "original", new UTF8Encoding(false));
+        using var cancelSource = new CancellationTokenSource();
+        var cancelTools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(enableCommands: false),
+            beforeMutationCommitForTests: toolName => { if (toolName == "write_file") cancelSource.Cancel(); });
+        try
+        {
+            _ = await cancelTools.CallAsync("write_file", Obj(("relative_path", "cancel-write.txt"), ("content", "cancelled")), cancelSource.Token);
+            throw new Exception("FMG-008 pre-commit cancellation must abort write_file");
+        }
+        catch (OperationCanceledException)
+        {
+            Assert(true, "FMG-008 cancellation before commit is honored");
+        }
+        Assert(File.ReadAllText(cancelPath) == "original", "pre-commit cancellation preserves original file");
+
+        // Policy generation removal exactly at pre-commit invalidates the prepared side effect.
+        var policyPath = Path.Combine(workspace, "policy-write.txt");
+        File.WriteAllText(policyPath, "original", new UTF8Encoding(false));
+        var mutablePolicy = ServerPolicy.FromLegacy(enableCommands: false);
+        var policyHookUsed = false;
+        var policyTools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            mutablePolicy,
+            beforeMutationCommitForTests: toolName =>
+            {
+                if (toolName != "write_file" || policyHookUsed) return;
+                policyHookUsed = true;
+                mutablePolicy.Update(new LocalPolicyConfiguration
+                {
+                    Profile = FileMcpPolicyProfiles.Custom,
+                    CustomMaxRisk = "low",
+                    CustomAllowedEffects = ["read", "metadata"],
+                });
+            });
+        await AssertThrowsAsync(
+            () => policyTools.CallAsync("write_file", Obj(("relative_path", "policy-write.txt"), ("content", "must-not-land"))),
+            "policy changed",
+            "FMG-008 commit-time policy reauthorization rejects stale prepared write");
+        Assert(File.ReadAllText(policyPath) == "original", "policy removal before commit preserves original file");
+
+        Console.WriteLine("windows-existing-mutation-hardening: ok");
     }
 
     private static async Task TestFilesystemAndToolsAsync(string root)

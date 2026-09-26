@@ -53,6 +53,6 @@ foreach ($Path in @("build_macos_app.sh", "run_macos_dev.sh", ".github/workflows
 
 $Catalog = Get-Content contracts/tool_catalog.v1.json -Raw | ConvertFrom-Json
 if ($Catalog.tools.Count -ne 20) { throw "FMG-007 is an internal mutation-safety primitive and must not add an MCP tool." }
-if ($Catalog.catalogVersion -ne "1.1.0") { throw "FMG-007 must not change the FMG-006 catalog version." }
+if ($Catalog.catalogVersion -ne "1.2.0") { throw "FMG-008 catalog schema version is 1.2.0; Mutation Guard remains internal." }
 
 Write-Host "mutation-guard-contract: ok (native identity + full ancestor chain + expected-leaf parity)"

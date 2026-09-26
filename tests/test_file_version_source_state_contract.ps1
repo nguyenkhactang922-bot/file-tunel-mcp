@@ -5,7 +5,7 @@ $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 $Catalog = Get-Content contracts/tool_catalog.v1.json -Raw | ConvertFrom-Json
-if ($Catalog.catalogVersion -ne "1.1.0") { throw "FMG-006 requires catalogVersion 1.1.0." }
+if ($Catalog.catalogVersion -ne "1.2.0") { throw "FMG-006 requires catalogVersion 1.1.0." }
 if ($Catalog.tools.Count -ne 20) { throw "FMG-006 must not add an MCP tool; expected 20 tools." }
 foreach ($Name in @("read_file", "read_file_range")) {
     $Tool = @($Catalog.tools | Where-Object name -eq $Name)
@@ -77,4 +77,4 @@ if ($WindowsSourceState -notmatch 'path_fingerprint' -or $WindowsSourceState -no
     throw "SourceStateRef must persist only fingerprinted scoped file-version metadata."
 }
 
-Write-Host "file-version-source-state-contract: ok (catalog=1.1.0 strong-version + scoped-digest parity)"
+Write-Host "file-version-source-state-contract: ok (catalog=1.2.0 strong-version + scoped-digest parity)"

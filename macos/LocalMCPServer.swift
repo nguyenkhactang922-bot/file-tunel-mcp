@@ -117,14 +117,15 @@ private struct LocalToolCallOutput {
     let structuredContent: [String: Any]
 }
 
-fileprivate final class LocalTools {
+final class LocalTools {
     private static let handlerToolNames: Set<String> = [
         "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
-        "list_files", "search_content", "search_filenames", "exec_process",
+        "list_files", "search_content", "search_filenames",
+        "write_file", "delete_file", "delete_directory", "exec_process",
     ]
     private let resolver: SafePathResolver
     private let gitUserName: String
@@ -133,6 +134,8 @@ fileprivate final class LocalTools {
     private let policy: ServerPolicy
     private let execEnvironment: ExecProcessEnvironmentAuthority
     private let fileVersions: FileVersionService
+    private let mutationGuard: AuthorizedPathSnapshotService
+    private let beforeMutationCommitForTests: ((String) -> Void)?
     private let toolSlots = DispatchSemaphore(value: 8)
     private let mutationSlot = DispatchSemaphore(value: 1)
     private let commandSlots = DispatchSemaphore(value: 2)
@@ -160,10 +163,13 @@ fileprivate final class LocalTools {
         gitUserName: String,
         gitUserEmail: String,
         policy: ServerPolicy,
-        execEnvironmentAllowList: [String] = []
+        execEnvironmentAllowList: [String] = [],
+        beforeMutationCommitForTests: ((String) -> Void)? = nil
     ) throws {
         self.resolver = resolver
         self.fileVersions = try FileVersionService(resolver: resolver)
+        self.mutationGuard = AuthorizedPathSnapshotService(resolver: resolver)
+        self.beforeMutationCommitForTests = beforeMutationCommitForTests
         self.gitUserName = gitUserName
         self.gitUserEmail = gitUserEmail
         self.policy = policy
@@ -232,12 +238,26 @@ fileprivate final class LocalTools {
             return stringOutput(try writeFile(
                 relativePath: requiredString(arguments, "relative_path"),
                 content: requiredString(arguments, "content"),
-                append: bool(arguments, "append", default: false)
+                append: bool(arguments, "append", default: false),
+                expectedVersion: string(arguments, "expected_version", default: ""),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
             ))
         case "delete_file":
-            return stringOutput(try deleteFile(relativePath: requiredString(arguments, "relative_path")))
+            return stringOutput(try deleteFile(
+                relativePath: requiredString(arguments, "relative_path"),
+                expectedVersion: string(arguments, "expected_version", default: ""),
+                dryRun: bool(arguments, "dry_run", default: false),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
+            ))
         case "delete_directory":
-            return stringOutput(try deleteDirectory(relativePath: requiredString(arguments, "relative_path")))
+            return stringOutput(try deleteDirectory(
+                relativePath: requiredString(arguments, "relative_path"),
+                dryRun: bool(arguments, "dry_run", default: false),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
+            ))
         case "exec_process":
             return objectOutput(try execProcess(
                 executable: requiredString(arguments, "executable"),
@@ -687,38 +707,150 @@ fileprivate final class LocalTools {
         return (matches, truncated || (context?.truncated ?? false))
     }
 
-    private func writeFile(relativePath: String, content: String, append: Bool) throws -> String {
+    private func writeFile(
+        relativePath: String,
+        content: String,
+        append: Bool,
+        expectedVersion: String,
+        preparedPolicy: PolicySnapshot,
+        executionContext: ToolExecutionContext?
+    ) throws -> String {
         guard let data = content.data(using: .utf8), data.count <= maxWriteBytes else {
             throw MCPServerError.operationFailed("Content is larger than the 5 MB write limit")
         }
+        try requireMutationContinuation(executionContext)
+
         let target = try resolver.resolve(relativePath)
         var isDirectory: ObjCBool = false
-        if append, FileManager.default.fileExists(atPath: target.path, isDirectory: &isDirectory), isDirectory.boolValue {
+        let existed = FileManager.default.fileExists(atPath: target.path, isDirectory: &isDirectory)
+        if existed && isDirectory.boolValue {
             throw MCPServerError.invalidPath("Not a file: \(relativePath)")
         }
-        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if append, FileManager.default.fileExists(atPath: target.path) {
-            let handle = try FileHandle(forWritingTo: target)
+
+        let normalizedExpected = normalizeExpectedVersion(expectedVersion)
+        if let normalizedExpected {
+            guard existed else {
+                throw MCPServerError.invalidArguments("expected_version requires an existing file target")
+            }
+            _ = try fileVersions.verifyExpectedVersion(
+                relativePath: relativePath,
+                token: normalizedExpected,
+                maxBytes: maxFileBytes
+            )
+        }
+
+        try FileManager.default.createDirectory(
+            at: target.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let snapshot = try existed
+            ? mutationGuard.captureExisting(relativePath: relativePath)
+            : mutationGuard.captureNewTarget(relativePath: relativePath)
+
+        let temp = target.deletingLastPathComponent().appendingPathComponent(
+            ".\(target.lastPathComponent).filemcp-\(UUID().uuidString).tmp"
+        )
+        defer { try? FileManager.default.removeItem(at: temp) }
+
+        if append && existed {
+            try FileManager.default.copyItem(at: target, to: temp)
+            let handle = try FileHandle(forWritingTo: temp)
             defer { try? handle.close() }
             try handle.seekToEnd()
             try handle.write(contentsOf: data)
         } else {
-            try data.write(to: target, options: .atomic)
+            try data.write(to: temp, options: [])
+        }
+
+        try prepareMutationCommit(
+            toolName: "write_file",
+            preparedPolicy: preparedPolicy,
+            executionContext: executionContext
+        )
+        _ = try mutationGuard.verify(snapshot)
+        if let normalizedExpected {
+            _ = try fileVersions.verifyExpectedVersion(
+                relativePath: relativePath,
+                token: normalizedExpected,
+                maxBytes: maxFileBytes
+            )
+        }
+        try requireMutationContinuation(executionContext)
+
+        if existed {
+            _ = try FileManager.default.replaceItemAt(target, withItemAt: temp)
+        } else {
+            try FileManager.default.moveItem(at: temp, to: target)
         }
         return "\(append ? "Appended to" : "Wrote") \(relativePath) (\(data.count) bytes)"
     }
 
-    private func deleteFile(relativePath: String) throws -> String {
+    private func deleteFile(
+        relativePath: String,
+        expectedVersion: String,
+        dryRun: Bool,
+        preparedPolicy: PolicySnapshot,
+        executionContext: ToolExecutionContext?
+    ) throws -> String {
+        try requireMutationContinuation(executionContext)
         let target = try resolver.resolveForDeletion(relativePath)
         let mode = try fileModeWithoutFollowingSymlink(target, missingMessage: "No such file: \(relativePath)")
-        guard mode & S_IFMT != S_IFDIR else {
+        let entryType = mode & S_IFMT
+        guard entryType != S_IFDIR else {
             throw MCPServerError.invalidPath("delete_file only removes files or symlinks; use delete_directory for folders")
         }
+
+        let normalizedExpected = normalizeExpectedVersion(expectedVersion)
+        if let normalizedExpected {
+            guard entryType == S_IFREG else {
+                throw MCPServerError.invalidArguments("expected_version is only supported for regular file targets")
+            }
+            _ = try fileVersions.verifyExpectedVersion(
+                relativePath: relativePath,
+                token: normalizedExpected,
+                maxBytes: maxFileBytes
+            )
+        }
+
+        let snapshot = try mutationGuard.captureExisting(relativePath: relativePath)
+        if dryRun {
+            try requireMutationContinuation(executionContext)
+            _ = try mutationGuard.verify(snapshot)
+            if let normalizedExpected {
+                _ = try fileVersions.verifyExpectedVersion(
+                    relativePath: relativePath,
+                    token: normalizedExpected,
+                    maxBytes: maxFileBytes
+                )
+            }
+            return "Dry run: would delete \(relativePath)"
+        }
+
+        try prepareMutationCommit(
+            toolName: "delete_file",
+            preparedPolicy: preparedPolicy,
+            executionContext: executionContext
+        )
+        _ = try mutationGuard.verify(snapshot)
+        if let normalizedExpected {
+            _ = try fileVersions.verifyExpectedVersion(
+                relativePath: relativePath,
+                token: normalizedExpected,
+                maxBytes: maxFileBytes
+            )
+        }
+        try requireMutationContinuation(executionContext)
         try FileManager.default.removeItem(at: target)
         return "Deleted \(relativePath)"
     }
 
-    private func deleteDirectory(relativePath: String) throws -> String {
+    private func deleteDirectory(
+        relativePath: String,
+        dryRun: Bool,
+        preparedPolicy: PolicySnapshot,
+        executionContext: ToolExecutionContext?
+    ) throws -> String {
+        try requireMutationContinuation(executionContext)
         let target = try resolver.resolveForDeletion(relativePath)
         guard target.path != resolver.root.path else {
             throw MCPServerError.invalidPath("Refusing to delete the shared root directory")
@@ -727,8 +859,47 @@ fileprivate final class LocalTools {
         guard mode & S_IFMT == S_IFDIR else {
             throw MCPServerError.invalidPath("Not a directory: \(relativePath). Use delete_file for symlinks.")
         }
+
+        let snapshot = try mutationGuard.captureExisting(relativePath: relativePath)
+        if dryRun {
+            try requireMutationContinuation(executionContext)
+            _ = try mutationGuard.verify(snapshot)
+            return "Dry run: would delete directory \(relativePath)"
+        }
+
+        try prepareMutationCommit(
+            toolName: "delete_directory",
+            preparedPolicy: preparedPolicy,
+            executionContext: executionContext
+        )
+        _ = try mutationGuard.verify(snapshot)
+        try requireMutationContinuation(executionContext)
         try FileManager.default.removeItem(at: target)
         return "Deleted directory \(relativePath)"
+    }
+
+    private func prepareMutationCommit(
+        toolName: String,
+        preparedPolicy: PolicySnapshot,
+        executionContext: ToolExecutionContext?
+    ) throws {
+        beforeMutationCommitForTests?(toolName)
+        try requireMutationContinuation(executionContext)
+        try policy.authorize(toolName, prepared: preparedPolicy)
+    }
+
+    private func requireMutationContinuation(_ context: ToolExecutionContext?) throws {
+        guard let context else { return }
+        guard context.tryContinue() else {
+            throw MCPServerError.operationFailed(
+                "Mutation aborted before commit: \(context.truncationReason)"
+            )
+        }
+    }
+
+    private func normalizeExpectedVersion(_ value: String) -> String? {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : normalized
     }
 
     private func fileModeWithoutFollowingSymlink(_ url: URL, missingMessage: String) throws -> mode_t {

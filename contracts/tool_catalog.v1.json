@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.1.0",
+  "catalogVersion": "1.2.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -421,7 +421,7 @@
       "availability": {},
       "definition": {
         "name": "write_file",
-        "description": "Create a file, overwrite it, or append to it inside the shared directory.",
+        "description": "Create, overwrite, or append to a file inside the shared directory. Optional expected_version protects existing targets from stale writes.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -436,6 +436,11 @@
             "append": {
               "type": "boolean",
               "default": false
+            },
+            "expected_version": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Optional opaque strong file version token. When provided for an existing target, the write commits only if the version still matches immediately before publish."
             }
           },
           "required": [
@@ -474,13 +479,23 @@
       "availability": {},
       "definition": {
         "name": "delete_file",
-        "description": "Delete a file inside the shared directory (files only, not directories).",
+        "description": "Delete a file or symlink inside the shared directory. Optional expected_version protects regular files; dry_run validates without deleting.",
         "inputSchema": {
           "type": "object",
           "properties": {
             "relative_path": {
               "type": "string",
               "description": "Relative file path."
+            },
+            "expected_version": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Optional opaque strong file version token for regular-file deletion."
+            },
+            "dry_run": {
+              "type": "boolean",
+              "default": false,
+              "description": "Validate deletion preconditions without deleting the target."
             }
           },
           "required": [
@@ -518,13 +533,18 @@
       "availability": {},
       "definition": {
         "name": "delete_directory",
-        "description": "Recursively delete a folder and everything inside it.",
+        "description": "Recursively delete a folder and everything inside it, or validate the deletion with dry_run.",
         "inputSchema": {
           "type": "object",
           "properties": {
             "relative_path": {
               "type": "string",
               "description": "Relative directory path."
+            },
+            "dry_run": {
+              "type": "boolean",
+              "default": false,
+              "description": "Validate recursive deletion preconditions without deleting the directory."
             }
           },
           "required": [

@@ -1468,7 +1468,7 @@ SAFE_BASE_URL="http://127.0.0.1:18089/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.1.0"
+CATALOG_VERSION="1.2.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
