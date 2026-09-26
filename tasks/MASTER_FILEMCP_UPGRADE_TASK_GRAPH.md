@@ -326,7 +326,7 @@ Negative tests:
 
 ## FMG-010 — Project Context Provenance / Digest
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-001, FMG-004, FMG-006
 
 Scope:
@@ -352,7 +352,7 @@ Negative tests:
 
 ## FMG-011 — Metadata-Only Evidence / Freshness
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-002, FMG-003, FMG-006, FMG-010
 
 Scope:

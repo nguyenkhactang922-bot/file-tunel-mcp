@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-010-project-context`
+Active branch: `chatgpt/FMG-011-metadata-evidence`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -222,15 +222,19 @@ Evidence: `docs/evidence/FMG-009_APPLY_EDITS_EVIDENCE.md`.
 
 ## FMG-010 implementation
 
-State: ACTIVE / CLAIMED.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-010-project-context`.
-Depends: FMG-001, FMG-004, FMG-006 DONE / MAIN VERIFIED.
-Scope: Project Context Provenance / Digest only.
-NEXT_EXACT_ACTION: commit/push exact FMG-010 candidate, require native Verify on macOS + Windows x64 + Windows ARM64, fix only exact failing stage, perform scoped provenance/authority review, merge only exact green head, verify merged main, mark FMG-010 DONE / MAIN VERIFIED, then claim FMG-011.
+Primary PR: #14.
+Follow-up PRs: #15, #16.
+Final main: `9340377f42abfe97bc708d0683f77dea26e86b50`.
+Native merged-main Verify: run `36235453791` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Local merged-main proof: project-context/catalog/parity/source-state contracts PASS; Windows runtime 715 assertions PASS; Release build 0 warnings / 0 errors.
+Evidence: `docs/evidence/FMG-010_PROJECT_CONTEXT_CANDIDATE_EVIDENCE.md`.
 
+## FMG-011 implementation
 
-FMG-010 local candidate evidence:
-- catalog 1.5.0 / 22 tools / hash f717cf599faf112964a981e516de0898d4ce140c3f6daca15d732f13216a53aa;
-- Windows runtime 715 assertions PASS including windows-project-context: ok;
-- x64 isolated package/app smoke PASS; ZIP SHA-256 9ABA9428D8CD22F0FE29F30D3D3D05FAA3327D512DA95DDAC183EE28DE31ECFB;
-- evidence docs/evidence/FMG-010_PROJECT_CONTEXT_CANDIDATE_EVIDENCE.md.
+State: ACTIVE / CLAIMED.
+Branch: `chatgpt/FMG-011-metadata-evidence`.
+Depends: FMG-002, FMG-003, FMG-006, FMG-010 DONE / MAIN VERIFIED.
+Scope: Metadata-Only Evidence / Freshness only.
+Later dependent tasks remain BLOCKED by the frozen graph.
