@@ -1529,6 +1529,262 @@ let policyWriteAfterReject = try String(contentsOf: policyWriteURL, encoding: .u
 precondition(policyWriteAfterReject == "original")
 print("swift-existing-mutation-hardening: ok")
 
+let fmg009Root = root.appendingPathComponent("apply-edits")
+try FileManager.default.createDirectory(at: fmg009Root, withIntermediateDirectories: true)
+let fmg009Resolver = try SafePathResolver(rootPath: fmg009Root.path)
+let fmg009Tools = try LocalTools(
+    resolver: fmg009Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false)
+)
+func fmg009Version(_ path: String) throws -> String {
+    let output = try fmg009Tools.call(name: "read_file", arguments: ["relative_path": path])
+    return output.structuredContent["version"] as! String
+}
+func byteEdit(_ start: Int, _ end: Int, _ replacement: String) -> [String: Any] {
+    ["start_byte": start, "end_byte": end, "replacement": replacement]
+}
+func lineEdit(_ sl: Int, _ sc: Int, _ el: Int, _ ec: Int, _ replacement: String) -> [String: Any] {
+    [
+        "start": ["line": sl, "column": sc],
+        "end": ["line": el, "column": ec],
+        "replacement": replacement,
+    ]
+}
+func applyArgs(_ path: String, _ version: String, _ coordinate: String, _ edits: [[String: Any]], dryRun: Bool = false, columnEncoding: String? = nil) -> [String: Any] {
+    var args: [String: Any] = [
+        "relative_path": path,
+        "expected_version": version,
+        "coordinate_system": coordinate,
+        "edits": edits,
+        "dry_run": dryRun,
+        "preserve_line_endings": true,
+        "preserve_bom": true,
+    ]
+    if let columnEncoding { args["column_encoding"] = columnEncoding }
+    return args
+}
+
+try Data("hello world\n".utf8).write(to: fmg009Root.appendingPathComponent("byte.txt"))
+let fmg009ByteVersion = try fmg009Version("byte.txt")
+let fmg009ByteResult = try fmg009Tools.call(
+    name: "apply_edits",
+    arguments: applyArgs("byte.txt", fmg009ByteVersion, "byte", [byteEdit(6, 11, "FileMCP")])
+)
+let fmg009ByteText = try String(contentsOf: fmg009Root.appendingPathComponent("byte.txt"), encoding: .utf8)
+precondition(fmg009ByteText == "hello FileMCP\n")
+precondition(fmg009ByteResult.structuredContent["committed"] as? Bool == true)
+
+try Data("ab".utf8).write(to: fmg009Root.appendingPathComponent("insert.txt"))
+let fmg009InsertVersion = try fmg009Version("insert.txt")
+_ = try fmg009Tools.call(
+    name: "apply_edits",
+    arguments: applyArgs("insert.txt", fmg009InsertVersion, "byte", [
+        byteEdit(1, 1, "X"), byteEdit(1, 1, "Y"), byteEdit(1, 1, "Z"),
+    ])
+)
+let fmg009InsertText = try String(contentsOf: fmg009Root.appendingPathComponent("insert.txt"), encoding: .utf8)
+precondition(fmg009InsertText == "aXYZb")
+
+let fmg009UnicodeURL = fmg009Root.appendingPathComponent("unicode-crlf.txt")
+var fmg009UnicodeData = Data([0xEF, 0xBB, 0xBF])
+fmg009UnicodeData.append(Data("A\u{1F600}B\r\nsecond\r\n".utf8))
+try fmg009UnicodeData.write(to: fmg009UnicodeURL)
+let fmg009LineVersion = try fmg009Version("unicode-crlf.txt")
+let fmg009LineResult = try fmg009Tools.call(
+    name: "apply_edits",
+    arguments: applyArgs(
+        "unicode-crlf.txt", fmg009LineVersion, "lineColumn",
+        [lineEdit(1, 2, 1, 3, "\u{1F642}\nX")],
+        columnEncoding: "utf8CodePoint"
+    )
+)
+let fmg009LineBytes = try Data(contentsOf: fmg009UnicodeURL)
+precondition(Array(fmg009LineBytes.prefix(3)) == [0xEF, 0xBB, 0xBF])
+precondition(String(decoding: fmg009LineBytes.dropFirst(3), as: UTF8.self) == "A\u{1F642}\r\nXB\r\nsecond\r\n")
+precondition(fmg009LineResult.structuredContent["line_ending"] as? String == "crlf")
+
+let fmg009DryURL = fmg009Root.appendingPathComponent("dry.txt")
+try Data("before\n".utf8).write(to: fmg009DryURL)
+let fmg009DryVersion = try fmg009Version("dry.txt")
+let fmg009DryMtime = try FileManager.default.attributesOfItem(atPath: fmg009DryURL.path)[.modificationDate] as! Date
+let fmg009Dry = try fmg009Tools.call(
+    name: "apply_edits",
+    arguments: applyArgs("dry.txt", fmg009DryVersion, "byte", [byteEdit(0, 6, "after")], dryRun: true)
+)
+let fmg009DryText = try String(contentsOf: fmg009DryURL, encoding: .utf8)
+precondition(fmg009DryText == "before\n")
+let fmg009DryMtimeAfter = try FileManager.default.attributesOfItem(atPath: fmg009DryURL.path)[.modificationDate] as! Date
+precondition(fmg009DryMtimeAfter == fmg009DryMtime)
+precondition(fmg009Dry.structuredContent["committed"] as? Bool == false)
+
+let fmg009OverlapVersion = try fmg009Version("dry.txt")
+do {
+    _ = try fmg009Tools.call(name: "apply_edits", arguments: applyArgs("dry.txt", fmg009OverlapVersion, "byte", [byteEdit(0, 3, "x"), byteEdit(2, 4, "y")]))
+    preconditionFailure("FMG-009 overlapping edits must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("overlapping"))
+}
+
+let fmg009Utf8URL = fmg009Root.appendingPathComponent("utf8.txt")
+try Data("A\u{1F600}B".utf8).write(to: fmg009Utf8URL)
+let fmg009Utf8Version = try fmg009Version("utf8.txt")
+do {
+    _ = try fmg009Tools.call(name: "apply_edits", arguments: applyArgs("utf8.txt", fmg009Utf8Version, "byte", [byteEdit(2, 3, "x")]))
+    preconditionFailure("FMG-009 UTF-8 interior byte offset must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("utf-8 boundary"))
+}
+
+let fmg009StaleURL = fmg009Root.appendingPathComponent("stale.txt")
+try Data("version-a".utf8).write(to: fmg009StaleURL)
+let fmg009StaleVersion = try fmg009Version("stale.txt")
+try Data("version-b".utf8).write(to: fmg009StaleURL)
+do {
+    _ = try fmg009Tools.call(name: "apply_edits", arguments: applyArgs("stale.txt", fmg009StaleVersion, "byte", [byteEdit(0, 1, "V")]))
+    preconditionFailure("FMG-009 stale version must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("changed"))
+}
+let fmg009StaleText = try String(contentsOf: fmg009StaleURL, encoding: .utf8)
+precondition(fmg009StaleText == "version-b")
+
+let fmg009BudgetURL = fmg009Root.appendingPathComponent("budget.txt")
+try Data("0123456789".utf8).write(to: fmg009BudgetURL)
+let fmg009BudgetVersion = try fmg009Version("budget.txt")
+let fmg009BudgetContext = try ToolExecutionContext(meta: [
+    ToolExecutionContext.budgetMetadataKey: ["maxBytesScanned": NSNumber(value: 5)]
+])
+do {
+    _ = try fmg009Tools.call(
+        name: "apply_edits",
+        arguments: applyArgs("budget.txt", fmg009BudgetVersion, "byte", [byteEdit(0, 1, "x")]),
+        executionContext: fmg009BudgetContext
+    )
+    preconditionFailure("FMG-009 budget exhaustion must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("budget exhausted"))
+}
+
+let fmg009WriterURL = fmg009Root.appendingPathComponent("writer.txt")
+try Data("original".utf8).write(to: fmg009WriterURL)
+let fmg009WriterVersion = try fmg009Version("writer.txt")
+var fmg009WriterUsed = false
+let fmg009WriterTools = try LocalTools(
+    resolver: fmg009Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    applyEditsStageForTests: { stage in
+        guard stage == "before_commit", !fmg009WriterUsed else { return }
+        fmg009WriterUsed = true
+        try! Data("external".utf8).write(to: fmg009WriterURL)
+    }
+)
+do {
+    _ = try fmg009WriterTools.call(name: "apply_edits", arguments: applyArgs("writer.txt", fmg009WriterVersion, "byte", [byteEdit(0, 8, "changed")]))
+    preconditionFailure("FMG-009 external writer must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("changed"))
+}
+let fmg009WriterText = try String(contentsOf: fmg009WriterURL, encoding: .utf8)
+precondition(fmg009WriterText == "external")
+
+let fmg009SwapURL = fmg009Root.appendingPathComponent("swap.txt")
+try Data("original".utf8).write(to: fmg009SwapURL)
+let fmg009SwapVersion = try fmg009Version("swap.txt")
+var fmg009SwapUsed = false
+let fmg009SwapTools = try LocalTools(
+    resolver: fmg009Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    applyEditsStageForTests: { stage in
+        guard stage == "before_commit", !fmg009SwapUsed else { return }
+        fmg009SwapUsed = true
+        try! FileManager.default.removeItem(at: fmg009SwapURL)
+        try! Data("replacement".utf8).write(to: fmg009SwapURL)
+    }
+)
+do {
+    _ = try fmg009SwapTools.call(name: "apply_edits", arguments: applyArgs("swap.txt", fmg009SwapVersion, "byte", [byteEdit(0, 8, "changed")]))
+    preconditionFailure("FMG-009 target replacement must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("target identity changed"))
+}
+
+let fmg009CancelBeforeURL = fmg009Root.appendingPathComponent("cancel-before.txt")
+try Data("original".utf8).write(to: fmg009CancelBeforeURL)
+let fmg009CancelBeforeVersion = try fmg009Version("cancel-before.txt")
+var fmg009CancelBefore = false
+let fmg009CancelBeforeContext = try ToolExecutionContext(meta: nil, cancellationProbe: { fmg009CancelBefore })
+let fmg009CancelBeforeTools = try LocalTools(
+    resolver: fmg009Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    applyEditsStageForTests: { stage in if stage == "before_commit" { fmg009CancelBefore = true } }
+)
+do {
+    _ = try fmg009CancelBeforeTools.call(
+        name: "apply_edits",
+        arguments: applyArgs("cancel-before.txt", fmg009CancelBeforeVersion, "byte", [byteEdit(0, 8, "changed")]),
+        executionContext: fmg009CancelBeforeContext
+    )
+    preconditionFailure("FMG-009 pre-commit cancellation must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("aborted before commit"))
+}
+let fmg009CancelBeforeText = try String(contentsOf: fmg009CancelBeforeURL, encoding: .utf8)
+precondition(fmg009CancelBeforeText == "original")
+
+let fmg009CancelAfterURL = fmg009Root.appendingPathComponent("cancel-after.txt")
+try Data("original".utf8).write(to: fmg009CancelAfterURL)
+let fmg009CancelAfterVersion = try fmg009Version("cancel-after.txt")
+var fmg009CancelAfter = false
+let fmg009CancelAfterContext = try ToolExecutionContext(meta: nil, cancellationProbe: { fmg009CancelAfter })
+let fmg009CancelAfterTools = try LocalTools(
+    resolver: fmg009Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    applyEditsStageForTests: { stage in if stage == "after_commit" { fmg009CancelAfter = true } }
+)
+let fmg009Committed = try fmg009CancelAfterTools.call(
+    name: "apply_edits",
+    arguments: applyArgs("cancel-after.txt", fmg009CancelAfterVersion, "byte", [byteEdit(0, 8, "changed")]),
+    executionContext: fmg009CancelAfterContext
+)
+precondition(fmg009Committed.structuredContent["committed"] as? Bool == true)
+precondition(fmg009Committed.structuredContent["cancelled_after_commit"] as? Bool == true)
+let fmg009CancelAfterText = try String(contentsOf: fmg009CancelAfterURL, encoding: .utf8)
+precondition(fmg009CancelAfterText == "changed")
+
+let fmg009StageDir = fmg009Root.appendingPathComponent("stage-fail")
+try FileManager.default.createDirectory(at: fmg009StageDir, withIntermediateDirectories: true)
+let fmg009StageURL = fmg009StageDir.appendingPathComponent("file.txt")
+try Data("original".utf8).write(to: fmg009StageURL)
+let fmg009StageVersionTools = try LocalTools(
+    resolver: fmg009Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false)
+)
+let fmg009StageVersion = (try fmg009StageVersionTools.call(name: "read_file", arguments: ["relative_path": "stage-fail/file.txt"])).structuredContent["version"] as! String
+try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: 0o500)], ofItemAtPath: fmg009StageDir.path)
+do {
+    _ = try fmg009StageVersionTools.call(name: "apply_edits", arguments: applyArgs("stage-fail/file.txt", fmg009StageVersion, "byte", [byteEdit(0, 8, "changed")]))
+    preconditionFailure("FMG-009 staging failure must fail")
+} catch {
+    // Expected: sibling temp cannot be created in read/execute-only directory.
+}
+try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: 0o700)], ofItemAtPath: fmg009StageDir.path)
+let fmg009StageText = try String(contentsOf: fmg009StageURL, encoding: .utf8)
+precondition(fmg009StageText == "original")
+
+print("swift-apply-edits: ok")
+
 let localAuthToken = String(repeating: "a", count: 64)
 
 do {
@@ -1658,7 +1914,7 @@ SAFE_BASE_URL="http://127.0.0.1:18089/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.2.0"
+CATALOG_VERSION="1.3.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
@@ -2700,8 +2956,7 @@ printf '%s' "$TOOLS" | plutil -extract result.tools.1.outputSchema.properties.re
 printf '%s' "$TOOLS" | plutil -extract result.tools.2.outputSchema.properties.content.type raw -expect string -o - - | grep -qx 'string'
 printf '%s' "$TOOLS" | plutil -extract result.tools.0.annotations.openWorldHint raw -expect bool -o - - | grep -qx 'false'
 printf '%s' "$TOOLS" | plutil -extract result.tools.5.annotations.destructiveHint raw -expect bool -o - - | grep -qx 'true'
-printf '%s' "$TOOLS" | plutil -extract result.tools.14.annotations.openWorldHint raw -expect bool -o - - | grep -qx 'true'
-printf '%s' "$TOOLS" | plutil -extract result.tools.15.annotations.openWorldHint raw -expect bool -o - - | grep -qx 'true'
+printf '%s' "$TOOLS" | python3 -c 'import json,sys; d=json.load(sys.stdin); by={t["name"]:t for t in d["result"]["tools"]}; assert by["exec_process"]["annotations"]["openWorldHint"] is True; assert by["run_command"]["annotations"]["openWorldHint"] is True'
 
 MODERN_CALL="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \

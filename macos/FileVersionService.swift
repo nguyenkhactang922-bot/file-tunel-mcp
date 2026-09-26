@@ -113,6 +113,11 @@ final class FileVersionService {
     }
 
     func verifyExpectedVersion(relativePath: String, token: String, maxBytes: Int) throws -> FileVersionPayload {
+        let currentRead = try readExpectedVersioned(relativePath: relativePath, token: token, maxBytes: maxBytes)
+        return try decodeToken(currentRead.versionToken)
+    }
+
+    func readExpectedVersioned(relativePath: String, token: String, maxBytes: Int) throws -> FileVersionedRead {
         let expected = try decodeToken(token)
         let currentRead = try readVersioned(relativePath: relativePath, maxBytes: maxBytes)
         let current = try decodeToken(currentRead.versionToken)
@@ -125,7 +130,7 @@ final class FileVersionService {
         guard current == expected else {
             throw FileVersionServiceError.invalid("File changed since the version token was captured")
         }
-        return current
+        return currentRead
     }
 
     func decodeForTest(_ token: String) throws -> FileVersionPayload { try decodeToken(token) }

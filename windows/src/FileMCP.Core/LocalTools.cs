@@ -14,6 +14,7 @@ internal sealed partial class LocalTools
     private readonly FileVersionService _fileVersions;
     private readonly AuthorizedPathSnapshotService _mutationGuard;
     private readonly Action<string>? _beforeMutationCommitForTests;
+    private readonly Action<string>? _applyEditsStageForTests;
     private readonly bool _enableCommands;
     private readonly string? _safeGitEmptyFile;
     private readonly string? _safeGitHooksDirectory;
@@ -24,17 +25,17 @@ internal sealed partial class LocalTools
     private static readonly HashSet<string> HandlerToolNames = new(StringComparer.Ordinal)
     {
         "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     };
     private static readonly HashSet<string> SerializedToolNames = new(StringComparer.Ordinal)
     {
-        "write_file", "delete_file", "delete_directory", "run_command",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "run_command",
         "git_init", "git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push",
     };
     private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "exec_process",
+        "list_files", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "exec_process",
     };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -52,12 +53,14 @@ internal sealed partial class LocalTools
         string gitUserEmail,
         ServerPolicy policy,
         IReadOnlyList<string>? execEnvironmentAllowList = null,
-        Action<string>? beforeMutationCommitForTests = null)
+        Action<string>? beforeMutationCommitForTests = null,
+        Action<string>? applyEditsStageForTests = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
         _mutationGuard = new AuthorizedPathSnapshotService(_resolver);
         _beforeMutationCommitForTests = beforeMutationCommitForTests;
+        _applyEditsStageForTests = applyEditsStageForTests;
         _gitUserName = gitUserName;
         _gitUserEmail = gitUserEmail;
         _policy = policy;
@@ -125,6 +128,18 @@ internal sealed partial class LocalTools
                     GetBool(arguments, "dry_run", false),
                     preparedPolicy,
                     effectiveCancellation)),
+                "apply_edits" => ObjectOutput(ApplyEdits(
+                    GetRequiredString(arguments, "relative_path"),
+                    GetRequiredString(arguments, "expected_version"),
+                    GetRequiredString(arguments, "coordinate_system"),
+                    GetString(arguments, "column_encoding", ""),
+                    GetRequiredArray(arguments, "edits"),
+                    GetBool(arguments, "dry_run", false),
+                    GetBool(arguments, "preserve_line_endings", true),
+                    GetBool(arguments, "preserve_bom", true),
+                    preparedPolicy,
+                    effectiveCancellation,
+                    executionContext)),
                 "exec_process" => ObjectOutput(await ExecProcessAsync(
                     GetRequiredString(arguments, "executable"),
                     GetStringArray(arguments, "arguments"),
@@ -659,6 +674,283 @@ internal sealed partial class LocalTools
         return normalized.Length == 0 ? null : normalized;
     }
 
+    private JsonObject ApplyEdits(
+        string relativePath,
+        string expectedVersion,
+        string coordinateSystem,
+        string columnEncoding,
+        JsonArray edits,
+        bool dryRun,
+        bool preserveLineEndings,
+        bool preserveBom,
+        PolicySnapshot preparedPolicy,
+        CancellationToken cancellationToken,
+        ToolExecutionContext? executionContext)
+    {
+        if (string.IsNullOrWhiteSpace(expectedVersion)) throw new FileMcpException("expected_version must not be empty");
+        if (edits.Count is < 1 or > 1024) throw new FileMcpException("apply_edits supports 1..1024 edits");
+        if (coordinateSystem is not ("byte" or "lineColumn")) throw new FileMcpException("coordinate_system must be byte or lineColumn");
+        if (coordinateSystem == "lineColumn" && columnEncoding != "utf8CodePoint")
+            throw new FileMcpException("lineColumn coordinates require column_encoding=utf8CodePoint");
+        if (coordinateSystem == "byte" && !string.IsNullOrEmpty(columnEncoding))
+            throw new FileMcpException("column_encoding is only valid with lineColumn coordinates");
+        cancellationToken.ThrowIfCancellationRequested();
+        if (executionContext is not null && !executionContext.TryContinue()) throw new OperationCanceledException("apply_edits cancelled before read", cancellationToken);
+
+        var versioned = _fileVersions.ReadExpectedVersioned(relativePath, expectedVersion);
+        _applyEditsStageForTests?.Invoke("after_read");
+        cancellationToken.ThrowIfCancellationRequested();
+        if (executionContext is not null && !executionContext.TryScanFile(versioned.SizeBytes))
+            throw new FileMcpException("apply_edits budget exhausted while reading source");
+
+        var raw = versioned.Data;
+        var hasBom = raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF;
+        var content = hasBom ? raw.AsSpan(3).ToArray() : raw.ToArray();
+        string text;
+        try
+        {
+            text = new UTF8Encoding(false, true).GetString(content);
+        }
+        catch (DecoderFallbackException)
+        {
+            throw new FileMcpException("apply_edits requires valid UTF-8 source text");
+        }
+
+        var newline = DetectPreferredNewline(text);
+        var compiled = CompileEdits(edits, coordinateSystem, text, content, preserveLineEndings ? newline : null);
+        var replacementBytes = compiled.Sum(edit => (long)edit.Replacement.Length);
+        var removedBytes = compiled.Sum(edit => (long)(edit.EndByte - edit.StartByte));
+        var outputContentBytes = checked(content.LongLength - removedBytes + replacementBytes);
+        var outputSize = checked(outputContentBytes + (preserveBom && hasBom ? 3 : 0));
+        if (outputSize > FileMcpConstants.MaxWriteBytes) throw new FileMcpException("apply_edits result is larger than the 5 MB write limit");
+        if (executionContext is not null && replacementBytes > executionContext.RemainingBytes)
+            throw new FileMcpException("apply_edits budget exhausted by replacement content");
+
+        var previewBytes = ApplyCompiledEdits(content, compiled, preserveBom && hasBom);
+        var snapshot = _mutationGuard.CaptureExisting(relativePath);
+        var result = new JsonObject
+        {
+            ["dry_run"] = dryRun,
+            ["committed"] = false,
+            ["edits_applied"] = compiled.Count,
+            ["bytes_before"] = raw.LongLength,
+            ["bytes_after"] = previewBytes.LongLength,
+            ["coordinate_system"] = coordinateSystem,
+            ["column_encoding"] = coordinateSystem == "lineColumn" ? "utf8CodePoint" : null,
+            ["before_version"] = versioned.VersionToken,
+            ["preserved_bom"] = preserveBom && hasBom,
+            ["line_ending"] = newline == "\r\n" ? "crlf" : newline == "\r" ? "cr" : "lf",
+        };
+
+        if (dryRun)
+        {
+            _policy.Authorize("apply_edits", preparedPolicy);
+            _ = _mutationGuard.Verify(snapshot);
+            _ = _fileVersions.VerifyExpectedVersion(relativePath, expectedVersion);
+            result["preview"] = PreviewUtf8(previewBytes, 8192);
+            result["after_version"] = null;
+            return result;
+        }
+
+        var target = _resolver.Resolve(relativePath);
+        var temp = target + ".filemcp-edits-" + Guid.NewGuid().ToString("N") + ".tmp";
+        var committed = false;
+        try
+        {
+            using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                stream.Write(previewBytes);
+                stream.Flush(flushToDisk: true);
+            }
+            _applyEditsStageForTests?.Invoke("after_stage");
+            cancellationToken.ThrowIfCancellationRequested();
+            if (executionContext is not null && !executionContext.TryContinue()) throw new OperationCanceledException("apply_edits cancelled before commit", cancellationToken);
+
+            _applyEditsStageForTests?.Invoke("before_commit");
+            cancellationToken.ThrowIfCancellationRequested();
+            if (executionContext is not null && !executionContext.TryContinue()) throw new OperationCanceledException("apply_edits cancelled before commit", cancellationToken);
+            _policy.Authorize("apply_edits", preparedPolicy);
+            _ = _mutationGuard.Verify(snapshot);
+            _ = _fileVersions.VerifyExpectedVersion(relativePath, expectedVersion);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (executionContext is not null && !executionContext.TryContinue()) throw new OperationCanceledException("apply_edits cancelled before commit", cancellationToken);
+            File.Move(temp, target, true);
+            committed = true;
+            _applyEditsStageForTests?.Invoke("after_commit");
+
+            var after = _fileVersions.ReadVersioned(relativePath, FileMcpConstants.MaxFileBytes);
+            result["committed"] = true;
+            result["after_version"] = after.VersionToken;
+            result["cancelled_after_commit"] = cancellationToken.IsCancellationRequested || (executionContext?.CancellationRequested ?? false);
+            return result;
+        }
+        catch when (committed)
+        {
+            // Once atomic publish committed, callers must not receive a false rollback signal.
+            var after = _fileVersions.ReadVersioned(relativePath, FileMcpConstants.MaxFileBytes);
+            result["committed"] = true;
+            result["after_version"] = after.VersionToken;
+            result["cancelled_after_commit"] = true;
+            return result;
+        }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+        }
+    }
+
+    private sealed record CompiledEdit(int RequestIndex, int StartByte, int EndByte, byte[] Replacement);
+
+    private static IReadOnlyList<CompiledEdit> CompileEdits(
+        JsonArray edits,
+        string coordinateSystem,
+        string text,
+        byte[] content,
+        string? normalizedNewline)
+    {
+        var compiled = new List<CompiledEdit>(edits.Count);
+        for (var i = 0; i < edits.Count; i++)
+        {
+            if (edits[i] is not JsonObject edit) throw new FileMcpException($"edits[{i}] must be an object");
+            if (edit["replacement"] is not JsonValue replacementNode || !replacementNode.TryGetValue<string>(out var replacement) || replacement is null)
+                throw new FileMcpException($"edits[{i}].replacement must be a string");
+            if (normalizedNewline is not null) replacement = NormalizeNewlines(replacement, normalizedNewline);
+            var replacementBytes = Encoding.UTF8.GetBytes(replacement);
+            int startByte;
+            int endByte;
+            if (coordinateSystem == "byte")
+            {
+                startByte = RequiredEditInt(edit, "start_byte", i);
+                endByte = RequiredEditInt(edit, "end_byte", i);
+                if (startByte < 0 || endByte < startByte || endByte > content.Length)
+                    throw new FileMcpException($"edits[{i}] byte range is out of bounds");
+                EnsureUtf8Boundary(content, startByte, i);
+                EnsureUtf8Boundary(content, endByte, i);
+            }
+            else
+            {
+                startByte = LineColumnToByte(text, RequiredPosition(edit, "start", i), i, "start");
+                endByte = LineColumnToByte(text, RequiredPosition(edit, "end", i), i, "end");
+                if (endByte < startByte) throw new FileMcpException($"edits[{i}] end precedes start");
+            }
+            compiled.Add(new CompiledEdit(i, startByte, endByte, replacementBytes));
+        }
+
+        var ordered = compiled.OrderBy(edit => edit.StartByte).ThenBy(edit => edit.EndByte).ThenBy(edit => edit.RequestIndex).ToList();
+        for (var i = 1; i < ordered.Count; i++)
+        {
+            var previous = ordered[i - 1];
+            var current = ordered[i];
+            if (current.StartByte < previous.EndByte)
+                throw new FileMcpException("apply_edits contains overlapping ranges");
+            if (current.StartByte == previous.StartByte && (current.EndByte != current.StartByte || previous.EndByte != previous.StartByte))
+                throw new FileMcpException("apply_edits contains overlapping ranges");
+        }
+        return ordered;
+    }
+
+    private static byte[] ApplyCompiledEdits(byte[] content, IReadOnlyList<CompiledEdit> edits, bool includeBom)
+    {
+        using var output = new MemoryStream();
+        if (includeBom) output.Write([0xEF, 0xBB, 0xBF]);
+        var cursor = 0;
+        foreach (var edit in edits)
+        {
+            output.Write(content, cursor, edit.StartByte - cursor);
+            output.Write(edit.Replacement);
+            cursor = edit.EndByte;
+        }
+        output.Write(content, cursor, content.Length - cursor);
+        return output.ToArray();
+    }
+
+    private static int RequiredEditInt(JsonObject edit, string key, int index)
+    {
+        if (edit[key] is JsonValue value && value.TryGetValue<int>(out var result)) return result;
+        throw new FileMcpException($"edits[{index}].{key} must be an integer");
+    }
+
+    private static (int Line, int Column) RequiredPosition(JsonObject edit, string key, int index)
+    {
+        if (edit[key] is not JsonObject position) throw new FileMcpException($"edits[{index}].{key} must be an object");
+        if (position["line"] is not JsonValue lineNode || !lineNode.TryGetValue<int>(out var line) ||
+            position["column"] is not JsonValue columnNode || !columnNode.TryGetValue<int>(out var column))
+            throw new FileMcpException($"edits[{index}].{key} requires integer line and column");
+        return (line, column);
+    }
+
+    private static int LineColumnToByte(string text, (int Line, int Column) position, int editIndex, string label)
+    {
+        if (position.Line < 1 || position.Column < 1) throw new FileMcpException($"edits[{editIndex}].{label} line/column are 1-based");
+        var line = 1;
+        var column = 1;
+        var charIndex = 0;
+        var byteOffset = 0;
+        while (true)
+        {
+            if (line == position.Line && column == position.Column) return byteOffset;
+            if (charIndex >= text.Length)
+                throw new FileMcpException($"edits[{editIndex}].{label} position is out of bounds");
+
+            if (text[charIndex] == '\r')
+            {
+                if (line >= position.Line)
+                    throw new FileMcpException($"edits[{editIndex}].{label} column is out of bounds");
+                byteOffset += 1;
+                charIndex++;
+                if (charIndex < text.Length && text[charIndex] == '\n')
+                {
+                    byteOffset += 1;
+                    charIndex++;
+                }
+                line++;
+                column = 1;
+                continue;
+            }
+            if (text[charIndex] == '\n')
+            {
+                if (line >= position.Line)
+                    throw new FileMcpException($"edits[{editIndex}].{label} column is out of bounds");
+                byteOffset += 1;
+                charIndex++;
+                line++;
+                column = 1;
+                continue;
+            }
+
+            var rune = Rune.GetRuneAt(text, charIndex);
+            charIndex += rune.Utf16SequenceLength;
+            byteOffset += rune.Utf8SequenceLength;
+            column++;
+        }
+    }
+
+    private static void EnsureUtf8Boundary(byte[] content, int offset, int editIndex)
+    {
+        if (offset == 0 || offset == content.Length) return;
+        if ((content[offset] & 0xC0) == 0x80) throw new FileMcpException($"edits[{editIndex}] byte offset is not a UTF-8 boundary");
+    }
+
+    private static string NormalizeNewlines(string value, string newline) =>
+        value.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", newline);
+
+    private static string DetectPreferredNewline(string text)
+    {
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '\r') return i + 1 < text.Length && text[i + 1] == '\n' ? "\r\n" : "\r";
+            if (text[i] == '\n') return "\n";
+        }
+        return "\n";
+    }
+
+    private static string PreviewUtf8(byte[] bytes, int maxBytes)
+    {
+        var slice = bytes.AsSpan(0, Math.Min(bytes.Length, maxBytes));
+        var preview = Encoding.UTF8.GetString(slice);
+        return bytes.Length > maxBytes ? preview + "\n[...preview truncated...]" : preview;
+    }
+
     private async Task<JsonObject> ExecProcessAsync(
         string executable,
         IReadOnlyList<string> arguments,
@@ -774,6 +1066,7 @@ internal sealed partial class LocalTools
 
     private static string GetRequiredString(JsonObject args, string key) => args[key] is JsonValue value && value.TryGetValue<string>(out var result) ? result : throw new FileMcpException($"Missing or invalid argument: {key}");
     private static int GetRequiredInt(JsonObject args, string key) => args[key] is JsonValue value && value.TryGetValue<int>(out var result) ? result : throw new FileMcpException($"Missing or invalid argument: {key}");
+    private static JsonArray GetRequiredArray(JsonObject args, string key) => args[key] is JsonArray value ? value : throw new FileMcpException($"Missing or invalid argument: {key}");
     private static string GetString(JsonObject args, string key, string fallback) => args[key] is JsonValue value && value.TryGetValue<string>(out var result) ? result : fallback;
     private static bool GetBool(JsonObject args, string key, bool fallback) => args[key] is JsonValue value && value.TryGetValue<bool>(out var result) ? result : fallback;
     private static int GetInt(JsonObject args, string key, int fallback) => args[key] is JsonValue value && value.TryGetValue<int>(out var result) ? result : fallback;

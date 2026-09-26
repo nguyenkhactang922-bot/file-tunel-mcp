@@ -97,6 +97,12 @@ internal sealed class FileVersionService
 
     public FileVersionPayload VerifyExpectedVersion(string relativePath, string token, int maxBytes = FileMcpConstants.MaxFileBytes)
     {
+        var currentRead = ReadExpectedVersioned(relativePath, token, maxBytes);
+        return Decode(currentRead.VersionToken);
+    }
+
+    public FileVersionedRead ReadExpectedVersioned(string relativePath, string token, int maxBytes = FileMcpConstants.MaxFileBytes)
+    {
         var expected = Decode(token);
         var currentRead = ReadVersioned(relativePath, maxBytes);
         var current = Decode(currentRead.VersionToken);
@@ -106,7 +112,7 @@ internal sealed class FileVersionService
             throw new FileMcpException("Target was replaced since the version token was captured");
         if (current != expected)
             throw new FileMcpException("File changed since the version token was captured");
-        return current;
+        return currentRead;
     }
 
     internal FileVersionPayload DecodeForTest(string token) => Decode(token);

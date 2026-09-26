@@ -18,7 +18,7 @@ internal static class CanonicalToolCatalog
 {
     private const string ResourceName = "FileMCP.Contracts.tool_catalog.v1.json";
     private const int SupportedSchemaVersion = 1;
-    private const string SupportedCatalogVersion = "1.2.0";
+    private const string SupportedCatalogVersion = "1.3.0";
     private const string SupportedInstructionVersion = "1.0.0";
     private static readonly HashSet<string> SupportedRisks = new(new[] { "low", "medium", "high" }, StringComparer.Ordinal);
     private static readonly HashSet<string> SupportedEffects = new(new[] { "read", "write", "delete", "execute", "external", "metadata" }, StringComparer.Ordinal);

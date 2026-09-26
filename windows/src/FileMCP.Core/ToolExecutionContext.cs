@@ -46,6 +46,7 @@ internal sealed class ToolExecutionContext : IDisposable
     public string TruncationReason => _truncationReason;
     public int RemainingFiles => Math.Max(0, Limits.MaxFilesScanned - _filesScanned);
     public long RemainingBytes => Math.Max(0, Limits.MaxBytesScanned - _bytesScanned);
+    public bool CancellationRequested => _cancellationProbe() || CancellationToken.IsCancellationRequested;
 
     public static bool HasBudget(JsonObject? meta) => meta?[BudgetMetadataKey] is not null;
 

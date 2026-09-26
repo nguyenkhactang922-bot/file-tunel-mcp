@@ -270,7 +270,7 @@ Negative tests:
 
 ## FMG-008 — Harden Existing write/delete Mutations
 
-State: ACTIVE
+State: DONE / MAIN VERIFIED
 Depends: FMG-007, FMG-003
 
 Scope:
@@ -295,7 +295,7 @@ Negative tests:
 
 ## FMG-009 — Atomic Versioned apply_edits
 
-State: BLOCKED
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
 Depends: FMG-004, FMG-008
 
 Scope:
