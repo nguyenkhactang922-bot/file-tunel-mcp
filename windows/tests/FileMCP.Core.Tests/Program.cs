@@ -2154,7 +2154,12 @@ internal static class Program
             cancelCts.Token);
         var childPid = 0;
         Assert(await WaitUntilAsync(
-            () => File.Exists(childPidFile) && int.TryParse(File.ReadAllText(childPidFile).Trim(), out childPid),
+            () =>
+            {
+                if (!File.Exists(childPidFile)) return false;
+                try { return int.TryParse(File.ReadAllText(childPidFile).Trim(), out childPid); }
+                catch (IOException) { return false; }
+            },
             TimeSpan.FromSeconds(8)), "exec_process cancellation child fixture started with PID");
         cancelCts.Cancel();
         var cancelled = await cancelTask;
