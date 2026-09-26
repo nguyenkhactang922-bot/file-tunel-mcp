@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.5.0",
+  "catalogVersion": "1.6.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -1386,6 +1386,54 @@
           },
           "required": [
             "name"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "evidence_get",
+      "handler": "server",
+      "risk": "low",
+      "effect": "metadata",
+      "capabilities": [
+        "evidence.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "evidence_get",
+        "description": "Read a durable metadata-only evidence record and recompute its effective freshness against current workspace policy/catalog and optional transient SourceStateRef scope. This tool cannot create or mark verification evidence.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "evidence_id": {
+              "type": "string",
+              "pattern": "^ev_[0-9a-f]{32}$"
+            },
+            "repo_path": {
+              "type": "string",
+              "description": "Transient repository path used only to recompute SourceStateRef freshness; never persisted."
+            },
+            "relevant_paths": {
+              "type": "array",
+              "maxItems": 4096,
+              "items": {
+                "type": "string"
+              },
+              "description": "Transient relevant-file scope used only for freshness recomputation; never persisted."
+            }
+          },
+          "required": [
+            "evidence_id"
           ],
           "additionalProperties": false
         },

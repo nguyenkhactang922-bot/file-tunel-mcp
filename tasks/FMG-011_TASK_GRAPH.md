@@ -13,3 +13,17 @@
 | FMG-011-I | PR merge + merged-main Verify | FMG-011 MAIN VERIFIED; FMG-012 READY |
 
 Dependency: A -> B/C -> D -> E/F -> G -> H -> I.
+
+## Current execution status
+
+- FMG-011-A: PASS
+- FMG-011-B: PASS
+- FMG-011-C: PASS / native execution pending
+- FMG-011-D: PASS
+- FMG-011-E: PASS
+- FMG-011-F: PASS
+- FMG-011-G: PASS locally
+- FMG-011-H: ACTIVE - native Verify pending
+- FMG-011-I: BLOCKED on H
+
+AUTHORITATIVE NEXT_EXACT_ACTION: commit/push exact candidate and require native Verify on macOS / Windows x64 / Windows ARM64.

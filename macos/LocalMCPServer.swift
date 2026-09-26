@@ -2238,13 +2238,15 @@ private final class MCPConnectionLease {
 }
 
 final class LocalMCPServer {
-    private static let handlerToolNames: Set<String> = ["filemcp_observability_connect"]
+    private static let handlerToolNames: Set<String> = ["filemcp_observability_connect", "evidence_get"]
     private let port: UInt16
     private let localAuthToken: String
     private let tools: LocalTools
     private let policy: ServerPolicy
     private let skills: CodexSkillRegistry
     private let chatCorrelation = LogicalChatCorrelationService()
+    private let evidenceStore: EvidenceStore
+    private let evidenceCoordinator: EvidenceCoordinator
     private let log: (String) -> Void
     private let listenerQueue = DispatchQueue(label: "com.filemcp.http-listener", qos: .userInitiated)
     private let workQueue = DispatchQueue(label: "com.filemcp.http-workers", qos: .userInitiated, attributes: .concurrent)
@@ -2265,7 +2267,8 @@ final class LocalMCPServer {
         log: @escaping (String) -> Void,
         limits: LocalMCPServerLimits = .standard,
         policyConfiguration: LocalPolicyConfiguration? = nil,
-        execEnvironmentAllowList: [String] = []
+        execEnvironmentAllowList: [String] = [],
+        evidenceStore: EvidenceStore? = nil
     ) throws {
         guard localAuthToken.utf8.count >= 32 else {
             throw MCPServerError.invalidArguments("Local MCP authentication token is too short")
@@ -2296,6 +2299,15 @@ final class LocalMCPServer {
             policy: activePolicy,
             execEnvironmentAllowList: execEnvironmentAllowList,
             skillRegistry: activeSkills
+        )
+        let activeEvidenceStore = evidenceStore ?? EvidenceStore()
+        self.evidenceStore = activeEvidenceStore
+        self.evidenceCoordinator = EvidenceCoordinator(
+            store: activeEvidenceStore,
+            tools: self.tools,
+            policy: activePolicy,
+            workspaceFingerprint: EvidenceStore.workspaceFingerprint(resolver.root.path),
+            log: log
         )
     }
 
@@ -2677,6 +2689,7 @@ final class LocalMCPServer {
     private func allToolDefinitions() -> [[String: Any]] {
         var result = tools.toolDefinitions.map(withCorrelationFacadeMetadata)
         result.append(contentsOf: skills.toolDefinitions.map(withCorrelationFacadeMetadata))
+        result.append(withCorrelationFacadeMetadata(evidenceStatusToolDefinition()))
         result.append(observabilityConnectToolDefinition())
         return try! policy.filterDefinitions(result)
     }
@@ -2691,6 +2704,10 @@ final class LocalMCPServer {
         inputSchema["properties"] = properties
         tool["inputSchema"] = inputSchema
         return tool
+    }
+
+    private func evidenceStatusToolDefinition() -> [String: Any] {
+        try! CanonicalToolCatalog.shared.toolDefinition(named: "evidence_get")
     }
 
     private func observabilityConnectToolDefinition() -> [String: Any] {
@@ -2751,6 +2768,7 @@ final class LocalMCPServer {
     }
 
     private func callTool(id: Any, params: [String: Any], modern: Bool) -> Data {
+        let operationID = ToolResultEnvelope.newOperationID()
         guard let toolName = params["name"] as? String else {
             return jsonRPCError(
                 id: id,
@@ -2761,7 +2779,8 @@ final class LocalMCPServer {
         }
 
         let isObservabilityConnect = toolName == "filemcp_observability_connect"
-        guard tools.hasTool(named: toolName) || skills.hasTool(named: toolName) || isObservabilityConnect else {
+        let isEvidenceStatus = toolName == "evidence_get"
+        guard tools.hasTool(named: toolName) || skills.hasTool(named: toolName) || isObservabilityConnect || isEvidenceStatus else {
             return jsonRPCError(id: id, code: -32602, message: "Unknown tool: \(toolName)")
         }
 
@@ -2769,7 +2788,7 @@ final class LocalMCPServer {
         if let rawArguments = params["arguments"] {
             guard let typedArguments = rawArguments as? [String: Any] else {
                 let invalidContent: [[String: Any]] = [["type": "text", "text": "Invalid arguments: expected an object"]]
-                var result = toolCallResult(content: invalidContent, structuredContent: nil, isError: true)
+                var result = toolCallResult(content: invalidContent, structuredContent: nil, isError: true, operationID: operationID)
                 if modern { result = modernCompleteResult(result) }
                 return jsonRPCResult(id: id, result: result)
             }
@@ -2778,6 +2797,8 @@ final class LocalMCPServer {
             arguments = [:]
         }
 
+        var evidenceRun: EvidenceRun?
+        var activeExecutionContext: ToolExecutionContext?
         do {
             let preparedPolicy = policy.capture()
             try policy.authorize(toolName, prepared: preparedPolicy)
@@ -2805,7 +2826,12 @@ final class LocalMCPServer {
                 let textData = try JSONSerialization.data(withJSONObject: structuredContent, options: [.sortedKeys])
                 let text = String(data: textData, encoding: .utf8) ?? "{}"
                 let connectContent: [[String: Any]] = [["type": "text", "text": text]]
-                var result = toolCallResult(content: connectContent, structuredContent: structuredContent, isError: false)
+                var result = toolCallResult(
+                    content: connectContent,
+                    structuredContent: structuredContent,
+                    isError: false,
+                    operationID: operationID
+                )
                 if modern { result = modernCompleteResult(result) }
                 return jsonRPCResult(id: id, result: result)
             }
@@ -2815,6 +2841,12 @@ final class LocalMCPServer {
             _ = chatCorrelation.tryResolve(correlationHandle)
 
             let callMeta = params["_meta"] as? [String: Any]
+            let evidenceRequest = try EvidenceRequestSpec.parse(meta: callMeta, toolName: toolName)
+            evidenceRun = evidenceCoordinator.begin(request: evidenceRequest, operationID: operationID, toolName: toolName)
+            if evidenceRun?.blockedBeforeDispatch == true {
+                throw MCPServerError.operationFailed("Required evidence unavailable before launch: \(evidenceRun?.blockReason ?? "unknown")")
+            }
+
             let budgetedTool = tools.supportsBudget(named: toolName)
             if ToolExecutionContext.hasBudget(callMeta), !budgetedTool {
                 throw MCPServerError.invalidArguments("Tool budget metadata is not supported for tool: \(toolName)")
@@ -2823,11 +2855,16 @@ final class LocalMCPServer {
                 throw MCPServerError.invalidArguments("Cursor metadata is not supported for tool: \(toolName)")
             }
             let executionContext = budgetedTool ? try ToolExecutionContext(meta: callMeta) : nil
+            activeExecutionContext = executionContext
 
             try policy.authorize(toolName, prepared: preparedPolicy)
             let content: [[String: Any]]
             let structuredContent: [String: Any]
-            if skills.hasTool(named: toolName) {
+            if isEvidenceStatus {
+                let output = try evidenceStatusOutput(arguments)
+                content = output.content
+                structuredContent = output.structuredContent
+            } else if skills.hasTool(named: toolName) {
                 let output = try skills.call(name: toolName, arguments: arguments)
                 content = output.content
                 structuredContent = output.structuredContent
@@ -2836,11 +2873,21 @@ final class LocalMCPServer {
                 content = output.content
                 structuredContent = output.structuredContent
             }
+
+            let evidenceMetadata = evidenceCoordinator.complete(
+                run: evidenceRun,
+                isError: false,
+                structuredContent: structuredContent,
+                context: executionContext
+            )
+            evidenceRun = nil
             var result = toolCallResult(
                 content: content,
                 structuredContent: structuredContent,
                 isError: false,
-                executionContext: executionContext
+                executionContext: executionContext,
+                operationID: operationID,
+                evidenceMetadata: evidenceMetadata
             )
             if modern { result = modernCompleteResult(result) }
             return jsonRPCResult(id: id, result: result)
@@ -2848,18 +2895,70 @@ final class LocalMCPServer {
             if skills.hasTool(named: toolName) {
                 log("[Skills] ERROR: \(error.localizedDescription)\n")
             }
+            let evidenceMetadata = evidenceCoordinator.complete(
+                run: evidenceRun,
+                isError: true,
+                structuredContent: nil,
+                context: activeExecutionContext
+            )
+            evidenceRun = nil
             let errorContent: [[String: Any]] = [["type": "text", "text": error.localizedDescription]]
-            var result = toolCallResult(content: errorContent, structuredContent: nil, isError: true)
+            var result = toolCallResult(
+                content: errorContent,
+                structuredContent: nil,
+                isError: true,
+                operationID: operationID,
+                evidenceMetadata: evidenceMetadata
+            )
             if modern { result = modernCompleteResult(result) }
             return jsonRPCResult(id: id, result: result)
         }
+    }
+
+    private func evidenceStatusOutput(_ arguments: [String: Any]) throws -> LocalToolCallOutput {
+        for key in arguments.keys where key != "evidence_id" && key != "repo_path" && key != "relevant_paths" {
+            throw MCPServerError.invalidArguments("Unknown argument: \(key)")
+        }
+        guard let evidenceID = arguments["evidence_id"] as? String, !evidenceID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw MCPServerError.invalidArguments("Missing required argument: evidence_id")
+        }
+        let repoPath: String?
+        if let raw = arguments["repo_path"] {
+            guard let value = raw as? String, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw MCPServerError.invalidArguments("Argument repo_path must be a non-empty string")
+            }
+            repoPath = value
+        } else {
+            repoPath = nil
+        }
+        var relevantPaths: [String] = []
+        if let raw = arguments["relevant_paths"] {
+            guard let values = raw as? [Any], values.count <= 4096 else {
+                throw MCPServerError.invalidArguments("Argument relevant_paths must be a bounded array")
+            }
+            for rawValue in values {
+                guard let value = rawValue as? String, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw MCPServerError.invalidArguments("relevant_paths entries must be non-empty strings")
+                }
+                relevantPaths.append(value)
+            }
+            if repoPath == nil && !relevantPaths.isEmpty {
+                throw MCPServerError.invalidArguments("relevant_paths requires repo_path")
+            }
+        }
+        let structured = try evidenceCoordinator.status(evidenceID: evidenceID, repoPath: repoPath, relevantPaths: relevantPaths)
+        let data = try JSONSerialization.data(withJSONObject: structured, options: [.sortedKeys])
+        let text = String(data: data, encoding: .utf8) ?? "{}"
+        return LocalToolCallOutput(content: [["type": "text", "text": text]], structuredContent: structured)
     }
 
     private func toolCallResult(
         content: [[String: Any]],
         structuredContent: [String: Any]?,
         isError: Bool,
-        executionContext: ToolExecutionContext? = nil
+        executionContext: ToolExecutionContext? = nil,
+        operationID: String? = nil,
+        evidenceMetadata: [String: Any]? = nil
     ) -> [String: Any] {
         var effectiveStructured = structuredContent
         if executionContext?.truncated == true {
@@ -2880,8 +2979,14 @@ final class LocalMCPServer {
             structuredContent: effectiveStructured,
             usage: executionContext?.usage(),
             forceTruncated: executionContext?.truncated == true,
-            truncationDetail: executionContext?.truncationReason
+            truncationDetail: executionContext?.truncationReason,
+            operationID: operationID
         )
+        if let evidenceMetadata {
+            var meta = result["_meta"] as? [String: Any] ?? [:]
+            meta[EvidenceRequestSpec.metadataKey] = evidenceMetadata
+            result["_meta"] = meta
+        }
         return result
     }
 

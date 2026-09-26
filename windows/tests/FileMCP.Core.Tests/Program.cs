@@ -24,6 +24,13 @@ internal static class Program
             await Task.Delay(TimeSpan.FromSeconds(20));
             return 0;
         }
+        if (args.Length > 0 && args[0] == "evidence-marker-fixture")
+        {
+            if (args.Length < 4) return 96;
+            File.WriteAllText(args[1], "launched", new UTF8Encoding(false));
+            Console.WriteLine(args[3]);
+            return int.TryParse(args[2], out var code) ? code : 97;
+        }
         if (args.Length > 0 && args[0] is "init" or "doctor" or "run")
             return await RunFakeTunnelClientAsync(args);
 
@@ -62,6 +69,7 @@ internal static class Program
             await TestExistingMutationHardeningAsync(root);
             await TestApplyEditsAsync(root);
             await TestProjectContextAsync(root);
+            await TestEvidenceAndFreshnessAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -90,7 +98,7 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.5.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.6.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
@@ -98,7 +106,7 @@ internal static class Program
         Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 18, "catalog non-shell local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 19, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 1, "catalog server tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 2, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
         try
         {
@@ -500,7 +508,7 @@ internal static class Program
         Assert(McpTelemetryAttributeAdapter.NormalizeMethod("tools/call") == "tools/call" && McpTelemetryAttributeAdapter.NormalizeMethod("private-method") == "other", "standard telemetry method dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeToolName("read_file") == "read_file" && McpTelemetryAttributeAdapter.NormalizeToolName("private-tool-name") == "unknown", "standard telemetry tool dimensions are allowlisted");
         Assert(McpTelemetryAttributeAdapter.NormalizeWorkspace("d") == "D" && McpTelemetryAttributeAdapter.NormalizeWorkspace("private-workspace") == "other", "standard telemetry workspace dimensions are bounded");
-        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
+        var boundedUtf8 = McpTelemetryAttributeAdapter.BoundUtf8(string.Concat(Enumerable.Repeat("ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬", 100)), McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes);
         Assert(Encoding.UTF8.GetByteCount(boundedUtf8) <= McpTelemetryAttributeAdapter.MaxAttributeUtf8Bytes, "standard telemetry UTF-8 attribute bound never splits beyond byte cap");
 
         const string privateMarker = "PRIVATE_OTEL_MARKER_8A2DF991";
@@ -3101,6 +3109,7 @@ internal static class Program
         var expectedRestrictedTools = ServerPolicy.FromLegacy(false).FilterDefinitions(new JsonArray(
             CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Select(node => node?.DeepClone()).ToArray()));
         foreach (var node in CanonicalToolCatalog.ToolDefinitions("skills")) expectedRestrictedTools.Add(node?.DeepClone());
+        expectedRestrictedTools.Add(CanonicalToolCatalog.ToolDefinition("evidence_get").DeepClone());
         expectedRestrictedTools = ServerPolicy.FromLegacy(false).FilterDefinitions(expectedRestrictedTools);
         var expectedRestrictedNames = expectedRestrictedTools.Select(node => node!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray();
         var legacyToolNames = legacyTools.Select(node => node!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray();
@@ -3199,7 +3208,7 @@ internal static class Program
         var correlatedList = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), meteredListBody);
         var correlatedListJson = JsonNode.Parse(HttpBody(correlatedList))!.AsObject();
         var correlatedTools = correlatedListJson["result"]!["tools"]!.AsArray();
-        Assert(correlatedTools.Count == 20, "logical correlation facade adds one connect tool");
+        Assert(correlatedTools.Count == 21, "logical correlation facade includes connect and evidence server tools");
         var connectDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "filemcp_observability_connect")!.AsObject();
         Assert(connectDefinition["annotations"]!["readOnlyHint"]!.GetValue<bool>(), "logical correlation connect tool is read-only metadata");
         var readDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "read_file")!.AsObject();
@@ -3441,6 +3450,304 @@ internal static class Program
         }
 
         Console.WriteLine("windows-http-connection-bounds: ok");
+    }
+
+    private static async Task TestEvidenceAndFreshnessAsync(string root)
+    {
+        var workspace = Path.Combine(root, "evidence");
+        Directory.CreateDirectory(workspace);
+        var now = new DateTimeOffset(2026, 9, 26, 16, 0, 0, TimeSpan.Zero);
+
+        static EvidenceBegin BeginRecord(string id, string op, string workspaceFingerprint, long started, long policyGeneration = 1, string catalogHash = "sha256:test") =>
+            new(id, op, workspaceFingerprint, "read_file", "tool.success", started, "host-native", policyGeneration, "sha256:policy", catalogHash, CanonicalToolCatalog.CatalogVersion);
+        static EvidenceCompletion CompleteRecord(string id, long ended, string verification = "passed", string? sourceJson = null) =>
+            new(id, ended, "succeeded", verification, sourceJson, null, null, 1, "sha256:policy", "sha256:test", CanonicalToolCatalog.CatalogVersion, null, false, false, false);
+
+        // Evaluator authority comes from structured outcome, never stdout text.
+        var fakePassText = new JsonObject { ["stdout"] = "PASS", ["exit_code"] = 7, ["timed_out"] = false, ["cancelled"] = false };
+        var failedExit = EvidenceEvaluator.Evaluate("exec_process", "process.exit_zero", false, fakePassText, null);
+        Assert(failedExit.VerificationState == "failed" && failedExit.ExitCode == 7, "evidence ignores stdout PASS when structured exit is nonzero");
+        var zeroExit = EvidenceEvaluator.Evaluate("exec_process", "process.exit_zero", false, new JsonObject { ["exit_code"] = 0 }, null);
+        Assert(zeroExit.VerificationState == "passed", "structured zero exit is process.exit_zero authority");
+        var timedOut = EvidenceEvaluator.Evaluate("exec_process", "process.exit_zero", false, new JsonObject { ["exit_code"] = 0, ["timed_out"] = true }, null);
+        Assert(timedOut.VerificationState == "unknown", "timeout cannot pass evidence");
+
+        var workspaceFingerprint = EvidenceStore.WorkspaceFingerprint(workspace);
+        var storePath = Path.Combine(workspace, "store", "evidence-v1.sqlite3");
+        var store = new EvidenceStore(storePath, utcNow: () => now);
+        var evidenceId = EvidenceStore.NewEvidenceId();
+        var operationId = ToolResultEnvelope.NewOperationId();
+        await store.BeginAsync(BeginRecord(evidenceId, operationId, workspaceFingerprint, now.ToUnixTimeMilliseconds()));
+        var running = await store.GetAsync(evidenceId);
+        Assert(running is not null && running.OperationState == "running" && running.VerificationState == "not-run", "evidence store durably begins running record");
+        await store.CompleteAsync(CompleteRecord(evidenceId, now.AddSeconds(1).ToUnixTimeMilliseconds()));
+        var completed = await store.GetAsync(evidenceId);
+        Assert(completed is not null && completed.OperationState == "succeeded" && completed.VerificationState == "passed", "evidence store durably commits terminal record");
+
+        // Storage is evidence-only, physically separate from telemetry schema.
+        await using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = storePath }.ToString()))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;";
+            await using var reader = await command.ExecuteReaderAsync();
+            var tables = new List<string>();
+            while (await reader.ReadAsync()) tables.Add(reader.GetString(0));
+            Assert(tables.Contains("evidence_meta") && tables.Contains("evidence_records") && tables.All(name => !name.Contains("telemetry", StringComparison.OrdinalIgnoreCase)), "evidence database is separate from telemetry tables");
+        }
+
+        // Restart converts unfinished running evidence to unknown.
+        var restartId = EvidenceStore.NewEvidenceId();
+        await store.BeginAsync(BeginRecord(restartId, ToolResultEnvelope.NewOperationId(), workspaceFingerprint, now.ToUnixTimeMilliseconds()));
+        var restarted = new EvidenceStore(storePath, utcNow: () => now.AddMinutes(1));
+        await restarted.InitializeAsync();
+        var recovered = await restarted.GetAsync(restartId);
+        Assert(recovered is not null && recovered.OperationState == "unknown" && recovered.VerificationState == "unknown" && recovered.EndedEpochMs.HasValue, "evidence restart converts running record to unknown");
+
+        // Retention removes expired records.
+        var retentionPath = Path.Combine(workspace, "retention.sqlite3");
+        var retentionStore = new EvidenceStore(retentionPath, TimeSpan.FromDays(1), maxRecords: 10, utcNow: () => now);
+        var expiredId = EvidenceStore.NewEvidenceId();
+        await retentionStore.BeginAsync(BeginRecord(expiredId, ToolResultEnvelope.NewOperationId(), workspaceFingerprint, now.AddDays(-2).ToUnixTimeMilliseconds()));
+        await retentionStore.CompleteAsync(CompleteRecord(expiredId, now.AddDays(-2).AddSeconds(1).ToUnixTimeMilliseconds()));
+        Assert(await retentionStore.GetAsync(expiredId) is null, "evidence retention removes expired terminal record");
+
+        // Record quota evicts oldest terminal records, but never active running records.
+        var quotaPath = Path.Combine(workspace, "quota.sqlite3");
+        var quotaStore = new EvidenceStore(quotaPath, maxRecords: 2, utcNow: () => now);
+        var q1 = EvidenceStore.NewEvidenceId();
+        var q2 = EvidenceStore.NewEvidenceId();
+        var q3 = EvidenceStore.NewEvidenceId();
+        await quotaStore.BeginAsync(BeginRecord(q1, ToolResultEnvelope.NewOperationId(), workspaceFingerprint, now.AddSeconds(-3).ToUnixTimeMilliseconds()));
+        await quotaStore.CompleteAsync(CompleteRecord(q1, now.AddSeconds(-2).ToUnixTimeMilliseconds()));
+        await quotaStore.BeginAsync(BeginRecord(q2, ToolResultEnvelope.NewOperationId(), workspaceFingerprint, now.AddSeconds(-2).ToUnixTimeMilliseconds()));
+        await quotaStore.CompleteAsync(CompleteRecord(q2, now.AddSeconds(-1).ToUnixTimeMilliseconds()));
+        await quotaStore.BeginAsync(BeginRecord(q3, ToolResultEnvelope.NewOperationId(), workspaceFingerprint, now.ToUnixTimeMilliseconds()));
+        Assert(await quotaStore.CountAsync() == 2 && await quotaStore.GetAsync(q1) is null, "evidence record quota evicts oldest terminal record");
+        var activeQuotaPath = Path.Combine(workspace, "active-quota.sqlite3");
+        var activeQuota = new EvidenceStore(activeQuotaPath, maxRecords: 1, utcNow: () => now);
+        await activeQuota.BeginAsync(BeginRecord(EvidenceStore.NewEvidenceId(), ToolResultEnvelope.NewOperationId(), workspaceFingerprint, now.ToUnixTimeMilliseconds()));
+        await AssertThrowsAsync(
+            () => activeQuota.BeginAsync(BeginRecord(EvidenceStore.NewEvidenceId(), ToolResultEnvelope.NewOperationId(), workspaceFingerprint, now.ToUnixTimeMilliseconds())),
+            "active records",
+            "evidence quota refuses to evict running record");
+
+        // Hard size quota and bounded SourceStateRef metadata.
+        var smallPath = Path.Combine(workspace, "small.sqlite3");
+        var smallStore = new EvidenceStore(smallPath, maxStoreBytes: 128 * 1024, utcNow: () => now);
+        var smallId = EvidenceStore.NewEvidenceId();
+        await smallStore.BeginAsync(BeginRecord(smallId, ToolResultEnvelope.NewOperationId(), workspaceFingerprint, now.ToUnixTimeMilliseconds()));
+        await AssertThrowsAsync(
+            () => smallStore.CompleteAsync(CompleteRecord(smallId, now.AddSeconds(1).ToUnixTimeMilliseconds(), sourceJson: new string('x', 220_000))),
+            "quota",
+            "evidence hard storage-size quota fails closed");
+        var oversizedPath = Path.Combine(workspace, "oversized.sqlite3");
+        var oversizedStore = new EvidenceStore(oversizedPath, utcNow: () => now);
+        var oversizedId = EvidenceStore.NewEvidenceId();
+        await oversizedStore.BeginAsync(BeginRecord(oversizedId, ToolResultEnvelope.NewOperationId(), workspaceFingerprint, now.ToUnixTimeMilliseconds()));
+        await AssertThrowsAsync(
+            () => oversizedStore.CompleteAsync(CompleteRecord(oversizedId, now.AddSeconds(1).ToUnixTimeMilliseconds(), sourceJson: new string('x', EvidenceStore.MaxSourceStateJsonBytes + 1))),
+            "exceeds",
+            "evidence SourceStateRef metadata is bounded");
+
+        // Corrupt/truncated persistence is unavailable, never silently reset to empty.
+        var corruptPath = Path.Combine(workspace, "corrupt.sqlite3");
+        File.WriteAllBytes(corruptPath, Encoding.UTF8.GetBytes("not-a-sqlite-database"));
+        var corruptStore = new EvidenceStore(corruptPath, utcNow: () => now);
+        var corruptRejected = false;
+        try { await corruptStore.InitializeAsync(); }
+        catch { corruptRejected = true; }
+        Assert(corruptRejected, "corrupt evidence database is rejected");
+        await AssertThrowsAsync(() => store.GetAsync("ev_bad"), "Malformed", "tampered evidence id fails closed");
+
+        // Coordinator freshness: narrow unrelated changes remain fresh; relevant changes/policy/catalog become stale.
+        var policy = ServerPolicy.FromLegacy(enableCommands: true);
+        var tools = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", policy);
+        await tools.CallAsync("git_init", Obj(("repo_path", "repo")));
+        await tools.CallAsync("write_file", Obj(("relative_path", "repo/a.txt"), ("content", "alpha\n")));
+        await tools.CallAsync("write_file", Obj(("relative_path", "repo/b.txt"), ("content", "bravo\n")));
+        await tools.CallAsync("git_add", Obj(("repo_path", "repo"), ("paths", ".")));
+        await tools.CallAsync("git_commit", Obj(("repo_path", "repo"), ("message", "evidence baseline")));
+        var coordinatorStorePath = Path.Combine(workspace, "coordinator.sqlite3");
+        var coordinatorStore = new EvidenceStore(coordinatorStorePath, utcNow: () => now);
+        var coordinator = new EvidenceCoordinator(coordinatorStore, tools, policy, workspaceFingerprint, _ => { });
+        var request = new EvidenceRequestSpec("tool.success", "repo", ["a.txt"], true);
+        var run = await coordinator.BeginAsync(request, ToolResultEnvelope.NewOperationId(), "read_file");
+        var completedMeta = await coordinator.CompleteAsync(run, false, new JsonObject { ["result"] = "ok" }, null);
+        Assert(completedMeta?["verification_state"]?.GetValue<string>() == "passed" && completedMeta?["storage_status"]?.GetValue<string>() == "durable", "tool.success evidence becomes durable passed metadata");
+        var coordinatorEvidenceId = completedMeta!["evidence_id"]!.GetValue<string>();
+        var current = await coordinator.StatusAsync(coordinatorEvidenceId, "repo", ["a.txt"]);
+        Assert(current["verification_state"]!.GetValue<string>() == "passed" && current["freshness_state"]!.GetValue<string>() == "current", "evidence_get reports fresh narrow evidence");
+        File.WriteAllText(Path.Combine(workspace, "repo", "b.txt"), "BRAVO\n", new UTF8Encoding(false));
+        var unrelated = await coordinator.StatusAsync(coordinatorEvidenceId, "repo", ["a.txt"]);
+        Assert(unrelated["verification_state"]!.GetValue<string>() == "passed" && unrelated["freshness_state"]!.GetValue<string>() == "current", "unrelated narrow-scope change remains fresh");
+        File.WriteAllText(Path.Combine(workspace, "repo", "a.txt"), "ALPHA\n", new UTF8Encoding(false));
+        var relevant = await coordinator.StatusAsync(coordinatorEvidenceId, "repo", ["a.txt"]);
+        Assert(relevant["verification_state"]!.GetValue<string>() == "stale" && relevant["freshness_reason"]!.GetValue<string>() == "source_or_context_changed", "relevant source change stales evidence");
+
+        var noRepoRun = await coordinator.BeginAsync(new EvidenceRequestSpec("tool.success", null, [], true), ToolResultEnvelope.NewOperationId(), "read_file");
+        var noRepoMeta = await coordinator.CompleteAsync(noRepoRun, false, new JsonObject { ["result"] = "ok" }, null);
+        var noRepoId = noRepoMeta!["evidence_id"]!.GetValue<string>();
+        policy.Update(new LocalPolicyConfiguration
+        {
+            Profile = FileMcpPolicyProfiles.Custom,
+            CustomMaxRisk = "low",
+            CustomAllowedEffects = ["read", "metadata"],
+        });
+        var policyStale = await coordinator.StatusAsync(noRepoId, null, []);
+        Assert(policyStale["verification_state"]!.GetValue<string>() == "stale" && policyStale["freshness_reason"]!.GetValue<string>() == "policy_or_catalog_changed", "policy generation/hash change stales evidence");
+
+        var catalogStorePath = Path.Combine(workspace, "catalog-stale.sqlite3");
+        var catalogStore = new EvidenceStore(catalogStorePath, utcNow: () => now);
+        var catalogId = EvidenceStore.NewEvidenceId();
+        var currentPolicy = policy.Capture();
+        await catalogStore.BeginAsync(new EvidenceBegin(catalogId, ToolResultEnvelope.NewOperationId(), workspaceFingerprint, "read_file", "tool.success", now.ToUnixTimeMilliseconds(), "host-native", currentPolicy.Generation, currentPolicy.Hash, "sha256:obsolete", "0.0.0"));
+        await catalogStore.CompleteAsync(new EvidenceCompletion(catalogId, now.AddSeconds(1).ToUnixTimeMilliseconds(), "succeeded", "passed", null, null, null, currentPolicy.Generation, currentPolicy.Hash, "sha256:obsolete", "0.0.0", null, false, false, false));
+        var catalogCoordinator = new EvidenceCoordinator(catalogStore, tools, policy, workspaceFingerprint, _ => { });
+        var catalogStale = await catalogCoordinator.StatusAsync(catalogId, null, []);
+        Assert(catalogStale["verification_state"]!.GetValue<string>() == "stale", "catalog mismatch stales evidence");
+
+        // End-to-end server: operation ID sharing + false PASS + evidence_get + privacy.
+        var serverWorkspace = Path.Combine(workspace, "server");
+        Directory.CreateDirectory(serverWorkspace);
+        var serverTools = new LocalTools(serverWorkspace, "FileMCP Test", "filemcp@example.invalid", false);
+        await serverTools.CallAsync("git_init", Obj(("repo_path", "repo")));
+        await serverTools.CallAsync("write_file", Obj(("relative_path", "repo/a.txt"), ("content", "alpha\n")));
+        await serverTools.CallAsync("write_file", Obj(("relative_path", "repo/b.txt"), ("content", "bravo\n")));
+        await serverTools.CallAsync("git_add", Obj(("repo_path", "repo"), ("paths", ".")));
+        await serverTools.CallAsync("git_commit", Obj(("repo_path", "repo"), ("message", "server baseline")));
+        var httpStorePath = Path.Combine(serverWorkspace, "evidence.sqlite3");
+        var httpStore = new EvidenceStore(httpStorePath);
+        var port = FreePort();
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        await using (var server = new LocalMcpServer((ushort)port, serverWorkspace, "FileMCP Test", "filemcp@example.invalid", true, token, _ => { }, LocalMcpServerLimits.Default, httpStore))
+        {
+            await server.StartAsync();
+            var testHost = Path.ChangeExtension(typeof(Program).Assembly.Location, ".exe");
+            var marker = Path.Combine(serverWorkspace, "nonzero.marker");
+            const string secretSentinel = "FMG011_SECRET_OUTPUT_DO_NOT_PERSIST";
+            JsonObject ProcessRequest(int id, int exitCode, string markerPath, bool required, string? repoPath = null, JsonArray? relevant = null)
+            {
+                var evidence = new JsonObject { ["criterionId"] = "process.exit_zero", ["required"] = required };
+                if (repoPath is not null) evidence["repoPath"] = repoPath;
+                if (relevant is not null) evidence["relevantPaths"] = relevant.DeepClone();
+                return new JsonObject
+                {
+                    ["jsonrpc"] = "2.0", ["id"] = id, ["method"] = "tools/call",
+                    ["params"] = new JsonObject
+                    {
+                        ["name"] = "exec_process",
+                        ["arguments"] = new JsonObject
+                        {
+                            ["executable"] = testHost,
+                            ["arguments"] = new JsonArray("evidence-marker-fixture", markerPath, exitCode.ToString(), "PASS " + secretSentinel),
+                            ["timeout_seconds"] = 10,
+                        },
+                        ["_meta"] = new JsonObject { [EvidenceRequestSpec.MetadataKey] = evidence },
+                    },
+                };
+            }
+            var nonzeroResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), ProcessRequest(501, 7, marker, true).ToJsonString());
+            var nonzeroJson = JsonNode.Parse(HttpBody(nonzeroResponse))!.AsObject();
+            var nonzeroResult = nonzeroJson["result"]!.AsObject();
+            Assert(!nonzeroResult["isError"]!.GetValue<bool>() && File.Exists(marker), "nonzero exec process still executes as structured tool outcome");
+            var nonzeroEvidence = nonzeroResult["_meta"]![EvidenceRequestSpec.MetadataKey]!.AsObject();
+            Assert(nonzeroEvidence["verification_state"]!.GetValue<string>() == "failed", "stdout PASS cannot override nonzero structured exit");
+            var resultEnvelope = nonzeroResult["_meta"]![ToolResultEnvelope.MetadataKey]!.AsObject();
+            Assert(resultEnvelope["operationId"]!.GetValue<string>() == nonzeroEvidence["operation_id"]!.GetValue<string>(), "result envelope and durable evidence share exact operation ID");
+            var nonzeroEvidenceId = nonzeroEvidence["evidence_id"]!.GetValue<string>();
+
+            var getBody = new JsonObject
+            {
+                ["jsonrpc"] = "2.0", ["id"] = 502, ["method"] = "tools/call",
+                ["params"] = new JsonObject { ["name"] = "evidence_get", ["arguments"] = new JsonObject { ["evidence_id"] = nonzeroEvidenceId } },
+            };
+            var getResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), getBody.ToJsonString());
+            var getResult = JsonNode.Parse(HttpBody(getResponse))!["result"]!["structuredContent"]!.AsObject();
+            Assert(getResult["verification_state"]!.GetValue<string>() == "failed" && getResult["persisted_verification_state"]!.GetValue<string>() == "failed", "evidence_get returns durable failed record");
+
+            var freshMarker = Path.Combine(serverWorkspace, "fresh.marker");
+            var freshResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), ProcessRequest(503, 0, freshMarker, true, "repo", new JsonArray("a.txt")).ToJsonString());
+            var freshResult = JsonNode.Parse(HttpBody(freshResponse))!["result"]!.AsObject();
+            var freshEvidence = freshResult["_meta"]![EvidenceRequestSpec.MetadataKey]!.AsObject();
+            Assert(freshEvidence["verification_state"]!.GetValue<string>() == "passed", "zero exit with stable source/context produces passed evidence");
+            var freshId = freshEvidence["evidence_id"]!.GetValue<string>();
+            File.WriteAllText(Path.Combine(serverWorkspace, "repo", "b.txt"), "BRAVO\n", new UTF8Encoding(false));
+            var narrowGet = new JsonObject
+            {
+                ["jsonrpc"] = "2.0", ["id"] = 504, ["method"] = "tools/call",
+                ["params"] = new JsonObject { ["name"] = "evidence_get", ["arguments"] = new JsonObject { ["evidence_id"] = freshId, ["repo_path"] = "repo", ["relevant_paths"] = new JsonArray("a.txt") } },
+            };
+            var narrowResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), narrowGet.ToJsonString());
+            var narrowResult = JsonNode.Parse(HttpBody(narrowResponse))!["result"]!["structuredContent"]!.AsObject();
+            Assert(narrowResult["verification_state"]!.GetValue<string>() == "passed", "unrelated change remains fresh through evidence_get narrow scope");
+            File.WriteAllText(Path.Combine(serverWorkspace, "repo", "a.txt"), "ALPHA\n", new UTF8Encoding(false));
+            var staleResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), narrowGet.ToJsonString());
+            var staleResult = JsonNode.Parse(HttpBody(staleResponse))!["result"]!["structuredContent"]!.AsObject();
+            Assert(staleResult["verification_state"]!.GetValue<string>() == "stale", "relevant source change returns stale through evidence_get");
+
+            var malformedGet = new JsonObject
+            {
+                ["jsonrpc"] = "2.0", ["id"] = 505, ["method"] = "tools/call",
+                ["params"] = new JsonObject { ["name"] = "evidence_get", ["arguments"] = new JsonObject { ["evidence_id"] = "ev_bad" } },
+            };
+            var malformedResponse = await SendHttpAsync(port, "POST", "/mcp", AuthHeaders(token), malformedGet.ToJsonString());
+            Assert(JsonNode.Parse(HttpBody(malformedResponse))!["result"]!["isError"]!.GetValue<bool>(), "evidence_get rejects malformed evidence ID");
+        }
+        SqliteConnection.ClearAllPools();
+        var durableBytes = File.ReadAllBytes(httpStorePath);
+        Assert(!Encoding.UTF8.GetString(durableBytes).Contains("FMG011_SECRET_OUTPUT_DO_NOT_PERSIST", StringComparison.Ordinal), "durable evidence excludes stdout/argv sentinel");
+
+        // required=false store failure executes but returns unavailable/unknown; required=true blocks before launch.
+        var blocker = Path.Combine(serverWorkspace, "store-parent-blocker");
+        File.WriteAllText(blocker, "file blocks directory", new UTF8Encoding(false));
+        var unavailableStore = new EvidenceStore(Path.Combine(blocker, "evidence.sqlite3"));
+        var unavailablePort = FreePort();
+        var unavailableToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        await using (var unavailableServer = new LocalMcpServer((ushort)unavailablePort, serverWorkspace, "", "", true, unavailableToken, _ => { }, LocalMcpServerLimits.Default, unavailableStore))
+        {
+            await unavailableServer.StartAsync();
+            var testHost = Path.ChangeExtension(typeof(Program).Assembly.Location, ".exe");
+            JsonObject RequestWithMarker(int id, string markerPath, bool required) => new()
+            {
+                ["jsonrpc"] = "2.0", ["id"] = id, ["method"] = "tools/call",
+                ["params"] = new JsonObject
+                {
+                    ["name"] = "exec_process",
+                    ["arguments"] = new JsonObject { ["executable"] = testHost, ["arguments"] = new JsonArray("evidence-marker-fixture", markerPath, "0", "PASS"), ["timeout_seconds"] = 10 },
+                    ["_meta"] = new JsonObject { [EvidenceRequestSpec.MetadataKey] = new JsonObject { ["criterionId"] = "process.exit_zero", ["required"] = required } },
+                },
+            };
+            var optionalMarker = Path.Combine(serverWorkspace, "optional-store.marker");
+            var optionalResponse = await SendHttpAsync(unavailablePort, "POST", "/mcp", AuthHeaders(unavailableToken), RequestWithMarker(506, optionalMarker, false).ToJsonString());
+            var optionalResult = JsonNode.Parse(HttpBody(optionalResponse))!["result"]!.AsObject();
+            var optionalMeta = optionalResult["_meta"]![EvidenceRequestSpec.MetadataKey]!.AsObject();
+            Assert(File.Exists(optionalMarker) && !optionalResult["isError"]!.GetValue<bool>(), "required=false evidence storage failure does not block tool execution");
+            Assert(optionalMeta["storage_status"]!.GetValue<string>() == "unavailable" && optionalMeta["verification_state"]!.GetValue<string>() == "unknown", "required=false storage failure returns unknown unavailable evidence");
+
+            var requiredMarker = Path.Combine(serverWorkspace, "required-store.marker");
+            var requiredResponse = await SendHttpAsync(unavailablePort, "POST", "/mcp", AuthHeaders(unavailableToken), RequestWithMarker(507, requiredMarker, true).ToJsonString());
+            var requiredResult = JsonNode.Parse(HttpBody(requiredResponse))!["result"]!.AsObject();
+            var requiredMeta = requiredResult["_meta"]![EvidenceRequestSpec.MetadataKey]!.AsObject();
+            Assert(requiredResult["isError"]!.GetValue<bool>() && !File.Exists(requiredMarker), "required=true unavailable evidence prevents process launch");
+            Assert(requiredMeta["verification_state"]!.GetValue<string>() == "blocked" && requiredMeta["operation_state"]!.GetValue<string>() == "not-run", "required=true store failure returns blocked/not-run evidence");
+        }
+
+        // Terminal persistence failure must downgrade verification; never report passed.
+        var terminalPath = Path.Combine(workspace, "terminal-failure.sqlite3");
+        var terminalStore = new EvidenceStore(terminalPath);
+        var terminalPolicy = ServerPolicy.FromLegacy(true);
+        var terminalTools = new LocalTools(workspace, "", "", terminalPolicy);
+        var terminalCoordinator = new EvidenceCoordinator(terminalStore, terminalTools, terminalPolicy, workspaceFingerprint, _ => { });
+        var terminalRun = await terminalCoordinator.BeginAsync(new EvidenceRequestSpec("tool.success", null, [], true), ToolResultEnvelope.NewOperationId(), "read_file");
+        Assert(terminalRun is not null && terminalRun.DurableStarted, "terminal-failure fixture begins durably");
+        SqliteConnection.ClearAllPools();
+        foreach (var suffix in new[] { "", "-wal", "-shm" }) { try { File.Delete(terminalPath + suffix); } catch { } }
+        Directory.CreateDirectory(terminalPath);
+        var terminalMeta = await terminalCoordinator.CompleteAsync(terminalRun, false, new JsonObject { ["result"] = "ok" }, null);
+        Assert(terminalMeta?["storage_status"]?.GetValue<string>() == "unavailable" && terminalMeta?["verification_state"]?.GetValue<string>() == "unknown", "terminal persistence failure never returns passed");
+
+        Console.WriteLine("windows-evidence-freshness: ok");
     }
 
     private static void TestTunnelRestartPolicy()

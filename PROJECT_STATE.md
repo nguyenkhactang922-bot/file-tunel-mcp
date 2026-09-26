@@ -223,7 +223,7 @@ Evidence: `docs/evidence/FMG-009_APPLY_EDITS_EVIDENCE.md`.
 ## FMG-010 implementation
 
 State: DONE / MAIN VERIFIED.
-Branch: `chatgpt/FMG-010-project-context`.
+Branch: `chatgpt/FMG-011-metadata-evidence`.
 Primary PR: #14.
 Follow-up PRs: #15, #16.
 Final main: `9340377f42abfe97bc708d0683f77dea26e86b50`.
@@ -238,3 +238,21 @@ Branch: `chatgpt/FMG-011-metadata-evidence`.
 Depends: FMG-002, FMG-003, FMG-006, FMG-010 DONE / MAIN VERIFIED.
 Scope: Metadata-Only Evidence / Freshness only.
 Later dependent tasks remain BLOCKED by the frozen graph.
+
+
+FMG-011 design freeze complete:
+- docs/design/FMG-011_METADATA_EVIDENCE_FRESHNESS_FROZEN.md
+- docs/design/FMG-011_INDEPENDENT_REVIEW.md
+- docs/design/FMG-011_DECISION_MATRIX.md
+- tasks/FMG-011_TASK_GRAPH.md
+- NEXT_EXACT_ACTION: implement FMG-011-A shared evidence contracts/IDs/states only; do not begin store integration before contracts pass.
+
+
+FMG-011 local candidate:
+- State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING.
+- Scope remains Metadata-Only Evidence / Freshness only.
+- A-G local implementation/adversarial gates PASS.
+- Windows runtime: 750 assertions PASS.
+- Native macOS/Windows x64/Windows ARM64 Verify is the remaining H-gate.
+- Evidence: `docs/evidence/FMG-011_METADATA_EVIDENCE_CANDIDATE_EVIDENCE.md`.
+- FMG-012 remains BLOCKED until FMG-011 MAIN VERIFIED.

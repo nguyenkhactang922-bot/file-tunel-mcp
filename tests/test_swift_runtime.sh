@@ -1082,6 +1082,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ToolCatalog.swift \
     macos/ServerPolicy.swift \
     macos/ToolResultEnvelope.swift \
+    macos/EvidenceSupport.swift \
     macos/ToolExecutionContext.swift \
     macos/AuthenticatedCursorCodec.swift \
     macos/FileVersionService.swift \
@@ -1937,6 +1938,128 @@ do {
 }
 print("swift-project-context: ok")
 
+// FMG-011 native evidence protocol/store semantics.
+let fmg011FakePass = EvidenceEvaluator.evaluate(
+    toolName: "exec_process",
+    criterionID: "process.exit_zero",
+    isError: false,
+    structuredContent: ["stdout": "PASS", "exit_code": 7, "timed_out": false, "cancelled": false],
+    context: nil
+)
+precondition(fmg011FakePass.verificationState == "failed" && fmg011FakePass.exitCode == 7, "stdout PASS must not override structured nonzero exit")
+let fmg011Zero = EvidenceEvaluator.evaluate(
+    toolName: "exec_process",
+    criterionID: "process.exit_zero",
+    isError: false,
+    structuredContent: ["exit_code": 0],
+    context: nil
+)
+precondition(fmg011Zero.verificationState == "passed", "structured zero exit is evidence authority")
+let fmg011TimedOut = EvidenceEvaluator.evaluate(
+    toolName: "exec_process",
+    criterionID: "process.exit_zero",
+    isError: false,
+    structuredContent: ["exit_code": 0, "timed_out": true],
+    context: nil
+)
+precondition(fmg011TimedOut.verificationState == "unknown", "timed out process cannot pass evidence")
+
+let fmg011Now = Date(timeIntervalSince1970: 1_795_000_000)
+let fmg011StoreURL = root.appendingPathComponent("fmg011-evidence-store.json")
+let fmg011WorkspaceFingerprint = EvidenceStore.workspaceFingerprint(root.path)
+func fmg011Record(_ id: String, started: Int64, state: String = "running", verification: String = "not-run") -> EvidenceRecord {
+    EvidenceRecord(
+        evidenceID: id,
+        operationID: ToolResultEnvelope.newOperationID(),
+        workspaceFingerprint: fmg011WorkspaceFingerprint,
+        toolName: "read_file",
+        criterionID: "tool.success",
+        startedEpochMs: started,
+        endedEpochMs: state == "running" ? nil : started + 1_000,
+        operationState: state,
+        verificationState: verification,
+        backendID: "host-native",
+        sourceStateJSON: nil,
+        sourceStateID: nil,
+        projectContextDigest: nil,
+        policyGeneration: 1,
+        policyHash: "sha256:policy",
+        catalogHash: CanonicalToolCatalog.shared.catalogHash,
+        catalogVersion: CanonicalToolCatalog.shared.catalogVersion,
+        exitCode: nil,
+        timedOut: false,
+        cancelled: false,
+        truncated: false
+    )
+}
+let fmg011Store = EvidenceStore(fileURL: fmg011StoreURL, now: { fmg011Now })
+let fmg011ID = EvidenceStore.newEvidenceID()
+let fmg011Started = Int64(fmg011Now.timeIntervalSince1970 * 1_000)
+try fmg011Store.begin(fmg011Record(fmg011ID, started: fmg011Started))
+precondition(try fmg011Store.get(fmg011ID)?.operationState == "running")
+var fmg011Completed = fmg011Record(fmg011ID, started: fmg011Started, state: "succeeded", verification: "passed")
+fmg011Completed.operationID = (try fmg011Store.get(fmg011ID))!.operationID
+try fmg011Store.complete(fmg011Completed)
+precondition(try fmg011Store.get(fmg011ID)?.verificationState == "passed")
+
+// Restart converts unfinished evidence to unknown.
+let fmg011RestartID = EvidenceStore.newEvidenceID()
+try fmg011Store.begin(fmg011Record(fmg011RestartID, started: fmg011Started + 2_000))
+let fmg011Restarted = EvidenceStore(fileURL: fmg011StoreURL, now: { fmg011Now.addingTimeInterval(60) })
+let fmg011Recovered = try fmg011Restarted.get(fmg011RestartID)
+precondition(fmg011Recovered?.operationState == "unknown" && fmg011Recovered?.verificationState == "unknown" && fmg011Recovered?.endedEpochMs != nil)
+
+// Retention removes expired terminal metadata.
+let fmg011RetentionURL = root.appendingPathComponent("fmg011-retention.json")
+let fmg011Retention = EvidenceStore(fileURL: fmg011RetentionURL, retention: 86_400, maxRecords: 10, now: { fmg011Now })
+let fmg011ExpiredID = EvidenceStore.newEvidenceID()
+let fmg011ExpiredStart = Int64(fmg011Now.addingTimeInterval(-172_800).timeIntervalSince1970 * 1_000)
+try fmg011Retention.begin(fmg011Record(fmg011ExpiredID, started: fmg011ExpiredStart))
+var fmg011Expired = fmg011Record(fmg011ExpiredID, started: fmg011ExpiredStart, state: "succeeded", verification: "passed")
+fmg011Expired.operationID = (try fmg011Retention.get(fmg011ExpiredID))!.operationID
+try fmg011Retention.complete(fmg011Expired)
+precondition(try fmg011Retention.get(fmg011ExpiredID) == nil)
+
+// Record quota evicts terminal metadata but refuses to evict active running records.
+let fmg011QuotaURL = root.appendingPathComponent("fmg011-quota.json")
+let fmg011Quota = EvidenceStore(fileURL: fmg011QuotaURL, maxRecords: 2, now: { fmg011Now })
+for offset in 0..<2 {
+    let id = EvidenceStore.newEvidenceID()
+    let started = fmg011Started + Int64(offset * 2_000)
+    try fmg011Quota.begin(fmg011Record(id, started: started))
+    var terminal = fmg011Record(id, started: started, state: "succeeded", verification: "passed")
+    terminal.operationID = (try fmg011Quota.get(id))!.operationID
+    try fmg011Quota.complete(terminal)
+}
+try fmg011Quota.begin(fmg011Record(EvidenceStore.newEvidenceID(), started: fmg011Started + 10_000))
+precondition(try fmg011Quota.countForTest() == 2)
+let fmg011ActiveQuota = EvidenceStore(fileURL: root.appendingPathComponent("fmg011-active-quota.json"), maxRecords: 1, now: { fmg011Now })
+try fmg011ActiveQuota.begin(fmg011Record(EvidenceStore.newEvidenceID(), started: fmg011Started))
+do {
+    try fmg011ActiveQuota.begin(fmg011Record(EvidenceStore.newEvidenceID(), started: fmg011Started + 1))
+    preconditionFailure("active evidence quota must fail closed")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("active records"), "unexpected active quota error: \(error)")
+}
+
+// Corrupt/truncated persistence stays unavailable instead of resetting silently.
+let fmg011CorruptURL = root.appendingPathComponent("fmg011-corrupt.json")
+try Data("{truncated".utf8).write(to: fmg011CorruptURL)
+let fmg011Corrupt = EvidenceStore(fileURL: fmg011CorruptURL, now: { fmg011Now })
+do {
+    _ = try fmg011Corrupt.get(EvidenceStore.newEvidenceID())
+    preconditionFailure("corrupt evidence persistence must be unavailable")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("unavailable"), "unexpected corrupt store error: \(error)")
+}
+do {
+    _ = try fmg011Store.get("ev_bad")
+    preconditionFailure("malformed evidence id must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("malformed"), "unexpected evidence id error: \(error)")
+}
+print("swift-evidence-store: ok")
+
 let localAuthToken = String(repeating: "a", count: 64)
 
 do {
@@ -1988,6 +2111,7 @@ let narrowAfterUnrelatedUntracked = try safeGitServer.captureSourceStateRefForTe
 precondition(narrowAfterUnrelatedUntracked["source_state_id"] as? String == narrowBeforeUnrelatedUntracked["source_state_id"] as? String)
 print("swift-file-version-source-state: ok")
 
+let fmg011ServerStoreURL = root.appendingPathComponent("server-evidence.json")
 let server = try LocalMCPServer(
     port: 18088,
     allowedDirectory: root.path,
@@ -1996,7 +2120,8 @@ let server = try LocalMCPServer(
     enableCommands: true,
     localAuthToken: localAuthToken,
     log: { _ in },
-    execEnvironmentAllowList: ["FMG005_OVERRIDE"]
+    execEnvironmentAllowList: ["FMG005_OVERRIDE"],
+    evidenceStore: EvidenceStore(fileURL: fmg011ServerStoreURL)
 )
 let boundedServer = try LocalMCPServer(
     port: 18090,
@@ -2012,9 +2137,22 @@ let boundedServer = try LocalMCPServer(
         headerReadTimeout: 1.0
     )
 )
+let fmg011StoreBlocker = root.appendingPathComponent("evidence-store-blocker")
+try "blocker".write(to: fmg011StoreBlocker, atomically: true, encoding: .utf8)
+let unavailableEvidenceServer = try LocalMCPServer(
+    port: 18091,
+    allowedDirectory: root.path,
+    gitUserName: "Test User",
+    gitUserEmail: "test@example.com",
+    enableCommands: true,
+    localAuthToken: localAuthToken,
+    log: { _ in },
+    evidenceStore: EvidenceStore(fileURL: fmg011StoreBlocker.appendingPathComponent("evidence.json"))
+)
 try safeGitServer.start()
 try server.start()
 try boundedServer.start()
+try unavailableEvidenceServer.start()
 // The shell harness owns this process lifetime and terminates it after all
 // transport tests. Do not use a wall-clock timer here: as the suite grows, a
 // fixed lifetime turns later parser/fuzz checks into false crash reports.
@@ -2030,6 +2168,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ToolCatalog.swift \
     macos/ServerPolicy.swift \
     macos/ToolResultEnvelope.swift \
+    macos/EvidenceSupport.swift \
     macos/ToolExecutionContext.swift \
     macos/AuthenticatedCursorCodec.swift \
     macos/FileVersionService.swift \
@@ -2045,7 +2184,7 @@ python3 - <<'PY'
 import socket
 import time
 
-ports = (18088, 18089, 18090)
+ports = (18088, 18089, 18090, 18091)
 deadline = time.monotonic() + 15.0
 pending = set(ports)
 while pending and time.monotonic() < deadline:
@@ -2064,10 +2203,11 @@ PY
 
 BASE_URL="http://127.0.0.1:18088/mcp"
 SAFE_BASE_URL="http://127.0.0.1:18089/mcp"
+UNAVAILABLE_EVIDENCE_BASE_URL="http://127.0.0.1:18091/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.5.0"
+CATALOG_VERSION="1.6.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
@@ -2160,6 +2300,118 @@ UNAUTHENTICATED="$(command curl -sS -i -X POST "$BASE_URL" \
     -d '{"jsonrpc":"2.0","id":389,"method":"ping","params":{}}')"
 printf '%s' "$UNAUTHENTICATED" | grep -q 'HTTP/1.1 401 Unauthorized'
 printf '%s' "$UNAUTHENTICATED" | grep -q 'Unauthorized'
+
+# FMG-011 live evidence/freshness tests.
+EVIDENCE_NONZERO_BODY="$(python3 - <<'PY'
+import json
+print(json.dumps({
+    "jsonrpc":"2.0","id":940,"method":"tools/call",
+    "params":{
+        "name":"exec_process",
+        "arguments":{
+            "executable":"/bin/sh",
+            "arguments":["-c","printf 'PASS FMG011_SECRET_OUTPUT_DO_NOT_PERSIST'; exit 7"],
+            "timeout_seconds":10,
+        },
+        "_meta":{"io.filemcp/evidence":{"criterionId":"process.exit_zero","required":True}},
+    },
+}))
+PY
+)"
+EVIDENCE_NONZERO="$(command curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H "X-FileMCP-Local-Token: $LOCAL_AUTH_TOKEN" \
+    --data-binary "$EVIDENCE_NONZERO_BODY")"
+printf '%s' "$EVIDENCE_NONZERO" | python3 -c 'import json,sys,re; d=json.load(sys.stdin)["result"]; assert d["isError"] is False; m=d["_meta"]; e=m["io.filemcp/evidence"]; r=m["io.filemcp/result"]; assert e["verification_state"]=="failed" and e["storage_status"]=="durable"; assert e["operation_id"]==r["operationId"] and re.fullmatch(r"ev_[0-9a-f]{32}",e["evidence_id"])'
+FMG011_NONZERO_ID="$(printf '%s' "$EVIDENCE_NONZERO" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["_meta"]["io.filemcp/evidence"]["evidence_id"])')"
+EVIDENCE_GET_NONZERO_BODY="$(python3 - "$FMG011_NONZERO_ID" <<'PY'
+import json,sys
+print(json.dumps({"jsonrpc":"2.0","id":941,"method":"tools/call","params":{"name":"evidence_get","arguments":{"evidence_id":sys.argv[1]}}}))
+PY
+)"
+EVIDENCE_GET_NONZERO="$(command curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H "X-FileMCP-Local-Token: $LOCAL_AUTH_TOKEN" \
+    --data-binary "$EVIDENCE_GET_NONZERO_BODY")"
+printf '%s' "$EVIDENCE_GET_NONZERO" | python3 -c 'import json,sys; s=json.load(sys.stdin)["result"]["structuredContent"]; assert s["persisted_verification_state"]=="failed" and s["verification_state"]=="failed" and s["freshness_state"]=="current"'
+if grep -a -q 'FMG011_SECRET_OUTPUT_DO_NOT_PERSIST' "$SERVER_ROOT/server-evidence.json"; then
+    echo 'evidence store persisted forbidden stdout/argv sentinel' >&2
+    exit 1
+fi
+echo "mcp-evidence-nonzero-privacy: ok"
+
+EVIDENCE_FRESH_BODY="$(python3 - <<'PY'
+import json
+print(json.dumps({
+    "jsonrpc":"2.0","id":942,"method":"tools/call",
+    "params":{
+        "name":"exec_process",
+        "arguments":{"executable":"/usr/bin/true","arguments":[],"timeout_seconds":10},
+        "_meta":{"io.filemcp/evidence":{
+            "criterionId":"process.exit_zero","required":True,
+            "repoPath":"source-state-repo","relevantPaths":["a.txt"],
+        }},
+    },
+}))
+PY
+)"
+EVIDENCE_FRESH="$(command curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H "X-FileMCP-Local-Token: $LOCAL_AUTH_TOKEN" \
+    --data-binary "$EVIDENCE_FRESH_BODY")"
+printf '%s' "$EVIDENCE_FRESH" | python3 -c 'import json,sys; e=json.load(sys.stdin)["result"]["_meta"]["io.filemcp/evidence"]; assert e["verification_state"]=="passed" and e["storage_status"]=="durable" and e["source_binding"]=="current"'
+FMG011_FRESH_ID="$(printf '%s' "$EVIDENCE_FRESH" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["_meta"]["io.filemcp/evidence"]["evidence_id"])')"
+printf 'unrelated evidence change\n' > "$SERVER_ROOT/source-state-repo/b.txt"
+EVIDENCE_GET_FRESH_BODY="$(python3 - "$FMG011_FRESH_ID" <<'PY'
+import json,sys
+print(json.dumps({"jsonrpc":"2.0","id":943,"method":"tools/call","params":{"name":"evidence_get","arguments":{"evidence_id":sys.argv[1],"repo_path":"source-state-repo","relevant_paths":["a.txt"]}}}))
+PY
+)"
+EVIDENCE_GET_FRESH="$(command curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H "X-FileMCP-Local-Token: $LOCAL_AUTH_TOKEN" \
+    --data-binary "$EVIDENCE_GET_FRESH_BODY")"
+printf '%s' "$EVIDENCE_GET_FRESH" | python3 -c 'import json,sys; s=json.load(sys.stdin)["result"]["structuredContent"]; assert s["verification_state"]=="passed" and s["freshness_state"]=="current"'
+printf 'relevant evidence change\n' > "$SERVER_ROOT/source-state-repo/a.txt"
+EVIDENCE_GET_STALE="$(command curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H "X-FileMCP-Local-Token: $LOCAL_AUTH_TOKEN" \
+    --data-binary "$EVIDENCE_GET_FRESH_BODY")"
+printf '%s' "$EVIDENCE_GET_STALE" | python3 -c 'import json,sys; s=json.load(sys.stdin)["result"]["structuredContent"]; assert s["verification_state"]=="stale" and s["freshness_state"]=="stale" and s["freshness_reason"]=="source_or_context_changed"'
+echo "mcp-evidence-freshness: ok"
+
+EVIDENCE_BAD_ID="$(command curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H "X-FileMCP-Local-Token: $LOCAL_AUTH_TOKEN" \
+    -d '{"jsonrpc":"2.0","id":944,"method":"tools/call","params":{"name":"evidence_get","arguments":{"evidence_id":"ev_bad"}}}')"
+printf '%s' "$EVIDENCE_BAD_ID" | python3 -c 'import json,sys; d=json.load(sys.stdin)["result"]; assert d["isError"] is True and "Malformed evidence_id" in d["content"][0]["text"]'
+
+FMG011_OPTIONAL_MARKER="$SERVER_ROOT/fmg011-optional.marker"
+FMG011_REQUIRED_MARKER="$SERVER_ROOT/fmg011-required.marker"
+rm -f "$FMG011_OPTIONAL_MARKER" "$FMG011_REQUIRED_MARKER"
+EVIDENCE_OPTIONAL_BODY="$(python3 - "$FMG011_OPTIONAL_MARKER" <<'PY'
+import json,sys
+print(json.dumps({"jsonrpc":"2.0","id":945,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/touch","arguments":[sys.argv[1]],"timeout_seconds":10},"_meta":{"io.filemcp/evidence":{"criterionId":"process.exit_zero","required":False}}}}))
+PY
+)"
+EVIDENCE_OPTIONAL="$(command curl -fsS -X POST "$UNAVAILABLE_EVIDENCE_BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H "X-FileMCP-Local-Token: $LOCAL_AUTH_TOKEN" \
+    --data-binary "$EVIDENCE_OPTIONAL_BODY")"
+test -f "$FMG011_OPTIONAL_MARKER"
+printf '%s' "$EVIDENCE_OPTIONAL" | python3 -c 'import json,sys; d=json.load(sys.stdin)["result"]; e=d["_meta"]["io.filemcp/evidence"]; assert d["isError"] is False and e["storage_status"]=="unavailable" and e["verification_state"]=="unknown"'
+EVIDENCE_REQUIRED_BODY="$(python3 - "$FMG011_REQUIRED_MARKER" <<'PY'
+import json,sys
+print(json.dumps({"jsonrpc":"2.0","id":946,"method":"tools/call","params":{"name":"exec_process","arguments":{"executable":"/usr/bin/touch","arguments":[sys.argv[1]],"timeout_seconds":10},"_meta":{"io.filemcp/evidence":{"criterionId":"process.exit_zero","required":True}}}}))
+PY
+)"
+EVIDENCE_REQUIRED="$(command curl -fsS -X POST "$UNAVAILABLE_EVIDENCE_BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -H "X-FileMCP-Local-Token: $LOCAL_AUTH_TOKEN" \
+    --data-binary "$EVIDENCE_REQUIRED_BODY")"
+test ! -e "$FMG011_REQUIRED_MARKER"
+printf '%s' "$EVIDENCE_REQUIRED" | python3 -c 'import json,sys; d=json.load(sys.stdin)["result"]; e=d["_meta"]["io.filemcp/evidence"]; assert d["isError"] is True and e["operation_state"]=="not-run" and e["verification_state"]=="blocked"'
+echo "mcp-evidence-required-mode: ok"
 
 DISCOVERY_PATH="$(command curl -sS -i 'http://127.0.0.1:18088/.well-known/oauth-protected-resource/mcp')"
 printf '%s' "$DISCOVERY_PATH" | grep -q 'HTTP/1.1 404 Not Found'

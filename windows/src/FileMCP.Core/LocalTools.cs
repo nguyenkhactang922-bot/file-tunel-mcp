@@ -81,6 +81,13 @@ internal sealed partial class LocalTools
     public bool HasTool(string name) => HandlerToolNames.Contains(name) && _policy.IsAllowed(name);
     internal bool SupportsBudget(string name) => BudgetedToolNames.Contains(name);
 
+    internal string CaptureProjectContextDigest(string repoPath)
+    {
+        var captured = _projectContext.Capture(repoPath, "", 1, includeSkills: true, context: null);
+        return captured["context_digest"]?.GetValue<string>()
+            ?? throw new FileMcpException("Project context digest is unavailable");
+    }
+
     public async Task<ToolCallOutput> CallAsync(string name, JsonObject arguments, CancellationToken cancellationToken = default, ToolExecutionContext? executionContext = null)
     {
         var effectiveCancellation = executionContext?.CancellationToken ?? cancellationToken;
