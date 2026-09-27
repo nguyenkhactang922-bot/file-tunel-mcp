@@ -18,12 +18,12 @@ Dependency: A -> B/C -> D -> E/F -> G -> H -> I.
 
 - FMG-011-A: PASS
 - FMG-011-B: PASS
-- FMG-011-C: PASS / native execution pending
+- FMG-011-C: PASS
 - FMG-011-D: PASS
 - FMG-011-E: PASS
 - FMG-011-F: PASS
-- FMG-011-G: PASS locally
-- FMG-011-H: ACTIVE - native Verify pending
-- FMG-011-I: BLOCKED on H
+- FMG-011-G: PASS
+- FMG-011-H: PASS - exact-head Verify 36295961603
+- FMG-011-I: PASS - PR #17 merged; main ddc8b278 verified by run 36296831946
 
-AUTHORITATIVE NEXT_EXACT_ACTION: commit/push exact candidate and require native Verify on macOS / Windows x64 / Windows ARM64.
+FMG-011 COMPLETE: authority transferred to FMG-012.

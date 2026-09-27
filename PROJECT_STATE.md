@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-011-metadata-evidence`
+Active branch: `chatgpt/FMG-012-cross-platform-gate`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -233,7 +233,7 @@ Evidence: `docs/evidence/FMG-010_PROJECT_CONTEXT_CANDIDATE_EVIDENCE.md`.
 
 ## FMG-011 implementation
 
-State: ACTIVE / CLAIMED.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-011-metadata-evidence`.
 Depends: FMG-002, FMG-003, FMG-006, FMG-010 DONE / MAIN VERIFIED.
 Scope: Metadata-Only Evidence / Freshness only.
@@ -256,3 +256,20 @@ FMG-011 local candidate:
 - Native macOS/Windows x64/Windows ARM64 Verify is the remaining H-gate.
 - Evidence: `docs/evidence/FMG-011_METADATA_EVIDENCE_CANDIDATE_EVIDENCE.md`.
 - FMG-012 remains BLOCKED until FMG-011 MAIN VERIFIED.
+Final candidate: `54270a86e03ebcdb86d01954d791065d5abdf1bc`.
+PR: #17.
+Merge main: `ddc8b27839469dcc5a6ff36bb531cf0b3dda87aa`.
+Native merged-main Verify: run `36296831946` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Evidence: `docs/evidence/FMG-011_METADATA_EVIDENCE_CANDIDATE_EVIDENCE.md`.
+
+## FMG-012 implementation
+
+State: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING.
+Branch: `chatgpt/FMG-012-cross-platform-gate`.
+Depends: FMG-001 through FMG-011 DONE / MAIN VERIFIED.
+Scope: Cross-Platform Adversarial Contract Gate only. No new feature scope unless verification finds a concrete defect.
+NEXT_EXACT_ACTION: run exact catalog/schema parity, all Phase A negative/adversarial contracts, Windows Release/runtime/package gates, then native macOS/Windows x64/Windows ARM64 Verify; fix only concrete failing stages.
+Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+Local proof: all Phase A contracts PASS; Windows runtime 750 assertions PASS; Release 0 warnings/errors; x64/ARM64 package builds and static integrity PASS.
+Claim-head native Verify: run `36297166252` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Final exact-head native Verify remains required after evidence commit.
