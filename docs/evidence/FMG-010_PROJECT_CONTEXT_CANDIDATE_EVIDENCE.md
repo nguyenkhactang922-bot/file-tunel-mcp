@@ -1,7 +1,7 @@
 # FMG-010 - Project Context Provenance / Digest - Candidate Evidence
 
 Date: 2026-09-26
-State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Branch: chatgpt/FMG-010-project-context
 
 Scope implemented:
@@ -62,3 +62,14 @@ Native GitHub Verify required on exact committed candidate:
 - verify-windows-arm64
 
 Do not mark FMG-010 DONE or claim FMG-011 until exact-head native Verify, scoped review, merge and merged-main verification complete.
+
+## Final closure
+
+- primary candidate PR #14 merged as `fdd25949864c54ba8021e3baf908e1b0f3f787bd`;
+- test-only follow-up PR #15 merged as `d3dd091a8d9a812885e5399ed216241206152df5`;
+- test-only follow-up PR #16 merged as final main `9340377f42abfe97bc708d0683f77dea26e86b50`;
+- final merged-main native Verify run `36235453791`: SUCCESS on macOS / Windows x64 / Windows ARM64;
+- final merged-main local project-context/catalog/parity/source-state contracts: PASS;
+- final merged-main Windows runtime: 715 assertions PASS;
+- final merged-main Release build: 0 warnings / 0 errors;
+- FMG-010: DONE / MAIN VERIFIED.

@@ -16,7 +16,8 @@ internal static class ToolResultEnvelope
         IEnumerable<string>? warnings = null,
         JsonObject? usage = null,
         bool forceTruncated = false,
-        string? truncationDetail = null)
+        string? truncationDetail = null,
+        string? operationId = null)
     {
         var warningArray = new JsonArray();
         if (warnings is not null)
@@ -50,7 +51,7 @@ internal static class ToolResultEnvelope
         {
             ["schemaVersion"] = SchemaVersion,
             ["status"] = status,
-            ["operationId"] = "op_" + Guid.NewGuid().ToString("N"),
+            ["operationId"] = operationId ?? NewOperationId(),
             ["truncation"] = truncation,
             ["usage"] = usageObject,
             ["warnings"] = warningArray,
@@ -67,10 +68,11 @@ internal static class ToolResultEnvelope
         IEnumerable<string>? warnings = null,
         JsonObject? usage = null,
         bool forceTruncated = false,
-        string? truncationDetail = null)
+        string? truncationDetail = null,
+        string? operationId = null)
     {
         var meta = result["_meta"] as JsonObject ?? new JsonObject();
-        meta[MetadataKey] = Create(isError, content, structuredContent, warnings, usage, forceTruncated, truncationDetail);
+        meta[MetadataKey] = Create(isError, content, structuredContent, warnings, usage, forceTruncated, truncationDetail, operationId);
         result["_meta"] = meta;
     }
 
@@ -135,6 +137,8 @@ internal static class ToolResultEnvelope
                 node is not JsonValue value || !value.TryGetValue<string>(out var warning) || string.IsNullOrWhiteSpace(warning)))
             throw new FileMcpException("Malformed tool result envelope warnings");
     }
+
+    internal static string NewOperationId() => "op_" + Guid.NewGuid().ToString("N");
 
     private static bool IsOperationId(string value)
     {

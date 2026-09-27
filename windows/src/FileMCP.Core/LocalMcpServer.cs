@@ -26,7 +26,7 @@ internal sealed record LocalMcpServerLimits(int MaxConcurrentConnections, TimeSp
 
 public sealed class LocalMcpServer : IAsyncDisposable
 {
-    private static readonly HashSet<string> ServerHandlerToolNames = new(StringComparer.Ordinal) { "filemcp_observability_connect" };
+    private static readonly HashSet<string> ServerHandlerToolNames = new(StringComparer.Ordinal) { "filemcp_observability_connect", "evidence_get" };
     private static readonly HashSet<string> UnauthenticatedOAuthDiscoveryPaths = new(StringComparer.Ordinal)
     {
         "/.well-known/oauth-protected-resource/mcp",
@@ -49,33 +49,46 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private readonly string? _workspaceKey;
     private readonly McpStandardTelemetry? _standardTelemetry;
     private readonly LocalMcpServerLimits _limits;
+    private readonly string _workspaceRoot;
+    private readonly string _workspaceFingerprint;
+    private readonly EvidenceStore _evidenceStore;
+    private readonly EvidenceCoordinator _evidenceCoordinator;
     private readonly SemaphoreSlim _connectionSlots;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
     private Task? _acceptLoop;
 
     public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null, LogicalSessionRegistry? sessions = null, string? workspaceKey = null, McpStandardTelemetry? standardTelemetry = null, LocalPolicyConfiguration? policyConfiguration = null, IReadOnlyList<string>? execEnvironmentAllowList = null)
-        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicyFor(enableCommands, policyConfiguration), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, LocalMcpServerLimits.Default, execEnvironmentAllowList)
+        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicyFor(enableCommands, policyConfiguration), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, LocalMcpServerLimits.Default, execEnvironmentAllowList, null)
     {
     }
 
     internal LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter, LogicalChatCorrelationService? chatCorrelation, LogicalSessionRegistry? sessions, string? workspaceKey, McpStandardTelemetry? standardTelemetry, LocalMcpServerLimits limits)
-        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, limits, null)
+        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, limits, null, null)
     {
     }
 
-    private LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter, LogicalChatCorrelationService? chatCorrelation, LogicalSessionRegistry? sessions, string? workspaceKey, McpStandardTelemetry? standardTelemetry, LocalMcpServerLimits limits, IReadOnlyList<string>? execEnvironmentAllowList)
+    internal LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, LocalMcpServerLimits limits, EvidenceStore evidenceStore)
+        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands), localAuthToken, log, null, null, null, null, null, limits, null, evidenceStore)
+    {
+    }
+
+    private LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter, LogicalChatCorrelationService? chatCorrelation, LogicalSessionRegistry? sessions, string? workspaceKey, McpStandardTelemetry? standardTelemetry, LocalMcpServerLimits limits, IReadOnlyList<string>? execEnvironmentAllowList, EvidenceStore? evidenceStore)
     {
         if (Encoding.UTF8.GetByteCount(localAuthToken) < 32) throw new FileMcpException("Local MCP authentication token is too short");
         limits.Validate();
         _port = port; _localAuthToken = localAuthToken; _log = log; _usageMeter = usageMeter; _chatCorrelation = chatCorrelation; _sessions = sessions; _workspaceKey = string.IsNullOrWhiteSpace(workspaceKey) ? null : workspaceKey.Trim().ToUpperInvariant(); _standardTelemetry = standardTelemetry;
         _limits = limits;
         _policy = policy;
+        _workspaceRoot = Path.GetFullPath(allowedDirectory);
+        _workspaceFingerprint = EvidenceStore.WorkspaceFingerprint(_workspaceRoot);
+        _evidenceStore = evidenceStore ?? new EvidenceStore();
         _connectionSlots = new SemaphoreSlim(limits.MaxConcurrentConnections, limits.MaxConcurrentConnections);
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
         CanonicalToolCatalog.ValidateHandlerCoverage("server", ServerHandlerToolNames);
         _skills = new CodexSkillRegistry(allowedDirectory, log);
         _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, _policy, execEnvironmentAllowList, skillRegistry: _skills);
+        _evidenceCoordinator = new EvidenceCoordinator(_evidenceStore, _tools, _policy, _workspaceFingerprint, _log);
     }
 
     private static ServerPolicy ServerPolicyFor(bool enableCommands, LocalPolicyConfiguration? configuration) =>
@@ -344,6 +357,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
         var result = new JsonArray();
         foreach (var tool in _tools.ToolDefinitions) result.Add(WithCorrelationFacadeMetadata(tool));
         foreach (var tool in _skills.ToolDefinitions) result.Add(WithCorrelationFacadeMetadata(tool));
+        result.Add(WithCorrelationFacadeMetadata(EvidenceStatusToolDefinition()));
         if (_chatCorrelation is not null) result.Add(ObservabilityConnectToolDefinition());
         return _policy.FilterDefinitions(result);
     }
@@ -358,6 +372,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
         return clone;
     }
 
+    private static JsonObject EvidenceStatusToolDefinition() => CanonicalToolCatalog.ToolDefinition("evidence_get");
     private static JsonObject ObservabilityConnectToolDefinition() => CanonicalToolCatalog.ToolDefinition("filemcp_observability_connect");
 
     private async Task<byte[]> CallToolAsync(JsonNode? id, JsonObject parameters, bool modern, long requestBytes, CancellationToken cancellationToken)
@@ -367,13 +382,17 @@ public sealed class LocalMcpServer : IAsyncDisposable
         var isError = true;
         LogicalSessionCallToken? sessionCall = null;
         byte[]? response = null;
+        var operationId = ToolResultEnvelope.NewOperationId();
+        EvidenceRun? evidenceRun = null;
+        ToolExecutionContext? activeExecutionContext = null;
         try
         {
             if (parameters["name"] is not JsonValue nameNode || !nameNode.TryGetValue<string>(out name))
                 return response = JsonRpcError(id, -32602, "Missing tool name", status: modern ? 400 : 200);
 
             var isObservabilityConnect = name == "filemcp_observability_connect" && _chatCorrelation is not null;
-            if (!_tools.HasTool(name) && !_skills.HasTool(name) && !isObservabilityConnect)
+            var isEvidenceStatus = name == "evidence_get";
+            if (!_tools.HasTool(name) && !_skills.HasTool(name) && !isObservabilityConnect && !isEvidenceStatus)
                 return response = JsonRpcError(id, -32602, $"Unknown tool: {name}");
 
             JsonObject arguments;
@@ -382,7 +401,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
             else
             {
                 var invalidContent = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = "Invalid arguments: expected an object" });
-                var invalid = ToolCallResult(invalidContent, null, isError: true);
+                var invalid = ToolCallResult(invalidContent, null, isError: true, operationId: operationId);
                 if (modern) invalid = ModernComplete(invalid);
                 return response = JsonRpcResult(id, invalid);
             }
@@ -422,7 +441,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
                         ["type"] = "text",
                         ["text"] = structured.ToJsonString(),
                     });
-                    var result = ToolCallResult(connectContent, structured, isError: false);
+                    var result = ToolCallResult(connectContent, structured, isError: false, operationId: operationId);
                     if (modern) result = ModernComplete(result);
                     isError = false;
                     return response = JsonRpcResult(id, result);
@@ -439,6 +458,11 @@ public sealed class LocalMcpServer : IAsyncDisposable
                     sessionCall = _sessions.BeginToolCall(_workspaceKey, sessionHashForCall, requestBytes, name);
 
                 var callMeta = parameters["_meta"] as JsonObject;
+                var evidenceRequest = EvidenceRequestSpec.Parse(callMeta, name);
+                evidenceRun = await _evidenceCoordinator.BeginAsync(evidenceRequest, operationId, name).ConfigureAwait(false);
+                if (evidenceRun?.BlockedBeforeDispatch == true)
+                    throw new FileMcpException($"Required evidence unavailable before launch: {evidenceRun.BlockReason ?? "unknown"}");
+
                 var budgetedTool = _tools.SupportsBudget(name);
                 if (ToolExecutionContext.HasBudget(callMeta) && !budgetedTool)
                     throw new FileMcpException($"Tool budget metadata is not supported for tool: {name}");
@@ -448,16 +472,38 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 using var executionContext = budgetedTool
                     ? ToolExecutionContext.Create(callMeta, cancellationToken)
                     : null;
+                activeExecutionContext = executionContext;
 
                 _policy.Authorize(name, preparedPolicy);
-                var output = _skills.HasTool(name)
-                    ? _skills.Call(name, arguments)
-                    : await _tools.CallAsync(
-                        name,
-                        arguments,
-                        executionContext?.CancellationToken ?? cancellationToken,
-                        executionContext).ConfigureAwait(false);
-                var toolResult = ToolCallResult(output.Content, output.StructuredContent, isError: false, executionContext);
+                ToolCallOutput output;
+                if (isEvidenceStatus)
+                {
+                    output = await EvidenceStatusOutputAsync(arguments, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    output = _skills.HasTool(name)
+                        ? _skills.Call(name, arguments)
+                        : await _tools.CallAsync(
+                            name,
+                            arguments,
+                            executionContext?.CancellationToken ?? cancellationToken,
+                            executionContext).ConfigureAwait(false);
+                }
+
+                var evidenceMetadata = await _evidenceCoordinator.CompleteAsync(
+                    evidenceRun,
+                    isError: false,
+                    output.StructuredContent,
+                    executionContext).ConfigureAwait(false);
+                evidenceRun = null;
+                var toolResult = ToolCallResult(
+                    output.Content,
+                    output.StructuredContent,
+                    isError: false,
+                    executionContext,
+                    operationId,
+                    evidenceMetadata);
                 if (modern) toolResult = ModernComplete(toolResult);
                 isError = false;
                 return response = JsonRpcResult(id, toolResult);
@@ -465,8 +511,14 @@ public sealed class LocalMcpServer : IAsyncDisposable
             catch (Exception ex)
             {
                 if (_skills.HasTool(name)) _log($"[Skills] ERROR: {ex.Message}\n");
+                var evidenceMetadata = await _evidenceCoordinator.CompleteAsync(
+                    evidenceRun,
+                    isError: true,
+                    structuredContent: null,
+                    activeExecutionContext).ConfigureAwait(false);
+                evidenceRun = null;
                 var errorContent = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = ex.Message });
-                var result = ToolCallResult(errorContent, null, isError: true);
+                var result = ToolCallResult(errorContent, null, isError: true, operationId: operationId, evidenceMetadata: evidenceMetadata);
                 if (modern) result = ModernComplete(result);
                 return response = JsonRpcResult(id, result);
             }
@@ -483,11 +535,46 @@ public sealed class LocalMcpServer : IAsyncDisposable
         }
     }
 
+    private async Task<ToolCallOutput> EvidenceStatusOutputAsync(JsonObject arguments, CancellationToken cancellationToken)
+    {
+        foreach (var key in arguments.Select(pair => pair.Key))
+            if (key is not ("evidence_id" or "repo_path" or "relevant_paths"))
+                throw new FileMcpException($"Unknown argument: {key}");
+        if (arguments["evidence_id"] is not JsonValue idNode || !idNode.TryGetValue<string>(out var evidenceId) || string.IsNullOrWhiteSpace(evidenceId))
+            throw new FileMcpException("Missing required argument: evidence_id");
+        string? repoPath = null;
+        if (arguments["repo_path"] is JsonNode repoNode)
+        {
+            if (repoNode is not JsonValue repoValue || !repoValue.TryGetValue<string>(out repoPath) || string.IsNullOrWhiteSpace(repoPath))
+                throw new FileMcpException("Argument repo_path must be a non-empty string");
+        }
+        var relevantPaths = new List<string>();
+        if (arguments["relevant_paths"] is JsonNode relevantNode)
+        {
+            if (relevantNode is not JsonArray array || array.Count > 4096)
+                throw new FileMcpException("Argument relevant_paths must be a bounded array");
+            foreach (var node in array)
+            {
+                if (node is not JsonValue value || !value.TryGetValue<string>(out var path) || string.IsNullOrWhiteSpace(path))
+                    throw new FileMcpException("relevant_paths entries must be non-empty strings");
+                relevantPaths.Add(path);
+            }
+            if (repoPath is null && relevantPaths.Count > 0)
+                throw new FileMcpException("relevant_paths requires repo_path");
+        }
+        var structured = await _evidenceCoordinator.StatusAsync(evidenceId, repoPath, relevantPaths, cancellationToken).ConfigureAwait(false);
+        return new ToolCallOutput(
+            new JsonArray(new JsonObject { ["type"] = "text", ["text"] = structured.ToJsonString() }),
+            structured);
+    }
+
     private static JsonObject ToolCallResult(
         JsonArray content,
         JsonObject? structuredContent,
         bool isError,
-        ToolExecutionContext? executionContext = null)
+        ToolExecutionContext? executionContext = null,
+        string? operationId = null,
+        JsonObject? evidenceMetadata = null)
     {
         if (executionContext?.Truncated == true && structuredContent is not null)
             structuredContent["truncated"] = true;
@@ -505,7 +592,14 @@ public sealed class LocalMcpServer : IAsyncDisposable
             structuredContent,
             usage: executionContext?.Usage(),
             forceTruncated: executionContext?.Truncated == true,
-            truncationDetail: executionContext?.TruncationReason);
+            truncationDetail: executionContext?.TruncationReason,
+            operationId: operationId);
+        if (evidenceMetadata is not null)
+        {
+            var meta = result["_meta"] as JsonObject ?? new JsonObject();
+            meta[EvidenceRequestSpec.MetadataKey] = evidenceMetadata;
+            result["_meta"] = meta;
+        }
         return result;
     }
 

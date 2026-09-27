@@ -20,7 +20,8 @@ enum ToolResultEnvelope {
         warnings: [String] = [],
         usage: [String: Any]? = nil,
         forceTruncated: Bool = false,
-        truncationDetail: String? = nil
+        truncationDetail: String? = nil,
+        operationID: String? = nil
     ) -> [String: Any] {
         let structuredTruncated = structuredContent?["truncated"] as? Bool ?? false
         let truncated = forceTruncated || structuredTruncated
@@ -46,7 +47,7 @@ enum ToolResultEnvelope {
         let envelope: [String: Any] = [
             "schemaVersion": schemaVersion,
             "status": isError ? "tool_error" : (truncated ? "partial" : "success"),
-            "operationId": "op_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
+            "operationId": operationID ?? newOperationID(),
             "truncation": truncation,
             "usage": usageValue,
             "warnings": warnings,
@@ -64,7 +65,8 @@ enum ToolResultEnvelope {
         warnings: [String] = [],
         usage: [String: Any]? = nil,
         forceTruncated: Bool = false,
-        truncationDetail: String? = nil
+        truncationDetail: String? = nil,
+        operationID: String? = nil
     ) {
         var meta = result["_meta"] as? [String: Any] ?? [:]
         meta[metadataKey] = create(
@@ -74,9 +76,14 @@ enum ToolResultEnvelope {
             warnings: warnings,
             usage: usage,
             forceTruncated: forceTruncated,
-            truncationDetail: truncationDetail
+            truncationDetail: truncationDetail,
+            operationID: operationID
         )
         result["_meta"] = meta
+    }
+
+    static func newOperationID() -> String {
+        "op_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
     }
 
     static func require(from result: [String: Any]) throws -> [String: Any] {

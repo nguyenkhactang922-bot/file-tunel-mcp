@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-010-project-context`
+Branch: `chatgpt/FMG-011-metadata-evidence`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -259,15 +259,48 @@ NEXT_EXACT_ACTION: commit/push exact FMG-009 candidate, require native GitHub Ve
 
 FMG-009: DONE / MAIN VERIFIED. Final candidate `d7d5e5d45f79fc27f35bd0758ba6e1675bda6b92` merged by PR #13 as main `e054aee3d18196881fbb8033037441959b255b73`; merged-main Verify `36225126052` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows runtime 682 assertions and Release build PASS.
 
-FMG-010: CLAIMED / ACTIVE on `chatgpt/FMG-010-project-context`.
+FMG-010: CLAIMED / ACTIVE on `chatgpt/FMG-011-metadata-evidence`.
 
 NEXT_EXACT_ACTION: implement Project Context Provenance / Digest only: bounded instruction discovery; deterministic ordered provenance/scope; schema+digest; range continuation; no-authority marker; existing skill integration without duplicate recipe engine; adversarial tests for oversized instructions, nested conflicts, malicious authority requests, stale range/version, path escape and cancellation. Do not begin FMG-011 before FMG-010 MAIN VERIFIED.
 
 
 ## FMG-010 local verification
 
-FMG-010: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on chatgpt/FMG-010-project-context.
+FMG-010: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on chatgpt/FMG-011-metadata-evidence.
 
 Local evidence: catalog/parity + project-context/prerequisite contracts PASS at catalog 1.5.0, 22 tools, hash f717cf599faf112964a981e516de0898d4ce140c3f6daca15d732f13216a53aa; Windows Release build 0 warnings/errors; runtime 715 assertions PASS including windows-project-context: ok; isolated x64 package/app smoke PASS; ZIP SHA-256 9ABA9428D8CD22F0FE29F30D3D3D05FAA3327D512DA95DDAC183EE28DE31ECFB; macOS implementation/test harness/compile wiring present and shell syntax PASS.
 
 NEXT_EXACT_ACTION: commit/push exact FMG-010 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, fix only exact failing stage, perform scoped provenance/authority review, merge only exact green head, verify merged main, mark FMG-010 DONE / MAIN VERIFIED, then claim FMG-011.
+
+## FMG-010 closure / FMG-011 claim
+
+FMG-010: DONE / MAIN VERIFIED. Final main `9340377f42abfe97bc708d0683f77dea26e86b50`; merged-main Verify `36235453791` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows runtime 715 assertions and Release build PASS.
+
+FMG-011: CLAIMED / ACTIVE on `chatgpt/FMG-011-metadata-evidence`.
+
+NEXT_EXACT_ACTION: implement FMG-011 Metadata-Only Evidence / Freshness only: evidence identity/state, SourceStateRef linkage, policy/catalog generation, passed/failed/not-run/unknown/stale/blocked/N/A state machine, retention/quota/cleanup, restart handling, telemetry separation, and adversarial tests for stale source/policy/catalog/storage failure/crash/secrets/retention. Do not begin FMG-012 before FMG-011 MAIN VERIFIED.
+
+
+FMG-011 design freeze complete:
+- docs/design/FMG-011_METADATA_EVIDENCE_FRESHNESS_FROZEN.md
+- docs/design/FMG-011_INDEPENDENT_REVIEW.md
+- docs/design/FMG-011_DECISION_MATRIX.md
+- tasks/FMG-011_TASK_GRAPH.md
+- NEXT_EXACT_ACTION: implement FMG-011-A shared evidence contracts/IDs/states only; do not begin store integration before contracts pass.
+
+
+## FMG-011 local verification
+
+FMG-011: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-011-metadata-evidence`.
+
+Local evidence:
+- canonical catalog/parity PASS at 23 tools / `8c5365afc0ae89e417c144ba77bbdc6a068e3fdbeefd92d674a62e1647c69d91`;
+- exec_process/source-state/project-context/evidence contracts PASS;
+- Windows Release build PASS, 0 warnings/errors;
+- Windows runtime PASS, 750 assertions including `windows-evidence-freshness: ok`;
+- macOS EvidenceStore/server/adversarial harness and build/CI wiring present; Git Bash syntax PASS;
+- scoped privacy/security review PASS.
+
+Evidence: `docs/evidence/FMG-011_METADATA_EVIDENCE_CANDIDATE_EVIDENCE.md`.
+
+AUTHORITATIVE NEXT_EXACT_ACTION: commit/push exact FMG-011 candidate, require native GitHub Verify macOS + Windows x64 + Windows ARM64, fix only exact failing stage, perform scoped exact-head review, merge only green head, verify merged main, mark FMG-011 DONE / MAIN VERIFIED, then claim FMG-012.
