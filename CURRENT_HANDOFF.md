@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-012-cross-platform-gate`
+Branch: `chatgpt/FMG-013-full-regression-live-proof`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -320,3 +320,11 @@ FMG-012: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING on `chatgpt/FMG-
 Local evidence: all Phase A contract/adversarial scripts PASS; Windows runtime 750 assertions PASS; Release build 0 warnings/errors; x64 + ARM64 package builds/static integrity PASS. Local GUI smoke is environment-blocked because the live FileMCP singleton is the MCP bridge; claim-head native Verify `36297166252` SUCCESS on macOS + Windows x64 + Windows ARM64.
 
 NEXT_EXACT_ACTION: commit/push exact FMG-012 evidence candidate, require native Verify on the final exact head, perform scoped gate review, merge only green exact head, verify merged main, mark FMG-012 DONE / MAIN VERIFIED, then claim FMG-013.
+
+## FMG-012 closure / FMG-013 claim
+
+FMG-012: DONE / MAIN VERIFIED. Final candidate `364b7945f2885e5ec39ee1ad1da9e8a08618735c` merged by PR #18 as main `d3a3670f6fb60ab75d8471b3d982c811337fa951`; merged-main Verify `36297870457` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows runtime 750 assertions and Release build PASS.
+
+FMG-013: CLAIMED / ACTIVE on `chatgpt/FMG-013-full-regression-live-proof`.
+
+NEXT_EXACT_ACTION: execute Foundation Full Regression + Live MCP Proof only: full regression contracts/runtime/package/native verification plus live MCP catalog/tool/correlation proof against the current connector. Fix only concrete failing stages. FMG-013 is foundation MAIN VERIFIED, not complete-upgrade completion.

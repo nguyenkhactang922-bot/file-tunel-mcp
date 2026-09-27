@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-012-cross-platform-gate`
+Active branch: `chatgpt/FMG-013-full-regression-live-proof`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -264,7 +264,7 @@ Evidence: `docs/evidence/FMG-011_METADATA_EVIDENCE_CANDIDATE_EVIDENCE.md`.
 
 ## FMG-012 implementation
 
-State: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-012-cross-platform-gate`.
 Depends: FMG-001 through FMG-011 DONE / MAIN VERIFIED.
 Scope: Cross-Platform Adversarial Contract Gate only. No new feature scope unless verification finds a concrete defect.
@@ -273,3 +273,16 @@ Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 Local proof: all Phase A contracts PASS; Windows runtime 750 assertions PASS; Release 0 warnings/errors; x64/ARM64 package builds and static integrity PASS.
 Claim-head native Verify: run `36297166252` SUCCESS on macOS / Windows x64 / Windows ARM64.
 Final exact-head native Verify remains required after evidence commit.
+Final candidate: `364b7945f2885e5ec39ee1ad1da9e8a08618735c`.
+PR: #18.
+Merge main: `d3a3670f6fb60ab75d8471b3d982c811337fa951`.
+Native merged-main Verify: run `36297870457` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+
+## FMG-013 implementation
+
+State: ACTIVE / CLAIMED.
+Branch: `chatgpt/FMG-013-full-regression-live-proof`.
+Depends: FMG-012 DONE / MAIN VERIFIED.
+Scope: Foundation Full Regression + Live MCP Proof only. No new feature scope unless verification finds a concrete defect.
+NEXT_EXACT_ACTION: run exact full regression and live MCP proof against the current FileMCP connector, verify catalog/schema/live tools parity and failure semantics, package/native gates, then merge only exact green evidence.

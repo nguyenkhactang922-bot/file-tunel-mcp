@@ -126,13 +126,13 @@ Detailed specification: foundation graph FMG-011.
 
 ## FMG-012 - Foundation Cross-Platform Adversarial Contract Gate
 
-State: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-001 through FMG-011
 Detailed specification: foundation graph FMG-012.
 
 ## FMG-013 - Foundation Full Regression + Live MCP Proof
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-012
 Detailed specification: foundation graph FMG-013.
 

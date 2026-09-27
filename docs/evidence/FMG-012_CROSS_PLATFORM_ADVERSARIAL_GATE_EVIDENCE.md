@@ -1,6 +1,6 @@
 # FMG-012 Cross-Platform Adversarial Contract Gate Evidence
 
-Status: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING
+Status: DONE / MAIN VERIFIED
 
 Branch: `chatgpt/FMG-012-cross-platform-gate`
 Baseline main: `ddc8b27839469dcc5a6ff36bb531cf0b3dda87aa`
@@ -54,3 +54,13 @@ Because this evidence/state document is a new final candidate commit, merge stil
 ## Remaining gate
 
 Commit/push exact evidence candidate -> require exact-head Verify macOS + Windows x64 + Windows ARM64 -> scoped review -> PR/merge only green exact head -> merged-main local/native confirmation -> mark FMG-012 DONE / MAIN VERIFIED -> then claim FMG-013.
+
+## Final closure
+
+- Final candidate: `364b7945f2885e5ec39ee1ad1da9e8a08618735c`.
+- PR: #18.
+- Merge main: `d3a3670f6fb60ab75d8471b3d982c811337fa951`.
+- Final exact-head Verify: run `36297708773` SUCCESS on macOS / Windows x64 / Windows ARM64.
+- Merged-main Verify: run `36297870457` SUCCESS on macOS / Windows x64 / Windows ARM64.
+- Merged-main local proof: catalog/parity/evidence/project-context/apply-edits contracts PASS; Windows runtime 750 assertions PASS; Release build 0 warnings / 0 errors.
+- FMG-012: DONE / MAIN VERIFIED.
