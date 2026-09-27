@@ -312,3 +312,11 @@ FMG-011: DONE / MAIN VERIFIED. Candidate `54270a86e03ebcdb86d01954d791065d5abdf1
 FMG-012: CLAIMED / ACTIVE on `chatgpt/FMG-012-cross-platform-gate`.
 
 NEXT_EXACT_ACTION: execute the foundation cross-platform adversarial contract gate only: catalog/schema parity, all Phase A negative suites, Windows Release/runtime/package proof, then native macOS/x64/ARM64 Verify. Fix only exact defects discovered; do not start FMG-013 before FMG-012 MAIN VERIFIED.
+
+## FMG-012 local verification
+
+FMG-012: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING on `chatgpt/FMG-012-cross-platform-gate`.
+
+Local evidence: all Phase A contract/adversarial scripts PASS; Windows runtime 750 assertions PASS; Release build 0 warnings/errors; x64 + ARM64 package builds/static integrity PASS. Local GUI smoke is environment-blocked because the live FileMCP singleton is the MCP bridge; claim-head native Verify `36297166252` SUCCESS on macOS + Windows x64 + Windows ARM64.
+
+NEXT_EXACT_ACTION: commit/push exact FMG-012 evidence candidate, require native Verify on the final exact head, perform scoped gate review, merge only green exact head, verify merged main, mark FMG-012 DONE / MAIN VERIFIED, then claim FMG-013.

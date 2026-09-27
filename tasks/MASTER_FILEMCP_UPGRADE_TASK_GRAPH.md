@@ -381,7 +381,7 @@ Negative tests:
 
 ## FMG-012 — Cross-Platform Adversarial Contract Gate
 
-State: ACTIVE / CLAIMED
+State: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING
 Depends: FMG-001 through FMG-011
 
 Scope:

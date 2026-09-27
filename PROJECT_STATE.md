@@ -264,8 +264,12 @@ Evidence: `docs/evidence/FMG-011_METADATA_EVIDENCE_CANDIDATE_EVIDENCE.md`.
 
 ## FMG-012 implementation
 
-State: ACTIVE / CLAIMED.
+State: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING.
 Branch: `chatgpt/FMG-012-cross-platform-gate`.
 Depends: FMG-001 through FMG-011 DONE / MAIN VERIFIED.
 Scope: Cross-Platform Adversarial Contract Gate only. No new feature scope unless verification finds a concrete defect.
 NEXT_EXACT_ACTION: run exact catalog/schema parity, all Phase A negative/adversarial contracts, Windows Release/runtime/package gates, then native macOS/Windows x64/Windows ARM64 Verify; fix only concrete failing stages.
+Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+Local proof: all Phase A contracts PASS; Windows runtime 750 assertions PASS; Release 0 warnings/errors; x64/ARM64 package builds and static integrity PASS.
+Claim-head native Verify: run `36297166252` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Final exact-head native Verify remains required after evidence commit.

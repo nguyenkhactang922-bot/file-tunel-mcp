@@ -126,7 +126,7 @@ Detailed specification: foundation graph FMG-011.
 
 ## FMG-012 - Foundation Cross-Platform Adversarial Contract Gate
 
-State: ACTIVE / CLAIMED
+State: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING
 Depends: FMG-001 through FMG-011
 Detailed specification: foundation graph FMG-012.
 

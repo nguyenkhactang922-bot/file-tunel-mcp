@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: execute FMG-012 Foundation Cross-Platform Adversarial Contract Gate; do not begin FMG-013 before FMG-012 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: commit/push exact FMG-012 evidence candidate on `chatgpt/FMG-012-cross-platform-gate`; require native macOS + Windows x64 + Windows ARM64 Verify on the final exact head; perform scoped gate review; merge only green exact head; verify merged main; mark FMG-012 DONE / MAIN VERIFIED before claiming FMG-013.
 
 FPA-004 product/release scope is resolved by ADR-0003. V11-009 upstream integration remains an external authority gate and does not block the active FMG complete-upgrade implementation program.
