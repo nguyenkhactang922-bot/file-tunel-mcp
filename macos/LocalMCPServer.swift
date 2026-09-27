@@ -1341,7 +1341,21 @@ final class LocalTools {
         return formatProcessResult(result)
     }
 
-    fileprivate func captureSourceStateRef(repoPath: String, relevantPaths: [String] = []) throws -> [String: Any] {
+    func captureProjectContextDigest(repoPath: String) throws -> String {
+        let captured = try projectContext.capture(
+            path: repoPath,
+            cursor: "",
+            maxLines: 1,
+            includeSkills: true,
+            context: nil
+        )
+        guard let digest = captured["context_digest"] as? String, !digest.isEmpty else {
+            throw MCPServerError.operationFailed("Project context digest is unavailable")
+        }
+        return digest
+    }
+
+    func captureSourceStateRef(repoPath: String, relevantPaths: [String] = []) throws -> [String: Any] {
         let repo = try gitRepo(repoPath)
         let scopes = try normalizeSourceStateScopes(repo: repo, relevantPaths: relevantPaths)
         let narrow = !scopes.isEmpty

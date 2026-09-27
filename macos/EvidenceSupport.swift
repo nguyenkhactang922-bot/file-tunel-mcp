@@ -238,7 +238,7 @@ final class EvidenceStore {
             let right = $1.element.endedEpochMs ?? $1.element.startedEpochMs
             return left == right ? $0.element.evidenceID < $1.element.evidenceID : left < right
         }
-        var remove = Set(removable.prefix(input.count - targetCount).map(\.offset))
+        let remove = Set(removable.prefix(input.count - targetCount).map(\.offset))
         return input.enumerated().compactMap { remove.contains($0.offset) ? nil : $0.element }
     }
 
