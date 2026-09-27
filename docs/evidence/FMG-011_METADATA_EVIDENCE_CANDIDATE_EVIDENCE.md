@@ -152,3 +152,11 @@ After native green:
 - run merged-main Verify;
 - mark FMG-011 DONE / MAIN VERIFIED;
 - only then claim FMG-012.
+
+## Final closure
+
+- Final candidate: `54270a86e03ebcdb86d01954d791065d5abdf1bc`.
+- PR: #17.
+- Merge main: `ddc8b27839469dcc5a6ff36bb531cf0b3dda87aa`.
+- Merged-main native Verify: run `36296831946` SUCCESS on macOS / Windows x64 / Windows ARM64.
+- FMG-011: DONE / MAIN VERIFIED.

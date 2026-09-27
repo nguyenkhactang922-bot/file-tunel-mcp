@@ -352,7 +352,7 @@ Negative tests:
 
 ## FMG-011 — Metadata-Only Evidence / Freshness
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: FMG-002, FMG-003, FMG-006, FMG-010
 
 Scope:
@@ -381,7 +381,7 @@ Negative tests:
 
 ## FMG-012 — Cross-Platform Adversarial Contract Gate
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMG-001 through FMG-011
 
 Scope:
