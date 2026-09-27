@@ -1996,11 +1996,13 @@ let fmg011Store = EvidenceStore(fileURL: fmg011StoreURL, now: { fmg011Now })
 let fmg011ID = EvidenceStore.newEvidenceID()
 let fmg011Started = Int64(fmg011Now.timeIntervalSince1970 * 1_000)
 try fmg011Store.begin(fmg011Record(fmg011ID, started: fmg011Started))
-precondition(try fmg011Store.get(fmg011ID)?.operationState == "running")
+let fmg011Running = try fmg011Store.get(fmg011ID)
+precondition(fmg011Running?.operationState == "running")
 var fmg011Completed = fmg011Record(fmg011ID, started: fmg011Started, state: "succeeded", verification: "passed")
 fmg011Completed.operationID = (try fmg011Store.get(fmg011ID))!.operationID
 try fmg011Store.complete(fmg011Completed)
-precondition(try fmg011Store.get(fmg011ID)?.verificationState == "passed")
+let fmg011Passed = try fmg011Store.get(fmg011ID)
+precondition(fmg011Passed?.verificationState == "passed")
 
 // Restart converts unfinished evidence to unknown.
 let fmg011RestartID = EvidenceStore.newEvidenceID()
@@ -2018,7 +2020,8 @@ try fmg011Retention.begin(fmg011Record(fmg011ExpiredID, started: fmg011ExpiredSt
 var fmg011Expired = fmg011Record(fmg011ExpiredID, started: fmg011ExpiredStart, state: "succeeded", verification: "passed")
 fmg011Expired.operationID = (try fmg011Retention.get(fmg011ExpiredID))!.operationID
 try fmg011Retention.complete(fmg011Expired)
-precondition(try fmg011Retention.get(fmg011ExpiredID) == nil)
+let fmg011ExpiredLookup = try fmg011Retention.get(fmg011ExpiredID)
+precondition(fmg011ExpiredLookup == nil)
 
 // Record quota evicts terminal metadata but refuses to evict active running records.
 let fmg011QuotaURL = root.appendingPathComponent("fmg011-quota.json")
@@ -2032,7 +2035,8 @@ for offset in 0..<2 {
     try fmg011Quota.complete(terminal)
 }
 try fmg011Quota.begin(fmg011Record(EvidenceStore.newEvidenceID(), started: fmg011Started + 10_000))
-precondition(try fmg011Quota.countForTest() == 2)
+let fmg011QuotaCount = try fmg011Quota.countForTest()
+precondition(fmg011QuotaCount == 2)
 let fmg011ActiveQuota = EvidenceStore(fileURL: root.appendingPathComponent("fmg011-active-quota.json"), maxRecords: 1, now: { fmg011Now })
 try fmg011ActiveQuota.begin(fmg011Record(EvidenceStore.newEvidenceID(), started: fmg011Started))
 do {
