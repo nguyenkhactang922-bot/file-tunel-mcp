@@ -132,7 +132,7 @@ Detailed specification: foundation graph FMG-012.
 
 ## FMG-013 - Foundation Full Regression + Live MCP Proof
 
-State: ACTIVE / CLAIMED
+State: BLOCKED / LIVE DEPLOYMENT STALE
 Depends: FMG-012
 Detailed specification: foundation graph FMG-013.
 

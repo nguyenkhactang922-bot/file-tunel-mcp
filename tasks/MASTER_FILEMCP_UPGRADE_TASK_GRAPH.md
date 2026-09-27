@@ -399,7 +399,7 @@ Acceptance:
 
 ## FMG-013 — Full Regression + Live MCP Proof
 
-State: ACTIVE / CLAIMED
+State: BLOCKED / LIVE DEPLOYMENT STALE
 Depends: FMG-012
 
 Scope:

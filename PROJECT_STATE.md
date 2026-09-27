@@ -281,8 +281,13 @@ Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 
 ## FMG-013 implementation
 
-State: ACTIVE / CLAIMED.
+State: BLOCKED / LIVE DEPLOYMENT STALE.
 Branch: `chatgpt/FMG-013-full-regression-live-proof`.
 Depends: FMG-012 DONE / MAIN VERIFIED.
 Scope: Foundation Full Regression + Live MCP Proof only. No new feature scope unless verification finds a concrete defect.
 NEXT_EXACT_ACTION: run exact full regression and live MCP proof against the current FileMCP connector, verify catalog/schema/live tools parity and failure semantics, package/native gates, then merge only exact green evidence.
+Evidence: `docs/evidence/FMG-013_FULL_REGRESSION_LIVE_MCP_EVIDENCE.md`.
+Regression/native CI proof: PASS.
+Blocker: current live desktop connector is old binary PID 13896 and exposes 19 tools vs canonical 23.
+Ready build: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`.
+Resume only live MCP proof after normal desktop restart/reconnect; do not rerun completed regression.
