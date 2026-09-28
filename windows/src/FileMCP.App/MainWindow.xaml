@@ -89,6 +89,8 @@
                         Margin="0,0,0,4" Click="NavigateChanges_Click" AutomationProperties.Name="Changes"/>
                 <Button x:Name="NavEvidenceButton" Content="Evidence" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateEvidence_Click" AutomationProperties.Name="Evidence"/>
+                <Button x:Name="NavArtifactsButton" Content="Artifacts" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateArtifacts_Click" AutomationProperties.Name="Artifacts and batch results"/>
                 <Button x:Name="NavDiagnosticsButton" Content="Diagnostics" HorizontalContentAlignment="Left"
                         Margin="0,8,0,4" Click="NavigateDiagnostics_Click" AutomationProperties.Name="Diagnostics"/>
             </StackPanel>
@@ -779,6 +781,98 @@
                     <TextBlock x:Name="EvidenceCountText" Grid.Row="2" Margin="0,8,0,0"
                                Style="{StaticResource FileMcpCaptionText}"
                                Text="0 captured evidence records"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Artifacts" x:Name="ArtifactsTab">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <controls:PageHeader Title="Artifacts &amp; Batch"
+                                         Description="Observed batch results and ContentRef metadata. Inline content and opaque ContentRef tokens are never copied into this view."/>
+
+                    <Border Grid.Row="1" Style="{StaticResource FileMcpCardBorder}" Margin="0,12,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Latest batch"/>
+                                <TextBlock x:Name="ArtifactBatchSummaryText" FontWeight="SemiBold" Text="No batch result captured yet." TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Artifact / quota observation"/>
+                                <TextBlock x:Name="ArtifactQuotaSummaryText" FontWeight="SemiBold"
+                                           Text="Quota usage remaining is not emitted by batch results." TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*"/>
+                            <ColumnDefinition Width="3*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <DataGrid x:Name="ArtifactBatchGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  SelectionMode="Single"
+                                  EnableRowVirtualization="True"
+                                  SelectionChanged="ArtifactBatchGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="80"/>
+                                <DataGridTextColumn Header="Workspace" Binding="{Binding Workspace}" Width="85"/>
+                                <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="100"/>
+                                <DataGridTextColumn Header="Completed" Binding="{Binding CompletionDisplay}" Width="90"/>
+                                <DataGridTextColumn Header="State" Binding="{Binding StateDisplay}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <Grid Grid.Column="1" Margin="12,0,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <DataGrid x:Name="ArtifactEntryGrid"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      CanUserAddRows="False"
+                                      SelectionMode="Single"
+                                      EnableRowVirtualization="True"
+                                      SelectionChanged="ArtifactEntryGrid_SelectionChanged">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Path" Binding="{Binding Path}" Width="*"/>
+                                    <DataGridTextColumn Header="State" Binding="{Binding State}" Width="90"/>
+                                    <DataGridTextColumn Header="Delivery" Binding="{Binding Delivery}" Width="100"/>
+                                    <DataGridTextColumn Header="Size" Binding="{Binding SizeDisplay}" Width="90"/>
+                                    <DataGridTextColumn Header="Expires" Binding="{Binding ExpiryDisplay}" Width="130"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <Border Grid.Row="1" Style="{StaticResource FileMcpCardBorder}" Margin="0,12,0,0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Entry detail"/>
+                                        <controls:StatusBadge x:Name="ArtifactEntryStatus" Status="Unavailable" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="ArtifactEntryDetailText" Margin="0,8,0,0"
+                                               Text="Select a captured batch entry." TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Grid>
+
+                    <TextBlock x:Name="ArtifactBatchCountText" Grid.Row="3" Margin="0,8,0,0"
+                               Style="{StaticResource FileMcpCaptionText}"
+                               Text="0 captured batch results"/>
                 </Grid>
             </TabItem>
 

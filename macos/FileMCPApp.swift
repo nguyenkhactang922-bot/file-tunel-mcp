@@ -205,6 +205,35 @@ private struct ChangeEvent {
     let detail: String
 }
 
+private struct ArtifactBatchEntryEvent {
+    let path: String
+    let state: String
+    let delivery: String
+    let sizeBytes: Int64?
+    let maxBytes: Int64?
+    let versionStrength: String?
+    let expiresEpochMs: Int64?
+    let blobID: String?
+    let contentRefPresent: Bool
+    let errorCode: String?
+    let message: String?
+}
+
+private struct ArtifactBatchEvent {
+    let timestamp: Date
+    let workspace: String
+    let operation: String
+    let requestedCount: Int
+    let completedCount: Int
+    let partial: Bool
+    let cancelled: Bool
+    let truncated: Bool
+    let truncationReason: String?
+    let contentRefCount: Int
+    let quotaErrorCount: Int
+    let entries: [ArtifactBatchEntryEvent]
+}
+
 private struct EvidenceEvent {
     let timestamp: Date
     let workspace: String
@@ -233,9 +262,12 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private var filteredActivityEvents: [ActivityEvent] = []
     private var changeEvents: [ChangeEvent] = []
     private var evidenceEvents: [EvidenceEvent] = []
+    private var artifactBatchEvents: [ArtifactBatchEvent] = []
+    private var selectedArtifactBatch: ArtifactBatchEvent?
     private let maxActivityEvents = 500
     private let maxChangeEvents = 250
     private let maxEvidenceEvents = 500
+    private let maxArtifactBatchEvents = 100
 
     private let tunnelIDField = NSTextField()
     private let apiKeyField = NSSecureTextField()
@@ -257,6 +289,11 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private let changesDetailLabel = NSTextField(wrappingLabelWithString: "Select a captured mutation event.")
     private let evidenceTableView = NSTableView()
     private let evidenceDetailLabel = NSTextField(wrappingLabelWithString: "Select an evidence record.")
+    private let artifactBatchTableView = NSTableView()
+    private let artifactEntryTableView = NSTableView()
+    private let artifactBatchSummaryLabel = NSTextField(wrappingLabelWithString: "No batch result captured yet.")
+    private let artifactQuotaSummaryLabel = NSTextField(wrappingLabelWithString: "Quota usage remaining is not emitted by batch results.")
+    private let artifactEntryDetailLabel = NSTextField(wrappingLabelWithString: "Select a captured batch entry.")
     private let saveConnectionButton = LoadingButton(title: "Save connection", target: nil, action: nil)
     private let saveSettingsButton = LoadingButton(title: "Save settings", target: nil, action: nil)
     private let startButton = NSButton(title: "Connect", target: nil, action: nil)
@@ -396,6 +433,47 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             column.width = width
             evidenceTableView.addTableColumn(column)
         }
+
+        artifactBatchTableView.delegate = self
+        artifactBatchTableView.dataSource = self
+        artifactBatchTableView.headerView = NSTableHeaderView()
+        artifactBatchTableView.usesAlternatingRowBackgroundColors = true
+        artifactBatchTableView.allowsMultipleSelection = false
+        for (identifier, title, width) in [
+            ("artifact-time", "Time", 72.0),
+            ("artifact-workspace", "Workspace", 84.0),
+            ("artifact-operation", "Operation", 100.0),
+            ("artifact-completed", "Completed", 88.0),
+            ("artifact-state", "State", 92.0),
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = width
+            artifactBatchTableView.addTableColumn(column)
+        }
+
+        artifactEntryTableView.delegate = self
+        artifactEntryTableView.dataSource = self
+        artifactEntryTableView.headerView = NSTableHeaderView()
+        artifactEntryTableView.usesAlternatingRowBackgroundColors = true
+        artifactEntryTableView.allowsMultipleSelection = false
+        for (identifier, title, width) in [
+            ("artifact-entry-path", "Path", 220.0),
+            ("artifact-entry-state", "State", 78.0),
+            ("artifact-entry-delivery", "Delivery", 92.0),
+            ("artifact-entry-size", "Size", 80.0),
+            ("artifact-entry-expiry", "Expires", 118.0),
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = width
+            artifactEntryTableView.addTableColumn(column)
+        }
+
+        artifactBatchSummaryLabel.maximumNumberOfLines = 3
+        artifactQuotaSummaryLabel.maximumNumberOfLines = 3
+        artifactQuotaSummaryLabel.textColor = .secondaryLabelColor
+        artifactEntryDetailLabel.maximumNumberOfLines = 12
 
         startButton.target = self
         startButton.action = #selector(startTunnel)
@@ -731,6 +809,56 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             evidenceScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
         ])
 
+        let artifactBatchScroll = NSScrollView()
+        artifactBatchScroll.documentView = artifactBatchTableView
+        artifactBatchScroll.hasVerticalScroller = true
+        artifactBatchScroll.borderType = .bezelBorder
+        artifactBatchScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let artifactEntryScroll = NSScrollView()
+        artifactEntryScroll.documentView = artifactEntryTableView
+        artifactEntryScroll.hasVerticalScroller = true
+        artifactEntryScroll.borderType = .bezelBorder
+        artifactEntryScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let artifactHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Artifacts & Batch",
+            description: "Observed batch results and ContentRef metadata. Inline content and opaque ContentRef tokens are never copied into this view."
+        )
+        let artifactSummary = NSStackView(views: [artifactBatchSummaryLabel, artifactQuotaSummaryLabel])
+        artifactSummary.orientation = .vertical
+        artifactSummary.alignment = .leading
+        artifactSummary.spacing = 4
+
+        let artifactTables = NSStackView(views: [artifactBatchScroll, artifactEntryScroll])
+        artifactTables.orientation = .horizontal
+        artifactTables.alignment = .top
+        artifactTables.distribution = .fillEqually
+        artifactTables.spacing = 10
+        artifactTables.translatesAutoresizingMaskIntoConstraints = false
+
+        let artifactRoot = NSStackView(views: [
+            artifactHeader,
+            artifactSummary,
+            artifactTables,
+            artifactEntryDetailLabel,
+        ])
+        artifactRoot.orientation = .vertical
+        artifactRoot.alignment = .leading
+        artifactRoot.spacing = 8
+        artifactRoot.translatesAutoresizingMaskIntoConstraints = false
+
+        let artifactPage = NSView()
+        artifactPage.addSubview(artifactRoot)
+        NSLayoutConstraint.activate([
+            artifactRoot.leadingAnchor.constraint(equalTo: artifactPage.leadingAnchor, constant: 12),
+            artifactRoot.trailingAnchor.constraint(equalTo: artifactPage.trailingAnchor, constant: -12),
+            artifactRoot.topAnchor.constraint(equalTo: artifactPage.topAnchor, constant: 12),
+            artifactRoot.bottomAnchor.constraint(equalTo: artifactPage.bottomAnchor, constant: -12),
+            artifactBatchScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
+            artifactEntryScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
+        ])
+
         let logPage = NSView()
         logPage.addSubview(logScroll)
         NSLayoutConstraint.activate([
@@ -844,6 +972,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         evidenceTab.label = "Evidence"
         evidenceTab.view = evidencePage
 
+        let artifactTab = NSTabViewItem(identifier: "artifacts")
+        artifactTab.label = "Artifacts"
+        artifactTab.view = artifactPage
+
         let logTab = NSTabViewItem(identifier: "log")
         logTab.label = "Diagnostics"
         logTab.view = logPage
@@ -855,6 +987,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         tabs.addTabViewItem(activityTab)
         tabs.addTabViewItem(changesTab)
         tabs.addTabViewItem(evidenceTab)
+        tabs.addTabViewItem(artifactTab)
         tabs.addTabViewItem(logTab)
         tabs.selectTabViewItem(withIdentifier: "home")
 
@@ -890,6 +1023,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             navigationButton("Activity", action: #selector(showActivity)),
             navigationButton("Changes", action: #selector(showChanges)),
             navigationButton("Evidence", action: #selector(showEvidence)),
+            navigationButton("Artifacts", action: #selector(showArtifacts)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
             NSView(),
             shellStatusLabel,
@@ -1119,10 +1253,59 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if tableView == activityTableView { return filteredActivityEvents.count }
         if tableView == changesTableView { return changeEvents.count }
         if tableView == evidenceTableView { return evidenceEvents.count }
+        if tableView == artifactBatchTableView { return artifactBatchEvents.count }
+        if tableView == artifactEntryTableView { return selectedArtifactBatch?.entries.count ?? 0 }
         return 0
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        if tableView == artifactBatchTableView {
+            guard row >= 0, row < artifactBatchEvents.count, let tableColumn else { return nil }
+            let event = artifactBatchEvents[artifactBatchEvents.count - 1 - row]
+            let text: String
+            switch tableColumn.identifier.rawValue {
+            case "artifact-time":
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm:ss"
+                text = formatter.string(from: event.timestamp)
+            case "artifact-workspace": text = event.workspace
+            case "artifact-operation": text = event.operation
+            case "artifact-completed": text = "\(event.completedCount)/\(event.requestedCount)"
+            default:
+                text = event.cancelled ? "Cancelled" : event.partial ? "Partial" : event.truncated ? "Truncated" : "Complete"
+            }
+            let label = NSTextField(labelWithString: text)
+            label.lineBreakMode = .byTruncatingTail
+            return label
+        }
+
+        if tableView == artifactEntryTableView {
+            guard let batch = selectedArtifactBatch,
+                  row >= 0,
+                  row < batch.entries.count,
+                  let tableColumn else { return nil }
+            let entry = batch.entries[row]
+            let text: String
+            switch tableColumn.identifier.rawValue {
+            case "artifact-entry-path": text = entry.path
+            case "artifact-entry-state": text = entry.state
+            case "artifact-entry-delivery": text = entry.delivery
+            case "artifact-entry-size":
+                text = entry.sizeBytes.map { "\($0) B" } ?? "N/A"
+            default:
+                if let expiry = entry.expiresEpochMs {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "MM-dd HH:mm"
+                    text = formatter.string(from: Date(timeIntervalSince1970: Double(expiry) / 1000.0))
+                } else {
+                    text = "N/A"
+                }
+            }
+            let label = NSTextField(labelWithString: text)
+            label.lineBreakMode = .byTruncatingTail
+            return label
+        }
+
         if tableView == evidenceTableView {
             guard row >= 0, row < evidenceEvents.count, let tableColumn else { return nil }
             let event = evidenceEvents[evidenceEvents.count - 1 - row]
@@ -1185,6 +1368,81 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard let table = notification.object as? NSTableView else { return }
+
+        if table === artifactBatchTableView {
+            let row = artifactBatchTableView.selectedRow
+            guard row >= 0, row < artifactBatchEvents.count else {
+                selectedArtifactBatch = nil
+                artifactEntryTableView.reloadData()
+                artifactBatchSummaryLabel.stringValue = "Select a captured batch result."
+                artifactQuotaSummaryLabel.stringValue = "Quota usage remaining is not emitted by batch results."
+                artifactEntryDetailLabel.stringValue = "Select a captured batch entry."
+                return
+            }
+
+            let event = artifactBatchEvents[artifactBatchEvents.count - 1 - row]
+            selectedArtifactBatch = event
+            artifactEntryTableView.reloadData()
+            artifactEntryTableView.deselectAll(nil)
+
+            var flags: [String] = []
+            if event.partial { flags.append("partial") }
+            if event.cancelled { flags.append("cancelled") }
+            if event.truncated { flags.append("truncated:\(event.truncationReason ?? "unknown")") }
+            let state = flags.isEmpty ? "complete" : flags.joined(separator: ", ")
+            artifactBatchSummaryLabel.stringValue =
+                "\(event.operation): \(event.completedCount)/\(event.requestedCount) completed | \(state) | \(event.entries.count) emitted entries."
+            artifactQuotaSummaryLabel.stringValue =
+                "\(event.contentRefCount) ContentRef delivery item(s); \(event.quotaErrorCount) observed artifact quota error(s). Remaining quota is not emitted by the batch result."
+            return
+        }
+
+        if table === artifactEntryTableView {
+            guard let batch = selectedArtifactBatch else {
+                artifactEntryDetailLabel.stringValue = "Select a captured batch entry."
+                return
+            }
+            let row = artifactEntryTableView.selectedRow
+            guard row >= 0, row < batch.entries.count else {
+                artifactEntryDetailLabel.stringValue = "Select a captured batch entry."
+                return
+            }
+
+            let entry = batch.entries[row]
+            let contentRef = entry.contentRefPresent ? "Present (opaque token redacted)" : "Not present"
+            let expiry: String
+            if let expiryMs = entry.expiresEpochMs {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+                expiry = formatter.string(from: Date(timeIntervalSince1970: Double(expiryMs) / 1000.0))
+            } else {
+                expiry = "N/A"
+            }
+            artifactEntryDetailLabel.stringValue =
+                "Path: \(entry.path)
+" +
+                "State: \(entry.state)
+" +
+                "Delivery: \(entry.delivery)
+" +
+                "Size: \(entry.sizeBytes.map { "\($0) B" } ?? "N/A")
+" +
+                "Max inline bytes: \(entry.maxBytes.map { "\($0) B" } ?? "N/A")
+" +
+                "Version strength: \(entry.versionStrength ?? "N/A")
+" +
+                "ContentRef: \(contentRef)
+" +
+                "Expires: \(expiry)
+" +
+                "Blob ID: \(entry.blobID ?? "N/A")
+" +
+                "Error: \(entry.errorCode ?? "N/A")
+" +
+                "Message: \(entry.message ?? "N/A")"
+            return
+        }
+
         if table === evidenceTableView {
             let row = evidenceTableView.selectedRow
             guard row >= 0, row < evidenceEvents.count else {
@@ -1225,6 +1483,64 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         }
         let event = filteredActivityEvents[row]
         activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)\n\(event.detail)"
+    }
+
+    private func captureArtifactBatchEvent(from line: String, workspace: String) {
+        let marker = "[ArtifactBatchResult] "
+        guard let range = line.range(of: marker) else { return }
+        let jsonText = String(line[range.upperBound...])
+        guard let data = jsonText.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+
+        func text(_ key: String, fallback: String = "unknown") -> String {
+            (object[key] as? String) ?? fallback
+        }
+        func integer(_ key: String) -> Int {
+            (object[key] as? NSNumber)?.intValue ?? 0
+        }
+        func bool(_ key: String) -> Bool {
+            (object[key] as? NSNumber)?.boolValue ?? false
+        }
+        func optionalText(_ source: [String: Any], _ key: String) -> String? {
+            source[key] as? String
+        }
+        func optionalInt64(_ source: [String: Any], _ key: String) -> Int64? {
+            (source[key] as? NSNumber)?.int64Value
+        }
+
+        var entries: [ArtifactBatchEntryEvent] = []
+        if let rawEntries = object["entries"] as? [[String: Any]] {
+            for entry in rawEntries {
+                entries.append(ArtifactBatchEntryEvent(
+                    path: (entry["path"] as? String) ?? "(unknown)",
+                    state: (entry["state"] as? String) ?? "unknown",
+                    delivery: (entry["delivery"] as? String) ?? "none",
+                    sizeBytes: optionalInt64(entry, "size_bytes"),
+                    maxBytes: optionalInt64(entry, "max_bytes"),
+                    versionStrength: optionalText(entry, "version_strength"),
+                    expiresEpochMs: optionalInt64(entry, "expires_epoch_ms"),
+                    blobID: optionalText(entry, "blob_id"),
+                    contentRefPresent: (entry["content_ref_present"] as? NSNumber)?.boolValue ?? false,
+                    errorCode: optionalText(entry, "error_code"),
+                    message: optionalText(entry, "message")
+                ))
+            }
+        }
+
+        artifactBatchEvents.append(ArtifactBatchEvent(
+            timestamp: Date(),
+            workspace: workspace,
+            operation: text("operation", fallback: "batch"),
+            requestedCount: integer("requested_count"),
+            completedCount: integer("completed_count"),
+            partial: bool("partial"),
+            cancelled: bool("cancelled"),
+            truncated: bool("truncated"),
+            truncationReason: object["truncation_reason"] as? String,
+            contentRefCount: integer("content_ref_count"),
+            quotaErrorCount: integer("quota_error_count"),
+            entries: entries
+        ))
     }
 
     private func captureEvidenceEvent(from line: String, workspace: String) {
@@ -1302,6 +1618,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             }
 
             captureEvidenceEvent(from: line, workspace: workspace)
+            captureArtifactBatchEvent(from: line, workspace: workspace)
             let summary = line.count <= 140 ? line : String(line.prefix(137)) + "..."
             activityEvents.append(ActivityEvent(timestamp: Date(), kind: kind, workspace: workspace, summary: summary, detail: line))
             if let change = changeEvent(from: line, workspace: workspace) {
@@ -1318,6 +1635,9 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if evidenceEvents.count > maxEvidenceEvents {
             evidenceEvents.removeFirst(evidenceEvents.count - maxEvidenceEvents)
         }
+        if artifactBatchEvents.count > maxArtifactBatchEvents {
+            artifactBatchEvents.removeFirst(artifactBatchEvents.count - maxArtifactBatchEvents)
+        }
         if tabs.selectedTabViewItem?.identifier as? String == "activity" {
             refreshActivityFilter()
         }
@@ -1326,6 +1646,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         }
         if tabs.selectedTabViewItem?.identifier as? String == "evidence" {
             evidenceTableView.reloadData()
+        }
+        if tabs.selectedTabViewItem?.identifier as? String == "artifacts" {
+            artifactBatchTableView.reloadData()
+            if selectedArtifactBatch != nil { artifactEntryTableView.reloadData() }
         }
     }
 
@@ -1337,6 +1661,12 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     @objc private func showEvidence() {
         evidenceTableView.reloadData()
         tabs.selectTabViewItem(withIdentifier: "evidence")
+    }
+
+    @objc private func showArtifacts() {
+        artifactBatchTableView.reloadData()
+        if selectedArtifactBatch != nil { artifactEntryTableView.reloadData() }
+        tabs.selectTabViewItem(withIdentifier: "artifacts")
     }
 
     @objc private func showDiagnostics() {

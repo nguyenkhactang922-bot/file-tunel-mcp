@@ -491,6 +491,8 @@ public sealed class LocalMcpServer : IAsyncDisposable
                             executionContext).ConfigureAwait(false);
                 }
 
+                EmitArtifactBatchUiEventSafely(name, output.StructuredContent);
+
                 var evidenceMetadata = await _evidenceCoordinator.CompleteAsync(
                     evidenceRun,
                     isError: false,
@@ -532,6 +534,63 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 try { _sessions?.CompleteToolCall(sessionCall.Value, HttpBodyByteLength(response), isError, latency); }
                 catch (Exception ex) { _log($"[Telemetry] session metric ignored: {ex.Message}\n"); }
             }
+        }
+    }
+
+    private void EmitArtifactBatchUiEventSafely(string toolName, JsonObject structuredContent)
+    {
+        if (toolName is not ("batch_read" or "batch_stat")) return;
+        try
+        {
+            var projected = new JsonObject
+            {
+                ["operation"] = structuredContent["operation"]?.DeepClone(),
+                ["requested_count"] = structuredContent["requested_count"]?.DeepClone(),
+                ["completed_count"] = structuredContent["completed_count"]?.DeepClone(),
+                ["partial"] = structuredContent["partial"]?.DeepClone(),
+                ["cancelled"] = structuredContent["cancelled"]?.DeepClone(),
+                ["truncated"] = structuredContent["truncated"]?.DeepClone(),
+                ["truncation_reason"] = structuredContent["truncation_reason"]?.DeepClone(),
+            };
+
+            var projectedEntries = new JsonArray();
+            var contentRefCount = 0;
+            var quotaErrorCount = 0;
+            if (structuredContent["entries"] is JsonArray entries)
+            {
+                foreach (var node in entries)
+                {
+                    if (node is not JsonObject entry) continue;
+                    var delivery = entry["delivery"]?.GetValue<string>();
+                    var errorCode = entry["error_code"]?.GetValue<string>();
+                    if (delivery == "content_ref") contentRefCount++;
+                    if (errorCode == "artifact_quota") quotaErrorCount++;
+
+                    projectedEntries.Add(new JsonObject
+                    {
+                        ["path"] = entry["path"]?.DeepClone(),
+                        ["state"] = entry["state"]?.DeepClone(),
+                        ["delivery"] = entry["delivery"]?.DeepClone(),
+                        ["size_bytes"] = entry["size_bytes"]?.DeepClone(),
+                        ["max_bytes"] = entry["max_bytes"]?.DeepClone(),
+                        ["version_strength"] = entry["version_strength"]?.DeepClone(),
+                        ["expires_epoch_ms"] = entry["expires_epoch_ms"]?.DeepClone(),
+                        ["blob_id"] = entry["blob_id"]?.DeepClone(),
+                        ["content_ref_present"] = delivery == "content_ref",
+                        ["error_code"] = entry["error_code"]?.DeepClone(),
+                        ["message"] = entry["message"]?.DeepClone(),
+                    });
+                }
+            }
+
+            projected["content_ref_count"] = contentRefCount;
+            projected["quota_error_count"] = quotaErrorCount;
+            projected["entries"] = projectedEntries;
+            _log("[ArtifactBatchResult] " + projected.ToJsonString() + "\n");
+        }
+        catch (Exception ex)
+        {
+            _log($"[ArtifactBatch] UI projection ignored: {ex.GetType().Name}\n");
         }
     }
 

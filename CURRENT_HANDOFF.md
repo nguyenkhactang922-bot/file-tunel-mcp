@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-015-batch-read-stat`
+Branch: `chatgpt/FMUX-014-artifact-batch`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -126,7 +126,7 @@ FMG-026, not FMG-013, is the complete upgrade completion gate.
 
 State: CLAIMED / ACTIVE.
 
-Branch: `chatgpt/FMUX-010-evidence`.
+Branch: `chatgpt/FMUX-014-artifact-batch`.
 
 NEXT_EXACT_ACTION: implement FMG-003 Server-Owned Policy + Migration only: restricted/workspace-auto/custom profiles, legacy EnableCommands migration, policy generation/hash, risk/effect authorization, effective catalog filtering and runtime reauthorization. Do not begin FMG-004 or later tasks.
 
@@ -243,7 +243,7 @@ NEXT_EXACT_ACTION: harden existing write/delete mutations only: expected-version
 FMG-008: DONE / MAIN VERIFIED. Final candidate `35ef237a0f4d32f0940491b9163a0dcbea7e6c61` merged by PR #12 as main `8a58a223814505518e581ebe79856846555cb4b4`; merged-main Verify `36212103370` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows core 655 assertions and Release build PASS. Evidence: `docs/evidence/FMG-008_EXISTING_MUTATION_HARDENING_EVIDENCE.md`.
 
 FMG-009: CLAIMED / ACTIVE on `chatgpt/FMG-009-apply-edits`.
-Branch: `chatgpt/FMUX-010-evidence`
+Branch: `chatgpt/FMUX-014-artifact-batch`
 
 NEXT_EXACT_ACTION: implement FMG-009 Atomic Versioned `apply_edits` only: canonical range-edit primitive, expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version/Mutation Guard/policy/cancellation rechecks, atomic publish, and adversarial/fault-injection coverage. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.
 
@@ -459,7 +459,7 @@ NEXT_EXACT_ACTION: implement FMG-014 Ephemeral Artifact / ContentRef Store only:
 ## FMG-014 local verification checkpoint - 2026-09-28
 
 State: ACTIVE / LOCAL VERIFIED / CROSS-PLATFORM CI PENDING.
-Branch: `chatgpt/FMUX-010-evidence`.
+Branch: `chatgpt/FMUX-014-artifact-batch`.
 Evidence: `docs/evidence/FMG-014_ARTIFACT_CONTENTREF_STORE_EVIDENCE.md`.
 
 Implemented:
@@ -629,3 +629,10 @@ NEXT_EXACT_ACTION: push the synchronized FMG-015 head, require native Verify all
 State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
 Head `2ff1442`; Verify run `36445207427`: SUCCESS on macOS / Windows x64 / Windows ARM64. Scoped review PASS: read-only authority, per-entry path/version checks, aggregate budget, snapshot-bound ContentRef spill, no evidence/telemetry blob coupling, no temp/debug artifacts.
 NEXT_EXACT_ACTION: commit/push evidence-only closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-015 DONE / MAIN VERIFIED -> claim FMG-016.
+
+## FMUX-014 local verification checkpoint
+
+FMUX-014: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-014-artifact-batch`.
+Local proof: Artifact/Batch contract PASS; Windows Release 0 warnings/errors; Windows runtime 796 assertions PASS on unchanged rerun after the known nondeterministic FMG-014 tamper assertion; macOS build-script syntax PASS.
+Evidence: `docs/evidence/FMUX-014_ARTIFACT_BATCH_UX_EVIDENCE.md`.
+NEXT_EXACT_ACTION: inspect latest `fork/main` + remote FMUX-014 branch before any push/PR; sync if needed, rerun only affected gates, then exact-head native Verify -> review -> merge -> merged-main Verify -> FMUX-014 MAIN VERIFIED -> next dependency-ready FMUX task.
