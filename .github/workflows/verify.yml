@@ -53,6 +53,8 @@ jobs:
             macos/LocalMCPServer.swift \
             macos/TunnelSupervisor.swift \
             macos/LocalMCPRuntime.swift \
+            macos/PresentationFoundation.swift \
+            macos/FeedbackComponents.swift \
             macos/FileMCPApp.swift \
             macos/main.swift
 

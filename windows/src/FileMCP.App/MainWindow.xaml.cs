@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private int _overviewPeriodQueryGeneration;
     private bool _overviewPeriodQueryRunning;
     private string _logBuffer = "";
+    private string _lastImportantEvent = "No recent issue";
     private const int MaxLogCharacters = 500_000;
 
     public MainWindow()
@@ -211,8 +212,31 @@ public partial class MainWindow : Window
 
         var realtime = _observability.CaptureRealtimeSample();
         UpdateOverviewHealth(snapshot);
+        UpdateHomeSummary(snapshot);
         UpdateRealtimeGraph(realtime);
         RefreshObservedSessionsUi();
+    }
+
+    private void UpdateHomeSummary(ObservabilitySnapshot snapshot)
+    {
+        var active = WorkspaceKeys.Where(key => EnabledBox(key).IsChecked == true).ToArray();
+        var running = snapshot.Workspaces.Values.Count(workspace => workspace.RuntimeRunning);
+        var failed = _runtimes.Values.Count(runtime => runtime.State.Status == LocalMcpRuntimeStatus.Failed);
+
+        HomeHeader.Status = failed > 0
+            ? PresentationStatus.Failed
+            : running > 0 && running == active.Length
+                ? PresentationStatus.Healthy
+                : running > 0
+                    ? PresentationStatus.Degraded
+                    : PresentationStatus.Stopped;
+
+        HomeSummaryText.Text = running == 0
+            ? "No runtime is currently connected."
+            : $"{running} runtime(s) connected; {snapshot.GlobalUsage.ToolCalls:N0} tool call(s) observed.";
+        HomeActiveWorkspacesText.Text = active.Length == 0 ? "None" : string.Join(", ", active);
+        HomeRunningWorkText.Text = $"{running} runtime(s)";
+        HomeRecentEventText.Text = _lastImportantEvent;
     }
 
     private void UpdateOverviewHealth(ObservabilitySnapshot snapshot)
@@ -1136,8 +1160,12 @@ public partial class MainWindow : Window
         LogBox.ScrollToEnd();
     }
 
-    private void ShowError(string message) =>
+    private void ShowError(string message)
+    {
+        _lastImportantEvent = message;
+        if (IsLoaded) HomeRecentEventText.Text = message;
         System.Windows.MessageBox.Show(this, message, "FileMCP", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
 
     private void ShowAbout()
     {
