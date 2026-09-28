@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMUX-002-app-shell`
+Branch: `chatgpt/FMUX-003-status-feedback`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -126,7 +126,7 @@ FMG-026, not FMG-013, is the complete upgrade completion gate.
 
 State: CLAIMED / ACTIVE.
 
-Branch: `chatgpt/FMUX-002-app-shell`.
+Branch: `chatgpt/FMUX-003-status-feedback`.
 
 NEXT_EXACT_ACTION: implement FMG-003 Server-Owned Policy + Migration only: restricted/workspace-auto/custom profiles, legacy EnableCommands migration, policy generation/hash, risk/effect authorization, effective catalog filtering and runtime reauthorization. Do not begin FMG-004 or later tasks.
 
@@ -243,7 +243,7 @@ NEXT_EXACT_ACTION: harden existing write/delete mutations only: expected-version
 FMG-008: DONE / MAIN VERIFIED. Final candidate `35ef237a0f4d32f0940491b9163a0dcbea7e6c61` merged by PR #12 as main `8a58a223814505518e581ebe79856846555cb4b4`; merged-main Verify `36212103370` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows core 655 assertions and Release build PASS. Evidence: `docs/evidence/FMG-008_EXISTING_MUTATION_HARDENING_EVIDENCE.md`.
 
 FMG-009: CLAIMED / ACTIVE on `chatgpt/FMG-009-apply-edits`.
-Branch: `chatgpt/FMUX-002-app-shell`
+Branch: `chatgpt/FMUX-003-status-feedback`
 
 NEXT_EXACT_ACTION: implement FMG-009 Atomic Versioned `apply_edits` only: canonical range-edit primitive, expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version/Mutation Guard/policy/cancellation rechecks, atomic publish, and adversarial/fault-injection coverage. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.
 
@@ -418,3 +418,18 @@ NEXT_EXACT_ACTION: finish main-sync conflict resolution, rerun only state/shell/
 FMUX-002 final merged candidate is LOCAL VERIFIED after syncing latest main/FM G-013.
 Local post-sync proof: project-state PASS; FMUX shell contract PASS; Windows Release 0 warnings/errors; Windows runtime 750 assertions PASS.
 NEXT_EXACT_ACTION: push exact final head, require native Verify on Windows x64 / Windows ARM64 / macOS, review, merge, merged-main verification, then mark FMUX-002 MAIN VERIFIED and claim FMUX-003.
+
+## FMUX-002 closure / FMUX-003 claim
+
+FMUX-002: DONE / MAIN VERIFIED.
+PR: #22.
+Final candidate head: `727ad27048146c129ac6f9dd81e1ebd452af15f1`.
+Final exact-head Verify: run `36407890996` SUCCESS on Windows x64 / Windows ARM64 / macOS.
+Merge main: `5bf90ad2e675917368657c5ec8c40f48ad9ead23`.
+Merged-main Verify: run `36408283195` SUCCESS on Windows x64 / Windows ARM64 / macOS.
+Local proof: project-state contract PASS; FMUX app-shell contract PASS; Windows Release build 0 warnings/errors; Windows runtime 750 assertions PASS.
+
+FMUX-003: CLAIMED / ACTIVE on `chatgpt/FMUX-003-status-feedback`.
+Scope: Canonical Status / Feedback Components only: StatusBadge, InlineNotice, EmptyState, PageHeader, loading/refresh/error/stale patterns, notification policy. Do not begin FMUX-004 before FMUX-003 MAIN VERIFIED.
+
+NEXT_EXACT_ACTION: implement FMUX-003 only, then local contracts/build/runtime, exact-head native Verify, review, merge, merged-main verification.

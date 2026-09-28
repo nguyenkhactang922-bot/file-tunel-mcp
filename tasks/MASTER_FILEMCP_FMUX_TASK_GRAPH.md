@@ -52,7 +52,7 @@ Acceptance:
 
 ## FMUX-002 — App Shell + Navigation
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: FMUX-001 MAIN VERIFIED.
 
 Scope:
@@ -71,7 +71,7 @@ Acceptance:
 
 ## FMUX-003 — Canonical Status / Feedback Components
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMUX-001.
 
 Scope:
