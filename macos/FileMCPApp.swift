@@ -216,6 +216,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let advancedSettingsGroup = NSStackView()
     private let apiKeyStatusLabel = NSTextField(labelWithString: "")
     private let shellStatusLabel = NSTextField(labelWithString: "Runtime stopped")
+    private let homeStatusLabel = NSTextField(labelWithString: "Runtime stopped")
+    private let homeWorkspaceLabel = NSTextField(labelWithString: "No workspace selected")
+    private let homeRecentEventLabel = NSTextField(labelWithString: "No recent issue")
+    private var lastImportantEvent = "No recent issue"
     private let tabs = NSTabView()
 
     override func loadView() { view = NSView() }
@@ -494,9 +498,52 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             logScroll.bottomAnchor.constraint(equalTo: logPage.bottomAnchor, constant: -12),
         ])
 
+        let homeHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Home",
+            description: "Operational health, active workspace and current gateway state.",
+            status: .stopped
+        )
+        homeStatusLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        homeWorkspaceLabel.textColor = .secondaryLabelColor
+        homeRecentEventLabel.textColor = .secondaryLabelColor
+        homeRecentEventLabel.maximumNumberOfLines = 2
+
+        let quickConnections = NSButton(title: "Connections", target: self, action: #selector(showConnections))
+        let quickSettings = NSButton(title: "Settings", target: self, action: #selector(showSettings))
+        let quickActions = NSStackView(views: [quickConnections, quickSettings])
+        quickActions.orientation = .horizontal
+        quickActions.spacing = 8
+
+        let homeContent = NSStackView(views: [
+            homeHeader,
+            NSTextField(labelWithString: "Runtime"),
+            homeStatusLabel,
+            NSTextField(labelWithString: "Active workspace"),
+            homeWorkspaceLabel,
+            NSTextField(labelWithString: "Latest important event"),
+            homeRecentEventLabel,
+            quickActions,
+        ])
+        homeContent.orientation = .vertical
+        homeContent.alignment = .leading
+        homeContent.spacing = 8
+        homeContent.translatesAutoresizingMaskIntoConstraints = false
+
+        let homePage = NSView()
+        homePage.addSubview(homeContent)
+        NSLayoutConstraint.activate([
+            homeContent.leadingAnchor.constraint(equalTo: homePage.leadingAnchor, constant: 12),
+            homeContent.trailingAnchor.constraint(lessThanOrEqualTo: homePage.trailingAnchor, constant: -12),
+            homeContent.topAnchor.constraint(equalTo: homePage.topAnchor, constant: 12),
+        ])
+
         tabs.tabViewType = .noTabsNoBorder
         tabs.translatesAutoresizingMaskIntoConstraints = false
         tabs.delegate = self
+
+        let homeTab = NSTabViewItem(identifier: "home")
+        homeTab.label = "Home"
+        homeTab.view = homePage
 
         let configTab = NSTabViewItem(identifier: "config")
         configTab.label = "Connection"
@@ -510,9 +557,11 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         logTab.label = "Logs"
         logTab.view = logPage
 
+        tabs.addTabViewItem(homeTab)
         tabs.addTabViewItem(configTab)
         tabs.addTabViewItem(settingsTab)
         tabs.addTabViewItem(logTab)
+        tabs.selectTabViewItem(withIdentifier: "home")
 
         func navigationButton(_ title: String, action: Selector) -> NSButton {
             let button = NSButton(title: title, target: self, action: action)
@@ -539,6 +588,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             brandTitle,
             brandSubtitle,
             NSBox(),
+            navigationButton("Home", action: #selector(showHome)),
             navigationButton("Connections", action: #selector(showConnections)),
             navigationButton("Settings", action: #selector(showSettings)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
@@ -699,6 +749,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private func saveAllConfiguration() {
         saveConnectionConfiguration()
         saveSettingsConfiguration()
+    }
+
+    @objc private func showHome() {
+        tabs.selectTabViewItem(withIdentifier: "home")
     }
 
     @objc private func showConnections() {
@@ -884,7 +938,22 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         }
     }
 
+    private func refreshHomeSummary(state: LocalMCPRuntimeState) {
+        homeWorkspaceLabel.stringValue = directoryField.stringValue.isEmpty ? "No workspace selected" : directoryField.stringValue
+        homeRecentEventLabel.stringValue = lastImportantEvent
+        switch state {
+        case .stopped: homeStatusLabel.stringValue = "Runtime stopped"
+        case .failed: homeStatusLabel.stringValue = "Runtime failed"
+        case .starting: homeStatusLabel.stringValue = "Runtime starting"
+        case .running: homeStatusLabel.stringValue = "Runtime connected"
+        case .restarting: homeStatusLabel.stringValue = "Runtime reconnecting"
+        case .cooldown: homeStatusLabel.stringValue = "Reconnect cooldown"
+        case .stopping: homeStatusLabel.stringValue = "Runtime stopping"
+        }
+    }
+
     private func updateRunButton(state: LocalMCPRuntimeState) {
+        refreshHomeSummary(state: state)
         switch state {
         case .stopped:
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
@@ -933,6 +1002,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     }
 
     private func showError(_ message: String) {
+        lastImportantEvent = message
+        homeRecentEventLabel.stringValue = message
         let alert = NSAlert()
         alert.messageText = appName
         alert.informativeText = message

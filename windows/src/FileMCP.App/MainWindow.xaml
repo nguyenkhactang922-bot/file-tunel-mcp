@@ -99,23 +99,52 @@
                 <Setter Property="Visibility" Value="Collapsed"/>
             </Style>
         </TabControl.Resources>
-            <TabItem Header="Overview" x:Name="OverviewTab">
+            <TabItem Header="Home" x:Name="OverviewTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
+                        <controls:PageHeader x:Name="HomeHeader"
+                                             Title="Home"
+                                             Description="Operational health, active workspaces and current agent activity."
+                                             ShowStatus="True"
+                                             Status="Stopped"
+                                             Margin="0,0,0,8"/>
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0">
-                                <TextBlock FontSize="26" FontWeight="SemiBold" Text="Overview"/>
-                                <TextBlock Margin="0,3,0,0" Foreground="Gray" Text="Local FileMCP observability - selected period totals + live runtime state"/>
-                            </StackPanel>
+                            <TextBlock x:Name="HomeSummaryText" Style="{StaticResource FileMcpCaptionText}" Text="Runtime stopped"/>
                             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                                 <TextBlock x:Name="OverviewClockText" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Right"/>
                                 <TextBlock x:Name="OverviewAppUptimeText" Margin="0,3,0,0" Foreground="Gray" HorizontalAlignment="Right"/>
                             </StackPanel>
                         </Grid>
+                        <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Active workspaces"/>
+                                    <TextBlock x:Name="HomeActiveWorkspacesText" FontWeight="SemiBold" Text="None"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Running work"/>
+                                    <TextBlock x:Name="HomeRunningWorkText" FontWeight="SemiBold" Text="0 runtimes"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource OverviewLabelStyle}" Text="Latest important event"/>
+                                    <TextBlock x:Name="HomeRecentEventText" Text="No recent issue" TextWrapping="Wrap" MaxWidth="260"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="Connections" Margin="0,0,8,0" Click="NavigateConnections_Click"/>
+                                    <Button Content="Settings" Click="NavigateSettings_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
