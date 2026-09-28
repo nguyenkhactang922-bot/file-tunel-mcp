@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-013-full-regression-live-proof`
+Branch: `chatgpt/FMUX-complete-scope-freeze`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -355,3 +355,21 @@ NEXT_EXACT_ACTION: do not rerun regression. Reconnect/rediscover the FileMCP con
 ### FMG-013 live correlation sub-proof - 2026-09-28
 
 Live correlation on the active ready build is PASS: existing `chat_instance_id` resumed with `resumed=true`, and a bound read using the same `_filemcp_chat` handle succeeded. Remaining gate is only ChatGPT connector rediscovery from 19 to 23 tools plus catalog version/hash/new-tool live parity.
+
+## FMUX product-experience track
+
+Design gate: PASS / FROZEN on 2026-09-28.
+Authorities:
+- docs/adr/0007-product-ui-ux-architecture-and-fmux-track.md
+- docs/audit/FMUX_INDEPENDENT_MULTI_ROUND_UI_UX_AUDIT_2026-09-28.md
+- docs/audit/FMUX_FINAL_REPAIR_REAUDIT_2026-09-28.md
+- docs/design/FMUX_PRODUCT_EXPERIENCE_ARCHITECTURE_V1.md
+- docs/design/FMUX_DESIGN_SYSTEM_AND_COMPONENT_SPEC_V1.md
+- docs/design/FMUX_INTERACTION_STATE_AND_FMG_MAPPING_V1.md
+- docs/design/FMUX_DEPENDENCY_GRAPH_V1.md
+- docs/design/FMUX_DECISION_MATRIX_V1.md
+- tasks/MASTER_FILEMCP_FMUX_TASK_GRAPH.md
+
+FMUX-001: ACTIVE / LOCAL VERIFIED / NATIVE macOS CI PENDING on branch `chatgpt/FMUX-complete-scope-freeze`.
+Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push the exact FMUX-001 candidate, require native verification, merge only exact green head, then claim FMUX-002. FMG-026 scope remains unchanged.

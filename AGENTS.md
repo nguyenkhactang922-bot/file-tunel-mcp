@@ -21,3 +21,11 @@
 - Ambiguous `DEFER` is not an acceptable final pre-code state for a capability already inside the currently desired product scope.
 - For the current FileMCP complete upgrade, ADR-0006 and `tasks/MASTER_FILEMCP_COMPLETE_UPGRADE_TASK_GRAPH.md` are the ordering authorities. FMG-001 is the only initial READY task; FMG-013 is a foundation milestone; FMG-026 is the complete-upgrade final gate.
 - Any later change to product boundary, trust boundary, persistence class, or dependency architecture requires a new ADR/review round; task-level implementation detail may evolve inside the frozen contracts.
+
+## FMUX product-experience law
+
+- FMG-001..FMG-026 remains the engine/gateway scope and MUST NOT be diluted by FMUX work.
+- FMUX authority is ADR-0007 plus tasks/MASTER_FILEMCP_FMUX_TASK_GRAPH.md.
+- FMUX consumes core/runtime truth; presentation code must never grant authority, bypass policy, invent evidence, or expose unavailable FMG capability.
+- Preserve native stacks: Windows WPF and macOS AppKit unless a future product-authority ADR explicitly changes that boundary.
+- Do not start FMUX-002 before FMUX-001 MAIN VERIFIED; follow the frozen FMUX dependency graph thereafter.

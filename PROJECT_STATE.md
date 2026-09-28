@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-013-full-regression-live-proof`
+Active branch: `chatgpt/FMUX-complete-scope-freeze`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -303,3 +303,21 @@ Desktop deployment is current:
 - SHA-256 `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`.
 
 This chat still exposes 19 FileMCP tools, so the required live 23-tool catalog/hash proof is not yet satisfied. Foundation regression/native CI remain PASS and must not be rerun solely because connector discovery is stale. FMG-014 remains BLOCKED.
+
+## FMUX product-experience track
+
+Design gate: PASS / FROZEN on 2026-09-28.
+Authorities:
+- docs/adr/0007-product-ui-ux-architecture-and-fmux-track.md
+- docs/audit/FMUX_INDEPENDENT_MULTI_ROUND_UI_UX_AUDIT_2026-09-28.md
+- docs/audit/FMUX_FINAL_REPAIR_REAUDIT_2026-09-28.md
+- docs/design/FMUX_PRODUCT_EXPERIENCE_ARCHITECTURE_V1.md
+- docs/design/FMUX_DESIGN_SYSTEM_AND_COMPONENT_SPEC_V1.md
+- docs/design/FMUX_INTERACTION_STATE_AND_FMG_MAPPING_V1.md
+- docs/design/FMUX_DEPENDENCY_GRAPH_V1.md
+- docs/design/FMUX_DECISION_MATRIX_V1.md
+- tasks/MASTER_FILEMCP_FMUX_TASK_GRAPH.md
+
+FMUX-001: ACTIVE / LOCAL VERIFIED / NATIVE macOS CI PENDING on branch `chatgpt/FMUX-complete-scope-freeze`.
+Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push the exact FMUX-001 candidate, require native verification, merge only exact green head, then claim FMUX-002. FMG-026 scope remains unchanged.
