@@ -20,7 +20,7 @@ $MacBuild = Get-Content "build_macos_app.sh" -Raw
 $MacDev = Get-Content "run_macos_dev.sh" -Raw
 $Readme = Get-Content "README.md" -Raw
 
-if ($CatalogObject.tools.Count -ne 23) { throw "Expected 23 canonical tools, got $($CatalogObject.tools.Count)." }
+if ($CatalogObject.tools.Count -ne 25) { throw "Expected 25 canonical tools, got $($CatalogObject.tools.Count)." }
 $Exec = @($CatalogObject.tools | Where-Object { $_.name -eq "exec_process" })
 if ($Exec.Count -ne 1) { throw "Expected exactly one exec_process canonical tool." }
 if ($Exec[0].risk -ne "high" -or $Exec[0].effect -ne "execute") { throw "exec_process risk/effect contract drift." }
@@ -113,4 +113,4 @@ foreach ($Marker in @(
     }
 }
 
-Write-Host "exec-process-contract: ok (canonical=23 direct-argv + env-authority + cross-platform settings/wiring)"
+Write-Host "exec-process-contract: ok (canonical=25 direct-argv + env-authority + cross-platform settings/wiring)"

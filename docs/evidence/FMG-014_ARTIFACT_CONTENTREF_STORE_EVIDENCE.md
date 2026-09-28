@@ -1,6 +1,6 @@
 # FMG-014 — Ephemeral Artifact / ContentRef Store Evidence
 
-Status: EXACT-HEAD NATIVE VERIFIED / REVIEW PENDING
+Status: DONE / MAIN VERIFIED
 
 Branch: `chatgpt/FMG-014-artifact-contentref-store`
 
@@ -152,3 +152,28 @@ Final code Verify run `36416421696`: SUCCESS on:
 No job retry and no source mutation occurred during run `36416421696`.
 
 NEXT: record this evidence in the branch, run exact-head Verify for the docs-only closure commit, scoped review, PR/merge, merged-main Verify, mark FMG-014 DONE / MAIN VERIFIED, then claim FMG-015.
+
+
+## Final closure / MAIN verification
+
+PASS:
+- final evidence head `d4d2c75ce91efd1b1b3f5f87d58e86f52f6ced53`;
+- exact-head push Verify run `36416843308`: SUCCESS on macOS / Windows x64 / native Windows ARM64;
+- PR #26 Verify run `36417272966`: SUCCESS on macOS / Windows x64 / native Windows ARM64;
+- PR #26 merged to fork main as `d7669ed0d60c51eb1cfb12813abc8f34d3d3ff0e`;
+- merged-main Verify run `36417632075`: SUCCESS on macOS / Windows x64 / native Windows ARM64;
+- fork `main` points at `d7669ed0d60c51eb1cfb12813abc8f34d3d3ff0e`.
+
+FMG-014 is DONE / MAIN VERIFIED. FMG-015 is dependency-unblocked and claimed on `chatgpt/FMG-015-batch-read-stat`.
+
+
+## Final closure / MAIN verification
+
+FMG-014 is DONE / MAIN VERIFIED.
+- exact closure head: `d4d2c75ce91efd1b1b3f5f87d58e86f52f6ced53`;
+- PR #26 Verify run `36417272966`: SUCCESS on macOS / Windows x64 / native Windows ARM64;
+- PR #26 merged as `d7669ed0d60c51eb1cfb12813abc8f34d3d3ff0e`;
+- merged-main Verify run `36417632075`: SUCCESS on macOS / Windows x64 / native Windows ARM64;
+- canonical/non-canonical ContentRef tamper hardening is included in verified main.
+
+FMG-015 is dependency-unblocked and claimed on `chatgpt/FMG-015-batch-read-stat`.

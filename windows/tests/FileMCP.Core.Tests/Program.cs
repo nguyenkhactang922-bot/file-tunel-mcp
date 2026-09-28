@@ -51,6 +51,13 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length > 0 && args[0] == "batch-store-only")
+            {
+                await TestBatchReadStatAsync(root);
+                Console.WriteLine($"windows-batch-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             TestObservabilityContracts();
             TestCanonicalToolCatalog();
             TestServerPolicy();
@@ -78,6 +85,7 @@ internal static class Program
             await TestProjectContextAsync(root);
             await TestEvidenceAndFreshnessAsync(root);
             await TestArtifactContentStoreAsync(root);
+            await TestBatchReadStatAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -106,13 +114,13 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.6.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.7.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 18, "catalog non-shell local tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 19, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 20, "catalog non-shell local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 21, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 2, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
@@ -2873,8 +2881,8 @@ internal static class Program
         var workspace = Path.Combine(root, "files"); Directory.CreateDirectory(workspace);
         var safe = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
         var full = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", true);
-        Assert(safe.ToolDefinitions.Count == 17 && !safe.HasTool("run_command"), "safe tool count");
-        Assert(full.ToolDefinitions.Count == 19 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
+        Assert(safe.ToolDefinitions.Count == 19 && !safe.HasTool("run_command"), "safe tool count");
+        Assert(full.ToolDefinitions.Count == 21 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
 
         var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
         var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);
@@ -3216,7 +3224,7 @@ internal static class Program
         var correlatedList = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), meteredListBody);
         var correlatedListJson = JsonNode.Parse(HttpBody(correlatedList))!.AsObject();
         var correlatedTools = correlatedListJson["result"]!["tools"]!.AsArray();
-        Assert(correlatedTools.Count == 21, "logical correlation facade includes connect and evidence server tools");
+        Assert(correlatedTools.Count == 23, "logical correlation facade includes connect and evidence server tools");
         var connectDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "filemcp_observability_connect")!.AsObject();
         Assert(connectDefinition["annotations"]!["readOnlyHint"]!.GetValue<bool>(), "logical correlation connect tool is read-only metadata");
         var readDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "read_file")!.AsObject();
@@ -3458,6 +3466,186 @@ internal static class Program
         }
 
         Console.WriteLine("windows-http-connection-bounds: ok");
+    }
+
+    private static async Task TestBatchReadStatAsync(string root)
+    {
+        var workspace = Path.Combine(root, "fmg015-batch");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "a.txt"), "alpha", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(workspace, "b.txt"), "bravo", new UTF8Encoding(false));
+        Directory.CreateDirectory(Path.Combine(workspace, "dir"));
+        var resolver = new SafePathResolver(workspace);
+        var versions = new FileVersionService(resolver, Enumerable.Repeat((byte)0x42, 32).ToArray());
+        var artifactsRoot = Path.Combine(root, "fmg015-artifacts");
+        var artifactStore = new ArtifactContentStore(new ArtifactContentStoreOptions
+        {
+            RootDirectory = artifactsRoot,
+            WorkspaceRootForIsolation = workspace,
+            MaxItemBytes = 1024 * 1024,
+            MaxWorkspaceBytes = 4 * 1024 * 1024,
+            MaxGlobalBytes = 8 * 1024 * 1024,
+        });
+        var service = new BatchFileService(resolver, versions, () => artifactStore);
+
+        var stat = service.Stat(new JsonArray("a.txt", "../escape.txt", "dir", "a.txt"), null);
+        var statEntries = stat["entries"]!.AsArray();
+        Assert(stat["requested_count"]!.GetValue<int>() == 4 && statEntries.Count == 4, "batch_stat preserves one result per requested entry");
+        Assert(statEntries[0]!["state"]!.GetValue<string>() == "ok" && statEntries[0]!["version"]!.GetValue<string>().StartsWith("v1:"), "batch_stat returns strong version for file");
+        Assert(statEntries[1]!["state"]!.GetValue<string>() == "error" && statEntries[1]!["error_code"]!.GetValue<string>() == "path_outside_root", "batch_stat rejects path escape per entry");
+        Assert(statEntries[2]!["entry_type"]!.GetValue<string>() == "directory" && statEntries[2]!["version"] is null, "batch_stat directory has no file version");
+        Assert(statEntries[3]!["path"]!.GetValue<string>() == "a.txt", "batch_stat preserves duplicate paths deterministically");
+
+        var inline = await service.ReadAsync(
+            new JsonArray(
+                new JsonObject { ["relative_path"] = "a.txt", ["max_bytes"] = 16 },
+                new JsonObject { ["relative_path"] = "../escape.txt", ["max_bytes"] = 16 }),
+            null,
+            CancellationToken.None);
+        var inlineEntries = inline["entries"]!.AsArray();
+        Assert(inlineEntries[0]!["delivery"]!.GetValue<string>() == "inline" && inlineEntries[0]!["content"]!.GetValue<string>() == "alpha", "batch_read returns bounded inline content");
+        Assert(inlineEntries[0]!["version"]!.GetValue<string>().StartsWith("v1:"), "batch_read returns version token");
+        Assert(inlineEntries[1]!["error_code"]!.GetValue<string>() == "path_outside_root", "batch_read rejects path escape per entry");
+
+        await AssertThrowsAsync(
+            () => service.ReadAsync(
+                new JsonArray(new JsonObject { ["relative_path"] = "a.txt", ["unexpected"] = true }),
+                null,
+                CancellationToken.None),
+            "unknown field",
+            "batch_read rejects unknown per-entry fields fail closed");
+
+        var tooLarge = await service.ReadAsync(
+            new JsonArray(new JsonObject { ["relative_path"] = "a.txt", ["max_bytes"] = 2, ["allow_content_ref"] = false }),
+            null,
+            CancellationToken.None);
+        Assert(tooLarge["entries"]![0]!["state"]!.GetValue<string>() == "too_large" && tooLarge["entries"]![0]!["delivery"]!.GetValue<string>() == "none", "batch_read reports oversized entry without implicit spillover");
+
+        var spill = await service.ReadAsync(
+            new JsonArray(new JsonObject { ["relative_path"] = "a.txt", ["max_bytes"] = 2, ["allow_content_ref"] = true }),
+            null,
+            CancellationToken.None);
+        var spillEntry = spill["entries"]![0]!.AsObject();
+        Assert(spillEntry["delivery"]!.GetValue<string>() == "content_ref" && spillEntry["content_ref"]!.GetValue<string>().StartsWith("cr1."), "batch_read spills oversized item to authenticated ContentRef");
+        var workspaceAuthority = ArtifactContentStore.WorkspaceAuthorityId(workspace);
+        var resolved = await artifactStore.ResolveAsync(spillEntry["content_ref"]!.GetValue<string>(), workspaceAuthority, ArtifactContentClasses.IsKnown);
+        Assert(resolved.SizeBytes == 5 && resolved.ContentClass == ArtifactContentClasses.ToolOutput, "batch_read ContentRef resolves inside workspace authority");
+
+        File.WriteAllText(Path.Combine(workspace, "spill-race.txt"), "snapshot", new UTF8Encoding(false));
+        var spillRaceMutated = false;
+        var spillRaceService = new BatchFileService(
+            resolver,
+            versions,
+            () => artifactStore,
+            stageForTests: (stage, _) =>
+            {
+                if (stage == "after_versioned" && !spillRaceMutated)
+                {
+                    spillRaceMutated = true;
+                    File.WriteAllText(Path.Combine(workspace, "spill-race.txt"), "changed!", new UTF8Encoding(false));
+                }
+            });
+        var spillRace = await spillRaceService.ReadAsync(
+            new JsonArray(new JsonObject { ["relative_path"] = "spill-race.txt", ["max_bytes"] = 1, ["allow_content_ref"] = true }),
+            null,
+            CancellationToken.None);
+        var spillRaceEntry = spillRace["entries"]![0]!.AsObject();
+        Assert(spillRaceEntry["state"]!.GetValue<string>() == "ok" && spillRaceEntry["delivery"]!.GetValue<string>() == "content_ref", "batch_read snapshot spill remains successful after post-version source mutation");
+        await using (var snapshotBytes = new MemoryStream())
+        {
+            await artifactStore.CopyToAsync(
+                spillRaceEntry["content_ref"]!.GetValue<string>(),
+                workspaceAuthority,
+                ArtifactContentClasses.IsKnown,
+                snapshotBytes);
+            Assert(Encoding.UTF8.GetString(snapshotBytes.ToArray()) == "snapshot", "batch_read ContentRef is bound to strong-version snapshot bytes, not reopened path bytes");
+        }
+        Assert(File.ReadAllText(Path.Combine(workspace, "spill-race.txt"), Encoding.UTF8) == "changed!", "batch_read spill race fixture mutated source after version snapshot");
+
+        using (var budget = ToolExecutionContext.Create(new JsonObject
+        {
+            [ToolExecutionContext.BudgetMetadataKey] = new JsonObject
+            {
+                ["maxVisitedEntries"] = 16,
+                ["maxFilesScanned"] = 16,
+                ["maxBytesScanned"] = 7L,
+                ["maxOutputItems"] = 16,
+            },
+        }))
+        {
+            var limited = await service.ReadAsync(
+                new JsonArray(
+                    new JsonObject { ["relative_path"] = "a.txt" },
+                    new JsonObject { ["relative_path"] = "b.txt" }),
+                budget,
+                CancellationToken.None);
+            Assert(limited["partial"]!.GetValue<bool>() && limited["truncated"]!.GetValue<bool>() && limited["truncation_reason"]!.GetValue<string>() == "bytes_scanned", "batch_read aggregate bytes budget cannot be bypassed by multiple entries");
+        }
+
+        var huge = new JsonArray();
+        for (var i = 0; i < BatchFileService.MaxBatchEntries + 1; i++) huge.Add("a.txt");
+        AssertThrows(() => service.Stat(huge, null), "at most", "batch_stat rejects huge path list");
+
+        var cancel = false;
+        using (var cancelContext = ToolExecutionContext.Create(null, cancellationProbe: () => cancel))
+        {
+            var cancelService = new BatchFileService(
+                resolver,
+                versions,
+                () => artifactStore,
+                stageForTests: (stage, index) =>
+                {
+                    if (stage == "after_entry" && index == 0) cancel = true;
+                });
+            var partial = await cancelService.ReadAsync(
+                new JsonArray(
+                    new JsonObject { ["relative_path"] = "a.txt" },
+                    new JsonObject { ["relative_path"] = "b.txt" }),
+                cancelContext,
+                CancellationToken.None);
+            Assert(partial["cancelled"]!.GetValue<bool>() && partial["partial"]!.GetValue<bool>() && partial["completed_count"]!.GetValue<int>() == 1, "batch_read cancellation returns explicit partial result");
+        }
+
+        var mutatePath = Path.Combine(workspace, "mutate.txt");
+        File.WriteAllText(mutatePath, new string('m', 256 * 1024), new UTF8Encoding(false));
+        var mutated = false;
+        var mutationVersions = new FileVersionService(
+            resolver,
+            Enumerable.Repeat((byte)0x43, 32).ToArray(),
+            readStageForTests: stage =>
+            {
+                if (stage == "after_first_chunk" && !mutated)
+                {
+                    mutated = true;
+                    using var writer = new FileStream(mutatePath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                    writer.Position = 0;
+                    writer.WriteByte((byte)'X');
+                    writer.Flush(true);
+                }
+            });
+        var mutationService = new BatchFileService(resolver, mutationVersions, () => artifactStore);
+        var mutation = await mutationService.ReadAsync(
+            new JsonArray(new JsonObject { ["relative_path"] = "mutate.txt", ["max_bytes"] = 512 * 1024 }),
+            null,
+            CancellationToken.None);
+        Assert(mutation["entries"]![0]!["state"]!.GetValue<string>() == "error" && mutation["entries"]![0]!["error_code"]!.GetValue<string>() == "file_changed", "batch_read detects individual file mutation during strong read");
+
+        var quotaStore = new ArtifactContentStore(new ArtifactContentStoreOptions
+        {
+            RootDirectory = Path.Combine(root, "fmg015-artifact-quota"),
+            WorkspaceRootForIsolation = workspace,
+            MaxItemBytes = 4,
+            MaxWorkspaceBytes = 4,
+            MaxGlobalBytes = 4,
+        });
+        var quotaService = new BatchFileService(resolver, versions, () => quotaStore);
+        var quota = await quotaService.ReadAsync(
+            new JsonArray(new JsonObject { ["relative_path"] = "a.txt", ["max_bytes"] = 1, ["allow_content_ref"] = true }),
+            null,
+            CancellationToken.None);
+        Assert(quota["entries"]![0]!["state"]!.GetValue<string>() == "error" && quota["entries"]![0]!["error_code"]!.GetValue<string>() == "artifact_quota", "batch_read reports artifact quota exhaustion per entry without widening authority");
+
+        Console.WriteLine("windows-batch-read-stat: ok");
     }
 
     private static async Task TestArtifactContentStoreAsync(string root)

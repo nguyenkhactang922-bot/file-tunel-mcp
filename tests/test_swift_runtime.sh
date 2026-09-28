@@ -1297,6 +1297,8 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/FileVersionService.swift \
     macos/ProjectContextService.swift \
     macos/AuthorizedPathSnapshot.swift \
+    macos/ArtifactContentStore.swift \
+    macos/BatchFileService.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -2324,6 +2326,40 @@ let narrowAfterUnrelatedUntracked = try safeGitServer.captureSourceStateRefForTe
 precondition(narrowAfterUnrelatedUntracked["source_state_id"] as? String == narrowBeforeUnrelatedUntracked["source_state_id"] as? String)
 print("swift-file-version-source-state: ok")
 
+let fmg015RaceURL = root.appendingPathComponent("fmg015-mid-read-race.bin")
+try Data(repeating: 0x6d, count: 256 * 1024).write(to: fmg015RaceURL)
+let fmg015RaceResolver = try SafePathResolver(rootPath: root.path)
+var fmg015RaceMutated = false
+let fmg015RaceVersions = try FileVersionService(
+    resolver: fmg015RaceResolver,
+    keyData: Data(repeating: 0x44, count: 32),
+    readStageForTests: { stage in
+        guard stage == "after_first_chunk", !fmg015RaceMutated else { return }
+        fmg015RaceMutated = true
+        guard let writer = try? FileHandle(forWritingTo: fmg015RaceURL) else {
+            preconditionFailure("could not open FMG-015 mutation fixture")
+        }
+        do {
+            try writer.seek(toOffset: 0)
+            try writer.write(contentsOf: Data([0x58]))
+            try writer.synchronize()
+            try writer.close()
+        } catch {
+            preconditionFailure("could not mutate FMG-015 fixture: \(error)")
+        }
+    })
+do {
+    _ = try fmg015RaceVersions.readVersioned(relativePath: "fmg015-mid-read-race.bin", maxBytes: 512 * 1024)
+    preconditionFailure("same-size mid-read mutation must fail strong read")
+} catch {
+    precondition(
+        error.localizedDescription.localizedCaseInsensitiveContains("changed"),
+        "unexpected FMG-015 mid-read mutation error: \(error)")
+}
+precondition(fmg015RaceMutated, "FMG-015 mutation hook did not execute")
+print("swift-file-version-mid-read-mutation: ok")
+
+
 let fmg011ServerStoreURL = root.appendingPathComponent("server-evidence.json")
 let server = try LocalMCPServer(
     port: 18088,
@@ -2387,6 +2423,8 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/FileVersionService.swift \
     macos/ProjectContextService.swift \
     macos/AuthorizedPathSnapshot.swift \
+    macos/ArtifactContentStore.swift \
+    macos/BatchFileService.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"
@@ -2420,7 +2458,7 @@ UNAVAILABLE_EVIDENCE_BASE_URL="http://127.0.0.1:18091/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.6.0"
+CATALOG_VERSION="1.7.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
@@ -2935,6 +2973,28 @@ printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.result raw
 printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.version raw -expect string -o - - | grep -Eq '^v1:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'
 printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.version_strength raw -expect string -o - - | grep -qx 'content'
 printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.size_bytes raw -expect integer -o - - | grep -qx '11'
+
+# FMG-015 live batch_stat/batch_read parity on the native macOS MCP path.
+BATCH_STAT_RESULT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":3201,"method":"tools/call","params":{"name":"batch_stat","arguments":{"paths":["hello.txt","../escape.txt","hello.txt"]}}}')"
+printf '%s' "$BATCH_STAT_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$BATCH_STAT_RESULT" | python3 -c 'import json,sys,re; d=json.load(sys.stdin)["result"]["structuredContent"]; e=d["entries"]; assert d["requested_count"]==3 and d["completed_count"]==3 and d["partial"] is False; assert e[0]["state"]=="ok" and e[0]["entry_type"]=="file" and re.match(r"^v1:",e[0]["version"]); assert e[1]["state"]=="error" and e[1]["error_code"]=="path_outside_root"; assert e[2]["path"]=="hello.txt" and e[2]["state"]=="ok"'
+echo "mcp-batch-stat: ok"
+
+BATCH_READ_RESULT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":3202,"method":"tools/call","params":{"name":"batch_read","arguments":{"requests":[{"relative_path":"hello.txt","max_bytes":64},{"relative_path":"../escape.txt","max_bytes":64}]}}}')"
+printf '%s' "$BATCH_READ_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$BATCH_READ_RESULT" | python3 -c 'import json,sys,re; d=json.load(sys.stdin)["result"]["structuredContent"]; e=d["entries"]; assert d["requested_count"]==2 and d["completed_count"]==2 and d["partial"] is False; assert e[0]["state"]=="ok" and e[0]["delivery"]=="inline" and e[0]["content"]=="hello swift" and re.match(r"^v1:",e[0]["version"]); assert e[1]["state"]=="error" and e[1]["error_code"]=="path_outside_root"'
+echo "mcp-batch-read: ok"
+
+BATCH_BUDGET_RESULT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":3203,"method":"tools/call","params":{"name":"batch_read","arguments":{"requests":[{"relative_path":"hello.txt","max_bytes":64},{"relative_path":"hello.txt","max_bytes":64}]},"_meta":{"io.filemcp/budget":{"maxBytesScanned":12,"maxVisitedEntries":8,"maxOutputItems":8}}}}')"
+printf '%s' "$BATCH_BUDGET_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$BATCH_BUDGET_RESULT" | python3 -c 'import json,sys; d=json.load(sys.stdin)["result"]["structuredContent"]; assert d["partial"] is True and d["truncated"] is True and d["truncation_reason"]=="bytes_scanned"; assert len(d["entries"])>=1'
+echo "mcp-batch-budget: ok"
 
 PROJECT_CONTEXT_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \
@@ -3581,12 +3641,7 @@ MODERN_CHAT_RESUME="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$MODERN_CHAT_RESUME" | grep -q '"resultType":"complete"'
 printf '%s' "$MODERN_CHAT_RESUME" | plutil -extract result.structuredContent.resumed raw -expect bool -o - - | grep -qx 'true'
 echo "logical-chat-facade-modern: ok"
-printf '%s' "$TOOLS" | plutil -extract result.tools.0.outputSchema.properties.result.type raw -expect string -o - - | grep -qx 'array'
-printf '%s' "$TOOLS" | plutil -extract result.tools.1.outputSchema.properties.result.type raw -expect string -o - - | grep -qx 'string'
-printf '%s' "$TOOLS" | plutil -extract result.tools.2.outputSchema.properties.content.type raw -expect string -o - - | grep -qx 'string'
-printf '%s' "$TOOLS" | plutil -extract result.tools.0.annotations.openWorldHint raw -expect bool -o - - | grep -qx 'false'
-printf '%s' "$TOOLS" | plutil -extract result.tools.5.annotations.destructiveHint raw -expect bool -o - - | grep -qx 'true'
-printf '%s' "$TOOLS" | python3 -c 'import json,sys; d=json.load(sys.stdin); by={t["name"]:t for t in d["result"]["tools"]}; assert by["exec_process"]["annotations"]["openWorldHint"] is True; assert by["run_command"]["annotations"]["openWorldHint"] is True'
+printf '%s' "$TOOLS" | python3 -c 'import json,sys; d=json.load(sys.stdin); by={t["name"]:t for t in d["result"]["tools"]}; assert by["list_files"]["outputSchema"]["properties"]["result"]["type"]=="array"; assert by["read_file"]["outputSchema"]["properties"]["result"]["type"]=="string"; assert by["read_file_range"]["outputSchema"]["properties"]["content"]["type"]=="string"; assert by["list_files"]["annotations"]["openWorldHint"] is False; assert by["delete_file"]["annotations"]["destructiveHint"] is True; assert by["exec_process"]["annotations"]["openWorldHint"] is True; assert by["run_command"]["annotations"]["openWorldHint"] is True'
 
 MODERN_CALL="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \

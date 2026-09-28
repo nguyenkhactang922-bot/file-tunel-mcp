@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.6.0",
+  "catalogVersion": "1.7.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -229,6 +229,295 @@
             "version",
             "version_strength",
             "size_bytes"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "batch_stat",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "batch_stat",
+        "description": "Stat multiple workspace paths with independent SafePath authorization and strong version tokens for eligible files. Results are returned per entry and aggregate ToolBudget applies to the whole batch.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1024,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "paths"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string"
+            },
+            "requested_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "completed_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "partial": {
+              "type": "boolean"
+            },
+            "cancelled": {
+              "type": "boolean"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "truncation_reason": {
+              "type": "string"
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "ok",
+                      "error"
+                    ]
+                  },
+                  "entry_type": {
+                    "type": "string",
+                    "enum": [
+                      "file",
+                      "directory"
+                    ]
+                  },
+                  "size_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "modified_utc": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "string"
+                  },
+                  "version_strength": {
+                    "type": "string",
+                    "enum": [
+                      "content"
+                    ]
+                  },
+                  "error_code": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "operation",
+            "requested_count",
+            "completed_count",
+            "partial",
+            "cancelled",
+            "truncated",
+            "truncation_reason",
+            "entries"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "batch_read",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "batch_read",
+        "description": "Read multiple workspace files with per-entry byte bounds, strong version tokens and aggregate ToolBudget. Oversized entries may spill to an authenticated FMG-014 ContentRef when explicitly requested.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1024,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "relative_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 52428800
+                  },
+                  "allow_content_ref": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "relative_path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "requests"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string"
+            },
+            "requested_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "completed_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "partial": {
+              "type": "boolean"
+            },
+            "cancelled": {
+              "type": "boolean"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "truncation_reason": {
+              "type": "string"
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "ok",
+                      "too_large",
+                      "error"
+                    ]
+                  },
+                  "delivery": {
+                    "type": "string",
+                    "enum": [
+                      "inline",
+                      "content_ref",
+                      "none"
+                    ]
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "content_ref": {
+                    "type": "string"
+                  },
+                  "blob_id": {
+                    "type": "string"
+                  },
+                  "expires_epoch_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "size_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "version": {
+                    "type": "string"
+                  },
+                  "version_strength": {
+                    "type": "string",
+                    "enum": [
+                      "content"
+                    ]
+                  },
+                  "error_code": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "operation",
+            "requested_count",
+            "completed_count",
+            "partial",
+            "cancelled",
+            "truncated",
+            "truncation_reason",
+            "entries"
           ],
           "additionalProperties": false
         },

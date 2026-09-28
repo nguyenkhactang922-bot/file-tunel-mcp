@@ -119,12 +119,12 @@ struct LocalToolCallOutput {
 
 final class LocalTools {
     private static let handlerToolNames: Set<String> = [
-        "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
+        "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
-        "list_files", "search_content", "search_filenames",
+        "list_files", "batch_stat", "batch_read", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "exec_process",
     ]
     private let resolver: SafePathResolver
@@ -134,6 +134,7 @@ final class LocalTools {
     private let policy: ServerPolicy
     private let execEnvironment: ExecProcessEnvironmentAuthority
     private let fileVersions: FileVersionService
+    private let batchFiles: BatchFileService
     private let mutationGuard: AuthorizedPathSnapshotService
     private let projectContext: ProjectContextService
     private let beforeMutationCommitForTests: ((String) -> Void)?
@@ -171,7 +172,9 @@ final class LocalTools {
         skillRegistry: CodexSkillRegistry? = nil
     ) throws {
         self.resolver = resolver
-        self.fileVersions = try FileVersionService(resolver: resolver)
+        let versionService = try FileVersionService(resolver: resolver)
+        self.fileVersions = versionService
+        self.batchFiles = BatchFileService(resolver: resolver, versions: versionService)
         self.mutationGuard = AuthorizedPathSnapshotService(resolver: resolver)
         self.projectContext = try ProjectContextService(resolver: resolver, policy: policy, skills: skillRegistry)
         self.beforeMutationCommitForTests = beforeMutationCommitForTests
@@ -227,6 +230,16 @@ final class LocalTools {
                 relativePath: requiredString(arguments, "relative_path"),
                 startLine: try requiredInt(arguments, "start_line"),
                 endLine: try requiredInt(arguments, "end_line")
+            ))
+        case "batch_stat":
+            return objectOutput(try batchFiles.stat(
+                paths: try anyArray(arguments, "paths", maximum: BatchFileService.maxBatchEntries),
+                context: executionContext
+            ))
+        case "batch_read":
+            return objectOutput(try batchFiles.read(
+                requests: try anyArray(arguments, "requests", maximum: BatchFileService.maxBatchEntries),
+                context: executionContext
             ))
         case "search_content":
             return objectOutput(try searchContent(

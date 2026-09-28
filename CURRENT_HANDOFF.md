@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMUX-010-evidence`
+Branch: `chatgpt/FMG-015-batch-read-stat`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -510,6 +510,39 @@ Post-main-sync local proof: project-state + FMUX presentation/home + FMG-014 con
 Security hardening: ContentRef base64url decoder now rejects non-canonical encodings on Windows and macOS before HMAC acceptance.
 NEXT_EXACT_ACTION: commit/push this evidence-only closure head -> exact-head native Verify -> scoped review -> PR/merge -> merged-main Verify -> FMG-014 DONE / MAIN VERIFIED -> claim FMG-015.
 
+
+## FMG-014 closure / FMG-015 claim - 2026-09-28
+
+FMG-014: DONE / MAIN VERIFIED.
+- Final evidence head: `d4d2c75ce91efd1b1b3f5f87d58e86f52f6ced53`.
+- Exact-head push Verify run `36416843308`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #26 Verify run `36417272966`: SUCCESS on all three native lanes.
+- PR #26 merged to fork `main` as `d7669ed0d60c51eb1cfb12813abc8f34d3d3ff0e`.
+- Merged-main Verify run `36417632075`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Content-addressed blob store, authenticated canonical ContentRef, installation/workspace/class/expiry/lease binding, quota/TTL GC, current-user permissions, streaming I/O and negative/adversarial coverage are MAIN VERIFIED.
+
+FMG-015: CLAIMED / ACTIVE on `chatgpt/FMG-015-batch-read-stat`.
+
+NEXT_EXACT_ACTION: implement FMG-015 Batch Read / Stat only: `batch_stat` + `batch_read`, per-entry SafePathResolver/version authorization, aggregate ToolBudget, deterministic per-entry states, cancellation with explicit partial result, version token per eligible file, and optional FMG-014 ContentRef for oversized items. Cover mixed valid/escape paths, duplicates, huge lists, mid-batch cancellation, file mutation during read and artifact quota exhaustion. Do not begin FMG-016 before FMG-015 MAIN VERIFIED.
+
+
+## FMG-014 closure / FMG-015 claim
+
+FMG-014: DONE / MAIN VERIFIED.
+PR #26 head `d4d2c75ce91efd1b1b3f5f87d58e86f52f6ced53`; merge main `d7669ed0d60c51eb1cfb12813abc8f34d3d3ff0e`; PR Verify `36417272966` SUCCESS; merged-main Verify `36417632075` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMG-015: CLAIMED / ACTIVE on `chatgpt/FMG-015-batch-read-stat`.
+NEXT_EXACT_ACTION: implement batch_stat + batch_read with per-entry resolver/version authority, one aggregate ToolBudget, deterministic per-entry results, explicit cancellation/partial state, and optional Artifact ContentRef spill for oversized content; then negative tests -> local verify -> exact-head native Verify -> review -> PR/merge -> merged-main Verify. FMG-016 remains BLOCKED until FMG-015 MAIN VERIFIED.
+
+## FMG-015 local verification checkpoint - 2026-09-28
+
+State: LOCAL VERIFIED / MAIN SYNC + NATIVE CI PENDING.
+Catalog: 1.7.0 / 25 canonical tools / SHA-256 `70faaa4cb370589191084ef76dfbcb502d810f5c8c658f0e1da80e9ec194a8c7`.
+Local FMG-015 isolation: PASS (20 assertions); Release build: PASS 0 warnings/errors; batch contract + catalog/parity: PASS.
+Scoped review hardening: ContentRef spill is bound to strong-version snapshot bytes and nested batch request arguments fail closed.
+Evidence: `docs/evidence/FMG-015_BATCH_READ_STAT_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: commit this local-verified FMG-015 candidate, merge latest fork/main without dropping concurrent FMUX work, rerun affected gates, push exact synchronized head, require native Verify macOS + Windows x64 + Windows ARM64, review/PR/merge, merged-main Verify, then mark FMG-015 DONE / MAIN VERIFIED and claim FMG-016.
 ## FMUX-004 closure / FMUX-005 post-main-sync
 
 FMUX-004: DONE / MAIN VERIFIED. PR #24; merge `e4e243ab1526d8cb67e7b2304b649227726e02f5`; merged-main Verify `36414061842` SUCCESS.
@@ -555,6 +588,26 @@ Local proof: Changes contract PASS; Windows Release 0 warnings/errors; Windows r
 Evidence: `docs/evidence/FMUX-009_CHANGES_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, review, merge, merged-main verification, then claim FMUX-010.
 
+## FMG-015 synchronized native-CI checkpoint
+
+State: SYNCHRONIZED LOCAL VERIFIED / NATIVE CI PENDING.
+Main sync: behind fork/main = 0 at checkpoint.
+Affected gates after merge: FMG-015 batch contract PASS; FMUX-005..009 contracts PASS; Windows Release build PASS 0 warnings/errors; FMG-015 isolated integration PASS 20 assertions.
+NEXT_EXACT_ACTION: push exact synchronized FMG-015 head, require native Verify macOS + Windows x64 + Windows ARM64, scoped review, PR/merge, merged-main verification, then mark FMG-015 DONE / MAIN VERIFIED and claim FMG-016.
+
+
+## FMG-015 native Verify attempt 1 remediation
+
+State: FIX VERIFIED LOCAL / RESYNC + NATIVE CI PENDING.
+Run `36440733440`: ARM64 SUCCESS; Windows x64 exposed deterministic strong-read mutation-detection weakness; macOS batch semantics passed but the harness exposed index-based catalog assertions. Both root causes are fixed without weakening acceptance: cross-platform final content-hash re-verification + after-first-chunk adversarial mutation, and name-based macOS tool assertions.
+Local post-fix: full Windows 796 assertions PASS; FMG-015 isolation 20 assertions PASS; batch/file-version/catalog/parity contracts PASS.
+NEXT_EXACT_ACTION: commit remediation, synchronize latest fork/main, push exact head, require native Verify all three lanes, then review/PR/merge/merged-main Verify. FMG-016 remains BLOCKED.
+
+## FMG-015 native Verify attempt 2
+
+State: WINDOWS X64 + ARM64 VERIFIED / MACOS TEST-HARNESS FIX PENDING EXACT-HEAD VERIFY.
+Run `36443414494`: Windows x64 SUCCESS; Windows ARM64 SUCCESS; macOS product typecheck PASS, integration failed only because the new native mutation test block was duplicated. Duplicate removed locally; exactly one `swift-file-version-mid-read-mutation: ok` marker remains and FMG-015 contract PASS.
+NEXT_EXACT_ACTION: commit/push the macOS test-only deduplication, require exact-head native Verify, then scoped review -> PR/merge -> merged-main Verify. FMG-016 remains BLOCKED until FMG-015 MAIN VERIFIED.
 ## FMUX-009 closure / FMUX-010 local verification
 
 FMUX-009: DONE / MAIN VERIFIED. PR #31; merge `271c3d402d2aa6799efd6edc08d746c2823fe517`; merged-main Verify `36440105236` SUCCESS.
@@ -563,3 +616,16 @@ FMUX-010: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-010-evide
 Local proof: Evidence contract PASS; Windows Release 0 warnings/errors; Windows runtime 776 assertions PASS on rerun; macOS build-script syntax PASS. Initial runtime attempt hit the previously observed non-deterministic FMG-014 ContentRef tamper assertion and passed unchanged on rerun.
 Evidence: `docs/evidence/FMUX-010_EVIDENCE_UX_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, review, merge, merged-main verification, then claim next dependency-ready FMUX task.
+
+## FMG-015 post-FMUX-010 synchronized closure checkpoint
+
+State: SYNCHRONIZED LOCAL VERIFIED / FINAL EXACT-HEAD NATIVE VERIFY PENDING.
+Run `36444058795` on pre-sync head `c341d6d`: SUCCESS on macOS / Windows x64 / Windows ARM64.
+Latest main `61359a9` (FMUX-010) merged cleanly except governance state; FMG-015 + FMUX-010 contracts PASS, Windows Release 0 warnings/errors, full Windows regression 796 assertions PASS.
+NEXT_EXACT_ACTION: push the synchronized FMG-015 head, require native Verify all three lanes, then scoped review -> PR/merge -> merged-main Verify. FMG-016 remains BLOCKED until FMG-015 MAIN VERIFIED.
+
+## FMG-015 final exact-head verification / review
+
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
+Head `2ff1442`; Verify run `36445207427`: SUCCESS on macOS / Windows x64 / Windows ARM64. Scoped review PASS: read-only authority, per-entry path/version checks, aggregate budget, snapshot-bound ContentRef spill, no evidence/telemetry blob coupling, no temp/debug artifacts.
+NEXT_EXACT_ACTION: commit/push evidence-only closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-015 DONE / MAIN VERIFIED -> claim FMG-016.
