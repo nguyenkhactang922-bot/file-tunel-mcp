@@ -1,6 +1,6 @@
 # FMG-013 Foundation Full Regression + Live MCP Proof Evidence
 
-Status: LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING
+Status: DONE / FOUNDATION MAIN VERIFIED
 
 Branch: `chatgpt/FMG-013-full-regression-live-proof`
 Baseline main: `d3a3670f6fb60ab75d8471b3d982c811337fa951`
@@ -146,3 +146,15 @@ PASS against the refreshed FileMCP connector surface:
 - Live correlation PASS on the 23-tool connector: the same opaque `chat_instance_id` resumed with `resumed=true` and a bound `read_file_range` succeeded.
 
 FMG-013 live MCP acceptance is satisfied. Remaining gate: commit/push this exact evidence candidate, require exact-head native Verify on macOS + Windows x64 + Windows ARM64, scoped review, PR/merge, merged-main verification, then mark FMG-013 DONE / FOUNDATION MAIN VERIFIED and claim FMG-014.
+
+
+## Final closure / MAIN verification
+
+PASS:
+- final candidate `db34185e4989953b54a504c9e03a1b5b7253ba3d`;
+- PR #21 merged to fork main as `0158bc5a7b94df7531d9d19c183c9b1c2f8af6c2`;
+- PR Verify run `36402363852` finished SUCCESS on macOS, Windows x64 and Windows ARM64. Its first ARM64 attempt hit an isolated hosted-runner `actions/setup-dotnet` CLR failure; only that failed job was rerun and the second attempt passed the full ARM64 build/smoke/package sequence without source changes;
+- merged-main Verify run `36403091233` finished SUCCESS on macOS, Windows x64 and Windows ARM64;
+- fork `main` points at `0158bc5a7b94df7531d9d19c183c9b1c2f8af6c2`.
+
+FMG-013 is DONE / FOUNDATION MAIN VERIFIED. FMG-014 is now dependency-unblocked and claimed on `chatgpt/FMG-014-artifact-contentref-store`.

@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMUX-004-home`
+Branch: `chatgpt/FMG-014-artifact-contentref-store`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -441,9 +441,71 @@ Local proof: feedback-component contract PASS; Windows Release 0 warnings/errors
 Evidence: `docs/evidence/FMUX-003_STATUS_FEEDBACK_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, scoped review, merge, merged-main verification, then claim FMUX-004.
 
+## FMG-013 closure / FMG-014 claim - 2026-09-28
+
+FMG-013: DONE / FOUNDATION MAIN VERIFIED.
+- Final candidate head: `db34185e4989953b54a504c9e03a1b5b7253ba3d`.
+- PR #21 merged to fork `main`.
+- Merge main: `0158bc5a7b94df7531d9d19c183c9b1c2f8af6c2`.
+- PR Verify run `36402363852`: SUCCESS after rerunning only the transient Windows ARM64 hosted-runner `setup-dotnet` failure; macOS / Windows x64 / Windows ARM64 all SUCCESS on the exact candidate.
+- Merged-main Verify run `36403091233`: SUCCESS on macOS / Windows x64 / Windows ARM64.
+- Live MCP proof: canonical 23 tools, catalog version `1.6.0`, catalog SHA-256 `98ba484931717cc7ee8efbce83941afc33aa5fbaddb6b667882100a423bfacee`; live exec_process / project_context / apply_edits / evidence_get dispatch + logical-chat correlation PASS.
+
+FMG-014: CLAIMED / ACTIVE on `chatgpt/FMG-014-artifact-contentref-store`.
+
+NEXT_EXACT_ACTION: implement FMG-014 Ephemeral Artifact / ContentRef Store only: local content-addressed blob store outside the repository, metadata index, authenticated ContentRef bound to installation/workspace/content-class/expiry, quotas + TTL GC, current-user-only storage permissions, stream read/write, and explicit TOOL_OUTPUT / PTY_OUTPUT / CHECKPOINT / QUARANTINE classes. Add tamper, cross-workspace replay, metadata/blob mismatch, corruption, disk-full, concurrent put/delete, expired lease and permission-regression tests. Do not begin FMG-015 before FMG-014 MAIN VERIFIED.
+
+
+## FMG-014 local verification checkpoint - 2026-09-28
+
+State: ACTIVE / LOCAL VERIFIED / CROSS-PLATFORM CI PENDING.
+Branch: `chatgpt/FMG-014-artifact-contentref-store`.
+Evidence: `docs/evidence/FMG-014_ARTIFACT_CONTENTREF_STORE_EVIDENCE.md`.
+
+Implemented:
+- content-addressed artifact blob store + independent metadata index;
+- authenticated HMAC-SHA256 `cr1` ContentRef;
+- installation/workspace/blob/class/ref-id/expiry/lease binding;
+- TOOL_OUTPUT / PTY_OUTPUT / CHECKPOINT / QUARANTINE classes;
+- quota + TTL GC;
+- Windows current-user ACL and macOS owner-only POSIX permissions;
+- streaming read/write;
+- negative coverage for tamper, cross-workspace, metadata mismatch, corruption, disk-full rollback, quota partial-write refusal, lease expiry and concurrent dedupe/delete.
+
+Local Windows evidence:
+- artifact contract PASS;
+- Release build PASS, 0 warnings / 0 errors;
+- full Windows integration PASS, 776 assertions.
+
+NEXT_EXACT_ACTION: commit this local candidate, sync latest fork/main (currently FMUX track may have advanced), push exact synchronized head, require native Verify on macOS + Windows x64 + Windows ARM64, review/PR/merge, merged-main Verify, then FMG-014 MAIN VERIFIED -> claim FMG-015. Do not begin FMG-015 early.
+
+
+## FMG-014 post-main-sync verification
+
+Merged latest `fork/main=7e8590a` into the FMG-014 working tree while preserving FMUX-003 and FMG-014 authority.
+Local post-sync proof: project-state PASS; FMUX shell PASS; FMUX feedback PASS; FMG-014 artifact contract PASS; Windows Release build 0 warnings/errors; Windows integration 776 assertions PASS.
+NEXT_EXACT_ACTION: finalize the merge commit, push the exact FMG-014 head, require native Verify on macOS + Windows x64 + Windows ARM64, then scoped review -> PR/merge -> merged-main Verify -> FMG-014 MAIN VERIFIED -> claim FMG-015.
+
+
+## FMG-014 exact-head native verification
+
+Candidate `c7f921e4036a7ac4be9b350b215f055e706ddd60` is NATIVE VERIFIED.
+Verify run `36413985720`: SUCCESS on macOS, Windows x64 and native Windows ARM64.
+Final macOS integration proof includes `swift-artifact-contentref-store: ok`; Windows integration includes `windows-artifact-contentref-store: ok` within 776 assertions.
+State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PENDING.
+NEXT_EXACT_ACTION: scoped review -> PR/merge -> merged-main Verify -> FMG-014 DONE / MAIN VERIFIED -> claim FMG-015. FMG-015 remains BLOCKED until merged-main verification completes.
 ## FMUX-004 local verification
 
 FMUX-004: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-004-home`.
 Local proof: Home contract PASS; Windows Release 0 warnings/errors; Windows runtime 750 assertions PASS; macOS build-script syntax PASS.
 Evidence: `docs/evidence/FMUX-004_HOME_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, review, merge, merged-main verification, then claim FMUX-005.
+
+
+## FMG-014 final synchronized code verification
+
+Code candidate: `15babd9f9eee540fef2f008b6ea6ce6340b33109`.
+Native Verify run: `36416421696` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Post-main-sync local proof: project-state + FMUX presentation/home + FMG-014 contract PASS; Windows Release 0 warnings/errors; Windows integration 776 assertions PASS.
+Security hardening: ContentRef base64url decoder now rejects non-canonical encodings on Windows and macOS before HMAC acceptance.
+NEXT_EXACT_ACTION: commit/push this evidence-only closure head -> exact-head native Verify -> scoped review -> PR/merge -> merged-main Verify -> FMG-014 DONE / MAIN VERIFIED -> claim FMG-015.

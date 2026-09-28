@@ -399,7 +399,7 @@ Acceptance:
 
 ## FMG-013 — Full Regression + Live MCP Proof
 
-State: ACTIVE / LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING
+State: DONE / FOUNDATION MAIN VERIFIED
 Depends: FMG-012
 
 Scope:

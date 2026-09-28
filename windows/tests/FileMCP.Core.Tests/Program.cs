@@ -44,6 +44,13 @@ internal static class Program
         Directory.CreateDirectory(root);
         try
         {
+            if (args.Length > 0 && args[0] == "artifact-store-only")
+            {
+                await TestArtifactContentStoreAsync(root);
+                Console.WriteLine($"windows-artifact-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             TestObservabilityContracts();
             TestCanonicalToolCatalog();
             TestServerPolicy();
@@ -70,6 +77,7 @@ internal static class Program
             await TestApplyEditsAsync(root);
             await TestProjectContextAsync(root);
             await TestEvidenceAndFreshnessAsync(root);
+            await TestArtifactContentStoreAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -3450,6 +3458,193 @@ internal static class Program
         }
 
         Console.WriteLine("windows-http-connection-bounds: ok");
+    }
+
+    private static async Task TestArtifactContentStoreAsync(string root)
+    {
+        var area = Path.Combine(root, "artifact-content-store");
+        var workspaceA = Path.Combine(area, "workspace-a");
+        var workspaceB = Path.Combine(area, "workspace-b");
+        Directory.CreateDirectory(workspaceA);
+        Directory.CreateDirectory(workspaceB);
+        var workspaceAId = ArtifactContentStore.WorkspaceAuthorityId(workspaceA);
+        var workspaceBId = ArtifactContentStore.WorkspaceAuthorityId(workspaceB);
+        var clock = new DateTimeOffset(2026, 9, 28, 9, 0, 0, TimeSpan.Zero);
+
+        ArtifactContentStoreOptions Options(
+            string storeName,
+            long maxItem = 1024 * 1024,
+            long maxWorkspace = 4 * 1024 * 1024,
+            long maxGlobal = 8 * 1024 * 1024,
+            Func<string, long, Exception?>? fault = null) =>
+            new()
+            {
+                RootDirectory = Path.Combine(area, storeName),
+                WorkspaceRootForIsolation = workspaceA,
+                MaxItemBytes = maxItem,
+                MaxWorkspaceBytes = maxWorkspace,
+                MaxGlobalBytes = maxGlobal,
+                DefaultTtl = TimeSpan.FromHours(1),
+                MaxTtl = TimeSpan.FromDays(1),
+                UtcNow = () => clock,
+                FaultInjector = fault,
+            };
+
+        var store = new ArtifactContentStore(Options("primary"));
+        var payload = Encoding.UTF8.GetBytes("FMG-014 streamed artifact payload");
+        var descriptor = await store.PutAsync(
+            new MemoryStream(payload, writable: false),
+            workspaceAId,
+            ArtifactContentClasses.ToolOutput,
+            "text/plain",
+            TimeSpan.FromMinutes(30),
+            leaseId: "lease-primary",
+            leaseTtl: TimeSpan.FromMinutes(10));
+
+        Assert(descriptor.ContentRef.StartsWith("cr1.", StringComparison.Ordinal), "artifact ContentRef is opaque authenticated token");
+        Assert(descriptor.BlobId.StartsWith("sha256:", StringComparison.Ordinal) && descriptor.BlobId.Length == 71, "artifact blob uses strong content digest");
+        Assert(descriptor.SizeBytes == payload.Length && descriptor.ContentClass == ArtifactContentClasses.ToolOutput, "artifact descriptor preserves class and size");
+        Assert(store.HasCurrentUserOnlyPermissionsForTest(), "artifact root is current-user-only on Windows");
+        Assert(!Path.GetFullPath(store.RootDirectoryForTest).StartsWith(Path.GetFullPath(workspaceA) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase), "artifact store stays outside workspace");
+
+        await using (var copied = new MemoryStream())
+        {
+            await store.CopyToAsync(descriptor.ContentRef, workspaceAId, ArtifactContentClasses.IsKnown, copied);
+            Assert(copied.ToArray().SequenceEqual(payload), "artifact stream read roundtrip");
+        }
+
+        var reopened = new ArtifactContentStore(Options("primary"));
+        var resolved = await reopened.ResolveAsync(descriptor.ContentRef, workspaceAId, ArtifactContentClasses.IsKnown);
+        Assert(resolved.BlobId == descriptor.BlobId && resolved.ReferenceId == descriptor.ReferenceId, "ContentRef survives store restart with installation identity");
+
+        var tampered = descriptor.ContentRef[..^1] + (descriptor.ContentRef[^1] == 'A' ? "B" : "A");
+        await AssertThrowsAsync(
+            () => reopened.ResolveAsync(tampered, workspaceAId, ArtifactContentClasses.IsKnown),
+            "authentication",
+            "tampered ContentRef rejected");
+        await AssertThrowsAsync(
+            () => reopened.ResolveAsync(descriptor.ContentRef, workspaceBId, ArtifactContentClasses.IsKnown),
+            "workspace",
+            "cross-workspace ContentRef replay rejected");
+        await AssertThrowsAsync(
+            () => reopened.ResolveAsync(descriptor.ContentRef, workspaceAId, _ => false),
+            "denied",
+            "ContentRef resolution rechecks current content-class policy");
+
+        var foreignStore = new ArtifactContentStore(Options("foreign-installation"));
+        await foreignStore.InitializeAsync();
+        await AssertThrowsAsync(
+            () => foreignStore.ResolveAsync(descriptor.ContentRef, workspaceAId, ArtifactContentClasses.IsKnown),
+            "authentication",
+            "ContentRef from another installation rejected");
+
+        clock = clock.AddMinutes(11);
+        await AssertThrowsAsync(
+            () => reopened.ResolveAsync(descriptor.ContentRef, workspaceAId, ArtifactContentClasses.IsKnown),
+            "lease expired",
+            "expired ContentRef lease rejected independently of ref TTL");
+
+        var expiryStore = new ArtifactContentStore(Options("expiry"));
+        var expiryRef = await expiryStore.PutAsync(
+            new MemoryStream(Encoding.UTF8.GetBytes("expires"), false),
+            workspaceAId,
+            ArtifactContentClasses.ToolOutput,
+            ttl: TimeSpan.FromMinutes(2));
+        clock = clock.AddMinutes(3);
+        await AssertThrowsAsync(
+            () => expiryStore.ResolveAsync(expiryRef.ContentRef, workspaceAId, ArtifactContentClasses.IsKnown),
+            "expired",
+            "expired ContentRef rejected");
+        var expiryGc = await expiryStore.CollectGarbageAsync();
+        var expiryUsage = await expiryStore.GetUsageAsync(workspaceAId);
+        Assert(expiryGc.ExpiredReferencesRemoved == 1 && expiryUsage.ReferenceCount == 0 && expiryUsage.BlobCount == 0, "TTL GC removes expired ref and orphan blob");
+
+        clock = new DateTimeOffset(2026, 9, 28, 10, 0, 0, TimeSpan.Zero);
+        var corruptStore = new ArtifactContentStore(Options("corrupt"));
+        var corruptRef = await corruptStore.PutAsync(
+            new MemoryStream(Encoding.UTF8.GetBytes("integrity"), false),
+            workspaceAId,
+            ArtifactContentClasses.Checkpoint);
+        File.WriteAllBytes(corruptStore.BlobPathForTest(corruptRef.BlobId), Encoding.UTF8.GetBytes("INT3GRITY"));
+        await AssertThrowsAsync(
+            () => corruptStore.ResolveAsync(corruptRef.ContentRef, workspaceAId, ArtifactContentClasses.IsKnown),
+            "corrupt",
+            "artifact blob corruption rejected before serving bytes");
+
+        var mismatchStore = new ArtifactContentStore(Options("metadata-mismatch"));
+        var mismatchRef = await mismatchStore.PutAsync(
+            new MemoryStream(Encoding.UTF8.GetBytes("metadata"), false),
+            workspaceAId,
+            ArtifactContentClasses.ToolOutput);
+        var mismatchIndex = File.ReadAllText(mismatchStore.IndexPathForTest, Encoding.UTF8);
+        mismatchIndex = mismatchIndex.Replace(
+            "\"contentClass\":\"TOOL_OUTPUT\"",
+            "\"contentClass\":\"PTY_OUTPUT\"",
+            StringComparison.Ordinal);
+        File.WriteAllText(mismatchStore.IndexPathForTest, mismatchIndex, new UTF8Encoding(false));
+        var mismatchReloaded = new ArtifactContentStore(Options("metadata-mismatch"));
+        await AssertThrowsAsync(
+            () => mismatchReloaded.ResolveAsync(mismatchRef.ContentRef, workspaceAId, ArtifactContentClasses.IsKnown),
+            "metadata mismatch",
+            "ContentRef metadata/blob binding mismatch rejected");
+
+        var quotaStore = new ArtifactContentStore(Options("quota", maxItem: 8, maxWorkspace: 8, maxGlobal: 8));
+        var quotaFirst = await quotaStore.PutAsync(
+            new MemoryStream(Encoding.ASCII.GetBytes("12345678"), false),
+            workspaceAId,
+            ArtifactContentClasses.ToolOutput);
+        await AssertThrowsAsync(
+            () => quotaStore.PutAsync(
+                new MemoryStream(Encoding.ASCII.GetBytes("x"), false),
+                workspaceAId,
+                ArtifactContentClasses.ToolOutput),
+            "quota",
+            "global/workspace quota exhaustion fails closed");
+        var quotaUsage = await quotaStore.GetUsageAsync(workspaceAId);
+        Assert(quotaUsage.ReferenceCount == 1 && quotaUsage.BlobCount == 1 && quotaUsage.GlobalBytes == 8, "quota failure leaves no partial durable artifact");
+        Assert(File.Exists(quotaStore.BlobPathForTest(quotaFirst.BlobId)), "quota failure preserves prior committed artifact");
+
+        var diskFullStore = new ArtifactContentStore(Options(
+            "disk-full",
+            fault: (stage, _) => stage == "before-index-commit" ? new IOException("simulated disk full") : null));
+        await AssertThrowsAsync(
+            () => diskFullStore.PutAsync(
+                new MemoryStream(Encoding.UTF8.GetBytes("must-rollback"), false),
+                workspaceAId,
+                ArtifactContentClasses.Quarantine),
+            "disk full",
+            "disk-full failure is surfaced");
+        var diskUsage = await diskFullStore.GetUsageAsync(workspaceAId);
+        var diskBlobRoot = Path.Combine(diskFullStore.RootDirectoryForTest, "blobs");
+        Assert(diskUsage.ReferenceCount == 0 && diskUsage.BlobCount == 0, "disk-full failure commits no metadata");
+        Assert(!Directory.EnumerateFiles(diskBlobRoot, "*", SearchOption.AllDirectories).Any(), "disk-full failure rolls back newly published blob");
+
+        var concurrentStore = new ArtifactContentStore(Options("concurrent", maxItem: 1024, maxWorkspace: 1024, maxGlobal: 1024));
+        var concurrentBytes = Enumerable.Repeat((byte)0x5A, 64).ToArray();
+        var puts = await Task.WhenAll(Enumerable.Range(0, 16).Select(_ =>
+            concurrentStore.PutAsync(
+                new MemoryStream(concurrentBytes, writable: false),
+                workspaceAId,
+                ArtifactContentClasses.PtyOutput,
+                leaseId: "pty-session",
+                leaseTtl: TimeSpan.FromMinutes(20))));
+        var concurrentUsage = await concurrentStore.GetUsageAsync(workspaceAId);
+        Assert(concurrentUsage.ReferenceCount == 16 && concurrentUsage.BlobCount == 1 && concurrentUsage.GlobalBytes == 64 && concurrentUsage.WorkspaceBytes == 64, "concurrent puts deduplicate one content-addressed blob");
+        await Task.WhenAll(puts.Select(item => concurrentStore.DeleteAsync(item.ContentRef, workspaceAId, ArtifactContentClasses.IsKnown)));
+        concurrentUsage = await concurrentStore.GetUsageAsync(workspaceAId);
+        Assert(concurrentUsage.ReferenceCount == 0 && concurrentUsage.BlobCount == 0 && concurrentUsage.GlobalBytes == 0, "concurrent delete removes final unreferenced blob");
+
+        AssertThrows(
+            () => _ = new ArtifactContentStore(new ArtifactContentStoreOptions
+            {
+                RootDirectory = Path.Combine(workspaceA, ".artifact-store"),
+                WorkspaceRootForIsolation = workspaceA,
+            }),
+            "outside",
+            "artifact root inside repository is rejected");
+
+        Assert(!File.Exists(Path.Combine(store.RootDirectoryForTest, "evidence-v1.sqlite3")), "artifact bytes are not stored in evidence database");
+        Console.WriteLine("windows-artifact-contentref-store: ok");
     }
 
     private static async Task TestEvidenceAndFreshnessAsync(string root)

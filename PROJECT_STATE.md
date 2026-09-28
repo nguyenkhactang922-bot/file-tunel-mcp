@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMUX-004-home`
+Active branch: `chatgpt/FMG-014-artifact-contentref-store`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -387,9 +387,59 @@ Local proof: feedback-component contract PASS; Windows Release 0 warnings/errors
 Evidence: `docs/evidence/FMUX-003_STATUS_FEEDBACK_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, scoped review, merge, merged-main verification, then claim FMUX-004.
 
+## FMG-013 final closure
+
+FMG-013: DONE / FOUNDATION MAIN VERIFIED.
+Final candidate: `db34185e4989953b54a504c9e03a1b5b7253ba3d`.
+PR: #21.
+Merge main: `0158bc5a7b94df7531d9d19c183c9b1c2f8af6c2`.
+Candidate PR Verify: run `36402363852` SUCCESS on macOS / Windows x64 / Windows ARM64 after retrying only a transient ARM64 setup-dotnet runner failure.
+Merged-main native Verify: run `36403091233` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Evidence: `docs/evidence/FMG-013_FULL_REGRESSION_LIVE_MCP_EVIDENCE.md`.
+
+## FMG-014 implementation
+
+State: ACTIVE / LOCAL VERIFIED / CROSS-PLATFORM CI PENDING.
+Branch: `chatgpt/FMG-014-artifact-contentref-store`.
+Depends: FMG-013, FMG-004, FMG-006, FMG-011 DONE / MAIN VERIFIED.
+Scope: Ephemeral Artifact / ContentRef Store only.
+NEXT_EXACT_ACTION: implement the authenticated content-addressed store foundation and its cross-platform security/failure contracts. Do not begin FMG-015 before FMG-014 MAIN VERIFIED.
+
+
+## FMG-014 local verification checkpoint
+
+Evidence: `docs/evidence/FMG-014_ARTIFACT_CONTENTREF_STORE_EVIDENCE.md`.
+Windows local contract/build/integration: PASS (776 assertions; 0 warnings / 0 errors).
+macOS native compile/integration: pending exact-head Verify.
+FMG-015 remains BLOCKED until FMG-014 MAIN VERIFIED.
+
+
+## FMG-014 post-main-sync verification
+
+Merged latest `fork/main=7e8590a` into the FMG-014 working tree while preserving FMUX-003 and FMG-014 authority.
+Local post-sync proof: project-state PASS; FMUX shell PASS; FMUX feedback PASS; FMG-014 artifact contract PASS; Windows Release build 0 warnings/errors; Windows integration 776 assertions PASS.
+NEXT_EXACT_ACTION: finalize the merge commit, push the exact FMG-014 head, require native Verify on macOS + Windows x64 + Windows ARM64, then scoped review -> PR/merge -> merged-main Verify -> FMG-014 MAIN VERIFIED -> claim FMG-015.
+
+
+## FMG-014 exact-head native verification
+
+Candidate `c7f921e4036a7ac4be9b350b215f055e706ddd60` is NATIVE VERIFIED.
+Verify run `36413985720`: SUCCESS on macOS, Windows x64 and native Windows ARM64.
+Final macOS integration proof includes `swift-artifact-contentref-store: ok`; Windows integration includes `windows-artifact-contentref-store: ok` within 776 assertions.
+State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PENDING.
+NEXT_EXACT_ACTION: scoped review -> PR/merge -> merged-main Verify -> FMG-014 DONE / MAIN VERIFIED -> claim FMG-015. FMG-015 remains BLOCKED until merged-main verification completes.
 ## FMUX-004 local verification
 
 FMUX-004: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-004-home`.
 Local proof: Home contract PASS; Windows Release 0 warnings/errors; Windows runtime 750 assertions PASS; macOS build-script syntax PASS.
 Evidence: `docs/evidence/FMUX-004_HOME_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, review, merge, merged-main verification, then claim FMUX-005.
+
+
+## FMG-014 final synchronized code verification
+
+Code candidate: `15babd9f9eee540fef2f008b6ea6ce6340b33109`.
+Native Verify run: `36416421696` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Post-main-sync local proof: project-state + FMUX presentation/home + FMG-014 contract PASS; Windows Release 0 warnings/errors; Windows integration 776 assertions PASS.
+Security hardening: ContentRef base64url decoder now rejects non-canonical encodings on Windows and macOS before HMAC acceptance.
+NEXT_EXACT_ACTION: commit/push this evidence-only closure head -> exact-head native Verify -> scoped review -> PR/merge -> merged-main Verify -> FMG-014 DONE / MAIN VERIFIED -> claim FMG-015.
