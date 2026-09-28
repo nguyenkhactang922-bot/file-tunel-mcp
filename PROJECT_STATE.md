@@ -318,6 +318,6 @@ Authorities:
 - docs/design/FMUX_DECISION_MATRIX_V1.md
 - tasks/MASTER_FILEMCP_FMUX_TASK_GRAPH.md
 
-FMUX-001: ACTIVE / LOCAL VERIFIED / NATIVE macOS CI PENDING on branch `chatgpt/FMUX-complete-scope-freeze`.
+FMUX-001: ACTIVE / LOCAL + NATIVE VERIFIED / REVIEW PENDING on branch `chatgpt/FMUX-complete-scope-freeze`.
 Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push the exact FMUX-001 candidate, require native verification, merge only exact green head, then claim FMUX-002. FMG-026 scope remains unchanged.
