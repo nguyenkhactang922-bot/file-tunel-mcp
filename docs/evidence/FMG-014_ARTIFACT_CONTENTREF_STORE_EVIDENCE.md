@@ -129,3 +129,26 @@ The previous macOS-only failures were corrected narrowly:
 - `c7f921e4036a7ac4be9b350b215f055e706ddd60`: moved that throwing call outside the autoclosure; all native lanes then passed.
 
 FMG-014 is EXACT-HEAD NATIVE VERIFIED. Remaining gates: scoped review -> PR/merge -> merged-main Verify -> DONE / MAIN VERIFIED -> claim FMG-015.
+
+
+## Final synchronized exact-head verification
+
+After syncing `fork/main=e4e243a` (FMUX-004) and resolving only governance-state conflicts, local gates passed:
+- project-state contract;
+- FMUX presentation contract;
+- FMUX Home contract;
+- FMG-014 artifact contract;
+- Windows Release build: 0 warnings / 0 errors;
+- Windows full integration: `windows-artifact-contentref-store: ok`, 776 assertions.
+
+A nondeterministic tamper test exposed non-canonical base64url acceptance: alternate final base64url characters can decode to the same bytes when unused padding bits differ. FMG-014 was hardened on both Windows and macOS by requiring `decode -> canonical re-encode == original segment` before HMAC verification. This makes any textual ContentRef segment mutation fail closed.
+
+Final synchronized code candidate: `15babd9f9eee540fef2f008b6ea6ce6340b33109`.
+Final code Verify run `36416421696`: SUCCESS on:
+- macOS;
+- Windows x64;
+- native Windows ARM64.
+
+No job retry and no source mutation occurred during run `36416421696`.
+
+NEXT: record this evidence in the branch, run exact-head Verify for the docs-only closure commit, scoped review, PR/merge, merged-main Verify, mark FMG-014 DONE / MAIN VERIFIED, then claim FMG-015.
