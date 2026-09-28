@@ -17,13 +17,14 @@ The underlying source foundation is verified:
 ## Live connector proof - BLOCKER
 
 The FileMCP desktop currently serving this ChatGPT session is not the latest product binary:
-- live process PID: `13896`;
+- live process PID: `11960`;
 - live executable: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-release\FileMCP.exe`;
 - live executable timestamp: `2026-09-22T14:26:46.4876055+07:00`;
 - live executable size: `165431146`;
 - live executable SHA-256: `7689540f1ff4cc080064eb1ccaf33a5b4a8b1a736b2f10b52988505e6e7c2807`;
 - ChatGPT connector tool registry visible in this session: 19 FileMCP tools;
-- expected current canonical source registry: 23 tools.
+- expected current canonical source registry: 23 tools;
+- live blocker re-verified on 2026-09-28: PID `11960`, same old executable/hash, connector still exposes exactly 19 FileMCP tools.
 
 Missing from the currently connected live registry relative to source are the newer foundation tools/capabilities such as `exec_process`, `apply_edits`, `project_context`, and `evidence_get`. Therefore FMG-013 cannot truthfully claim live MCP parity while this old desktop process remains the active connector.
 
