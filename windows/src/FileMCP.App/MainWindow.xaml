@@ -83,6 +83,8 @@
                         Margin="0,0,0,4" Click="NavigateConnections_Click" AutomationProperties.Name="Connections"/>
                 <Button x:Name="NavSettingsButton" Content="Settings" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateSettings_Click" AutomationProperties.Name="Settings"/>
+                <Button x:Name="NavActivityButton" Content="Activity" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateActivity_Click" AutomationProperties.Name="Activity"/>
                 <Button x:Name="NavDiagnosticsButton" Content="Diagnostics" HorizontalContentAlignment="Left"
                         Margin="0,8,0,4" Click="NavigateDiagnostics_Click" AutomationProperties.Name="Diagnostics"/>
             </StackPanel>
@@ -623,7 +625,61 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="Logs">
+            <TabItem Header="Activity" x:Name="ActivityTab">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="220"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:PageHeader Title="Activity"
+                                             Description="Structured runtime, workspace and error events. Raw logs remain under Diagnostics."/>
+                        <ComboBox x:Name="ActivityFilterCombo" Grid.Column="1" SelectedIndex="0"
+                                  SelectionChanged="ActivityFilterCombo_SelectionChanged">
+                            <ComboBoxItem Content="All activity" Tag="all"/>
+                            <ComboBoxItem Content="Errors only" Tag="error"/>
+                            <ComboBoxItem Content="Workspace/runtime" Tag="runtime"/>
+                            <ComboBoxItem Content="Settings/connection" Tag="settings"/>
+                        </ComboBox>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3*"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+                        <DataGrid x:Name="ActivityGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True"
+                                  SelectionMode="Single"
+                                  SelectionChanged="ActivityGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="90"/>
+                                <DataGridTextColumn Header="Type" Binding="{Binding Kind}" Width="110"/>
+                                <DataGridTextColumn Header="Workspace" Binding="{Binding Workspace}" Width="90"/>
+                                <DataGridTextColumn Header="Summary" Binding="{Binding Summary}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Border Grid.Column="1" Margin="12,0,0,0" Style="{StaticResource FileMcpCardBorder}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Event detail"/>
+                                <TextBlock x:Name="ActivityDetailText" Margin="0,8,0,0" Text="Select an activity event." TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock x:Name="ActivityCountText" Grid.Row="2" Margin="0,8,0,0"
+                               Style="{StaticResource FileMcpCaptionText}" Text="0 events"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Diagnostics">
                 <Grid Margin="10">
                     <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
