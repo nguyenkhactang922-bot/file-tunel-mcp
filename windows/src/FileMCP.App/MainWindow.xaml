@@ -87,6 +87,8 @@
                         Margin="0,0,0,4" Click="NavigateActivity_Click" AutomationProperties.Name="Activity"/>
                 <Button x:Name="NavChangesButton" Content="Changes" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateChanges_Click" AutomationProperties.Name="Changes"/>
+                <Button x:Name="NavEvidenceButton" Content="Evidence" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateEvidence_Click" AutomationProperties.Name="Evidence"/>
                 <Button x:Name="NavDiagnosticsButton" Content="Diagnostics" HorizontalContentAlignment="Left"
                         Margin="0,8,0,4" Click="NavigateDiagnostics_Click" AutomationProperties.Name="Diagnostics"/>
             </StackPanel>
@@ -731,6 +733,52 @@
                     <TextBlock x:Name="ChangesCountText" Grid.Row="2" Margin="0,8,0,0"
                                Style="{StaticResource FileMcpCaptionText}"
                                Text="0 captured mutation events"/>
+                </Grid>
+            </TabItem>
+
+
+
+            <TabItem Header="Evidence" x:Name="EvidenceTab">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <controls:PageHeader Title="Evidence"
+                                         Description="Server-owned verification records with source, policy and catalog linkage."/>
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3*"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+                        <DataGrid x:Name="EvidenceGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True"
+                                  SelectionMode="Single"
+                                  SelectionChanged="EvidenceGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="90"/>
+                                <DataGridTextColumn Header="State" Binding="{Binding DisplayState}" Width="100"/>
+                                <DataGridTextColumn Header="Workspace" Binding="{Binding Workspace}" Width="90"/>
+                                <DataGridTextColumn Header="Criterion" Binding="{Binding Criterion}" Width="150"/>
+                                <DataGridTextColumn Header="Evidence ID" Binding="{Binding EvidenceId}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Border Grid.Column="1" Margin="12,0,0,0" Style="{StaticResource FileMcpCardBorder}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Evidence detail"/>
+                                <controls:StatusBadge x:Name="EvidenceDetailStatus" Status="Unavailable" HorizontalAlignment="Left" Margin="0,8,0,8"/>
+                                <TextBlock x:Name="EvidenceDetailText" Text="Select an evidence record." TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock x:Name="EvidenceCountText" Grid.Row="2" Margin="0,8,0,0"
+                               Style="{StaticResource FileMcpCaptionText}"
+                               Text="0 captured evidence records"/>
                 </Grid>
             </TabItem>
 

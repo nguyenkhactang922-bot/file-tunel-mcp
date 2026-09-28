@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
+using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -34,8 +35,10 @@ public partial class MainWindow : Window
     private string _logBuffer = "";
     private readonly List<ActivityRow> _activityRows = new();
     private readonly List<ChangeRow> _changeRows = new();
+    private readonly List<EvidenceRow> _evidenceRows = new();
     private const int MaxActivityRows = 500;
     private const int MaxChangeRows = 250;
+    private const int MaxEvidenceRows = 500;
     private string _lastImportantEvent = "No recent issue";
     private const int MaxLogCharacters = 500_000;
 
@@ -1063,6 +1066,11 @@ public partial class MainWindow : Window
         MainTabs.SelectedItem = ChangesTab;
         RefreshChangesGrid();
     }
+    private void NavigateEvidence_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = EvidenceTab;
+        RefreshEvidenceGrid();
+    }
     private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
 
     private void CompactNavigation_Click(object sender, RoutedEventArgs e)
@@ -1078,6 +1086,7 @@ public partial class MainWindow : Window
         SetNavigationButtonPresentation(NavSettingsButton, "Settings", "S");
         SetNavigationButtonPresentation(NavActivityButton, "Activity", "A");
         SetNavigationButtonPresentation(NavChangesButton, "Changes", "C");
+        SetNavigationButtonPresentation(NavEvidenceButton, "Evidence", "E");
         SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
 
         ShellWorkspaceText.Visibility = _navigationCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -1268,6 +1277,27 @@ public partial class MainWindow : Window
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
 
+    private sealed record EvidenceRow(
+        DateTimeOffset Timestamp,
+        string Workspace,
+        string EvidenceId,
+        string OperationId,
+        string Criterion,
+        string VerificationState,
+        string OperationState,
+        string StorageStatus,
+        string SourceBinding,
+        string? SourceStateId,
+        string? ProjectContextDigest,
+        string PolicyHash,
+        string CatalogHash,
+        string CatalogVersion,
+        string? BlockReason)
+    {
+        public string Time => Timestamp.ToLocalTime().ToString("HH:mm:ss");
+        public string DisplayState => VerificationState == "not-applicable" ? "N/A" : VerificationState;
+    }
+
     private sealed record ChangeRow(
         DateTimeOffset Timestamp,
         string Status,
@@ -1302,6 +1332,8 @@ public partial class MainWindow : Window
             if (line.StartsWith("[") && line.IndexOf(']') is var close && close > 1)
                 workspace = line[1..close];
 
+            TryCaptureEvidenceRow(line, workspace);
+
             var lower = line.ToLowerInvariant();
             var kind = lower.Contains("error") || lower.Contains("failed") || lower.Contains("could not")
                 ? "Error"
@@ -1322,11 +1354,92 @@ public partial class MainWindow : Window
             _activityRows.RemoveRange(0, _activityRows.Count - MaxActivityRows);
         if (_changeRows.Count > MaxChangeRows)
             _changeRows.RemoveRange(0, _changeRows.Count - MaxChangeRows);
+        if (_evidenceRows.Count > MaxEvidenceRows)
+            _evidenceRows.RemoveRange(0, _evidenceRows.Count - MaxEvidenceRows);
 
         if (IsLoaded && MainTabs.SelectedItem == ActivityTab)
             RefreshActivityGrid();
         if (IsLoaded && MainTabs.SelectedItem == ChangesTab)
             RefreshChangesGrid();
+        if (IsLoaded && MainTabs.SelectedItem == EvidenceTab)
+            RefreshEvidenceGrid();
+    }
+
+    private void TryCaptureEvidenceRow(string line, string workspace)
+    {
+        const string marker = "[EvidenceResult] ";
+        var markerIndex = line.IndexOf(marker, StringComparison.Ordinal);
+        if (markerIndex < 0) return;
+
+        try
+        {
+            var json = line[(markerIndex + marker.Length)..];
+            var node = JsonNode.Parse(json)?.AsObject();
+            if (node is null) return;
+
+            static string Text(JsonObject obj, string key, string fallback = "unknown") =>
+                obj[key]?.GetValue<string>() ?? fallback;
+            static string? OptionalText(JsonObject obj, string key) =>
+                obj[key] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+
+            _evidenceRows.Add(new EvidenceRow(
+                DateTimeOffset.Now,
+                workspace,
+                Text(node, "evidence_id"),
+                Text(node, "operation_id"),
+                Text(node, "criterion_id"),
+                Text(node, "verification_state"),
+                Text(node, "operation_state"),
+                Text(node, "storage_status"),
+                Text(node, "source_binding"),
+                OptionalText(node, "source_state_id"),
+                OptionalText(node, "project_context_digest"),
+                Text(node, "policy_hash"),
+                Text(node, "catalog_hash"),
+                Text(node, "catalog_version"),
+                OptionalText(node, "block_reason")));
+        }
+        catch
+        {
+            // Evidence UI never invents a record when structured metadata is malformed.
+        }
+    }
+
+    private void RefreshEvidenceGrid()
+    {
+        var visible = _evidenceRows.AsEnumerable().Reverse().ToArray();
+        EvidenceGrid.ItemsSource = visible;
+        EvidenceCountText.Text = visible.Length == 0
+            ? "0 captured evidence records | waiting for real evidence metadata"
+            : $"{visible.Length} captured evidence record(s) | max {MaxEvidenceRows}";
+    }
+
+    private void EvidenceGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (EvidenceGrid.SelectedItem is not EvidenceRow row)
+        {
+            EvidenceDetailStatus.Status = PresentationStatus.Unavailable;
+            EvidenceDetailText.Text = "Select an evidence record.";
+            return;
+        }
+
+        EvidenceDetailStatus.Status = row.VerificationState switch
+        {
+            "passed" => PresentationStatus.Passed,
+            "failed" => PresentationStatus.Failed,
+            "stale" => PresentationStatus.Stale,
+            "blocked" => PresentationStatus.Blocked,
+            "not-run" => PresentationStatus.Stopped,
+            "not-applicable" => PresentationStatus.Unavailable,
+            _ => PresentationStatus.Warning,
+        };
+
+        EvidenceDetailText.Text =
+            $"Evidence: {row.EvidenceId}\nOperation: {row.OperationId} ({row.OperationState})\nCriterion: {row.Criterion}\n" +
+            $"Verification: {row.DisplayState}\nStorage: {row.StorageStatus}\nSource binding: {row.SourceBinding}\n" +
+            $"Source state: {row.SourceStateId ?? "N/A"}\nProject context: {row.ProjectContextDigest ?? "N/A"}\n" +
+            $"Policy hash: {row.PolicyHash}\nCatalog: {row.CatalogVersion} | {row.CatalogHash}\n" +
+            $"Block reason: {row.BlockReason ?? "N/A"}";
     }
 
     private static bool TryCreateChangeRow(string line, string workspace, out ChangeRow change)

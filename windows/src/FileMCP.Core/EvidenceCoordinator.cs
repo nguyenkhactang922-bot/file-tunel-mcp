@@ -178,7 +178,7 @@ internal sealed class EvidenceCoordinator
             verification = "unknown";
         }
 
-        return new JsonObject
+        var metadata = new JsonObject
         {
             ["schema_version"] = MetadataSchemaVersion,
             ["evidence_id"] = run.EvidenceId,
@@ -196,6 +196,8 @@ internal sealed class EvidenceCoordinator
             ["catalog_version"] = CanonicalToolCatalog.CatalogVersion,
             ["block_reason"] = run.BlockReason,
         };
+        _log("[EvidenceResult] " + metadata.ToJsonString() + "\n");
+        return metadata;
     }
 
     public async Task<JsonObject> StatusAsync(

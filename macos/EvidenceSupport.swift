@@ -386,7 +386,7 @@ final class EvidenceCoordinator {
         } else if ["passed", "failed", "stale"].contains(verification) {
             verification = "unknown"
         }
-        return [
+        let metadata: [String: Any] = [
             "schema_version": Self.metadataSchemaVersion, "evidence_id": run.evidenceID, "operation_id": run.operationID,
             "storage_status": durable ? "durable" : "unavailable", "operation_state": evaluation.operationState,
             "verification_state": verification, "criterion_id": run.request.criterionID, "source_binding": sourceBinding,
@@ -395,6 +395,12 @@ final class EvidenceCoordinator {
             "catalog_hash": CanonicalToolCatalog.shared.catalogHash, "catalog_version": CanonicalToolCatalog.shared.catalogVersion,
             "block_reason": run.blockReason ?? NSNull(),
         ]
+        if JSONSerialization.isValidJSONObject(metadata),
+           let data = try? JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys]),
+           let text = String(data: data, encoding: .utf8) {
+            log("[EvidenceResult] \(text)\n")
+        }
+        return metadata
     }
 
     func status(evidenceID: String, repoPath: String?, relevantPaths: [String]) throws -> [String: Any] {
