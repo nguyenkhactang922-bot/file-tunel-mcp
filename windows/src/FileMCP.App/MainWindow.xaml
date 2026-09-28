@@ -1,6 +1,7 @@
 <Window x:Class="FileMCP.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:FileMCP.App.Controls"
         Title="FileMCP" Width="980" Height="760" MinWidth="860" MinHeight="650"
         WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip"
         Icon="Assets/filemcp.ico">
@@ -85,9 +86,9 @@
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Margin="2,12,2,2">
-                <TextBlock x:Name="ShellHealthText" FontWeight="SemiBold" Text="Runtime status"/>
+                <controls:StatusBadge x:Name="ShellStatusBadge" Status="Stopped" HorizontalAlignment="Left"/>
                 <TextBlock x:Name="ShellWorkspaceText" Style="{StaticResource FileMcpCaptionText}"
-                           Text="Workspaces C · D · E · F" TextWrapping="Wrap"/>
+                           Text="Workspaces C Ã‚| D Ã‚| E Ã‚| F" TextWrapping="Wrap"/>
             </StackPanel>
         </DockPanel>
     </Border>
