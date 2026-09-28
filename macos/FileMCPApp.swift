@@ -206,6 +206,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let execEnvironmentAllowListField = NSTextField()
     private let enableCommandsCheckbox = NSButton(checkboxWithTitle: "Allow shell commands", target: nil, action: nil)
     private let policyProfilePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let policyExplanationLabel = NSTextField(wrappingLabelWithString: "")
     private let logView = NSTextView()
     private let saveConnectionButton = LoadingButton(title: "Save connection", target: nil, action: nil)
     private let saveSettingsButton = LoadingButton(title: "Save settings", target: nil, action: nil)
@@ -457,11 +458,12 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
                 item.isEnabled = enabled
             }
         }
-        let policyWarning = NSTextField(wrappingLabelWithString: "Policy is owned by local settings. Workspace auto never enables shell or open-world network tools; legacy command mode is retained only for migrated configurations.")
-        policyWarning.font = .systemFont(ofSize: 10)
-        policyWarning.textColor = .secondaryLabelColor
-        policyWarning.maximumNumberOfLines = 0
-        policyWarning.preferredMaxLayoutWidth = Layout.contentWidth
+        policyProfilePopup.target = self
+        policyProfilePopup.action = #selector(policyProfileChanged)
+        policyExplanationLabel.font = .systemFont(ofSize: 10)
+        policyExplanationLabel.textColor = .secondaryLabelColor
+        policyExplanationLabel.maximumNumberOfLines = 0
+        policyExplanationLabel.preferredMaxLayoutWidth = Layout.contentWidth
 
         let policyRow = fieldRow("Policy", policyProfilePopup)
         let profileRow = fieldRow("Profile", profileField)
@@ -476,23 +478,55 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         advancedSettingsGroup.alignment = .leading
         advancedSettingsGroup.spacing = 8
         advancedSettingsGroup.detachesHiddenViews = true
-        [profileRow, portRow, healthRow, gitNameRow, gitEmailRow, execEnvironmentRow].forEach {
+        let executionTitle = NSTextField(labelWithString: "Execution")
+        executionTitle.font = .systemFont(ofSize: 14, weight: .semibold)
+        let gitTitle = NSTextField(labelWithString: "Git")
+        gitTitle.font = .systemFont(ofSize: 14, weight: .semibold)
+        [executionTitle, profileRow, portRow, healthRow, execEnvironmentRow, gitTitle, gitNameRow, gitEmailRow].forEach {
             advancedSettingsGroup.addArrangedSubview($0)
         }
         advancedSettingsGroup.isHidden = true
         advancedSettingsGroup.translatesAutoresizingMaskIntoConstraints = false
 
+        let settingsHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Settings",
+            description: "Workspace, policy, execution and local application preferences."
+        )
+        let generalTitle = NSTextField(labelWithString: "General")
+        generalTitle.font = .systemFont(ofSize: 14, weight: .semibold)
+        let policyTitle = NSTextField(labelWithString: "Policy & permissions")
+        policyTitle.font = .systemFont(ofSize: 14, weight: .semibold)
+        let appearanceTitle = NSTextField(labelWithString: "Appearance")
+        appearanceTitle.font = .systemFont(ofSize: 14, weight: .semibold)
+        let appearanceInfo = NSTextField(wrappingLabelWithString: "FileMCP follows the operating-system appearance and accessibility settings. No independent theme override is configured.")
+        appearanceInfo.textColor = .secondaryLabelColor
+        let storageTitle = NSTextField(labelWithString: "Storage & retention")
+        storageTitle.font = .systemFont(ofSize: 14, weight: .semibold)
+        let storageInfo = NSTextField(wrappingLabelWithString: "Artifact, telemetry and evidence retention are enforced by runtime storage policies; this UI does not bypass those limits.")
+        storageInfo.textColor = .secondaryLabelColor
+
         let settingsForm = NSStackView(views: [
+            settingsHeader,
+            generalTitle,
             directoryRow,
+            policyTitle,
             policyRow,
-            policyWarning,
+            policyExplanationLabel,
+            appearanceTitle,
+            appearanceInfo,
+            storageTitle,
+            storageInfo,
             advancedToggleButton,
             advancedSettingsGroup,
         ])
         settingsForm.orientation = .vertical
         settingsForm.alignment = .leading
         settingsForm.spacing = 8
-        settingsForm.setCustomSpacing(14, after: policyWarning)
+        settingsForm.setCustomSpacing(12, after: settingsHeader)
+        settingsForm.setCustomSpacing(12, after: directoryRow)
+        settingsForm.setCustomSpacing(12, after: policyExplanationLabel)
+        settingsForm.setCustomSpacing(12, after: appearanceInfo)
+        settingsForm.setCustomSpacing(12, after: storageInfo)
         settingsForm.setCustomSpacing(10, after: advancedToggleButton)
         settingsForm.translatesAutoresizingMaskIntoConstraints = false
 
@@ -760,6 +794,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             policyProfilePopup.selectItem(at: 0)
         }
         enableCommandsCheckbox.state = policyProfile == FileMCPPolicyProfiles.legacyCommandCompatible ? .on : .off
+        updatePolicyExplanation()
     }
 
     private func updateAPIKeyPlaceholder() {
@@ -961,6 +996,26 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             apiKeyField.stringValue = ""
             updateAPIKeyPlaceholder()
         } catch { showError(error.localizedDescription) }
+    }
+
+    @objc private func policyProfileChanged() {
+        updatePolicyExplanation()
+    }
+
+    private func updatePolicyExplanation() {
+        let profile = policyProfilePopup.selectedItem?.representedObject as? String ?? FileMCPPolicyProfiles.restricted
+        switch profile {
+        case FileMCPPolicyProfiles.restricted:
+            policyExplanationLabel.stringValue = "Restricted: conservative compatibility policy. Shell and open-world network capabilities remain unavailable unless core policy explicitly allows them."
+        case FileMCPPolicyProfiles.workspaceAuto:
+            policyExplanationLabel.stringValue = "Workspace auto: permits workspace-safe operations while shell and open-world network actions remain disabled."
+        case FileMCPPolicyProfiles.custom:
+            policyExplanationLabel.stringValue = "Custom: advanced local policy. Effective permissions remain runtime-enforced and cannot be elevated by the UI."
+        case FileMCPPolicyProfiles.legacyCommandCompatible:
+            policyExplanationLabel.stringValue = "Legacy command compatible: migration-only compatibility profile retained for existing configurations."
+        default:
+            policyExplanationLabel.stringValue = "Policy is owned by local settings and enforced by the runtime."
+        }
     }
 
     @objc private func quitApp() { NSApp.terminate(nil) }

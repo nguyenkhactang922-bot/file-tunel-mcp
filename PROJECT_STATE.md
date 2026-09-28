@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMUX-006-connections`
+Active branch: `chatgpt/FMUX-007-settings-policy-v2`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -461,3 +461,22 @@ FMUX-006: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-006-conne
 Local proof: Connections contract PASS; Windows Release 0 warnings/errors; Windows runtime 776 assertions PASS; macOS build-script syntax PASS.
 Evidence: `docs/evidence/FMUX-006_CONNECTIONS_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, review, merge, merged-main verification, then claim FMUX-007.
+
+## FMUX-006 closure / FMUX-007 claim
+
+FMUX-006: DONE / MAIN VERIFIED.
+PR: #27.
+Merge main: `c595af516ca31be3bb20ab34316fa5ad92fe02be`.
+Merged-main Verify: run `36420010186` SUCCESS on Windows x64 / Windows ARM64 / macOS.
+
+FMUX-007: ACTIVE / CLAIMED on `chatgpt/FMUX-007-settings-policy-v2`.
+Scope: structured Settings categories, factual policy explanation, advanced progressive disclosure, Execution/Git/Appearance/Storage presentation only. UI must not create new authority or fake settings.
+
+NEXT_EXACT_ACTION: finish FMUX-007 local contract/build/runtime gates, exact-head native Verify, review, merge, merged-main verification, then claim FMUX-008.
+
+## FMUX-007 local verification
+
+FMUX-007: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-007-settings-policy-v2`.
+Local proof: Settings/Policy contract PASS; Windows Release 0 warnings/errors; Windows runtime 776 assertions PASS; macOS build-script syntax PASS.
+Evidence: `docs/evidence/FMUX-007_SETTINGS_POLICY_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, review, merge, merged-main verification, then claim FMUX-008.

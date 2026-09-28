@@ -90,7 +90,7 @@
             <StackPanel DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Margin="2,12,2,2">
                 <controls:StatusBadge x:Name="ShellStatusBadge" Status="Stopped" HorizontalAlignment="Left"/>
                 <TextBlock x:Name="ShellWorkspaceText" Style="{StaticResource FileMcpCaptionText}"
-                           Text="Workspaces C Ã‚| D Ã‚| E Ã‚| F" TextWrapping="Wrap"/>
+                           Text="Workspaces C Ãƒâ€š| D Ãƒâ€š| E Ãƒâ€š| F" TextWrapping="Wrap"/>
             </StackPanel>
         </DockPanel>
     </Border>
@@ -450,6 +450,18 @@
             <TabItem Header="Settings" x:Name="SettingsTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
+                        <controls:PageHeader Title="Settings"
+                                             Description="Workspace, policy, execution and local application preferences."
+                                             Margin="0,0,0,14"/>
+
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="General"/>
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Margin="0,3,0,0"
+                                           Text="Workspace roots and local gateway defaults."/>
+                            </StackPanel>
+                        </Border>
+
                         <TextBlock FontWeight="SemiBold" Text="Workspace roots"/>
                         <TextBlock Margin="0,4,0,10" Foreground="Gray" TextWrapping="Wrap"
                                    Text="Enable the drives you want FileMCP to expose. Every workspace remains isolated to its configured root."/>
@@ -501,21 +513,46 @@
                             </Grid>
                         </Border>
 
-                        <StackPanel Margin="0,14,0,0">
-                            <TextBlock Text="Execution policy" FontWeight="SemiBold"/>
-                            <ComboBox x:Name="PolicyProfileComboBox" Margin="0,6,0,0" SelectedValuePath="Tag">
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Policy &amp; permissions"/>
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Margin="0,3,0,10"
+                                           Text="Local policy controls what agent actions may execute. UI never grants authority beyond this setting."/>
+                                <TextBlock Text="Execution policy" FontWeight="SemiBold"/>
+                                <ComboBox x:Name="PolicyProfileComboBox" Margin="0,6,0,0" SelectedValuePath="Tag"
+                                          SelectionChanged="PolicyProfileComboBox_SelectionChanged">
                                 <ComboBoxItem Content="Restricted (legacy-safe compatibility)" Tag="restricted"/>
                                 <ComboBoxItem Content="Workspace auto" Tag="workspace-auto"/>
                                 <ComboBoxItem Content="Custom (advanced local policy)" Tag="custom"/>
                                 <ComboBoxItem Content="Legacy command compatible (migrated only)" Tag="legacy-command-compatible" IsEnabled="False"/>
                             </ComboBox>
-                            <TextBlock Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
-                                       Text="Policy is owned by local settings. Workspace auto never enables shell or open-world network tools; legacy command mode appears only for migrated configurations."/>
-                            <CheckBox x:Name="EnableCommandsCheckBox" Visibility="Collapsed"/>
-                        </StackPanel>
+                                <TextBlock x:Name="PolicyExplanationText" Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
+                                           Text="Policy is owned by local settings."/>
+                                <CheckBox x:Name="EnableCommandsCheckBox" Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Appearance"/>
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Margin="0,3,0,0"
+                                           Text="FileMCP follows the operating-system appearance and accessibility settings. No independent theme override is configured."/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Storage &amp; retention"/>
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Margin="0,3,0,0"
+                                           Text="Artifact, telemetry and evidence retention are enforced by the runtime storage policies; this page does not bypass those limits."/>
+                            </StackPanel>
+                        </Border>
 
                         <Expander x:Name="AdvancedExpander" Header="Advanced options" Margin="0,16,0,0">
                             <StackPanel Margin="0,12,0,0">
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Execution"/>
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Margin="0,3,0,10"
+                                           Text="Advanced per-workspace runtime, environment and health settings."/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="60"/>
@@ -561,7 +598,8 @@
                                     <TextBox x:Name="FHealthBox" Grid.Row="8" Grid.Column="3"/>
                                 </Grid>
 
-                                <Grid Margin="0,16,0,0">
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Margin="0,18,0,6" Text="Git"/>
+                                <Grid Margin="0,0,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="120"/>
                                         <ColumnDefinition Width="*"/>

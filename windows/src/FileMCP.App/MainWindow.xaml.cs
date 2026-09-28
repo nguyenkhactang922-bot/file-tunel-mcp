@@ -469,6 +469,25 @@ public partial class MainWindow : Window
         }
     }
 
+    private void PolicyProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (PolicyExplanationText is null) return;
+
+        var profile = PolicyProfileComboBox.SelectedValue?.ToString() ?? FileMcpPolicyProfiles.Restricted;
+        PolicyExplanationText.Text = profile switch
+        {
+            FileMcpPolicyProfiles.Restricted =>
+                "Restricted: conservative compatibility policy. Shell and open-world network capabilities stay unavailable unless explicitly allowed by core policy.",
+            FileMcpPolicyProfiles.WorkspaceAuto =>
+                "Workspace auto: automatically permits workspace-safe operations while keeping shell and open-world network actions disabled.",
+            FileMcpPolicyProfiles.Custom =>
+                "Custom: advanced local policy profile. Effective permissions remain enforced by the runtime and cannot be elevated by the UI.",
+            FileMcpPolicyProfiles.LegacyCommandCompatible =>
+                "Legacy command compatible: migration-only compatibility profile retained for existing configurations.",
+            _ => "Policy is owned by local settings and enforced by the runtime.",
+        };
+    }
+
     private void OverviewSessionsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (OverviewSessionsGrid.SelectedItem is not ObservedSessionRow row)
@@ -591,6 +610,7 @@ public partial class MainWindow : Window
         GitEmailBox.Text = settings.GitUserEmail;
         PolicyProfileComboBox.SelectedValue = settings.PolicyProfile;
         if (PolicyProfileComboBox.SelectedValue is null) PolicyProfileComboBox.SelectedValue = FileMcpPolicyProfiles.Restricted;
+        PolicyProfileComboBox_SelectionChanged(PolicyProfileComboBox, null!);
         EnableCommandsCheckBox.IsChecked = settings.PolicyProfile == FileMcpPolicyProfiles.LegacyCommandCompatible;
         ExecEnvironmentAllowListBox.Text = string.Join(", ", settings.ExecEnvironmentAllowList);
         OtlpEnabledCheckBox.IsChecked = settings.OtlpEnabled;
