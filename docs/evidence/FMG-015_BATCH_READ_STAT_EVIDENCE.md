@@ -125,3 +125,16 @@ Head: `c4b2eb5ce36109f686e53e83d53df5b90f84c735`.
 - macOS integration: FAIL before executing the new mutation assertion because the same `fmg015Race...` test block existed twice in the generated Swift main, causing redeclaration diagnostics.
 
 Remediation: remove the duplicate test block only; keep exactly one native macOS same-size mid-read mutation proof. Product code is unchanged from the Windows/ARM64-successful head.
+
+## Exact-head Verify run 36444058795 - attempt 3
+
+Head: `c341d6dfad6f90c20604543f3a7f2720213ea48a`.
+
+PASS:
+- macOS native Verify: SUCCESS;
+- Windows x64 native Verify: SUCCESS;
+- Windows ARM64 native Verify: SUCCESS.
+
+After this run completed, fork/main advanced to FMUX-010 (`61359a9f98ddda9b78cb85ae87042620ab50f94f`). FMG-015 merged that main state. Post-sync local proof is PASS: FMG-015 contract, FMUX-010 Evidence contract, Windows Release build 0 warnings/errors, and full Windows regression 796 assertions.
+
+NEXT_EXACT_ACTION: exact-head native Verify on the synchronized post-FMUX-010 head; then scoped review -> PR/merge -> merged-main Verify -> FMG-015 MAIN VERIFIED -> FMG-016.
