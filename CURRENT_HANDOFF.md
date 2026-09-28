@@ -126,7 +126,7 @@ FMG-026, not FMG-013, is the complete upgrade completion gate.
 
 State: CLAIMED / ACTIVE.
 
-Branch: `chatgpt/FMUX-010-evidence`.
+Branch: `chatgpt/FMUX-014-artifact-batch`.
 
 NEXT_EXACT_ACTION: implement FMG-003 Server-Owned Policy + Migration only: restricted/workspace-auto/custom profiles, legacy EnableCommands migration, policy generation/hash, risk/effect authorization, effective catalog filtering and runtime reauthorization. Do not begin FMG-004 or later tasks.
 
@@ -243,7 +243,7 @@ NEXT_EXACT_ACTION: harden existing write/delete mutations only: expected-version
 FMG-008: DONE / MAIN VERIFIED. Final candidate `35ef237a0f4d32f0940491b9163a0dcbea7e6c61` merged by PR #12 as main `8a58a223814505518e581ebe79856846555cb4b4`; merged-main Verify `36212103370` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows core 655 assertions and Release build PASS. Evidence: `docs/evidence/FMG-008_EXISTING_MUTATION_HARDENING_EVIDENCE.md`.
 
 FMG-009: CLAIMED / ACTIVE on `chatgpt/FMG-009-apply-edits`.
-Branch: `chatgpt/FMUX-010-evidence`
+Branch: `chatgpt/FMUX-014-artifact-batch`
 
 NEXT_EXACT_ACTION: implement FMG-009 Atomic Versioned `apply_edits` only: canonical range-edit primitive, expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version/Mutation Guard/policy/cancellation rechecks, atomic publish, and adversarial/fault-injection coverage. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.
 
@@ -459,7 +459,7 @@ NEXT_EXACT_ACTION: implement FMG-014 Ephemeral Artifact / ContentRef Store only:
 ## FMG-014 local verification checkpoint - 2026-09-28
 
 State: ACTIVE / LOCAL VERIFIED / CROSS-PLATFORM CI PENDING.
-Branch: `chatgpt/FMUX-010-evidence`.
+Branch: `chatgpt/FMUX-014-artifact-batch`.
 Evidence: `docs/evidence/FMG-014_ARTIFACT_CONTENTREF_STORE_EVIDENCE.md`.
 
 Implemented:
@@ -630,24 +630,42 @@ State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE V
 Head `2ff1442`; Verify run `36445207427`: SUCCESS on macOS / Windows x64 / Windows ARM64. Scoped review PASS: read-only authority, per-entry path/version checks, aggregate budget, snapshot-bound ContentRef spill, no evidence/telemetry blob coupling, no temp/debug artifacts.
 NEXT_EXACT_ACTION: commit/push evidence-only closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-015 DONE / MAIN VERIFIED -> claim FMG-016.
 
-## FMG-015 closure / FMG-016 claim - 2026-09-28
+## FMUX-014 local verification checkpoint
 
-FMG-015: DONE / MAIN VERIFIED.
-- PR #33 head: `fb0318837c36cb428c27cb34a8162a55a38b46f9`.
-- Merge main: `0c4562197cf91675cba9329ba154e76cfb102f1e`.
-- Merged-main Verify: `36446607396` SUCCESS on macOS / Windows x64 / Windows ARM64.
+FMUX-014: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-014-artifact-batch`.
+Local proof: Artifact/Batch contract PASS; Windows Release 0 warnings/errors; Windows runtime 796 assertions PASS on unchanged rerun after the known nondeterministic FMG-014 tamper assertion; macOS build-script syntax PASS.
+Evidence: `docs/evidence/FMUX-014_ARTIFACT_BATCH_UX_EVIDENCE.md`.
+NEXT_EXACT_ACTION: inspect latest `fork/main` + remote FMUX-014 branch before any push/PR; sync if needed, rerun only affected gates, then exact-head native Verify -> review -> merge -> merged-main Verify -> FMUX-014 MAIN VERIFIED -> next dependency-ready FMUX task.
 
-FMG-016: CLAIMED / ACTIVE on `chatgpt/FMG-016-quarantine-restore` from verified main `0c4562197cf91675cba9329ba154e76cfb102f1e`.
-Locked canonical surface: `quarantine_delete`, `quarantine_list`, `quarantine_get`, `quarantine_restore`; catalog target 1.8.0 / 29 tools.
-Implementation order: single-file artifact package + guarded restore -> metadata list/get -> tree package + rollback checkpoint transaction -> negative/fault tests -> cross-platform parity -> exact-head Verify -> review -> PR/merge -> merged-main Verify.
-FMG-017 remains BLOCKED until FMG-016 MAIN VERIFIED.
+## FMUX-014 Windows x64 gate stabilization
 
-## FMG-016 local verification checkpoint - 2026-09-29
+Exact-head `7e83341cc526490762cc470d011d56ad13241f4e` passed macOS and Windows ARM64, but Windows x64 repeatedly hit the pre-existing FMG-014 tamper-fixture ambiguity (`Malformed ContentRef` before HMAC assertion).
+Only the failing test fixture was hardened: tamper now changes the first signature-segment character, keeping base64url canonical while still requiring HMAC authentication rejection.
+Local failed-stage rerun: Windows runtime PASS, 797 assertions.
+NEXT_EXACT_ACTION: commit/push this test-fixture hardening, require native Verify on the new exact head, then review -> PR/merge -> merged-main Verify.
 
-State: LOCAL VERIFIED / MAIN SYNC + NATIVE CI PENDING.
-Branch: `chatgpt/FMG-016-quarantine-restore`.
+## FMUX-014 macOS gate stabilization
+
+Exact-head `69a631d5cb447acd11324c32f07ece3da3fcd12c` exposed the same pre-existing FMG-014 tamper-fixture ambiguity in `tests/test_swift_runtime.sh`: final-character mutation could become non-canonical base64url and fail as Malformed ContentRef before HMAC authentication.
+Only the Swift test fixture was hardened to mutate the first signature-segment character, matching the deterministic Windows proof. `bash -n tests/test_swift_runtime.sh` and `git diff --check` PASS locally.
+NEXT_EXACT_ACTION: commit/push this macOS fixture hardening and require native Verify on the new exact head. No ArtifactContentStore/runtime authority changed.
+
+## FMUX-014 closure / FMG-016 synchronized local checkpoint
+
+FMUX-014: DONE / MAIN VERIFIED.
+- PR #34.
+- Merge main: `7ced7b604d67acbb526e280e7e3653ba15d37d11`.
+- Merged-main Verify: run `36458827979` SUCCESS on macOS / Windows x64 / Windows ARM64.
+
+FMG-016: LOCAL VERIFIED / MAIN SYNC IN PROGRESS on `chatgpt/FMG-016-quarantine-restore`.
 Catalog: 1.8.0 / 29 canonical tools / SHA-256 `717917385167e7c9877f83d60165e295ea703c25f37a2422cdd6ab2abc4cb50e`.
-Local proof: quarantine contract + catalog/parity PASS; Release build 0 warnings/errors; Windows full runtime 818 assertions PASS; macOS script syntax PASS; diff check PASS.
-Hardening: durable quarantine state is `prepared` before destructive commit and `quarantined` only after source deletion + record persistence; ArtifactContentStore construction is lazy so volume-root non-artifact operations remain functional without weakening artifact isolation.
+Pre-sync local proof: quarantine contract + catalog/parity PASS; Release build 0 warnings/errors; Windows full runtime 818 assertions PASS; macOS script syntax PASS.
 Evidence: `docs/evidence/FMG-016_QUARANTINE_DELETE_RESTORE_EVIDENCE.md`.
-NEXT_EXACT_ACTION: commit local checkpoint -> merge latest fork/main -> preserve FMUX-014 + FMG-016 authority -> rerun affected gates -> push exact synchronized head -> native Verify all three lanes -> review/merge -> merged-main Verify -> FMG-016 MAIN VERIFIED.
+NEXT_EXACT_ACTION: finish latest-main merge, rerun only affected state/catalog/quarantine/build/runtime gates, push exact synchronized head, native Verify all three lanes, scoped review, PR/merge, merged-main Verify, then FMG-016 MAIN VERIFIED.
+
+## FMG-016 post-main-sync verification
+
+State: SYNCHRONIZED LOCAL VERIFIED / NATIVE CI PENDING.
+Synced main: `7ced7b604d67acbb526e280e7e3653ba15d37d11` (FMUX-014 MAIN VERIFIED).
+Post-sync proof: project-state + FMG-016 quarantine + FMUX-014 contracts PASS; catalog/parity 1.8.0 / 29 tools PASS; Windows Release 0 warnings/errors; Windows runtime 818 assertions PASS; macOS script syntax PASS; diff check PASS.
+NEXT_EXACT_ACTION: finish merge commit -> push exact head -> native Verify all three lanes -> scoped review -> PR/merge -> merged-main Verify -> FMG-016 MAIN VERIFIED.

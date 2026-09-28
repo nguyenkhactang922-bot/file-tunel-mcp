@@ -85,3 +85,9 @@ Push exact synchronized head.
 Require native Verify on macOS / Windows x64 / Windows ARM64.
 Scoped review, PR/merge, merged-main Verify.
 Then mark FMG-016 DONE / MAIN VERIFIED and claim the next dependency-ready task.
+
+## Post-main-sync verification
+
+Synchronized with verified main `7ced7b604d67acbb526e280e7e3653ba15d37d11` (FMUX-014 MAIN VERIFIED).
+Affected gates after merge: project-state PASS; FMG-016 quarantine contract PASS; FMUX-014 artifact/batch contract PASS after lifecycle assertion accepted DONE state; catalog/parity PASS at 1.8.0 / 29 tools / `717917385167e7c9877f83d60165e295ea703c25f37a2422cdd6ab2abc4cb50e`; Windows Release 0 warnings/errors; Windows full runtime 818 assertions PASS; macOS script syntax PASS; diff check PASS.
+NEXT_EXACT_ACTION: finish merge commit, push exact synchronized head, require native Verify on macOS / Windows x64 / Windows ARM64, scoped review, PR/merge, merged-main Verify.
