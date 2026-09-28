@@ -281,7 +281,7 @@ Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 
 ## FMG-013 implementation
 
-State: LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING.
+State: DONE / FOUNDATION MAIN VERIFIED.
 Branch: `chatgpt/FMG-013-full-regression-live-proof`.
 Depends: FMG-012 DONE / MAIN VERIFIED.
 Scope: Foundation Full Regression + Live MCP Proof only. No new feature scope unless verification finds a concrete defect.
@@ -342,3 +342,22 @@ Authorities:
 FMUX-001: ACTIVE / LOCAL + NATIVE VERIFIED / FINAL-HEAD CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
 Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
 NEXT_EXACT_ACTION: finish exact-head native verification, review/merge FMUX-001, then claim FMUX-002. FMG-026 scope remains unchanged.
+
+
+## FMG-013 final closure
+
+FMG-013: DONE / FOUNDATION MAIN VERIFIED.
+Final candidate: `db34185e4989953b54a504c9e03a1b5b7253ba3d`.
+PR: #21.
+Merge main: `0158bc5a7b94df7531d9d19c183c9b1c2f8af6c2`.
+Candidate PR Verify: run `36402363852` SUCCESS on macOS / Windows x64 / Windows ARM64 after retrying only a transient ARM64 setup-dotnet runner failure.
+Merged-main native Verify: run `36403091233` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Evidence: `docs/evidence/FMG-013_FULL_REGRESSION_LIVE_MCP_EVIDENCE.md`.
+
+## FMG-014 implementation
+
+State: CLAIMED / ACTIVE.
+Branch: `chatgpt/FMG-014-artifact-contentref-store`.
+Depends: FMG-013, FMG-004, FMG-006, FMG-011 DONE / MAIN VERIFIED.
+Scope: Ephemeral Artifact / ContentRef Store only.
+NEXT_EXACT_ACTION: implement the authenticated content-addressed store foundation and its cross-platform security/failure contracts. Do not begin FMG-015 before FMG-014 MAIN VERIFIED.

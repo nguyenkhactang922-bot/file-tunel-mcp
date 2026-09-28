@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-013-full-regression-live-proof`
+Branch: `chatgpt/FMG-014-artifact-contentref-store`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -396,3 +396,18 @@ Authorities:
 FMUX-001: ACTIVE / LOCAL + NATIVE VERIFIED / FINAL-HEAD CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
 Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
 NEXT_EXACT_ACTION: finish exact-head native verification, review/merge FMUX-001, then claim FMUX-002. FMG-026 scope remains unchanged.
+
+
+## FMG-013 closure / FMG-014 claim - 2026-09-28
+
+FMG-013: DONE / FOUNDATION MAIN VERIFIED.
+- Final candidate head: `db34185e4989953b54a504c9e03a1b5b7253ba3d`.
+- PR #21 merged to fork `main`.
+- Merge main: `0158bc5a7b94df7531d9d19c183c9b1c2f8af6c2`.
+- PR Verify run `36402363852`: SUCCESS after rerunning only the transient Windows ARM64 hosted-runner `setup-dotnet` failure; macOS / Windows x64 / Windows ARM64 all SUCCESS on the exact candidate.
+- Merged-main Verify run `36403091233`: SUCCESS on macOS / Windows x64 / Windows ARM64.
+- Live MCP proof: canonical 23 tools, catalog version `1.6.0`, catalog SHA-256 `98ba484931717cc7ee8efbce83941afc33aa5fbaddb6b667882100a423bfacee`; live exec_process / project_context / apply_edits / evidence_get dispatch + logical-chat correlation PASS.
+
+FMG-014: CLAIMED / ACTIVE on `chatgpt/FMG-014-artifact-contentref-store`.
+
+NEXT_EXACT_ACTION: implement FMG-014 Ephemeral Artifact / ContentRef Store only: local content-addressed blob store outside the repository, metadata index, authenticated ContentRef bound to installation/workspace/content-class/expiry, quotas + TTL GC, current-user-only storage permissions, stream read/write, and explicit TOOL_OUTPUT / PTY_OUTPUT / CHECKPOINT / QUARANTINE classes. Add tamper, cross-workspace replay, metadata/blob mismatch, corruption, disk-full, concurrent put/delete, expired lease and permission-regression tests. Do not begin FMG-015 before FMG-014 MAIN VERIFIED.

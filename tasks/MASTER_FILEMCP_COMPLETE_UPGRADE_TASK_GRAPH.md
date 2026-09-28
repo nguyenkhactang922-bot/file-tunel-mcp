@@ -132,7 +132,7 @@ Detailed specification: foundation graph FMG-012.
 
 ## FMG-013 - Foundation Full Regression + Live MCP Proof
 
-State: ACTIVE / LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING
+State: DONE / FOUNDATION MAIN VERIFIED
 Depends: FMG-012
 Detailed specification: foundation graph FMG-013.
 
@@ -140,7 +140,7 @@ FMG-013 is FOUNDATION MAIN VERIFIED only; it is not the final complete-upgrade c
 
 ## FMG-014 - Ephemeral Artifact / ContentRef Store
 
-State: BLOCKED
+State: CLAIMED / ACTIVE
 Depends: FMG-013, FMG-004, FMG-006, FMG-011
 
 Scope:
