@@ -219,6 +219,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let homeStatusLabel = NSTextField(labelWithString: "Runtime stopped")
     private let homeWorkspaceLabel = NSTextField(labelWithString: "No workspace selected")
     private let homeRecentEventLabel = NSTextField(labelWithString: "No recent issue")
+    private let workspaceRootLabel = NSTextField(labelWithString: "Not configured")
+    private let workspaceStatusLabel = NSTextField(labelWithString: "Stopped")
+    private let workspacePolicyLabel = NSTextField(labelWithString: "Default")
+    private let workspaceConnectionLabel = NSTextField(labelWithString: "Disconnected")
     private var lastImportantEvent = "No recent issue"
     private let tabs = NSTabView()
 
@@ -537,6 +541,39 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             homeContent.topAnchor.constraint(equalTo: homePage.topAnchor, constant: 12),
         ])
 
+        workspaceRootLabel.maximumNumberOfLines = 2
+        workspaceRootLabel.lineBreakMode = .byTruncatingMiddle
+        workspaceStatusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        workspacePolicyLabel.textColor = .secondaryLabelColor
+        workspaceConnectionLabel.textColor = .secondaryLabelColor
+
+        let workspaceContent = NSStackView(views: [
+            FileMCPFeedbackComponents.pageHeader(
+                title: "Workspaces",
+                description: "Configured root, health and policy context."
+            ),
+            NSTextField(labelWithString: "Root"),
+            workspaceRootLabel,
+            NSTextField(labelWithString: "Status"),
+            workspaceStatusLabel,
+            NSTextField(labelWithString: "Policy profile"),
+            workspacePolicyLabel,
+            NSTextField(labelWithString: "Connection"),
+            workspaceConnectionLabel,
+        ])
+        workspaceContent.orientation = .vertical
+        workspaceContent.alignment = .leading
+        workspaceContent.spacing = 8
+        workspaceContent.translatesAutoresizingMaskIntoConstraints = false
+
+        let workspacesPage = NSView()
+        workspacesPage.addSubview(workspaceContent)
+        NSLayoutConstraint.activate([
+            workspaceContent.leadingAnchor.constraint(equalTo: workspacesPage.leadingAnchor, constant: 12),
+            workspaceContent.trailingAnchor.constraint(lessThanOrEqualTo: workspacesPage.trailingAnchor, constant: -12),
+            workspaceContent.topAnchor.constraint(equalTo: workspacesPage.topAnchor, constant: 12),
+        ])
+
         tabs.tabViewType = .noTabsNoBorder
         tabs.translatesAutoresizingMaskIntoConstraints = false
         tabs.delegate = self
@@ -544,6 +581,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         let homeTab = NSTabViewItem(identifier: "home")
         homeTab.label = "Home"
         homeTab.view = homePage
+
+        let workspacesTab = NSTabViewItem(identifier: "workspaces")
+        workspacesTab.label = "Workspaces"
+        workspacesTab.view = workspacesPage
 
         let configTab = NSTabViewItem(identifier: "config")
         configTab.label = "Connection"
@@ -558,6 +599,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         logTab.view = logPage
 
         tabs.addTabViewItem(homeTab)
+        tabs.addTabViewItem(workspacesTab)
         tabs.addTabViewItem(configTab)
         tabs.addTabViewItem(settingsTab)
         tabs.addTabViewItem(logTab)
@@ -589,6 +631,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             brandSubtitle,
             NSBox(),
             navigationButton("Home", action: #selector(showHome)),
+            navigationButton("Workspaces", action: #selector(showWorkspaces)),
             navigationButton("Connections", action: #selector(showConnections)),
             navigationButton("Settings", action: #selector(showSettings)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
@@ -753,6 +796,11 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
 
     @objc private func showHome() {
         tabs.selectTabViewItem(withIdentifier: "home")
+    }
+
+    @objc private func showWorkspaces() {
+        refreshWorkspaceSummary()
+        tabs.selectTabViewItem(withIdentifier: "workspaces")
     }
 
     @objc private func showConnections() {
@@ -938,6 +986,42 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         }
     }
 
+    private func refreshWorkspaceSummary() {
+        let root = directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        workspaceRootLabel.stringValue = root.isEmpty ? "Not configured" : root
+        workspacePolicyLabel.stringValue = policyProfilePopup.titleOfSelectedItem ?? "Default"
+
+        guard let runtime else {
+            workspaceStatusLabel.stringValue = "Stopped"
+            workspaceConnectionLabel.stringValue = "Disconnected"
+            return
+        }
+
+        switch runtime.state {
+        case .stopped:
+            workspaceStatusLabel.stringValue = "Stopped"
+            workspaceConnectionLabel.stringValue = "Disconnected"
+        case .failed:
+            workspaceStatusLabel.stringValue = "Failed"
+            workspaceConnectionLabel.stringValue = "Attention required"
+        case .starting:
+            workspaceStatusLabel.stringValue = "Starting"
+            workspaceConnectionLabel.stringValue = "Connecting"
+        case .running:
+            workspaceStatusLabel.stringValue = "Healthy"
+            workspaceConnectionLabel.stringValue = "Connected"
+        case .restarting:
+            workspaceStatusLabel.stringValue = "Reconnecting"
+            workspaceConnectionLabel.stringValue = "Connected"
+        case .cooldown:
+            workspaceStatusLabel.stringValue = "Cooldown"
+            workspaceConnectionLabel.stringValue = "Waiting to reconnect"
+        case .stopping:
+            workspaceStatusLabel.stringValue = "Stopping"
+            workspaceConnectionLabel.stringValue = "Disconnecting"
+        }
+    }
+
     private func refreshHomeSummary(state: LocalMCPRuntimeState) {
         homeWorkspaceLabel.stringValue = directoryField.stringValue.isEmpty ? "No workspace selected" : directoryField.stringValue
         homeRecentEventLabel.stringValue = lastImportantEvent
@@ -954,6 +1038,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
 
     private func updateRunButton(state: LocalMCPRuntimeState) {
         refreshHomeSummary(state: state)
+        refreshWorkspaceSummary()
         switch state {
         case .stopped:
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true

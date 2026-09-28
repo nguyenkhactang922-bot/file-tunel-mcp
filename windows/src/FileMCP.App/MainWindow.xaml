@@ -77,6 +77,8 @@
 
                 <Button x:Name="NavHomeButton" Content="Home" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateHome_Click" AutomationProperties.Name="Home"/>
+                <Button x:Name="NavWorkspacesButton" Content="Workspaces" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateWorkspaces_Click" AutomationProperties.Name="Workspaces"/>
                 <Button x:Name="NavConnectionsButton" Content="Connections" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateConnections_Click" AutomationProperties.Name="Connections"/>
                 <Button x:Name="NavSettingsButton" Content="Settings" HorizontalContentAlignment="Left"
@@ -324,6 +326,36 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+            <TabItem Header="Workspaces" x:Name="WorkspacesTab">
+                <Grid Margin="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="3*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <controls:PageHeader Title="Workspaces" Description="Configured roots, health and policy context." Margin="0,0,0,12"/>
+                        <Button x:Name="WorkspaceCRow" Content="Drive C" Tag="C" Click="WorkspaceRow_Click" HorizontalContentAlignment="Left" Margin="0,0,0,6"/>
+                        <Button x:Name="WorkspaceDRow" Content="Drive D" Tag="D" Click="WorkspaceRow_Click" HorizontalContentAlignment="Left" Margin="0,0,0,6"/>
+                        <Button x:Name="WorkspaceERow" Content="Drive E" Tag="E" Click="WorkspaceRow_Click" HorizontalContentAlignment="Left" Margin="0,0,0,6"/>
+                        <Button x:Name="WorkspaceFRow" Content="Drive F" Tag="F" Click="WorkspaceRow_Click" HorizontalContentAlignment="Left"/>
+                    </StackPanel>
+                    <Border Grid.Column="1" Style="{StaticResource FileMcpCardBorder}">
+                        <StackPanel>
+                            <TextBlock x:Name="WorkspaceDetailTitle" Style="{StaticResource FileMcpSectionTitleText}" Text="Select a workspace"/>
+                            <controls:StatusBadge x:Name="WorkspaceDetailStatus" Status="Unavailable" HorizontalAlignment="Left" Margin="0,8,0,12"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Root"/>
+                            <TextBlock x:Name="WorkspaceDetailRoot" Text="-" TextWrapping="Wrap" Margin="0,2,0,10"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Policy profile"/>
+                            <TextBlock x:Name="WorkspaceDetailPolicy" Text="-" Margin="0,2,0,10"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Connection"/>
+                            <TextBlock x:Name="WorkspaceDetailConnection" Text="-" TextWrapping="Wrap" Margin="0,2,0,10"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Activity"/>
+                            <TextBlock x:Name="WorkspaceDetailActivity" Text="-" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
             <TabItem Header="Connection" x:Name="ConnectionTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">

@@ -27,7 +27,7 @@ CLAIM -> ANALYZE -> PLAN -> CODE -> TEST -> EVIDENCE -> VERIFY -> COMMIT -> REVI
 
 Accessibility, security truthfulness, theme behavior and no-fake-state rules apply to every task.
 
-## FMUX-001 â€” Presentation Foundation
+## FMUX-001 Ã¢â‚¬â€ Presentation Foundation
 
 State: DONE / MAIN VERIFIED
 Depends: ADR-0007 / FMUX design gate PASS.
@@ -50,7 +50,7 @@ Acceptance:
 - macOS source/build contract remains valid;
 - legacy UI remains functional.
 
-## FMUX-002 â€” App Shell + Navigation
+## FMUX-002 Ã¢â‚¬â€ App Shell + Navigation
 
 State: DONE / MAIN VERIFIED
 Depends: FMUX-001 MAIN VERIFIED.
@@ -69,7 +69,7 @@ Acceptance:
 - shell can host old pages during incremental migration;
 - navigation state preserved.
 
-## FMUX-003 â€” Canonical Status / Feedback Components
+## FMUX-003 Ã¢â‚¬â€ Canonical Status / Feedback Components
 
 State: DONE / MAIN VERIFIED
 Depends: FMUX-001.
@@ -82,9 +82,9 @@ Scope:
 - loading/refresh/error/stale patterns;
 - notification policy.
 
-## FMUX-004 â€” Home
+## FMUX-004 Ã¢â‚¬â€ Home
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Depends: FMUX-002, FMUX-003.
 
 Scope:
@@ -95,9 +95,9 @@ Scope:
 - compact usage/activity;
 - quick actions.
 
-## FMUX-005 â€” Workspaces
+## FMUX-005 Ã¢â‚¬â€ Workspaces
 
-State: BLOCKED
+State: ACTIVE / CLAIMED
 Depends: FMUX-002, FMUX-003.
 
 Scope:
@@ -106,7 +106,7 @@ Scope:
 - detail pane;
 - multi-drive parity.
 
-## FMUX-006 â€” Connections
+## FMUX-006 Ã¢â‚¬â€ Connections
 
 State: BLOCKED
 Depends: FMUX-002, FMUX-003.
@@ -117,7 +117,7 @@ Scope:
 - connectivity diagnostics;
 - safe save/connect/disconnect flows.
 
-## FMUX-007 â€” Settings / Policy
+## FMUX-007 Ã¢â‚¬â€ Settings / Policy
 
 State: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-003.
@@ -128,7 +128,7 @@ Scope:
 - advanced progressive disclosure;
 - execution/Git/storage/appearance sections.
 
-## FMUX-008 â€” Structured Activity
+## FMUX-008 Ã¢â‚¬â€ Structured Activity
 
 State: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-002, FMG-005, FMG-011.
@@ -140,7 +140,7 @@ Scope:
 - bounded/virtualized live collection;
 - raw logs moved to diagnostics.
 
-## FMUX-009 â€” Changes
+## FMUX-009 Ã¢â‚¬â€ Changes
 
 State: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-009.
@@ -152,7 +152,7 @@ Scope:
 - stale/conflict states.
 FMG-017 integration extends adapters when available.
 
-## FMUX-010 â€” Evidence
+## FMUX-010 Ã¢â‚¬â€ Evidence
 
 State: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-011.
@@ -162,7 +162,7 @@ Scope:
 - passed/failed/stale/blocked/not-run/unknown/N/A;
 - source/policy/catalog linkage.
 
-## FMUX-011 â€” Repository Intelligence
+## FMUX-011 Ã¢â‚¬â€ Repository Intelligence
 
 State: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-018, FMG-019.
@@ -174,7 +174,7 @@ Scope:
 - related files;
 - provider/completeness state.
 
-## FMUX-012 â€” Terminal / PTY
+## FMUX-012 Ã¢â‚¬â€ Terminal / PTY
 
 State: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-020.
@@ -186,7 +186,7 @@ Scope:
 - stop/signal/resize;
 - backend/policy state.
 
-## FMUX-013 â€” Recovery
+## FMUX-013 Ã¢â‚¬â€ Recovery
 
 State: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-016, FMG-021, FMG-022.
@@ -198,7 +198,7 @@ Scope:
 - rollback;
 - partial-recovery states.
 
-## FMUX-014 â€” Artifact / Batch UX
+## FMUX-014 Ã¢â‚¬â€ Artifact / Batch UX
 
 State: BLOCKED
 Depends: FMUX-003, FMG-014, FMG-015.
@@ -209,7 +209,7 @@ Scope:
 - large-output inspection;
 - batch grouped/partial results.
 
-## FMUX-015 â€” Backend / Isolation UX
+## FMUX-015 Ã¢â‚¬â€ Backend / Isolation UX
 
 State: BLOCKED
 Depends: FMUX-003, FMG-023, FMG-024.
@@ -220,7 +220,7 @@ Scope:
 - Docker availability;
 - image/network/resource policy facts.
 
-## FMUX-016 â€” Onboarding
+## FMUX-016 Ã¢â‚¬â€ Onboarding
 
 State: BLOCKED
 Depends: FMUX-004 through FMUX-015 applicable implemented surfaces.
@@ -233,7 +233,7 @@ Scope:
 - connection test;
 - completion handoff to Home.
 
-## FMUX-017 â€” Accessibility / Keyboard / Theme Enforcement
+## FMUX-017 Ã¢â‚¬â€ Accessibility / Keyboard / Theme Enforcement
 
 State: BLOCKED
 Depends: FMUX-001 through FMUX-016 implemented surfaces.
@@ -247,7 +247,7 @@ Scope:
 - reduced motion;
 - scaling/reflow.
 
-## FMUX-018 â€” Performance + Visual Consistency Gate
+## FMUX-018 Ã¢â‚¬â€ Performance + Visual Consistency Gate
 
 State: BLOCKED
 Depends: FMUX-017.
@@ -259,7 +259,7 @@ Scope:
 - layout consistency;
 - startup/render regressions.
 
-## FMUX-019 â€” Cross-Platform UX Adversarial Gate
+## FMUX-019 Ã¢â‚¬â€ Cross-Platform UX Adversarial Gate
 
 State: BLOCKED
 Depends: FMUX-018.
@@ -272,7 +272,7 @@ Scope:
 - security-language audit;
 - regression of legacy/core behaviors.
 
-## FMUX-020 â€” Product UI/UX Main Verification
+## FMUX-020 Ã¢â‚¬â€ Product UI/UX Main Verification
 
 State: BLOCKED
 Depends: FMUX-019 and FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED.

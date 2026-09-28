@@ -973,6 +973,7 @@ public partial class MainWindow : Window
 
         UpdateConnectButton();
         UpdateShellContext();
+        if (MainTabs.SelectedItem == WorkspacesTab) RefreshWorkspaceRows();
     }
 
     private void UpdateShellContext()
@@ -991,6 +992,11 @@ public partial class MainWindow : Window
     }
 
     private void NavigateHome_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = OverviewTab;
+    private void NavigateWorkspaces_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = WorkspacesTab;
+        RefreshWorkspaceRows();
+    }
     private void NavigateConnections_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = ConnectionTab;
     private void NavigateSettings_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = SettingsTab;
     private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
@@ -1003,6 +1009,7 @@ public partial class MainWindow : Window
         CompactNavigationButton.Content = _navigationCompact ? "Expand" : "Collapse";
 
         SetNavigationButtonPresentation(NavHomeButton, "Home", "H");
+        SetNavigationButtonPresentation(NavWorkspacesButton, "Workspaces", "W");
         SetNavigationButtonPresentation(NavConnectionsButton, "Connections", "C");
         SetNavigationButtonPresentation(NavSettingsButton, "Settings", "S");
         SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
@@ -1015,6 +1022,51 @@ public partial class MainWindow : Window
         button.Content = _navigationCompact ? compactLabel : fullLabel;
         button.HorizontalContentAlignment = _navigationCompact ? System.Windows.HorizontalAlignment.Center : System.Windows.HorizontalAlignment.Left;
         button.ToolTip = _navigationCompact ? fullLabel : null;
+    }
+
+    private void RefreshWorkspaceRows()
+    {
+        foreach (var key in WorkspaceKeys)
+        {
+            var button = key switch
+            {
+                "C" => WorkspaceCRow,
+                "D" => WorkspaceDRow,
+                "E" => WorkspaceERow,
+                "F" => WorkspaceFRow,
+                _ => throw new ArgumentOutOfRangeException(nameof(key)),
+            };
+            var enabled = EnabledBox(key).IsChecked == true;
+            var state = _runtimes[key].State.Status;
+            var stateText = enabled ? state.ToString() : "Disabled";
+            var root = PathBox(key).Text.Trim();
+            button.Content = $"Drive {key}  |  {stateText}" + (root.Length == 0 ? string.Empty : $"  |  {root}");
+        }
+    }
+
+    private void WorkspaceRow_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button button || button.Tag is not string key)
+            return;
+
+        var enabled = EnabledBox(key).IsChecked == true;
+        var state = _runtimes[key].State.Status;
+        WorkspaceDetailTitle.Text = $"Drive {key}";
+        WorkspaceDetailRoot.Text = string.IsNullOrWhiteSpace(PathBox(key).Text) ? "Not configured" : PathBox(key).Text.Trim();
+        WorkspaceDetailPolicy.Text = string.IsNullOrWhiteSpace(ProfileBoxFor(key).Text) ? "Default" : ProfileBoxFor(key).Text.Trim();
+        WorkspaceDetailConnection.Text = enabled
+            ? $"{state} | {TunnelBox(key).Text.Trim()}"
+            : "Disabled";
+        WorkspaceDetailActivity.Text = OverviewStatusText(key).Text;
+        WorkspaceDetailStatus.Status = !enabled
+            ? PresentationStatus.Unavailable
+            : state switch
+            {
+                LocalMcpRuntimeStatus.Running => PresentationStatus.Healthy,
+                LocalMcpRuntimeStatus.Failed => PresentationStatus.Failed,
+                LocalMcpRuntimeStatus.Starting or LocalMcpRuntimeStatus.Restarting => PresentationStatus.Starting,
+                _ => PresentationStatus.Stopped,
+            };
     }
 
     private void UpdateWorkspaceStatus(string key, LocalMcpRuntimeState state)
