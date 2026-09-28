@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMUX-001-presentation-foundation`
+Branch: `chatgpt/FMG-013-full-regression-live-proof`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -321,6 +321,64 @@ Local evidence: all Phase A contract/adversarial scripts PASS; Windows runtime 7
 
 NEXT_EXACT_ACTION: commit/push exact FMG-012 evidence candidate, require native Verify on the final exact head, perform scoped gate review, merge only green exact head, verify merged main, mark FMG-012 DONE / MAIN VERIFIED, then claim FMG-013.
 
+## FMG-012 closure / FMG-013 claim
+
+FMG-012: DONE / MAIN VERIFIED. Final candidate `364b7945f2885e5ec39ee1ad1da9e8a08618735c` merged by PR #18 as main `d3a3670f6fb60ab75d8471b3d982c811337fa951`; merged-main Verify `36297870457` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows runtime 750 assertions and Release build PASS.
+
+FMG-013: CLAIMED / ACTIVE on `chatgpt/FMG-013-full-regression-live-proof`.
+
+NEXT_EXACT_ACTION: execute Foundation Full Regression + Live MCP Proof only: full regression contracts/runtime/package/native verification plus live MCP catalog/tool/correlation proof against the current connector. Fix only concrete failing stages. FMG-013 is foundation MAIN VERIFIED, not complete-upgrade completion.
+
+## FMG-013 live proof blocker
+
+FMG-013: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE on `chatgpt/FMG-013-full-regression-live-proof`.
+
+Completed evidence: source/full regression/native Verify PASS; claim-head Verify `36298103299` SUCCESS on macOS + Windows x64 + Windows ARM64. Current source catalog is 23 tools / version 1.6.0.
+
+Live blocker: current FileMCP PID 11960 runs old binary `D:\Tools\FileMCP\dist\windows-x64\FileMCP-release\FileMCP.exe` (SHA-256 `7689540f1ff4cc080064eb1ccaf33a5b4a8b1a736b2f10b52988505e6e7c2807`) and this ChatGPT connector exposes only 19 tools.
+
+Ready replacement: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe` (SHA-256 `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`).
+
+NEXT_EXACT_ACTION: after normal FileMCP desktop restart into the ready build and connector reconnection, resume FMG-013 at LIVE MCP PROOF ONLY; verify 23-tool catalog/current hash + live tool/correlation behavior. Do not rerun completed regression and do not claim FMG-014 before FMG-013 FOUNDATION MAIN VERIFIED.
+
+
+
+## FMG-013 post-restart checkpoint - 2026-09-28
+
+Desktop/runtime replacement is now verified: PID `10688` is running `dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe` with SHA-256 `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`.
+
+The remaining blocker is ChatGPT connector discovery/cache: this chat still exposes only 19 FileMCP tools.
+
+NEXT_EXACT_ACTION: do not rerun regression. Reconnect/rediscover the FileMCP connector so the chat advertises 23 tools; then run LIVE MCP PROOF ONLY (catalog version/hash + live tool/correlation behavior), exact-head native Verify, review, merge, merged-main verification, then claim FMG-014.
+
+
+### FMG-013 live correlation sub-proof - 2026-09-28
+
+Live correlation on the active ready build is PASS: existing `chat_instance_id` resumed with `resumed=true`, and a bound read using the same `_filemcp_chat` handle succeeded. Remaining gate is only ChatGPT connector rediscovery from 19 to 23 tools plus catalog version/hash/new-tool live parity.
+
+
+## FMG-013 reconnect verification - 2026-09-28
+
+Fresh reconnect verification PASSed for runtime/tunnel/correlation: ready binary PID `10688`, tunnel health `live`, readiness `ready`, main-channel probe `ok`, control-plane forwarding to local MCP returns service status `200`, and logical chat correlation resume + bound read PASS.
+
+The current ChatGPT registry is still 19 tools. NEXT_EXACT_ACTION remains: refresh/rediscover the connector until 23 canonical tools are advertised, then run only the remaining live catalog/hash/new-tool parity proof. Do not rerun completed regression. FMG-014 remains BLOCKED.
+
+
+### FMG-013 rediscovery diagnosis - 2026-09-28
+
+19/23 is not policy filtering: active profile is `legacy-command-compatible` and that profile allows all tools. Tunnel is healthy and live `tools/call` traffic reaches the new runtime, but no `tools/list` discovery request is visible after the new runtime startup. Remaining gate is external connector/control-plane rediscovery; do not run exact-head Verify or merge until the live registry actually advertises 23 tools and catalog/hash parity is proven.
+
+
+### FMG-013 targeted connector refresh checkpoint - 2026-09-28T15:49:09+07:00
+
+Restarted only the D-workspace tunnel-client while preserving FileMCP desktop/server. D tunnel recovered healthy/ready with new PID 2552, but this ChatGPT session still exposes 19 FileMCP tools. NEXT_EXACT_ACTION remains external ChatGPT connector rediscovery/reload to 23 tools, then run LIVE MCP PROOF ONLY for exec_process/apply_edits/project_context/evidence_get + catalog/hash/correlation. FMG-014 remains BLOCKED.
+
+
+## FMG-013 live 23-tool proof PASS - 2026-09-28T15:59:05+07:00
+
+The refreshed FileMCP connector now exposes the canonical 23 tools. Live `exec_process`, `project_context`, versioned atomic `apply_edits`, `evidence_get` negative-path dispatch, exact catalog version/hash parity, and correlation resume/bound read are verified. FMG-013 is LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING.
+
+NEXT_EXACT_ACTION: commit/push the exact FMG-013 live-evidence candidate, require native Verify on macOS + Windows x64 + Windows ARM64 for that exact head, perform scoped review, open/merge PR only on green exact-head evidence, verify merged main, then mark FMG-013 DONE / FOUNDATION MAIN VERIFIED and claim FMG-014. Do not rerun completed foundation regression.
 ## FMUX product-experience track
 
 Design gate: PASS / FROZEN on 2026-09-28.

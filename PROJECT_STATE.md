@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMUX-001-presentation-foundation`
+Active branch: `chatgpt/FMG-013-full-regression-live-proof`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -264,7 +264,7 @@ Evidence: `docs/evidence/FMG-011_METADATA_EVIDENCE_CANDIDATE_EVIDENCE.md`.
 
 ## FMG-012 implementation
 
-State: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING.
+State: DONE / MAIN VERIFIED.
 Branch: `chatgpt/FMG-012-cross-platform-gate`.
 Depends: FMG-001 through FMG-011 DONE / MAIN VERIFIED.
 Scope: Cross-Platform Adversarial Contract Gate only. No new feature scope unless verification finds a concrete defect.
@@ -273,6 +273,57 @@ Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 Local proof: all Phase A contracts PASS; Windows runtime 750 assertions PASS; Release 0 warnings/errors; x64/ARM64 package builds and static integrity PASS.
 Claim-head native Verify: run `36297166252` SUCCESS on macOS / Windows x64 / Windows ARM64.
 Final exact-head native Verify remains required after evidence commit.
+Final candidate: `364b7945f2885e5ec39ee1ad1da9e8a08618735c`.
+PR: #18.
+Merge main: `d3a3670f6fb60ab75d8471b3d982c811337fa951`.
+Native merged-main Verify: run `36297870457` SUCCESS on macOS / Windows x64 / Windows ARM64.
+Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+
+## FMG-013 implementation
+
+State: LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING.
+Branch: `chatgpt/FMG-013-full-regression-live-proof`.
+Depends: FMG-012 DONE / MAIN VERIFIED.
+Scope: Foundation Full Regression + Live MCP Proof only. No new feature scope unless verification finds a concrete defect.
+NEXT_EXACT_ACTION: run exact full regression and live MCP proof against the current FileMCP connector, verify catalog/schema/live tools parity and failure semantics, package/native gates, then merge only exact green evidence.
+Evidence: `docs/evidence/FMG-013_FULL_REGRESSION_LIVE_MCP_EVIDENCE.md`.
+Regression/native CI proof: PASS.
+Blocker: current live desktop connector is old binary PID 11960 and exposes 19 tools vs canonical 23.
+Ready build: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`.
+Resume only live MCP proof after normal desktop restart/reconnect; do not rerun completed regression.
+
+
+## FMG-013 post-restart checkpoint - 2026-09-28
+
+State: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE.
+
+Desktop deployment is current:
+- PID `10688`;
+- executable `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`;
+- SHA-256 `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`.
+
+This chat still exposes 19 FileMCP tools, so the required live 23-tool catalog/hash proof is not yet satisfied. Foundation regression/native CI remain PASS and must not be rerun solely because connector discovery is stale. FMG-014 remains BLOCKED.
+
+
+## FMG-013 reconnect verification - 2026-09-28
+
+State remains BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE.
+
+Verified current runtime/tunnel: ready binary PID `10688`; tunnel `healthz=live`, `readyz=ready`; main MCP channel probe `ok`; direct route to `127.0.0.1:8008`; successful control-plane-to-MCP forwarding observed; fresh logical correlation resume and bound read PASS.
+
+ChatGPT still exposes 19/23 tools, so FMG-013 cannot be marked FOUNDATION MAIN VERIFIED and FMG-014 cannot be claimed.
+
+
+## FMG-013 connector refresh checkpoint - 2026-09-28T15:49:09+07:00
+
+Targeted D tunnel reconnect completed successfully (PID 2620 -> 2552; health live; readiness ready) without rerunning regression. ChatGPT-visible registry remains 19/23, with exec_process/apply_edits/project_context/evidence_get absent. State remains BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE. FMG-014 remains blocked.
+
+
+## FMG-013 live connector acceptance - 2026-09-28T15:59:05+07:00
+
+State: LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING.
+
+Canonical live registry: 23 tools; catalog version `1.6.0`; catalog SHA-256 `98ba484931717cc7ee8efbce83941afc33aa5fbaddb6b667882100a423bfacee`. Live proofs PASS for exec_process, project_context, apply_edits, evidence_get dispatch/error semantics, and logical-chat correlation. Remaining work is exact-head native Verify -> scoped review -> PR/merge -> merged-main verification. FMG-014 remains BLOCKED until FMG-013 FOUNDATION MAIN VERIFIED.
 
 ## FMUX product-experience track
 
