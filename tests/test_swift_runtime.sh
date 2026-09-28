@@ -2359,38 +2359,6 @@ do {
 precondition(fmg015RaceMutated, "FMG-015 mutation hook did not execute")
 print("swift-file-version-mid-read-mutation: ok")
 
-let fmg015RaceURL = root.appendingPathComponent("fmg015-mid-read-race.bin")
-try Data(repeating: 0x6d, count: 256 * 1024).write(to: fmg015RaceURL)
-let fmg015RaceResolver = try SafePathResolver(rootPath: root.path)
-var fmg015RaceMutated = false
-let fmg015RaceVersions = try FileVersionService(
-    resolver: fmg015RaceResolver,
-    keyData: Data(repeating: 0x44, count: 32),
-    readStageForTests: { stage in
-        guard stage == "after_first_chunk", !fmg015RaceMutated else { return }
-        fmg015RaceMutated = true
-        guard let writer = try? FileHandle(forWritingTo: fmg015RaceURL) else {
-            preconditionFailure("could not open FMG-015 mutation fixture")
-        }
-        do {
-            try writer.seek(toOffset: 0)
-            try writer.write(contentsOf: Data([0x58]))
-            try writer.synchronize()
-            try writer.close()
-        } catch {
-            preconditionFailure("could not mutate FMG-015 fixture: \(error)")
-        }
-    })
-do {
-    _ = try fmg015RaceVersions.readVersioned(relativePath: "fmg015-mid-read-race.bin", maxBytes: 512 * 1024)
-    preconditionFailure("same-size mid-read mutation must fail strong read")
-} catch {
-    precondition(
-        error.localizedDescription.localizedCaseInsensitiveContains("changed"),
-        "unexpected FMG-015 mid-read mutation error: \(error)")
-}
-precondition(fmg015RaceMutated, "FMG-015 mutation hook did not execute")
-print("swift-file-version-mid-read-mutation: ok")
 
 let fmg011ServerStoreURL = root.appendingPathComponent("server-evidence.json")
 let server = try LocalMCPServer(

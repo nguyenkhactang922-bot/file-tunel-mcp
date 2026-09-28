@@ -114,3 +114,14 @@ Targeted local verification after correction:
 - Windows Release build: PASS, 0 warnings / 0 errors.
 - FMG-015 isolated integration: PASS, 20 assertions.
 - FMG-015 contract: PASS.
+
+## Exact-head Verify run 36443414494 - attempt 2
+
+Head: `c4b2eb5ce36109f686e53e83d53df5b90f84c735`.
+
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS static/typecheck: PASS, including the cross-platform FileVersionService hardening.
+- macOS integration: FAIL before executing the new mutation assertion because the same `fmg015Race...` test block existed twice in the generated Swift main, causing redeclaration diagnostics.
+
+Remediation: remove the duplicate test block only; keep exactly one native macOS same-size mid-read mutation proof. Product code is unchanged from the Windows/ARM64-successful head.
