@@ -2901,6 +2901,8 @@ final class LocalMCPServer {
                 structuredContent = output.structuredContent
             }
 
+            emitArtifactBatchUIEventSafely(toolName: toolName, structuredContent: structuredContent)
+
             let evidenceMetadata = evidenceCoordinator.complete(
                 run: evidenceRun,
                 isError: false,
@@ -2940,6 +2942,44 @@ final class LocalMCPServer {
             if modern { result = modernCompleteResult(result) }
             return jsonRPCResult(id: id, result: result)
         }
+    }
+
+    private func emitArtifactBatchUIEventSafely(toolName: String, structuredContent: [String: Any]) {
+        guard toolName == "batch_read" || toolName == "batch_stat" else { return }
+
+        var projected: [String: Any] = [:]
+        for key in ["operation", "requested_count", "completed_count", "partial", "cancelled", "truncated", "truncation_reason"] {
+            if let value = structuredContent[key] { projected[key] = value }
+        }
+
+        var contentRefCount = 0
+        var quotaErrorCount = 0
+        var projectedEntries: [[String: Any]] = []
+
+        if let entries = structuredContent["entries"] as? [[String: Any]] {
+            for entry in entries {
+                let delivery = entry["delivery"] as? String
+                let errorCode = entry["error_code"] as? String
+                if delivery == "content_ref" { contentRefCount += 1 }
+                if errorCode == "artifact_quota" { quotaErrorCount += 1 }
+
+                var item: [String: Any] = [:]
+                for key in ["path", "state", "delivery", "size_bytes", "max_bytes", "version_strength", "expires_epoch_ms", "blob_id", "error_code", "message"] {
+                    if let value = entry[key] { item[key] = value }
+                }
+                item["content_ref_present"] = delivery == "content_ref"
+                projectedEntries.append(item)
+            }
+        }
+
+        projected["content_ref_count"] = contentRefCount
+        projected["quota_error_count"] = quotaErrorCount
+        projected["entries"] = projectedEntries
+
+        guard JSONSerialization.isValidJSONObject(projected),
+              let data = try? JSONSerialization.data(withJSONObject: projected, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return }
+        log("[ArtifactBatchResult] \(text)\n")
     }
 
     private func evidenceStatusOutput(_ arguments: [String: Any]) throws -> LocalToolCallOutput {

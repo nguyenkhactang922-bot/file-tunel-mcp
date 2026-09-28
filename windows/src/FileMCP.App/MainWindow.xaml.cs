@@ -36,9 +36,11 @@ public partial class MainWindow : Window
     private readonly List<ActivityRow> _activityRows = new();
     private readonly List<ChangeRow> _changeRows = new();
     private readonly List<EvidenceRow> _evidenceRows = new();
+    private readonly List<ArtifactBatchRow> _artifactBatchRows = new();
     private const int MaxActivityRows = 500;
     private const int MaxChangeRows = 250;
     private const int MaxEvidenceRows = 500;
+    private const int MaxArtifactBatchRows = 100;
     private string _lastImportantEvent = "No recent issue";
     private const int MaxLogCharacters = 500_000;
 
@@ -1071,6 +1073,11 @@ public partial class MainWindow : Window
         MainTabs.SelectedItem = EvidenceTab;
         RefreshEvidenceGrid();
     }
+    private void NavigateArtifacts_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = ArtifactsTab;
+        RefreshArtifactBatchGrid();
+    }
     private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
 
     private void CompactNavigation_Click(object sender, RoutedEventArgs e)
@@ -1087,6 +1094,7 @@ public partial class MainWindow : Window
         SetNavigationButtonPresentation(NavActivityButton, "Activity", "A");
         SetNavigationButtonPresentation(NavChangesButton, "Changes", "C");
         SetNavigationButtonPresentation(NavEvidenceButton, "Evidence", "E");
+        SetNavigationButtonPresentation(NavArtifactsButton, "Artifacts", "R");
         SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
 
         ShellWorkspaceText.Visibility = _navigationCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -1277,6 +1285,44 @@ public partial class MainWindow : Window
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
 
+    private sealed record ArtifactBatchEntryRow(
+        string Path,
+        string State,
+        string Delivery,
+        long? SizeBytes,
+        long? MaxBytes,
+        string? VersionStrength,
+        long? ExpiresEpochMs,
+        string? BlobId,
+        bool ContentRefPresent,
+        string? ErrorCode,
+        string? Message)
+    {
+        public string SizeDisplay => SizeBytes is null ? "N/A" : $"{SizeBytes.Value:N0} B";
+        public string ExpiryDisplay => ExpiresEpochMs is null
+            ? "N/A"
+            : DateTimeOffset.FromUnixTimeMilliseconds(ExpiresEpochMs.Value).ToLocalTime().ToString("MM-dd HH:mm");
+    }
+
+    private sealed record ArtifactBatchRow(
+        DateTimeOffset Timestamp,
+        string Workspace,
+        string Operation,
+        int RequestedCount,
+        int CompletedCount,
+        bool Partial,
+        bool Cancelled,
+        bool Truncated,
+        string? TruncationReason,
+        int ContentRefCount,
+        int QuotaErrorCount,
+        IReadOnlyList<ArtifactBatchEntryRow> Entries)
+    {
+        public string Time => Timestamp.ToLocalTime().ToString("HH:mm:ss");
+        public string CompletionDisplay => $"{CompletedCount}/{RequestedCount}";
+        public string StateDisplay => Cancelled ? "Cancelled" : Partial ? "Partial" : Truncated ? "Truncated" : "Complete";
+    }
+
     private sealed record EvidenceRow(
         DateTimeOffset Timestamp,
         string Workspace,
@@ -1333,6 +1379,7 @@ public partial class MainWindow : Window
                 workspace = line[1..close];
 
             TryCaptureEvidenceRow(line, workspace);
+            TryCaptureArtifactBatchRow(line, workspace);
 
             var lower = line.ToLowerInvariant();
             var kind = lower.Contains("error") || lower.Contains("failed") || lower.Contains("could not")
@@ -1356,6 +1403,8 @@ public partial class MainWindow : Window
             _changeRows.RemoveRange(0, _changeRows.Count - MaxChangeRows);
         if (_evidenceRows.Count > MaxEvidenceRows)
             _evidenceRows.RemoveRange(0, _evidenceRows.Count - MaxEvidenceRows);
+        if (_artifactBatchRows.Count > MaxArtifactBatchRows)
+            _artifactBatchRows.RemoveRange(0, _artifactBatchRows.Count - MaxArtifactBatchRows);
 
         if (IsLoaded && MainTabs.SelectedItem == ActivityTab)
             RefreshActivityGrid();
@@ -1363,6 +1412,141 @@ public partial class MainWindow : Window
             RefreshChangesGrid();
         if (IsLoaded && MainTabs.SelectedItem == EvidenceTab)
             RefreshEvidenceGrid();
+        if (IsLoaded && MainTabs.SelectedItem == ArtifactsTab)
+            RefreshArtifactBatchGrid();
+    }
+
+    private void TryCaptureArtifactBatchRow(string line, string workspace)
+    {
+        const string marker = "[ArtifactBatchResult] ";
+        var markerIndex = line.IndexOf(marker, StringComparison.Ordinal);
+        if (markerIndex < 0) return;
+
+        try
+        {
+            var json = line[(markerIndex + marker.Length)..];
+            var node = JsonNode.Parse(json)?.AsObject();
+            if (node is null) return;
+
+            static string Text(JsonObject obj, string key, string fallback = "unknown") =>
+                obj[key] is JsonValue value && value.TryGetValue<string>(out var text) ? text : fallback;
+            static string? OptionalText(JsonObject obj, string key) =>
+                obj[key] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+            static int Int(JsonObject obj, string key) =>
+                obj[key] is JsonValue value && value.TryGetValue<int>(out var number) ? number : 0;
+            static long? OptionalLong(JsonObject obj, string key) =>
+                obj[key] is JsonValue value && value.TryGetValue<long>(out var number) ? number : null;
+            static bool Bool(JsonObject obj, string key) =>
+                obj[key] is JsonValue value && value.TryGetValue<bool>(out var flag) && flag;
+
+            var entries = new List<ArtifactBatchEntryRow>();
+            if (node["entries"] is JsonArray array)
+            {
+                foreach (var child in array)
+                {
+                    if (child is not JsonObject entry) continue;
+                    entries.Add(new ArtifactBatchEntryRow(
+                        Text(entry, "path", "(unknown)"),
+                        Text(entry, "state", "unknown"),
+                        Text(entry, "delivery", "none"),
+                        OptionalLong(entry, "size_bytes"),
+                        OptionalLong(entry, "max_bytes"),
+                        OptionalText(entry, "version_strength"),
+                        OptionalLong(entry, "expires_epoch_ms"),
+                        OptionalText(entry, "blob_id"),
+                        Bool(entry, "content_ref_present"),
+                        OptionalText(entry, "error_code"),
+                        OptionalText(entry, "message")));
+                }
+            }
+
+            _artifactBatchRows.Add(new ArtifactBatchRow(
+                DateTimeOffset.Now,
+                workspace,
+                Text(node, "operation", "batch"),
+                Int(node, "requested_count"),
+                Int(node, "completed_count"),
+                Bool(node, "partial"),
+                Bool(node, "cancelled"),
+                Bool(node, "truncated"),
+                OptionalText(node, "truncation_reason"),
+                Int(node, "content_ref_count"),
+                Int(node, "quota_error_count"),
+                entries));
+        }
+        catch
+        {
+            // Artifact/Batch UI ignores malformed presentation telemetry rather than inventing state.
+        }
+    }
+
+    private void RefreshArtifactBatchGrid()
+    {
+        var visible = _artifactBatchRows.AsEnumerable().Reverse().ToArray();
+        ArtifactBatchGrid.ItemsSource = visible;
+        ArtifactBatchCountText.Text = visible.Length == 0
+            ? "0 captured batch results | waiting for real batch_read / batch_stat results"
+            : $"{visible.Length} captured batch result(s) | max {MaxArtifactBatchRows}";
+        if (visible.Length == 0)
+        {
+            ArtifactEntryGrid.ItemsSource = Array.Empty<ArtifactBatchEntryRow>();
+            ArtifactBatchSummaryText.Text = "No batch result captured yet.";
+            ArtifactQuotaSummaryText.Text = "Quota usage remaining is not emitted by batch results.";
+        }
+    }
+
+    private void ArtifactBatchGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ArtifactBatchGrid.SelectedItem is not ArtifactBatchRow row)
+        {
+            ArtifactEntryGrid.ItemsSource = Array.Empty<ArtifactBatchEntryRow>();
+            ArtifactBatchSummaryText.Text = "Select a captured batch result.";
+            ArtifactQuotaSummaryText.Text = "Quota usage remaining is not emitted by batch results.";
+            ArtifactEntryStatus.Status = PresentationStatus.Unavailable;
+            ArtifactEntryDetailText.Text = "Select a captured batch entry.";
+            return;
+        }
+
+        ArtifactEntryGrid.ItemsSource = row.Entries;
+        var flags = new List<string>();
+        if (row.Partial) flags.Add("partial");
+        if (row.Cancelled) flags.Add("cancelled");
+        if (row.Truncated) flags.Add($"truncated:{row.TruncationReason ?? "unknown"}");
+        var suffix = flags.Count == 0 ? "complete" : string.Join(", ", flags);
+        ArtifactBatchSummaryText.Text =
+            $"{row.Operation}: {row.CompletedCount}/{row.RequestedCount} completed | {suffix} | {row.Entries.Count} emitted entries.";
+        ArtifactQuotaSummaryText.Text =
+            $"{row.ContentRefCount} ContentRef delivery item(s); {row.QuotaErrorCount} observed artifact quota error(s). " +
+            "Remaining quota is not emitted by the batch result.";
+    }
+
+    private void ArtifactEntryGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ArtifactEntryGrid.SelectedItem is not ArtifactBatchEntryRow row)
+        {
+            ArtifactEntryStatus.Status = PresentationStatus.Unavailable;
+            ArtifactEntryDetailText.Text = "Select a captured batch entry.";
+            return;
+        }
+
+        var expired = row.ExpiresEpochMs is long expiry && expiry <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        ArtifactEntryStatus.Status = expired
+            ? PresentationStatus.Expired
+            : row.ErrorCode == "artifact_quota"
+                ? PresentationStatus.Blocked
+                : row.State == "ok"
+                    ? PresentationStatus.Passed
+                    : row.State == "too_large"
+                        ? PresentationStatus.Warning
+                        : PresentationStatus.Failed;
+
+        var contentRef = row.ContentRefPresent ? "Present (opaque token redacted)" : "Not present";
+        ArtifactEntryDetailText.Text =
+            $"Path: {row.Path}\nState: {row.State}\nDelivery: {row.Delivery}\nSize: {row.SizeDisplay}\n" +
+            $"Max inline bytes: {(row.MaxBytes is null ? "N/A" : $"{row.MaxBytes.Value:N0} B")}\n" +
+            $"Version strength: {row.VersionStrength ?? "N/A"}\nContentRef: {contentRef}\n" +
+            $"Expires: {row.ExpiryDisplay}\nBlob ID: {row.BlobId ?? "N/A"}\n" +
+            $"Error: {row.ErrorCode ?? "N/A"}\nMessage: {row.Message ?? "N/A"}";
     }
 
     private void TryCaptureEvidenceRow(string line, string workspace)

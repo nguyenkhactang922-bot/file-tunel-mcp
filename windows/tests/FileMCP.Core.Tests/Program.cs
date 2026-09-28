@@ -3705,7 +3705,10 @@ internal static class Program
         var resolved = await reopened.ResolveAsync(descriptor.ContentRef, workspaceAId, ArtifactContentClasses.IsKnown);
         Assert(resolved.BlobId == descriptor.BlobId && resolved.ReferenceId == descriptor.ReferenceId, "ContentRef survives store restart with installation identity");
 
-        var tampered = descriptor.ContentRef[..^1] + (descriptor.ContentRef[^1] == 'A' ? "B" : "A");
+        var tamperedParts = descriptor.ContentRef.Split('.', StringSplitOptions.None);
+        Assert(tamperedParts.Length == 3 && tamperedParts[2].Length > 1, "ContentRef signature segment is present for tamper proof");
+        var tamperedSignature = (tamperedParts[2][0] == 'A' ? "B" : "A") + tamperedParts[2][1..];
+        var tampered = string.Join('.', tamperedParts[0], tamperedParts[1], tamperedSignature);
         await AssertThrowsAsync(
             () => reopened.ResolveAsync(tampered, workspaceAId, ArtifactContentClasses.IsKnown),
             "authentication",
