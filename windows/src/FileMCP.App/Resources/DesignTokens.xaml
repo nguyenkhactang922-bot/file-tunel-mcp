@@ -1,0 +1,50 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Semantic product palette. Feature views consume brush keys, never raw product colors. -->
+    <Color x:Key="FileMcpSurfaceAppColor">#FFF7F8FA</Color>
+    <Color x:Key="FileMcpSurfaceSidebarColor">#FFF1F3F6</Color>
+    <Color x:Key="FileMcpSurfaceCardColor">#FFFFFFFF</Color>
+    <Color x:Key="FileMcpSurfaceRaisedColor">#FFFFFFFF</Color>
+    <Color x:Key="FileMcpSurfaceCodeColor">#FF16181D</Color>
+    <Color x:Key="FileMcpBorderSubtleColor">#FFE1E5EA</Color>
+    <Color x:Key="FileMcpBorderStrongColor">#FFC4CAD2</Color>
+    <Color x:Key="FileMcpTextPrimaryColor">#FF171A1F</Color>
+    <Color x:Key="FileMcpTextSecondaryColor">#FF5D6672</Color>
+    <Color x:Key="FileMcpTextDisabledColor">#FF929AA4</Color>
+    <Color x:Key="FileMcpAccentPrimaryColor">#FF2563EB</Color>
+    <Color x:Key="FileMcpStatusInfoColor">#FF2563EB</Color>
+    <Color x:Key="FileMcpStatusSuccessColor">#FF15803D</Color>
+    <Color x:Key="FileMcpStatusWarningColor">#FFB45309</Color>
+    <Color x:Key="FileMcpStatusDangerColor">#FFB91C1C</Color>
+    <Color x:Key="FileMcpStatusNeutralColor">#FF667085</Color>
+    <Color x:Key="FileMcpStatusStaleColor">#FF7C3AED</Color>
+
+    <SolidColorBrush x:Key="FileMcpSurfaceAppBrush" Color="{StaticResource FileMcpSurfaceAppColor}"/>
+    <SolidColorBrush x:Key="FileMcpSurfaceSidebarBrush" Color="{StaticResource FileMcpSurfaceSidebarColor}"/>
+    <SolidColorBrush x:Key="FileMcpSurfaceCardBrush" Color="{StaticResource FileMcpSurfaceCardColor}"/>
+    <SolidColorBrush x:Key="FileMcpSurfaceRaisedBrush" Color="{StaticResource FileMcpSurfaceRaisedColor}"/>
+    <SolidColorBrush x:Key="FileMcpSurfaceCodeBrush" Color="{StaticResource FileMcpSurfaceCodeColor}"/>
+    <SolidColorBrush x:Key="FileMcpBorderSubtleBrush" Color="{StaticResource FileMcpBorderSubtleColor}"/>
+    <SolidColorBrush x:Key="FileMcpBorderStrongBrush" Color="{StaticResource FileMcpBorderStrongColor}"/>
+    <SolidColorBrush x:Key="FileMcpTextPrimaryBrush" Color="{StaticResource FileMcpTextPrimaryColor}"/>
+    <SolidColorBrush x:Key="FileMcpTextSecondaryBrush" Color="{StaticResource FileMcpTextSecondaryColor}"/>
+    <SolidColorBrush x:Key="FileMcpTextDisabledBrush" Color="{StaticResource FileMcpTextDisabledColor}"/>
+    <SolidColorBrush x:Key="FileMcpAccentPrimaryBrush" Color="{StaticResource FileMcpAccentPrimaryColor}"/>
+    <SolidColorBrush x:Key="FileMcpStatusInfoBrush" Color="{StaticResource FileMcpStatusInfoColor}"/>
+    <SolidColorBrush x:Key="FileMcpStatusSuccessBrush" Color="{StaticResource FileMcpStatusSuccessColor}"/>
+    <SolidColorBrush x:Key="FileMcpStatusWarningBrush" Color="{StaticResource FileMcpStatusWarningColor}"/>
+    <SolidColorBrush x:Key="FileMcpStatusDangerBrush" Color="{StaticResource FileMcpStatusDangerColor}"/>
+    <SolidColorBrush x:Key="FileMcpStatusNeutralBrush" Color="{StaticResource FileMcpStatusNeutralColor}"/>
+    <SolidColorBrush x:Key="FileMcpStatusStaleBrush" Color="{StaticResource FileMcpStatusStaleColor}"/>
+
+    <Thickness x:Key="FileMcpSpace4">4</Thickness>
+    <Thickness x:Key="FileMcpSpace8">8</Thickness>
+    <Thickness x:Key="FileMcpSpace12">12</Thickness>
+    <Thickness x:Key="FileMcpSpace16">16</Thickness>
+    <Thickness x:Key="FileMcpSpace24">24</Thickness>
+    <Thickness x:Key="FileMcpSpace32">32</Thickness>
+    <CornerRadius x:Key="FileMcpRadiusSmall">4</CornerRadius>
+    <CornerRadius x:Key="FileMcpRadiusMedium">8</CornerRadius>
+    <CornerRadius x:Key="FileMcpRadiusLarge">12</CornerRadius>
+</ResourceDictionary>

@@ -73,6 +73,7 @@ chmod 755 "$APP/Contents/MacOS/tunnel-client"
     "$ROOT/macos/LocalMCPServer.swift" \
     "$ROOT/macos/TunnelSupervisor.swift" \
     "$ROOT/macos/LocalMCPRuntime.swift" \
+    "$ROOT/macos/PresentationFoundation.swift" \
     "$ROOT/macos/FileMCPApp.swift" \
     "$ROOT/macos/main.swift"
 

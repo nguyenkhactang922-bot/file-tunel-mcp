@@ -273,3 +273,21 @@ Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 Local proof: all Phase A contracts PASS; Windows runtime 750 assertions PASS; Release 0 warnings/errors; x64/ARM64 package builds and static integrity PASS.
 Claim-head native Verify: run `36297166252` SUCCESS on macOS / Windows x64 / Windows ARM64.
 Final exact-head native Verify remains required after evidence commit.
+
+## FMUX product-experience track
+
+Design gate: PASS / FROZEN on 2026-09-28.
+Authorities:
+- docs/adr/0007-product-ui-ux-architecture-and-fmux-track.md
+- docs/audit/FMUX_INDEPENDENT_MULTI_ROUND_UI_UX_AUDIT_2026-09-28.md
+- docs/audit/FMUX_FINAL_REPAIR_REAUDIT_2026-09-28.md
+- docs/design/FMUX_PRODUCT_EXPERIENCE_ARCHITECTURE_V1.md
+- docs/design/FMUX_DESIGN_SYSTEM_AND_COMPONENT_SPEC_V1.md
+- docs/design/FMUX_INTERACTION_STATE_AND_FMG_MAPPING_V1.md
+- docs/design/FMUX_DEPENDENCY_GRAPH_V1.md
+- docs/design/FMUX_DECISION_MATRIX_V1.md
+- tasks/MASTER_FILEMCP_FMUX_TASK_GRAPH.md
+
+FMUX-001: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
+Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
+NEXT_EXACT_ACTION: finish exact-head native verification, review/merge FMUX-001, then claim FMUX-002. FMG-026 scope remains unchanged.
