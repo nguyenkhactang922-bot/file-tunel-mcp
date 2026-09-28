@@ -1,9 +1,8 @@
 # FMUX-001 Presentation Foundation Evidence
 
-Status: LOCAL + NATIVE VERIFIED / REVIEW PENDING
+Status: LOCAL VERIFIED / CLEAN-BRANCH NATIVE CI PENDING
 Date: 2026-09-28
-Branch: chatgpt/FMUX-complete-scope-freeze
-Candidate head before evidence refresh: 9735881c467cf99426d1f1a707ff02b392506b04
+Branch: chatgpt/FMUX-001-presentation-foundation
 
 ## Scope implemented
 
@@ -45,18 +44,11 @@ FMUX presentation contract:
 macOS build-script syntax:
 - PASS via Git Bash.
 
-Project-state contract:
-- PASS on chatgpt/FMUX-complete-scope-freeze.
+## Branch hygiene
 
-## Native exact-head verification
-
-GitHub Verify run 36394903071:
-- verify-windows: SUCCESS;
-- verify-windows-arm64: SUCCESS;
-- verify-macos: SUCCESS;
-- macOS Build app: SUCCESS.
-
-This run verified candidate head 9735881c467cf99426d1f1a707ff02b392506b04.
+The initial FMUX branch was found during review to include unrelated FMG-012/FMG-013 history.
+A clean branch was rebuilt from fork/main and only FMUX commits were retained.
+The clean branch diff contains FMUX/state/build-wiring files only.
 
 ## Safety / regression review
 
@@ -69,9 +61,10 @@ This run verified candidate head 9735881c467cf99426d1f1a707ff02b392506b04.
 
 ## Next exact action
 
-Commit/push this evidence refresh.
-Require native Verify on the final exact evidence head.
-Perform scoped PR review.
-Merge only exact green head.
+Run local state/diff gates on the clean branch.
+Commit/push the clean-branch metadata/evidence refresh.
+Require native Verify on that exact clean head.
+Review changed-file scope.
+Merge only exact green clean head.
 Then verify merged main and mark FMUX-001 DONE / MAIN VERIFIED.
 Do not start FMUX-002 first.

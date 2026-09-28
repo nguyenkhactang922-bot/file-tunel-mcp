@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-012-cross-platform-gate`
+Active branch: `chatgpt/FMUX-001-presentation-foundation`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -288,6 +288,6 @@ Authorities:
 - docs/design/FMUX_DECISION_MATRIX_V1.md
 - tasks/MASTER_FILEMCP_FMUX_TASK_GRAPH.md
 
-FMUX-001: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
+FMUX-001: ACTIVE / LOCAL VERIFIED / CLEAN-BRANCH NATIVE CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
 Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
 NEXT_EXACT_ACTION: finish exact-head native verification, review/merge FMUX-001, then claim FMUX-002. FMG-026 scope remains unchanged.

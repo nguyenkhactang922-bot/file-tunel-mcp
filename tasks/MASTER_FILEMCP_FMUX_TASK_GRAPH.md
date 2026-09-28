@@ -1,16 +1,16 @@
-# MASTER FileMCP FMUX Task Graph
+# MAtTER FileMCP FMUX Task Graph
 
-Status: FROZEN COMPLETE IMPLEMENTATION PLAN
+ttatus: FROZEN COMPLETE IMPLEMENTATION PLAN
 Date: 2026-09-28
 Authority:
 - docs/adr/0007-product-ui-ux-architecture-and-fmux-track.md
 - docs/audit/FMUX_INDEPENDENT_MULTI_ROUND_UI_UX_AUDIT_2026-09-28.md
 - docs/audit/FMUX_FINAL_REPAIR_REAUDIT_2026-09-28.md
 - docs/design/FMUX_PRODUCT_EXPERIENCE_ARCHITECTURE_V1.md
-- docs/design/FMUX_DESIGN_SYSTEM_AND_COMPONENT_SPEC_V1.md
-- docs/design/FMUX_INTERACTION_STATE_AND_FMG_MAPPING_V1.md
+- docs/design/FMUX_DEtIGN_tYtTEM_AND_COMPONENT_tPEC_V1.md
+- docs/design/FMUX_INTERACTION_tTATE_AND_FMG_MAPPING_V1.md
 - docs/design/FMUX_DEPENDENCY_GRAPH_V1.md
-- docs/design/FMUX_DECISION_MATRIX_V1.md
+- docs/design/FMUX_DECItION_MATRIX_V1.md
 
 ## Completion law
 
@@ -23,21 +23,21 @@ FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED
 FMUX-020 PRODUCT_UI_UX_MAIN_VERIFIED.
 
 Each FMUX task follows:
-CLAIM -> ANALYZE -> PLAN -> CODE -> TEST -> EVIDENCE -> VERIFY -> COMMIT -> REVIEW -> MERGE -> MAIN VERIFIED -> NEXT READY TASK.
+CLAIM -> ANALYZE -> PLAN -> CODE -> TEtT -> EVIDENCE -> VERIFY -> COMMIT -> REVIEW -> MERGE -> MAIN VERIFIED -> NEXT READY TAtK.
 
 Accessibility, security truthfulness, theme behavior and no-fake-state rules apply to every task.
 
 ## FMUX-001 — Presentation Foundation
 
-State: ACTIVE / LOCAL + NATIVE VERIFIED / REVIEW PENDING
-Depends: ADR-0007 / FMUX design gate PASS.
+ttate: ACTIVE / LOCAL + NATIVE VERIFIED / REVIEW PENDING
+Depends: ADR-0007 / FMUX design gate PAtt.
 
-Scope:
+tcope:
 - Windows semantic resource dictionaries/tokens;
 - canonical presentation status enum/model;
 - page/navigation contract;
 - common formatting/status mapping;
-- macOS semantic token/status equivalents;
+- macOt semantic token/status equivalents;
 - testable presentation primitives;
 - no product-page redesign yet.
 
@@ -47,21 +47,21 @@ Acceptance:
 - status mapping is deterministic;
 - Windows Release build passes;
 - core/runtime regression remains green;
-- macOS source/build contract remains valid;
+- macOt source/build contract remains valid;
 - legacy UI remains functional.
 
-## FMUX-002 — App Shell + Navigation
+## FMUX-002 — App thell + Navigation
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-001 MAIN VERIFIED.
 
-Scope:
+tcope:
 - labeled sidebar shell;
 - content host;
 - workspace/global health context;
 - compact mode;
-- persistent Settings placement;
-- Windows/macOS semantic parity.
+- persistent tettings placement;
+- Windows/macOt semantic parity.
 
 Acceptance:
 - keyboard navigable;
@@ -69,25 +69,25 @@ Acceptance:
 - shell can host old pages during incremental migration;
 - navigation state preserved.
 
-## FMUX-003 — Canonical Status / Feedback Components
+## FMUX-003 — Canonical ttatus / Feedback Components
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-001.
 
-Scope:
-- StatusBadge;
+tcope:
+- ttatusBadge;
 - InlineNotice;
-- EmptyState;
+- Emptyttate;
 - PageHeader;
 - loading/refresh/error/stale patterns;
 - notification policy.
 
 ## FMUX-004 — Home
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003.
 
-Scope:
+tcope:
 - global health;
 - active workspace;
 - running work;
@@ -97,10 +97,10 @@ Scope:
 
 ## FMUX-005 — Workspaces
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003.
 
-Scope:
+tcope:
 - workspace list/cards;
 - connection/health/policy;
 - detail pane;
@@ -108,32 +108,32 @@ Scope:
 
 ## FMUX-006 — Connections
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003.
 
-Scope:
+tcope:
 - runtime credential status;
 - tunnel configuration;
 - connectivity diagnostics;
 - safe save/connect/disconnect flows.
 
-## FMUX-007 — Settings / Policy
+## FMUX-007 — tettings / Policy
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-003.
 
-Scope:
+tcope:
 - structured settings categories;
 - policy explanation;
 - advanced progressive disclosure;
 - execution/Git/storage/appearance sections.
 
-## FMUX-008 — Structured Activity
+## FMUX-008 — ttructured Activity
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-002, FMG-005, FMG-011.
 
-Scope:
+tcope:
 - structured event timeline;
 - filtering;
 - master/detail;
@@ -142,10 +142,10 @@ Scope:
 
 ## FMUX-009 — Changes
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-009.
 
-Scope:
+tcope:
 - edit preview/result;
 - file/version context;
 - diff/code surface;
@@ -154,20 +154,20 @@ FMG-017 integration extends adapters when available.
 
 ## FMUX-010 — Evidence
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-011.
 
-Scope:
+tcope:
 - evidence state list/detail;
 - passed/failed/stale/blocked/not-run/unknown/N/A;
 - source/policy/catalog linkage.
 
 ## FMUX-011 — Repository Intelligence
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-018, FMG-019.
 
-Scope:
+tcope:
 - repository summary;
 - repo map;
 - symbol search;
@@ -176,10 +176,10 @@ Scope:
 
 ## FMUX-012 — Terminal / PTY
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-020.
 
-Scope:
+tcope:
 - session list;
 - active terminal;
 - bounded output;
@@ -188,10 +188,10 @@ Scope:
 
 ## FMUX-013 — Recovery
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-002, FMUX-003, FMG-016, FMG-021, FMG-022.
 
-Scope:
+tcope:
 - quarantine;
 - checkpoints;
 - restore plan;
@@ -200,10 +200,10 @@ Scope:
 
 ## FMUX-014 — Artifact / Batch UX
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-003, FMG-014, FMG-015.
 
-Scope:
+tcope:
 - ContentRef metadata;
 - expiry/quota;
 - large-output inspection;
@@ -211,10 +211,10 @@ Scope:
 
 ## FMUX-015 — Backend / Isolation UX
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-003, FMG-023, FMG-024.
 
-Scope:
+tcope:
 - backend identity/status;
 - host vs isolated execution;
 - Docker availability;
@@ -222,10 +222,10 @@ Scope:
 
 ## FMUX-016 — Onboarding
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-004 through FMUX-015 applicable implemented surfaces.
 
-Scope:
+tcope:
 - first-run setup;
 - workspace selection;
 - credential/connect;
@@ -235,10 +235,10 @@ Scope:
 
 ## FMUX-017 — Accessibility / Keyboard / Theme Enforcement
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-001 through FMUX-016 implemented surfaces.
 
-Scope:
+tcope:
 - focus order;
 - keyboard navigation;
 - accessible names;
@@ -249,10 +249,10 @@ Scope:
 
 ## FMUX-018 — Performance + Visual Consistency Gate
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-017.
 
-Scope:
+tcope:
 - live-list performance;
 - bounded rendering;
 - token drift scan;
@@ -261,11 +261,11 @@ Scope:
 
 ## FMUX-019 — Cross-Platform UX Adversarial Gate
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-018.
 
-Scope:
-- Windows/macOS parity;
+tcope:
+- Windows/macOt parity;
 - error/empty/stale/offline states;
 - keyboard-only task completion;
 - feature gating;
@@ -274,10 +274,10 @@ Scope:
 
 ## FMUX-020 — Product UI/UX Main Verification
 
-State: BLOCKED
+ttate: BLOCKED
 Depends: FMUX-019 and FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED.
 
-Scope:
+tcope:
 - clean build/package;
 - complete end-to-end product flows;
 - live core-to-UI state proof;
@@ -287,8 +287,8 @@ Scope:
 Acceptance:
 - PRODUCT_UI_UX_MAIN_VERIFIED evidence exists;
 - no fake controls/states;
-- cross-platform semantic parity PASS;
-- core FMG regression PASS;
+- cross-platform semantic parity PAtt;
+- core FMG regression PAtt;
 - current handoff/state/task graph mark FMUX complete.
 
 ## Initial next action
