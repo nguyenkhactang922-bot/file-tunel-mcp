@@ -324,3 +324,21 @@ Targeted D tunnel reconnect completed successfully (PID 2620 -> 2552; health liv
 State: LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING.
 
 Canonical live registry: 23 tools; catalog version `1.6.0`; catalog SHA-256 `98ba484931717cc7ee8efbce83941afc33aa5fbaddb6b667882100a423bfacee`. Live proofs PASS for exec_process, project_context, apply_edits, evidence_get dispatch/error semantics, and logical-chat correlation. Remaining work is exact-head native Verify -> scoped review -> PR/merge -> merged-main verification. FMG-014 remains BLOCKED until FMG-013 FOUNDATION MAIN VERIFIED.
+
+## FMUX product-experience track
+
+Design gate: PASS / FROZEN on 2026-09-28.
+Authorities:
+- docs/adr/0007-product-ui-ux-architecture-and-fmux-track.md
+- docs/audit/FMUX_INDEPENDENT_MULTI_ROUND_UI_UX_AUDIT_2026-09-28.md
+- docs/audit/FMUX_FINAL_REPAIR_REAUDIT_2026-09-28.md
+- docs/design/FMUX_PRODUCT_EXPERIENCE_ARCHITECTURE_V1.md
+- docs/design/FMUX_DESIGN_SYSTEM_AND_COMPONENT_SPEC_V1.md
+- docs/design/FMUX_INTERACTION_STATE_AND_FMG_MAPPING_V1.md
+- docs/design/FMUX_DEPENDENCY_GRAPH_V1.md
+- docs/design/FMUX_DECISION_MATRIX_V1.md
+- tasks/MASTER_FILEMCP_FMUX_TASK_GRAPH.md
+
+FMUX-001: ACTIVE / LOCAL + NATIVE VERIFIED / FINAL-HEAD CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
+Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
+NEXT_EXACT_ACTION: finish exact-head native verification, review/merge FMUX-001, then claim FMUX-002. FMG-026 scope remains unchanged.
