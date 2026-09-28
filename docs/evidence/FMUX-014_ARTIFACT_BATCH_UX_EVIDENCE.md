@@ -36,7 +36,7 @@ Core presentation marker:
 - macOS build-script syntax: PASS;
 - git diff --check: PASS before evidence checkpoint.
 
-The Windows runtime gate exposed a pre-existing nondeterministic FMG-014 tamper fixture: mutating the final base64url signature character could produce a non-canonical token and fail as Malformed ContentRef before reaching the intended HMAC-authentication assertion. The test fixture was hardened to mutate the first signature-segment character instead, preserving a canonical token while still proving tamper rejection. Runtime authority and ContentRef semantics were not changed; the failed stage then passed with 797 assertions.
+The Windows and macOS runtime gates exposed the same pre-existing nondeterministic FMG-014 tamper-fixture ambiguity: mutating the final base64url signature character could produce a non-canonical token and fail as Malformed ContentRef before reaching the intended HMAC-authentication assertion. Both test fixtures were hardened to mutate the first signature-segment character instead, preserving a canonical token while still proving tamper rejection. Runtime authority and ContentRef semantics were not changed. Windows runtime passed with 797 assertions; macOS exact-head re-verification is required for the Swift fixture.
 
 ## Scope guard
 

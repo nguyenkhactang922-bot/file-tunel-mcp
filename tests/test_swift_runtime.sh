@@ -404,8 +404,11 @@ let reopened = try ArtifactContentStore(options: artifactOptions("primary"))
 let resolved = try reopened.resolve(descriptor.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
 precondition(resolved.blobID == descriptor.blobID && resolved.referenceID == descriptor.referenceID, "ContentRef did not survive restart")
 
-let tamperedTail = descriptor.contentRef.last == "A" ? "B" : "A"
-let tampered = String(descriptor.contentRef.dropLast()) + tamperedTail
+var tamperedParts = descriptor.contentRef.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+precondition(tamperedParts.count == 3 && tamperedParts[2].count > 1, "ContentRef signature segment missing")
+let firstSignatureCharacter = tamperedParts[2].first!
+tamperedParts[2] = String(firstSignatureCharacter == "A" ? "B" : "A") + tamperedParts[2].dropFirst()
+let tampered = tamperedParts.joined(separator: ".")
 expectArtifactFailure("tamper", containing: "authentication") {
     _ = try reopened.resolve(tampered, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
 }
