@@ -206,6 +206,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let execEnvironmentAllowListField = NSTextField()
     private let enableCommandsCheckbox = NSButton(checkboxWithTitle: "Allow shell commands", target: nil, action: nil)
     private let policyProfilePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let policyExplanationLabel = NSTextField(wrappingLabelWithString: "Policy is owned by local settings.")
     private let logView = NSTextView()
     private let saveConnectionButton = LoadingButton(title: "Save connection", target: nil, action: nil)
     private let saveSettingsButton = LoadingButton(title: "Save settings", target: nil, action: nil)
@@ -450,6 +451,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             ("Custom (advanced local policy)", FileMCPPolicyProfiles.custom, true),
             ("Legacy command compatible (migrated only)", FileMCPPolicyProfiles.legacyCommandCompatible, false),
         ]
+        policyProfilePopup.target = self
+        policyProfilePopup.action = #selector(policyProfileChanged)
         for (title, value, enabled) in policyOptions {
             policyProfilePopup.addItem(withTitle: title)
             if let item = policyProfilePopup.lastItem {
@@ -457,11 +460,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
                 item.isEnabled = enabled
             }
         }
-        let policyWarning = NSTextField(wrappingLabelWithString: "Policy is owned by local settings. Workspace auto never enables shell or open-world network tools; legacy command mode is retained only for migrated configurations.")
-        policyWarning.font = .systemFont(ofSize: 10)
-        policyWarning.textColor = .secondaryLabelColor
-        policyWarning.maximumNumberOfLines = 0
-        policyWarning.preferredMaxLayoutWidth = Layout.contentWidth
+        policyExplanationLabel.font = .systemFont(ofSize: 10)
+        policyExplanationLabel.textColor = .secondaryLabelColor
+        policyExplanationLabel.maximumNumberOfLines = 0
+        policyExplanationLabel.preferredMaxLayoutWidth = Layout.contentWidth
 
         let policyRow = fieldRow("Policy", policyProfilePopup)
         let profileRow = fieldRow("Profile", profileField)
@@ -482,17 +484,36 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         advancedSettingsGroup.isHidden = true
         advancedSettingsGroup.translatesAutoresizingMaskIntoConstraints = false
 
+        let workspaceSection = NSTextField(labelWithString: "Workspace & access")
+        workspaceSection.font = .systemFont(ofSize: 13, weight: .semibold)
+        let policySection = NSTextField(labelWithString: "Policy")
+        policySection.font = .systemFont(ofSize: 13, weight: .semibold)
+        let appearanceSection = NSTextField(labelWithString: "Appearance")
+        appearanceSection.font = .systemFont(ofSize: 13, weight: .semibold)
+        let appearanceExplanation = NSTextField(wrappingLabelWithString: "Follows macOS system appearance and accessibility contrast settings. Manual theme override is not exposed.")
+        appearanceExplanation.font = .systemFont(ofSize: 10)
+        appearanceExplanation.textColor = .secondaryLabelColor
+
+        let settingsHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Settings",
+            description: "Workspace access, policy, execution, Git, telemetry and appearance."
+        )
         let settingsForm = NSStackView(views: [
+            settingsHeader,
+            workspaceSection,
             directoryRow,
+            policySection,
             policyRow,
-            policyWarning,
+            policyExplanationLabel,
             advancedToggleButton,
             advancedSettingsGroup,
+            appearanceSection,
+            appearanceExplanation,
         ])
         settingsForm.orientation = .vertical
         settingsForm.alignment = .leading
         settingsForm.spacing = 8
-        settingsForm.setCustomSpacing(14, after: policyWarning)
+        settingsForm.setCustomSpacing(14, after: policyExplanationLabel)
         settingsForm.setCustomSpacing(10, after: advancedToggleButton)
         settingsForm.translatesAutoresizingMaskIntoConstraints = false
 
@@ -743,6 +764,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         tunnelIDField.stringValue = defaults.string(forKey: ConfigKey.tunnelID) ?? ""
         apiKeyField.stringValue = ""
         updateAPIKeyPlaceholder()
+        updatePolicyExplanation()
         profileField.stringValue = defaults.string(forKey: ConfigKey.profile) ?? "filemcp"
         portField.stringValue = defaults.string(forKey: ConfigKey.port) ?? "8008"
         directoryField.stringValue = defaults.string(forKey: ConfigKey.allowedDirectory) ?? defaultDirectory()
@@ -827,6 +849,26 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
 
     @objc private func showConnections() {
         tabs.selectTabViewItem(withIdentifier: "config")
+    }
+
+    @objc private func policyProfileChanged() {
+        updatePolicyExplanation()
+    }
+
+    private func updatePolicyExplanation() {
+        let profile = policyProfilePopup.selectedItem?.representedObject as? String ?? FileMCPPolicyProfiles.restricted
+        switch profile {
+        case FileMCPPolicyProfiles.restricted:
+            policyExplanationLabel.stringValue = "Restricted keeps the legacy-safe surface and does not grant shell or open-world network authority."
+        case FileMCPPolicyProfiles.workspaceAuto:
+            policyExplanationLabel.stringValue = "Workspace auto enables the safe workspace-oriented capability set while keeping shell and open-world network tools disabled."
+        case FileMCPPolicyProfiles.custom:
+            policyExplanationLabel.stringValue = "Custom uses explicit local policy configuration; server-owned policy remains authoritative."
+        case FileMCPPolicyProfiles.legacyCommandCompatible:
+            policyExplanationLabel.stringValue = "Legacy command compatible is retained only for migrated configurations and cannot be selected for new policy changes."
+        default:
+            policyExplanationLabel.stringValue = "Policy is owned by local settings and enforced by the server."
+        }
     }
 
     @objc private func showSettings() {
@@ -1088,7 +1130,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Runtime failed"
         case .starting:
-            startButton.title = "Connectingâ€¦"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
+            startButton.title = "ConnectingÃ¢â‚¬Â¦"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime starting"
         case .running:
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
@@ -1100,7 +1142,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Reconnect cooldown"
         case .stopping:
-            startButton.title = "Disconnectingâ€¦"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
+            startButton.title = "DisconnectingÃ¢â‚¬Â¦"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime stopping"
         }
         startButton.contentTintColor = .white
@@ -1179,7 +1221,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let aboutItem = NSMenuItem(title: "About FileMCP", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         aboutItem.target = NSApp
         appMenu.addItem(aboutItem)
-        let settingsItem = NSMenuItem(title: "Settingsâ€¦", action: #selector(showSettingsWindow), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "SettingsÃ¢â‚¬Â¦", action: #selector(showSettingsWindow), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
         appMenu.addItem(.separator())

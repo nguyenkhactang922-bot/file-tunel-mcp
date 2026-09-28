@@ -593,8 +593,31 @@ public partial class MainWindow : Window
         if (PolicyProfileComboBox.SelectedValue is null) PolicyProfileComboBox.SelectedValue = FileMcpPolicyProfiles.Restricted;
         EnableCommandsCheckBox.IsChecked = settings.PolicyProfile == FileMcpPolicyProfiles.LegacyCommandCompatible;
         ExecEnvironmentAllowListBox.Text = string.Join(", ", settings.ExecEnvironmentAllowList);
+        UpdatePolicyExplanation();
         OtlpEnabledCheckBox.IsChecked = settings.OtlpEnabled;
         OtlpEndpointBox.Text = string.IsNullOrWhiteSpace(settings.OtlpEndpoint) ? OtlpTelemetrySettings.DefaultEndpoint : settings.OtlpEndpoint;
+    }
+
+    private void PolicyProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdatePolicyExplanation();
+    }
+
+    private void UpdatePolicyExplanation()
+    {
+        var profile = PolicyProfileComboBox.SelectedValue?.ToString() ?? FileMcpPolicyProfiles.Restricted;
+        PolicyExplanationText.Text = profile switch
+        {
+            FileMcpPolicyProfiles.Restricted =>
+                "Restricted keeps the legacy-safe surface. It does not grant shell or open-world network authority.",
+            FileMcpPolicyProfiles.WorkspaceAuto =>
+                "Workspace auto enables the safe workspace-oriented capability set while keeping shell and open-world network tools disabled.",
+            FileMcpPolicyProfiles.Custom =>
+                "Custom uses the explicit local policy configuration. Advanced authority remains constrained by the server-owned policy model.",
+            FileMcpPolicyProfiles.LegacyCommandCompatible =>
+                "Legacy command compatible is retained only for migrated configurations and cannot be selected for new policy changes.",
+            _ => "Policy is owned by local settings and enforced by the server.",
+        };
     }
 
     private void UpdateApiKeyStatus()

@@ -450,7 +450,11 @@
             <TabItem Header="Settings" x:Name="SettingsTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
-                        <TextBlock FontWeight="SemiBold" Text="Workspace roots"/>
+                        <controls:PageHeader Title="Settings"
+                                             Description="Workspace access, policy, execution, Git, telemetry and appearance."
+                                             Margin="0,0,0,12"/>
+                        <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Workspace &amp; access"/>
+                        <TextBlock FontWeight="SemiBold" Text="Workspace roots" Margin="0,6,0,0"/>
                         <TextBlock Margin="0,4,0,10" Foreground="Gray" TextWrapping="Wrap"
                                    Text="Enable the drives you want FileMCP to expose. Every workspace remains isolated to its configured root."/>
 
@@ -501,20 +505,23 @@
                             </Grid>
                         </Border>
 
-                        <StackPanel Margin="0,14,0,0">
-                            <TextBlock Text="Execution policy" FontWeight="SemiBold"/>
-                            <ComboBox x:Name="PolicyProfileComboBox" Margin="0,6,0,0" SelectedValuePath="Tag">
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,16,0,0">
+                            <StackPanel>
+                            <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Policy"/>
+                            <TextBlock Text="Execution policy" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                            <ComboBox x:Name="PolicyProfileComboBox" Margin="0,6,0,0" SelectedValuePath="Tag" SelectionChanged="PolicyProfileComboBox_SelectionChanged">
                                 <ComboBoxItem Content="Restricted (legacy-safe compatibility)" Tag="restricted"/>
                                 <ComboBoxItem Content="Workspace auto" Tag="workspace-auto"/>
                                 <ComboBoxItem Content="Custom (advanced local policy)" Tag="custom"/>
                                 <ComboBoxItem Content="Legacy command compatible (migrated only)" Tag="legacy-command-compatible" IsEnabled="False"/>
                             </ComboBox>
-                            <TextBlock Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
-                                       Text="Policy is owned by local settings. Workspace auto never enables shell or open-world network tools; legacy command mode appears only for migrated configurations."/>
+                            <TextBlock x:Name="PolicyExplanationText" Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
+                                       Text="Policy is owned by local settings."/>
                             <CheckBox x:Name="EnableCommandsCheckBox" Visibility="Collapsed"/>
-                        </StackPanel>
+                            </StackPanel>
+                        </Border>
 
-                        <Expander x:Name="AdvancedExpander" Header="Advanced options" Margin="0,16,0,0">
+                        <Expander x:Name="AdvancedExpander" Header="Advanced execution, Git &amp; telemetry" Margin="0,16,0,0">
                             <StackPanel Margin="0,12,0,0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -601,6 +608,15 @@
                                 </Border>
                             </StackPanel>
                         </Expander>
+
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Appearance"/>
+                                <TextBlock Margin="0,6,0,0" Text="Follows system appearance and high-contrast settings."/>
+                                <TextBlock Margin="0,4,0,0" Style="{StaticResource FileMcpCaptionText}"
+                                           Text="Manual theme override is not exposed because the current desktop shell follows system resources."/>
+                            </StackPanel>
+                        </Border>
 
                         <Button x:Name="SaveSettingsButton" Content="Save settings" HorizontalAlignment="Right" Margin="0,16,0,0" Click="SaveSettings_Click"/>
                     </StackPanel>
