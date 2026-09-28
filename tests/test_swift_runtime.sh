@@ -475,7 +475,8 @@ expectArtifactFailure("quota", containing: "quota") {
 }
 let quotaUsage = try quotaStore.usage(workspaceAuthorityID: workspaceAID)
 precondition(quotaUsage.referenceCount == 1 && quotaUsage.blobCount == 1 && quotaUsage.globalBytes == 8, "quota failure left partial durable state")
-precondition(FileManager.default.fileExists(atPath: try quotaStore.blobURLForTest(quotaFirst.blobID).path), "quota failure damaged committed blob")
+let quotaBlobURL = try quotaStore.blobURLForTest(quotaFirst.blobID)
+precondition(FileManager.default.fileExists(atPath: quotaBlobURL.path), "quota failure damaged committed blob")
 
 let diskFullStore = try ArtifactContentStore(options: artifactOptions("disk-full", fault: { stage, _ in
     stage == "before-index-commit" ? NSError(domain: "FileMCP.Test", code: 28, userInfo: [NSLocalizedDescriptionKey: "simulated disk full"]) : nil
