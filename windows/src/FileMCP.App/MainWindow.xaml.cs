@@ -33,7 +33,9 @@ public partial class MainWindow : Window
     private bool _overviewPeriodQueryRunning;
     private string _logBuffer = "";
     private readonly List<ActivityRow> _activityRows = new();
+    private readonly List<ChangeRow> _changeRows = new();
     private const int MaxActivityRows = 500;
+    private const int MaxChangeRows = 250;
     private string _lastImportantEvent = "No recent issue";
     private const int MaxLogCharacters = 500_000;
 
@@ -1056,6 +1058,11 @@ public partial class MainWindow : Window
         MainTabs.SelectedItem = ActivityTab;
         RefreshActivityGrid();
     }
+    private void NavigateChanges_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = ChangesTab;
+        RefreshChangesGrid();
+    }
     private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
 
     private void CompactNavigation_Click(object sender, RoutedEventArgs e)
@@ -1070,6 +1077,7 @@ public partial class MainWindow : Window
         SetNavigationButtonPresentation(NavConnectionsButton, "Connections", "C");
         SetNavigationButtonPresentation(NavSettingsButton, "Settings", "S");
         SetNavigationButtonPresentation(NavActivityButton, "Activity", "A");
+        SetNavigationButtonPresentation(NavChangesButton, "Changes", "C");
         SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
 
         ShellWorkspaceText.Visibility = _navigationCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -1260,6 +1268,19 @@ public partial class MainWindow : Window
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
 
+    private sealed record ChangeRow(
+        DateTimeOffset Timestamp,
+        string Status,
+        string Workspace,
+        string Operation,
+        string Summary,
+        string Detail,
+        string? Target = null,
+        string? VersionContext = null)
+    {
+        public string Time => Timestamp.ToLocalTime().ToString("HH:mm:ss");
+    }
+
     private sealed record ActivityRow(
         DateTimeOffset Timestamp,
         string Kind,
@@ -1292,13 +1313,81 @@ public partial class MainWindow : Window
 
             var summary = line.Length <= 140 ? line : line[..137] + "...";
             _activityRows.Add(new ActivityRow(DateTimeOffset.Now, kind, workspace, summary, line));
+
+            if (TryCreateChangeRow(line, workspace, out var change))
+                _changeRows.Add(change);
         }
 
         if (_activityRows.Count > MaxActivityRows)
             _activityRows.RemoveRange(0, _activityRows.Count - MaxActivityRows);
+        if (_changeRows.Count > MaxChangeRows)
+            _changeRows.RemoveRange(0, _changeRows.Count - MaxChangeRows);
 
         if (IsLoaded && MainTabs.SelectedItem == ActivityTab)
             RefreshActivityGrid();
+        if (IsLoaded && MainTabs.SelectedItem == ChangesTab)
+            RefreshChangesGrid();
+    }
+
+    private static bool TryCreateChangeRow(string line, string workspace, out ChangeRow change)
+    {
+        var lower = line.ToLowerInvariant();
+        var operation = lower.Contains("apply_edits") ? "apply_edits"
+            : lower.Contains("write_file") ? "write_file"
+            : lower.Contains("delete_file") ? "delete_file"
+            : lower.Contains("delete_directory") ? "delete_directory"
+            : string.Empty;
+
+        if (operation.Length == 0)
+        {
+            change = null!;
+            return false;
+        }
+
+        var status = lower.Contains("changed since") || lower.Contains("stale")
+            ? "Stale"
+            : lower.Contains("conflict") || lower.Contains("overlapping")
+                ? "Conflict"
+                : lower.Contains("error") || lower.Contains("failed") || lower.Contains("refused")
+                    ? "Failed"
+                    : "Applied";
+
+        var summary = line.Length <= 160 ? line : line[..157] + "...";
+        change = new ChangeRow(DateTimeOffset.Now, status, workspace, operation, summary, line);
+        return true;
+    }
+
+    private void RefreshChangesGrid()
+    {
+        var visible = _changeRows.AsEnumerable().Reverse().ToArray();
+        ChangesGrid.ItemsSource = visible;
+        ChangesCountText.Text = visible.Length == 0
+            ? "0 captured mutation events | waiting for real write/delete/apply_edits activity"
+            : $"{visible.Length} captured mutation event(s) | max {MaxChangeRows}";
+    }
+
+    private void ChangesGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ChangesGrid.SelectedItem is not ChangeRow row)
+        {
+            ChangeDetailStatus.Status = PresentationStatus.Unavailable;
+            ChangeDetailTarget.Text = "Not emitted by runtime event";
+            ChangeDetailVersion.Text = "Not emitted by runtime event";
+            ChangeDetailText.Text = "Select a captured mutation event.";
+            return;
+        }
+
+        ChangeDetailStatus.Status = row.Status switch
+        {
+            "Applied" => PresentationStatus.Passed,
+            "Stale" => PresentationStatus.Stale,
+            "Conflict" => PresentationStatus.Blocked,
+            "Failed" => PresentationStatus.Failed,
+            _ => PresentationStatus.Unavailable,
+        };
+        ChangeDetailTarget.Text = row.Target ?? "Not emitted by runtime event";
+        ChangeDetailVersion.Text = row.VersionContext ?? "Not emitted by runtime event";
+        ChangeDetailText.Text = row.Detail;
     }
 
     private void RefreshActivityGrid()
