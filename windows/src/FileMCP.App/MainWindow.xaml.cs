@@ -32,6 +32,8 @@ public partial class MainWindow : Window
     private int _overviewPeriodQueryGeneration;
     private bool _overviewPeriodQueryRunning;
     private string _logBuffer = "";
+    private readonly List<ActivityRow> _activityRows = new();
+    private const int MaxActivityRows = 500;
     private string _lastImportantEvent = "No recent issue";
     private const int MaxLogCharacters = 500_000;
 
@@ -1049,6 +1051,11 @@ public partial class MainWindow : Window
     }
     private void NavigateConnections_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = ConnectionTab;
     private void NavigateSettings_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = SettingsTab;
+    private void NavigateActivity_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = ActivityTab;
+        RefreshActivityGrid();
+    }
     private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
 
     private void CompactNavigation_Click(object sender, RoutedEventArgs e)
@@ -1062,6 +1069,7 @@ public partial class MainWindow : Window
         SetNavigationButtonPresentation(NavWorkspacesButton, "Workspaces", "W");
         SetNavigationButtonPresentation(NavConnectionsButton, "Connections", "C");
         SetNavigationButtonPresentation(NavSettingsButton, "Settings", "S");
+        SetNavigationButtonPresentation(NavActivityButton, "Activity", "A");
         SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
 
         ShellWorkspaceText.Visibility = _navigationCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -1252,8 +1260,79 @@ public partial class MainWindow : Window
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
 
+    private sealed record ActivityRow(
+        DateTimeOffset Timestamp,
+        string Kind,
+        string Workspace,
+        string Summary,
+        string Detail)
+    {
+        public string Time => Timestamp.ToLocalTime().ToString("HH:mm:ss");
+    }
+
+    private void RecordActivity(string text)
+    {
+        foreach (var rawLine in text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0) continue;
+
+            var workspace = "Global";
+            if (line.StartsWith("[") && line.IndexOf(']') is var close && close > 1)
+                workspace = line[1..close];
+
+            var lower = line.ToLowerInvariant();
+            var kind = lower.Contains("error") || lower.Contains("failed") || lower.Contains("could not")
+                ? "Error"
+                : lower.Contains("settings") || lower.Contains("connection")
+                    ? "Settings"
+                    : lower.Contains("runtime") || lower.Contains("tunnel") || workspace != "Global"
+                        ? "Runtime"
+                        : "System";
+
+            var summary = line.Length <= 140 ? line : line[..137] + "...";
+            _activityRows.Add(new ActivityRow(DateTimeOffset.Now, kind, workspace, summary, line));
+        }
+
+        if (_activityRows.Count > MaxActivityRows)
+            _activityRows.RemoveRange(0, _activityRows.Count - MaxActivityRows);
+
+        if (IsLoaded && MainTabs.SelectedItem == ActivityTab)
+            RefreshActivityGrid();
+    }
+
+    private void RefreshActivityGrid()
+    {
+        var filter = (ActivityFilterCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
+        IEnumerable<ActivityRow> rows = _activityRows;
+        rows = filter switch
+        {
+            "error" => rows.Where(row => row.Kind == "Error"),
+            "runtime" => rows.Where(row => row.Kind == "Runtime"),
+            "settings" => rows.Where(row => row.Kind == "Settings"),
+            _ => rows,
+        };
+
+        var visible = rows.Reverse().ToArray();
+        ActivityGrid.ItemsSource = visible;
+        ActivityCountText.Text = $"{visible.Length} shown | {_activityRows.Count} retained (max {MaxActivityRows})";
+    }
+
+    private void ActivityFilterCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded) RefreshActivityGrid();
+    }
+
+    private void ActivityGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ActivityDetailText.Text = ActivityGrid.SelectedItem is ActivityRow row
+            ? $"{row.Timestamp.ToLocalTime():yyyy-MM-dd HH:mm:ss}\nType: {row.Kind}\nWorkspace: {row.Workspace}\n\n{row.Detail}"
+            : "Select an activity event.";
+    }
+
     private void AppendLog(string text)
     {
+        RecordActivity(text);
         _logBuffer += text;
         if (_logBuffer.Length > MaxLogCharacters)
             _logBuffer = "[...older log truncated...]\n" + _logBuffer[^MaxLogCharacters..];

@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMUX-007-settings-policy`
+Branch: `chatgpt/FMUX-008-structured-activity`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -126,7 +126,7 @@ FMG-026, not FMG-013, is the complete upgrade completion gate.
 
 State: CLAIMED / ACTIVE.
 
-Branch: `chatgpt/FMUX-007-settings-policy`.
+Branch: `chatgpt/FMUX-008-structured-activity`.
 
 NEXT_EXACT_ACTION: implement FMG-003 Server-Owned Policy + Migration only: restricted/workspace-auto/custom profiles, legacy EnableCommands migration, policy generation/hash, risk/effect authorization, effective catalog filtering and runtime reauthorization. Do not begin FMG-004 or later tasks.
 
@@ -243,7 +243,7 @@ NEXT_EXACT_ACTION: harden existing write/delete mutations only: expected-version
 FMG-008: DONE / MAIN VERIFIED. Final candidate `35ef237a0f4d32f0940491b9163a0dcbea7e6c61` merged by PR #12 as main `8a58a223814505518e581ebe79856846555cb4b4`; merged-main Verify `36212103370` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows core 655 assertions and Release build PASS. Evidence: `docs/evidence/FMG-008_EXISTING_MUTATION_HARDENING_EVIDENCE.md`.
 
 FMG-009: CLAIMED / ACTIVE on `chatgpt/FMG-009-apply-edits`.
-Branch: `chatgpt/FMUX-007-settings-policy`
+Branch: `chatgpt/FMUX-008-structured-activity`
 
 NEXT_EXACT_ACTION: implement FMG-009 Atomic Versioned `apply_edits` only: canonical range-edit primitive, expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version/Mutation Guard/policy/cancellation rechecks, atomic publish, and adversarial/fault-injection coverage. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.
 
@@ -459,7 +459,7 @@ NEXT_EXACT_ACTION: implement FMG-014 Ephemeral Artifact / ContentRef Store only:
 ## FMG-014 local verification checkpoint - 2026-09-28
 
 State: ACTIVE / LOCAL VERIFIED / CROSS-PLATFORM CI PENDING.
-Branch: `chatgpt/FMUX-007-settings-policy`.
+Branch: `chatgpt/FMUX-008-structured-activity`.
 Evidence: `docs/evidence/FMG-014_ARTIFACT_CONTENTREF_STORE_EVIDENCE.md`.
 
 Implemented:
@@ -536,3 +536,12 @@ FMUX-007: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-007-setti
 Local proof: Settings/Policy contract PASS; Windows Release 0 warnings/errors; Windows runtime 776 assertions PASS; macOS build-script syntax PASS.
 Evidence: `docs/evidence/FMUX-007_SETTINGS_POLICY_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, review, merge, merged-main verification, then claim FMUX-008.
+
+## FMUX-007 closure / FMUX-008 local verification
+
+FMUX-007: DONE / MAIN VERIFIED. PR #28; merge `1e5b1c94bd747a0576b7b2871ac78d10b649930a`; merged-main Verify `36421881472` SUCCESS after targeted macOS rerun.
+
+FMUX-008: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-008-structured-activity`.
+Local proof: Structured Activity contract PASS; Windows Release 0 warnings/errors; Windows runtime 776 assertions PASS on targeted rerun; macOS build-script syntax PASS.
+Evidence: `docs/evidence/FMUX-008_STRUCTURED_ACTIVITY_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push exact candidate, native Verify, review, merge, merged-main verification, then claim FMUX-009.
