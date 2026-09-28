@@ -856,7 +856,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     }
 
     private func updatePolicyExplanation() {
-        let profile = selectedPolicyProfile()
+        let profile = policyProfilePopup.selectedItem?.representedObject as? String ?? FileMCPPolicyProfiles.restricted
         switch profile {
         case FileMCPPolicyProfiles.restricted:
             policyExplanationLabel.stringValue = "Restricted keeps the legacy-safe surface and does not grant shell or open-world network authority."
@@ -1130,7 +1130,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Runtime failed"
         case .starting:
-            startButton.title = "Connectingâ€¦"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
+            startButton.title = "ConnectingÃ¢â‚¬Â¦"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime starting"
         case .running:
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
@@ -1142,7 +1142,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Reconnect cooldown"
         case .stopping:
-            startButton.title = "Disconnectingâ€¦"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
+            startButton.title = "DisconnectingÃ¢â‚¬Â¦"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime stopping"
         }
         startButton.contentTintColor = .white
@@ -1221,7 +1221,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let aboutItem = NSMenuItem(title: "About FileMCP", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         aboutItem.target = NSApp
         appMenu.addItem(aboutItem)
-        let settingsItem = NSMenuItem(title: "Settingsâ€¦", action: #selector(showSettingsWindow), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "SettingsÃ¢â‚¬Â¦", action: #selector(showSettingsWindow), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
         appMenu.addItem(.separator())
