@@ -40,6 +40,7 @@ jobs:
             macos/ProcessRunner.swift \
             macos/ExecProcessEnvironmentAuthority.swift \
             macos/LogicalChatCorrelation.swift \
+            macos/ArtifactContentStore.swift \
             macos/EvidenceSupport.swift \
             macos/ToolCatalog.swift \
             macos/ServerPolicy.swift \
@@ -146,6 +147,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_evidence_contract.ps1
 
+      - name: Verify artifact ContentRef contract
+        shell: pwsh
+        run: ./tests/test_artifact_contentref_contract.ps1
+
       - name: Verify macOS supervisor contract
         shell: pwsh
         run: ./tests/test_macos_supervisor_contract.ps1
@@ -248,6 +253,10 @@ jobs:
       - name: Verify project context contract
         shell: pwsh
         run: ./tests/test_project_context_contract.ps1
+
+      - name: Verify artifact ContentRef contract
+        shell: pwsh
+        run: ./tests/test_artifact_contentref_contract.ps1
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v5

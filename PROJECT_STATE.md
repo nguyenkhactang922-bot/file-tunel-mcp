@@ -356,8 +356,16 @@ Evidence: `docs/evidence/FMG-013_FULL_REGRESSION_LIVE_MCP_EVIDENCE.md`.
 
 ## FMG-014 implementation
 
-State: CLAIMED / ACTIVE.
+State: ACTIVE / LOCAL VERIFIED / CROSS-PLATFORM CI PENDING.
 Branch: `chatgpt/FMG-014-artifact-contentref-store`.
 Depends: FMG-013, FMG-004, FMG-006, FMG-011 DONE / MAIN VERIFIED.
 Scope: Ephemeral Artifact / ContentRef Store only.
 NEXT_EXACT_ACTION: implement the authenticated content-addressed store foundation and its cross-platform security/failure contracts. Do not begin FMG-015 before FMG-014 MAIN VERIFIED.
+
+
+## FMG-014 local verification checkpoint
+
+Evidence: `docs/evidence/FMG-014_ARTIFACT_CONTENTREF_STORE_EVIDENCE.md`.
+Windows local contract/build/integration: PASS (776 assertions; 0 warnings / 0 errors).
+macOS native compile/integration: pending exact-head Verify.
+FMG-015 remains BLOCKED until FMG-014 MAIN VERIFIED.

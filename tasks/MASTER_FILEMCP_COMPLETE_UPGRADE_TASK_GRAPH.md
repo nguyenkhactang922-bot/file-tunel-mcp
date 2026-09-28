@@ -140,7 +140,7 @@ FMG-013 is FOUNDATION MAIN VERIFIED only; it is not the final complete-upgrade c
 
 ## FMG-014 - Ephemeral Artifact / ContentRef Store
 
-State: CLAIMED / ACTIVE
+State: ACTIVE / LOCAL VERIFIED / CROSS-PLATFORM CI PENDING
 Depends: FMG-013, FMG-004, FMG-006, FMG-011
 
 Scope:

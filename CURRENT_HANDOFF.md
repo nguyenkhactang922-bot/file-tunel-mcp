@@ -411,3 +411,27 @@ FMG-013: DONE / FOUNDATION MAIN VERIFIED.
 FMG-014: CLAIMED / ACTIVE on `chatgpt/FMG-014-artifact-contentref-store`.
 
 NEXT_EXACT_ACTION: implement FMG-014 Ephemeral Artifact / ContentRef Store only: local content-addressed blob store outside the repository, metadata index, authenticated ContentRef bound to installation/workspace/content-class/expiry, quotas + TTL GC, current-user-only storage permissions, stream read/write, and explicit TOOL_OUTPUT / PTY_OUTPUT / CHECKPOINT / QUARANTINE classes. Add tamper, cross-workspace replay, metadata/blob mismatch, corruption, disk-full, concurrent put/delete, expired lease and permission-regression tests. Do not begin FMG-015 before FMG-014 MAIN VERIFIED.
+
+
+## FMG-014 local verification checkpoint - 2026-09-28
+
+State: ACTIVE / LOCAL VERIFIED / CROSS-PLATFORM CI PENDING.
+Branch: `chatgpt/FMG-014-artifact-contentref-store`.
+Evidence: `docs/evidence/FMG-014_ARTIFACT_CONTENTREF_STORE_EVIDENCE.md`.
+
+Implemented:
+- content-addressed artifact blob store + independent metadata index;
+- authenticated HMAC-SHA256 `cr1` ContentRef;
+- installation/workspace/blob/class/ref-id/expiry/lease binding;
+- TOOL_OUTPUT / PTY_OUTPUT / CHECKPOINT / QUARANTINE classes;
+- quota + TTL GC;
+- Windows current-user ACL and macOS owner-only POSIX permissions;
+- streaming read/write;
+- negative coverage for tamper, cross-workspace, metadata mismatch, corruption, disk-full rollback, quota partial-write refusal, lease expiry and concurrent dedupe/delete.
+
+Local Windows evidence:
+- artifact contract PASS;
+- Release build PASS, 0 warnings / 0 errors;
+- full Windows integration PASS, 776 assertions.
+
+NEXT_EXACT_ACTION: commit this local candidate, sync latest fork/main (currently FMUX track may have advanced), push exact synchronized head, require native Verify on macOS + Windows x64 + Windows ARM64, review/PR/merge, merged-main Verify, then FMG-014 MAIN VERIFIED -> claim FMG-015. Do not begin FMG-015 early.
