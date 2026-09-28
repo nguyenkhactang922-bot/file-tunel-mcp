@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-015 Batch Read / Stat only on `chatgpt/FMG-015-batch-read-stat`; add batch_stat + batch_read with per-entry SafePathResolver/version checks, aggregate ToolBudget, deterministic per-entry outcomes, explicit partial cancellation and optional FMG-014 ContentRef for oversized payloads; cover mixed valid/escape paths, duplicates, huge lists, mid-batch mutation/cancellation and artifact quota exhaustion; do not begin FMG-016 before FMG-015 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: commit the LOCAL VERIFIED FMG-015 candidate on `chatgpt/FMG-015-batch-read-stat`, sync latest fork/main, rerun affected local gates, push exact synchronized head, require native Verify on macOS + Windows x64 + Windows ARM64, scoped review, PR/merge and merged-main verification; only then mark FMG-015 DONE / MAIN VERIFIED and claim FMG-016.

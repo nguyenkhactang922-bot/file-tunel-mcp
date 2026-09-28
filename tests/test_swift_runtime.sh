@@ -1297,6 +1297,8 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/FileVersionService.swift \
     macos/ProjectContextService.swift \
     macos/AuthorizedPathSnapshot.swift \
+    macos/ArtifactContentStore.swift \
+    macos/BatchFileService.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -2387,6 +2389,8 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/FileVersionService.swift \
     macos/ProjectContextService.swift \
     macos/AuthorizedPathSnapshot.swift \
+    macos/ArtifactContentStore.swift \
+    macos/BatchFileService.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"
@@ -2420,7 +2424,7 @@ UNAVAILABLE_EVIDENCE_BASE_URL="http://127.0.0.1:18091/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.6.0"
+CATALOG_VERSION="1.7.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
@@ -2935,6 +2939,28 @@ printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.result raw
 printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.version raw -expect string -o - - | grep -Eq '^v1:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$'
 printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.version_strength raw -expect string -o - - | grep -qx 'content'
 printf '%s' "$READ_RESULT" | plutil -extract result.structuredContent.size_bytes raw -expect integer -o - - | grep -qx '11'
+
+# FMG-015 live batch_stat/batch_read parity on the native macOS MCP path.
+BATCH_STAT_RESULT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":3201,"method":"tools/call","params":{"name":"batch_stat","arguments":{"paths":["hello.txt","../escape.txt","hello.txt"]}}}')"
+printf '%s' "$BATCH_STAT_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$BATCH_STAT_RESULT" | python3 -c 'import json,sys,re; d=json.load(sys.stdin)["result"]["structuredContent"]; e=d["entries"]; assert d["requested_count"]==3 and d["completed_count"]==3 and d["partial"] is False; assert e[0]["state"]=="ok" and e[0]["entry_type"]=="file" and re.match(r"^v1:",e[0]["version"]); assert e[1]["state"]=="error" and e[1]["error_code"]=="path_outside_root"; assert e[2]["path"]=="hello.txt" and e[2]["state"]=="ok"'
+echo "mcp-batch-stat: ok"
+
+BATCH_READ_RESULT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":3202,"method":"tools/call","params":{"name":"batch_read","arguments":{"requests":[{"relative_path":"hello.txt","max_bytes":64},{"relative_path":"../escape.txt","max_bytes":64}]}}}')"
+printf '%s' "$BATCH_READ_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$BATCH_READ_RESULT" | python3 -c 'import json,sys,re; d=json.load(sys.stdin)["result"]["structuredContent"]; e=d["entries"]; assert d["requested_count"]==2 and d["completed_count"]==2 and d["partial"] is False; assert e[0]["state"]=="ok" and e[0]["delivery"]=="inline" and e[0]["content"]=="hello swift" and re.match(r"^v1:",e[0]["version"]); assert e[1]["state"]=="error" and e[1]["error_code"]=="path_outside_root"'
+echo "mcp-batch-read: ok"
+
+BATCH_BUDGET_RESULT="$(curl -fsS -X POST "$BASE_URL" \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":3203,"method":"tools/call","params":{"name":"batch_read","arguments":{"requests":[{"relative_path":"hello.txt","max_bytes":64},{"relative_path":"hello.txt","max_bytes":64}]},"_meta":{"io.filemcp/budget":{"maxBytesScanned":12,"maxVisitedEntries":8,"maxOutputItems":8}}}}')"
+printf '%s' "$BATCH_BUDGET_RESULT" | plutil -extract result.isError raw -expect bool -o - - | grep -qx 'false'
+printf '%s' "$BATCH_BUDGET_RESULT" | python3 -c 'import json,sys; d=json.load(sys.stdin)["result"]["structuredContent"]; assert d["partial"] is True and d["truncated"] is True and d["truncation_reason"]=="bytes_scanned"; assert len(d["entries"])>=1'
+echo "mcp-batch-budget: ok"
 
 PROJECT_CONTEXT_RESULT="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \

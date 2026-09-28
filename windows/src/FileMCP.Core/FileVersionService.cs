@@ -34,16 +34,18 @@ internal sealed class FileVersionService
     private static readonly byte[] ProcessSigningKey = RandomNumberGenerator.GetBytes(32);
     private readonly SafePathResolver _resolver;
     private readonly byte[] _key;
+    private readonly Action<string>? _readStageForTests;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false,
     };
 
-    public FileVersionService(SafePathResolver resolver, byte[]? key = null)
+    public FileVersionService(SafePathResolver resolver, byte[]? key = null, Action<string>? readStageForTests = null)
     {
         _resolver = resolver;
         _key = key is null ? ProcessSigningKey : key.ToArray();
+        _readStageForTests = readStageForTests;
         if (_key.Length < 32) throw new ArgumentException("File version signing key must be at least 32 bytes", nameof(key));
     }
 
@@ -53,6 +55,7 @@ internal sealed class FileVersionService
         var target = _resolver.Resolve(relativePath);
         using var stream = new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, HashChunkBytes, FileOptions.SequentialScan);
         var before = Snapshot(stream.SafeFileHandle);
+        _readStageForTests?.Invoke("after_snapshot");
         if (!string.Equals(before.EntryType, "file", StringComparison.Ordinal))
             throw new FileMcpException($"No such file: {relativePath}");
         if (before.SizeBytes > maxBytes)

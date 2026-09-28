@@ -165,3 +165,15 @@ PASS:
 - fork `main` points at `d7669ed0d60c51eb1cfb12813abc8f34d3d3ff0e`.
 
 FMG-014 is DONE / MAIN VERIFIED. FMG-015 is dependency-unblocked and claimed on `chatgpt/FMG-015-batch-read-stat`.
+
+
+## Final closure / MAIN verification
+
+FMG-014 is DONE / MAIN VERIFIED.
+- exact closure head: `d4d2c75ce91efd1b1b3f5f87d58e86f52f6ced53`;
+- PR #26 Verify run `36417272966`: SUCCESS on macOS / Windows x64 / native Windows ARM64;
+- PR #26 merged as `d7669ed0d60c51eb1cfb12813abc8f34d3d3ff0e`;
+- merged-main Verify run `36417632075`: SUCCESS on macOS / Windows x64 / native Windows ARM64;
+- canonical/non-canonical ContentRef tamper hardening is included in verified main.
+
+FMG-015 is dependency-unblocked and claimed on `chatgpt/FMG-015-batch-read-stat`.

@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-014-artifact-contentref-store`
+Branch: `chatgpt/FMG-015-batch-read-stat`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -524,3 +524,22 @@ FMG-014: DONE / MAIN VERIFIED.
 FMG-015: CLAIMED / ACTIVE on `chatgpt/FMG-015-batch-read-stat`.
 
 NEXT_EXACT_ACTION: implement FMG-015 Batch Read / Stat only: `batch_stat` + `batch_read`, per-entry SafePathResolver/version authorization, aggregate ToolBudget, deterministic per-entry states, cancellation with explicit partial result, version token per eligible file, and optional FMG-014 ContentRef for oversized items. Cover mixed valid/escape paths, duplicates, huge lists, mid-batch cancellation, file mutation during read and artifact quota exhaustion. Do not begin FMG-016 before FMG-015 MAIN VERIFIED.
+
+
+## FMG-014 closure / FMG-015 claim
+
+FMG-014: DONE / MAIN VERIFIED.
+PR #26 head `d4d2c75ce91efd1b1b3f5f87d58e86f52f6ced53`; merge main `d7669ed0d60c51eb1cfb12813abc8f34d3d3ff0e`; PR Verify `36417272966` SUCCESS; merged-main Verify `36417632075` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMG-015: CLAIMED / ACTIVE on `chatgpt/FMG-015-batch-read-stat`.
+NEXT_EXACT_ACTION: implement batch_stat + batch_read with per-entry resolver/version authority, one aggregate ToolBudget, deterministic per-entry results, explicit cancellation/partial state, and optional Artifact ContentRef spill for oversized content; then negative tests -> local verify -> exact-head native Verify -> review -> PR/merge -> merged-main Verify. FMG-016 remains BLOCKED until FMG-015 MAIN VERIFIED.
+
+## FMG-015 local verification checkpoint - 2026-09-28
+
+State: LOCAL VERIFIED / MAIN SYNC + NATIVE CI PENDING.
+Catalog: 1.7.0 / 25 canonical tools / SHA-256 `70faaa4cb370589191084ef76dfbcb502d810f5c8c658f0e1da80e9ec194a8c7`.
+Local FMG-015 isolation: PASS (20 assertions); Release build: PASS 0 warnings/errors; batch contract + catalog/parity: PASS.
+Scoped review hardening: ContentRef spill is bound to strong-version snapshot bytes and nested batch request arguments fail closed.
+Evidence: `docs/evidence/FMG-015_BATCH_READ_STAT_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: commit this local-verified FMG-015 candidate, merge latest fork/main without dropping concurrent FMUX work, rerun affected gates, push exact synchronized head, require native Verify macOS + Windows x64 + Windows ARM64, review/PR/merge, merged-main Verify, then mark FMG-015 DONE / MAIN VERIFIED and claim FMG-016.

@@ -50,9 +50,15 @@ final class FileVersionService {
 
     private let resolver: SafePathResolver
     private let key: SymmetricKey
+    private let readStageForTests: ((String) -> Void)?
 
-    init(resolver: SafePathResolver, keyData: Data? = nil) throws {
+    init(
+        resolver: SafePathResolver,
+        keyData: Data? = nil,
+        readStageForTests: ((String) -> Void)? = nil
+    ) throws {
         self.resolver = resolver
+        self.readStageForTests = readStageForTests
         let bytes = keyData ?? Self.processSigningKey
         guard bytes.count >= 32 else {
             throw FileVersionServiceError.invalid("File version signing key must be at least 32 bytes")
@@ -66,6 +72,7 @@ final class FileVersionService {
         let handle = try FileHandle(forReadingFrom: target)
         defer { try? handle.close() }
         let before = try snapshot(fileDescriptor: handle.fileDescriptor)
+        readStageForTests?("after_snapshot")
         guard before.entryType == "file" else {
             throw FileVersionServiceError.invalid("No such file: \(relativePath)")
         }

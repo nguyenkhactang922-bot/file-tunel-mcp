@@ -179,7 +179,7 @@ Cross-platform:
 
 ## FMG-015 - Batch Read / Stat
 
-State: CLAIMED / ACTIVE
+State: LOCAL VERIFIED / MAIN SYNC + NATIVE CI PENDING
 Depends: FMG-014, FMG-004, FMG-006
 
 Scope:

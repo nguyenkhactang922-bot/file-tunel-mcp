@@ -12,6 +12,7 @@ internal sealed partial class LocalTools
     private readonly ServerPolicy _policy;
     private readonly ExecProcessEnvironmentAuthority _execEnvironment;
     private readonly FileVersionService _fileVersions;
+    private readonly BatchFileService _batchFiles;
     private readonly AuthorizedPathSnapshotService _mutationGuard;
     private readonly ProjectContextService _projectContext;
     private readonly Action<string>? _beforeMutationCommitForTests;
@@ -25,7 +26,7 @@ internal sealed partial class LocalTools
     private readonly SemaphoreSlim _gitSlots = new(3, 3);
     private static readonly HashSet<string> HandlerToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "read_file", "read_file_range", "search_content", "search_filenames",
+        "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     };
@@ -36,7 +37,7 @@ internal sealed partial class LocalTools
     };
     private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "exec_process",
+        "list_files", "batch_stat", "batch_read", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "exec_process",
     };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -60,6 +61,7 @@ internal sealed partial class LocalTools
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
+        _batchFiles = new BatchFileService(_resolver, _fileVersions);
         _mutationGuard = new AuthorizedPathSnapshotService(_resolver);
         _projectContext = new ProjectContextService(_resolver, policy, skillRegistry);
         _beforeMutationCommitForTests = beforeMutationCommitForTests;
@@ -112,6 +114,13 @@ internal sealed partial class LocalTools
                     GetRequiredString(arguments, "relative_path"),
                     GetRequiredInt(arguments, "start_line"),
                     GetRequiredInt(arguments, "end_line"))),
+                "batch_stat" => ObjectOutput(_batchFiles.Stat(
+                    GetRequiredArray(arguments, "paths"),
+                    executionContext)),
+                "batch_read" => ObjectOutput(await _batchFiles.ReadAsync(
+                    GetRequiredArray(arguments, "requests"),
+                    executionContext,
+                    effectiveCancellation).ConfigureAwait(false)),
                 "search_content" => ObjectOutput(SearchContent(
                     GetRequiredString(arguments, "query"),
                     GetString(arguments, "path", ""),
