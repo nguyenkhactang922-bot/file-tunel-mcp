@@ -32,11 +32,11 @@ Core presentation marker:
 - project-state contract: PASS;
 - FMUX Artifact / Batch contract: PASS;
 - Windows Release build: PASS, 0 warnings / 0 errors;
-- Windows runtime regression: PASS, 796 assertions;
+- Windows runtime regression: PASS, 797 assertions after deterministic tamper-fixture hardening;
 - macOS build-script syntax: PASS;
 - git diff --check: PASS before evidence checkpoint.
 
-The first Windows runtime attempt hit the previously observed nondeterministic FMG-014 tamper assertion (Malformed ContentRef). The same runtime stage passed unchanged on immediate rerun, so no FMUX-014 code change was made for that unrelated flaky assertion.
+The Windows runtime gate exposed a pre-existing nondeterministic FMG-014 tamper fixture: mutating the final base64url signature character could produce a non-canonical token and fail as Malformed ContentRef before reaching the intended HMAC-authentication assertion. The test fixture was hardened to mutate the first signature-segment character instead, preserving a canonical token while still proving tamper rejection. Runtime authority and ContentRef semantics were not changed; the failed stage then passed with 797 assertions.
 
 ## Scope guard
 
