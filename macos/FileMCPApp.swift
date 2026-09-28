@@ -1099,10 +1099,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
                 return
             }
             let event = changeEvents[changeEvents.count - 1 - row]
-            changesDetailLabel.stringValue = "\(event.status) | \(event.operation) | \(event.workspace)
-File/version context: not emitted by runtime event
-
-\(event.detail)"
+            changesDetailLabel.stringValue = "\(event.status) | \(event.operation) | \(event.workspace)\nFile/version context: not emitted by runtime event\n\n\(event.detail)"
             return
         }
         guard table === activityTableView else { return }
@@ -1112,8 +1109,7 @@ File/version context: not emitted by runtime event
             return
         }
         let event = filteredActivityEvents[row]
-        activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)
-\(event.detail)"
+        activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)\n\(event.detail)"
     }
 
     private func changeEvent(from line: String, workspace: String) -> ChangeEvent? {
