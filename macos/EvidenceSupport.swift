@@ -398,8 +398,7 @@ final class EvidenceCoordinator {
         if JSONSerialization.isValidJSONObject(metadata),
            let data = try? JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys]),
            let text = String(data: data, encoding: .utf8) {
-            log("[EvidenceResult] \(text)
-")
+            log("[EvidenceResult] \(text)\n")
         }
         return metadata
     }

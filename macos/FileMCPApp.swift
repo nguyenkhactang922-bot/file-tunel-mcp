@@ -1194,20 +1194,16 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             let event = evidenceEvents[evidenceEvents.count - 1 - row]
             let state = event.verificationState == "not-applicable" ? "N/A" : event.verificationState
             evidenceDetailLabel.stringValue =
-                "Evidence: \(event.evidenceID)
-Operation: \(event.operationID) (\(event.operationState))
-Criterion: \(event.criterion)
-" +
-                "Verification: \(state)
-Storage: \(event.storageStatus)
-Source binding: \(event.sourceBinding)
-" +
-                "Source state: \(event.sourceStateID ?? "N/A")
-Project context: \(event.projectContextDigest ?? "N/A")
-" +
-                "Policy hash: \(event.policyHash)
-Catalog: \(event.catalogVersion) | \(event.catalogHash)
-" +
+                "Evidence: \(event.evidenceID)\n" +
+                "Operation: \(event.operationID) (\(event.operationState))\n" +
+                "Criterion: \(event.criterion)\n" +
+                "Verification: \(state)\n" +
+                "Storage: \(event.storageStatus)\n" +
+                "Source binding: \(event.sourceBinding)\n" +
+                "Source state: \(event.sourceStateID ?? "N/A")\n" +
+                "Project context: \(event.projectContextDigest ?? "N/A")\n" +
+                "Policy hash: \(event.policyHash)\n" +
+                "Catalog: \(event.catalogVersion) | \(event.catalogHash)\n" +
                 "Block reason: \(event.blockReason ?? "N/A")"
             return
         }
@@ -1218,10 +1214,7 @@ Catalog: \(event.catalogVersion) | \(event.catalogHash)
                 return
             }
             let event = changeEvents[changeEvents.count - 1 - row]
-            changesDetailLabel.stringValue = "\(event.status) | \(event.operation) | \(event.workspace)
-File/version context: not emitted by runtime event
-
-\(event.detail)"
+            changesDetailLabel.stringValue = "\(event.status) | \(event.operation) | \(event.workspace)\nFile/version context: not emitted by runtime event\n\n\(event.detail)"
             return
         }
         guard table === activityTableView else { return }
@@ -1231,8 +1224,7 @@ File/version context: not emitted by runtime event
             return
         }
         let event = filteredActivityEvents[row]
-        activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)
-\(event.detail)"
+        activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)\n\(event.detail)"
     }
 
     private func captureEvidenceEvent(from line: String, workspace: String) {
