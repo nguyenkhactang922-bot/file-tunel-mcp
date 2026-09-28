@@ -2,7 +2,7 @@
 
 Status: LOCAL VERIFIED / NATIVE CI PENDING
 Date: 2026-09-28
-Branch: chatgpt/FMUX-006-connections
+Branch: chatgpt/FMUX-006-connections-v2
 
 ## Implemented
 
