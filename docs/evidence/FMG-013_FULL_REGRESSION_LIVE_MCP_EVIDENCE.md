@@ -51,3 +51,25 @@ The live process cannot be safely killed/restarted from the same FileMCP MCP ses
 6. If live parity passes, update this evidence to PASS, perform exact-head native Verify/review/merge/main verification, then mark FMG-013 FOUNDATION MAIN VERIFIED.
 
 FMG-014 remains BLOCKED until this live connector proof passes.
+
+
+## Post-restart live checkpoint - 2026-09-28
+
+FMG-013 remains BLOCKED, but the blocker has narrowed from stale desktop deployment to stale ChatGPT connector discovery.
+
+Verified after reconnect attempt:
+- active FileMCP PID: `10688`;
+- active executable: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`;
+- active executable SHA-256: `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`;
+- ready executable SHA-256: identical;
+- Git branch: `chatgpt/FMG-013-full-regression-live-proof`;
+- Git HEAD at checkpoint: `8111869c8389959151b4ce4bf8fc7700aadb39f5`;
+- working tree before this evidence update: clean;
+- current ChatGPT/FileMCP registry exposed to this chat: 19 tools.
+
+Conclusion:
+- the desktop/runtime replacement step is PASS;
+- the current ChatGPT connector schema is still stale and has not rediscovered the 23-tool catalog;
+- do not rerun foundation regression;
+- do not claim FMG-013 PASS and do not claim FMG-014;
+- NEXT_EXACT_ACTION is LIVE MCP PROOF ONLY after ChatGPT connector rediscovery/reconnection exposes the current 23-tool registry, then verify catalog version/hash and live correlation behavior.

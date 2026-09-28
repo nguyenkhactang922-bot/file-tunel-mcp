@@ -291,3 +291,15 @@ Regression/native CI proof: PASS.
 Blocker: current live desktop connector is old binary PID 11960 and exposes 19 tools vs canonical 23.
 Ready build: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`.
 Resume only live MCP proof after normal desktop restart/reconnect; do not rerun completed regression.
+
+
+## FMG-013 post-restart checkpoint - 2026-09-28
+
+State: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE.
+
+Desktop deployment is current:
+- PID `10688`;
+- executable `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`;
+- SHA-256 `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`.
+
+This chat still exposes 19 FileMCP tools, so the required live 23-tool catalog/hash proof is not yet satisfied. Foundation regression/native CI remain PASS and must not be rerun solely because connector discovery is stale. FMG-014 remains BLOCKED.
