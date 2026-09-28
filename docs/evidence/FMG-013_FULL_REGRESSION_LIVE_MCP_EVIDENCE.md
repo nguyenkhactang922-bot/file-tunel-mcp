@@ -117,3 +117,15 @@ Additional root-cause checks:
 - no available ChatGPT/plugin management action in this session exposes a safe connector-schema refresh/rediscovery operation.
 
 Interpretation: the remaining 19/23 mismatch is consistent with stale connector/control-plane discovery state outside the FileMCP runtime. This is still a hard FMG-013 acceptance blocker because the required live 23-tool catalog/hash proof has not occurred.
+
+
+## Connector refresh attempt - 2026-09-28T15:49:09+07:00
+
+A targeted control-plane reconnect was attempted without rerunning regression:
+- FileMCP desktop remained PID `10688` on the verified `FileMCP-FMG013-ready\FileMCP.exe` binary;
+- D-workspace tunnel-client was restarted and changed PID from `2620` to `2552`;
+- post-restart D tunnel health is `live` and readiness is `ready`;
+- the ChatGPT-visible FileMCP registry still exposes exactly 19 tools;
+- `exec_process`, `apply_edits`, `project_context`, and `evidence_get` remain absent from the current chat tool surface.
+
+Conclusion: tunnel/runtime reconnect is PASS but does not refresh ChatGPT connector schema in-place. FMG-013 remains BLOCKED only on external connector/control-plane rediscovery to the canonical 23-tool catalog. Do not rerun completed regression and do not claim FMG-014.
