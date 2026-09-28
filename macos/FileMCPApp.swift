@@ -205,6 +205,24 @@ private struct ChangeEvent {
     let detail: String
 }
 
+private struct EvidenceEvent {
+    let timestamp: Date
+    let workspace: String
+    let evidenceID: String
+    let operationID: String
+    let criterion: String
+    let verificationState: String
+    let operationState: String
+    let storageStatus: String
+    let sourceBinding: String
+    let sourceStateID: String?
+    let projectContextDigest: String?
+    let policyHash: String
+    let catalogHash: String
+    let catalogVersion: String
+    let blockReason: String?
+}
+
 private final class MainViewController: NSViewController, NSTabViewDelegate, NSTableViewDataSource, NSTableViewDelegate {
     private let storage = RuntimeStorage()
     private let runtime = LocalMCPRuntime()
@@ -214,8 +232,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private var activityEvents: [ActivityEvent] = []
     private var filteredActivityEvents: [ActivityEvent] = []
     private var changeEvents: [ChangeEvent] = []
+    private var evidenceEvents: [EvidenceEvent] = []
     private let maxActivityEvents = 500
     private let maxChangeEvents = 250
+    private let maxEvidenceEvents = 500
 
     private let tunnelIDField = NSTextField()
     private let apiKeyField = NSSecureTextField()
@@ -235,6 +255,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private let activityFilterPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let changesTableView = NSTableView()
     private let changesDetailLabel = NSTextField(wrappingLabelWithString: "Select a captured mutation event.")
+    private let evidenceTableView = NSTableView()
+    private let evidenceDetailLabel = NSTextField(wrappingLabelWithString: "Select an evidence record.")
     private let saveConnectionButton = LoadingButton(title: "Save connection", target: nil, action: nil)
     private let saveSettingsButton = LoadingButton(title: "Save settings", target: nil, action: nil)
     private let startButton = NSButton(title: "Connect", target: nil, action: nil)
@@ -355,6 +377,24 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             column.title = title
             column.width = width
             changesTableView.addTableColumn(column)
+        }
+
+        evidenceTableView.delegate = self
+        evidenceTableView.dataSource = self
+        evidenceTableView.headerView = NSTableHeaderView()
+        evidenceTableView.usesAlternatingRowBackgroundColors = true
+        evidenceTableView.allowsMultipleSelection = false
+        for (identifier, title, width) in [
+            ("evidence-time", "Time", 72.0),
+            ("evidence-state", "State", 90.0),
+            ("evidence-workspace", "Workspace", 84.0),
+            ("evidence-criterion", "Criterion", 120.0),
+            ("evidence-id", "Evidence ID", 260.0),
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = width
+            evidenceTableView.addTableColumn(column)
         }
 
         startButton.target = self
@@ -664,6 +704,33 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             changesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
         ])
 
+        let evidenceScroll = NSScrollView()
+        evidenceScroll.documentView = evidenceTableView
+        evidenceScroll.hasVerticalScroller = true
+        evidenceScroll.borderType = .bezelBorder
+        evidenceScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let evidenceHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Evidence",
+            description: "Server-owned verification records with source, policy and catalog linkage."
+        )
+        evidenceDetailLabel.maximumNumberOfLines = 14
+        let evidenceRoot = NSStackView(views: [evidenceHeader, evidenceScroll, evidenceDetailLabel])
+        evidenceRoot.orientation = .vertical
+        evidenceRoot.alignment = .leading
+        evidenceRoot.spacing = 8
+        evidenceRoot.translatesAutoresizingMaskIntoConstraints = false
+
+        let evidencePage = NSView()
+        evidencePage.addSubview(evidenceRoot)
+        NSLayoutConstraint.activate([
+            evidenceRoot.leadingAnchor.constraint(equalTo: evidencePage.leadingAnchor, constant: 12),
+            evidenceRoot.trailingAnchor.constraint(equalTo: evidencePage.trailingAnchor, constant: -12),
+            evidenceRoot.topAnchor.constraint(equalTo: evidencePage.topAnchor, constant: 12),
+            evidenceRoot.bottomAnchor.constraint(equalTo: evidencePage.bottomAnchor, constant: -12),
+            evidenceScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
+        ])
+
         let logPage = NSView()
         logPage.addSubview(logScroll)
         NSLayoutConstraint.activate([
@@ -773,6 +840,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         changesTab.label = "Changes"
         changesTab.view = changesPage
 
+        let evidenceTab = NSTabViewItem(identifier: "evidence")
+        evidenceTab.label = "Evidence"
+        evidenceTab.view = evidencePage
+
         let logTab = NSTabViewItem(identifier: "log")
         logTab.label = "Diagnostics"
         logTab.view = logPage
@@ -783,6 +854,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         tabs.addTabViewItem(settingsTab)
         tabs.addTabViewItem(activityTab)
         tabs.addTabViewItem(changesTab)
+        tabs.addTabViewItem(evidenceTab)
         tabs.addTabViewItem(logTab)
         tabs.selectTabViewItem(withIdentifier: "home")
 
@@ -817,6 +889,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             navigationButton("Settings", action: #selector(showSettings)),
             navigationButton("Activity", action: #selector(showActivity)),
             navigationButton("Changes", action: #selector(showChanges)),
+            navigationButton("Evidence", action: #selector(showEvidence)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
             NSView(),
             shellStatusLabel,
@@ -1045,10 +1118,30 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     func numberOfRows(in tableView: NSTableView) -> Int {
         if tableView == activityTableView { return filteredActivityEvents.count }
         if tableView == changesTableView { return changeEvents.count }
+        if tableView == evidenceTableView { return evidenceEvents.count }
         return 0
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        if tableView == evidenceTableView {
+            guard row >= 0, row < evidenceEvents.count, let tableColumn else { return nil }
+            let event = evidenceEvents[evidenceEvents.count - 1 - row]
+            let text: String
+            switch tableColumn.identifier.rawValue {
+            case "evidence-time":
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm:ss"
+                text = formatter.string(from: event.timestamp)
+            case "evidence-state": text = event.verificationState == "not-applicable" ? "N/A" : event.verificationState
+            case "evidence-workspace": text = event.workspace
+            case "evidence-criterion": text = event.criterion
+            default: text = event.evidenceID
+            }
+            let label = NSTextField(labelWithString: text)
+            label.lineBreakMode = .byTruncatingTail
+            return label
+        }
+
         if tableView == changesTableView {
             guard row >= 0, row < changeEvents.count, let tableColumn else { return nil }
             let event = changeEvents[changeEvents.count - 1 - row]
@@ -1092,6 +1185,32 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard let table = notification.object as? NSTableView else { return }
+        if table === evidenceTableView {
+            let row = evidenceTableView.selectedRow
+            guard row >= 0, row < evidenceEvents.count else {
+                evidenceDetailLabel.stringValue = "Select an evidence record."
+                return
+            }
+            let event = evidenceEvents[evidenceEvents.count - 1 - row]
+            let state = event.verificationState == "not-applicable" ? "N/A" : event.verificationState
+            evidenceDetailLabel.stringValue =
+                "Evidence: \(event.evidenceID)
+Operation: \(event.operationID) (\(event.operationState))
+Criterion: \(event.criterion)
+" +
+                "Verification: \(state)
+Storage: \(event.storageStatus)
+Source binding: \(event.sourceBinding)
+" +
+                "Source state: \(event.sourceStateID ?? "N/A")
+Project context: \(event.projectContextDigest ?? "N/A")
+" +
+                "Policy hash: \(event.policyHash)
+Catalog: \(event.catalogVersion) | \(event.catalogHash)
+" +
+                "Block reason: \(event.blockReason ?? "N/A")"
+            return
+        }
         if table === changesTableView {
             let row = changesTableView.selectedRow
             guard row >= 0, row < changeEvents.count else {
@@ -1099,7 +1218,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
                 return
             }
             let event = changeEvents[changeEvents.count - 1 - row]
-            changesDetailLabel.stringValue = "\(event.status) | \(event.operation) | \(event.workspace)\nFile/version context: not emitted by runtime event\n\n\(event.detail)"
+            changesDetailLabel.stringValue = "\(event.status) | \(event.operation) | \(event.workspace)
+File/version context: not emitted by runtime event
+
+\(event.detail)"
             return
         }
         guard table === activityTableView else { return }
@@ -1109,7 +1231,41 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             return
         }
         let event = filteredActivityEvents[row]
-        activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)\n\(event.detail)"
+        activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)
+\(event.detail)"
+    }
+
+    private func captureEvidenceEvent(from line: String, workspace: String) {
+        let marker = "[EvidenceResult] "
+        guard let range = line.range(of: marker) else { return }
+        let jsonText = String(line[range.upperBound...])
+        guard let data = jsonText.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+
+        func text(_ key: String, fallback: String = "unknown") -> String {
+            (object[key] as? String) ?? fallback
+        }
+        func optionalText(_ key: String) -> String? {
+            object[key] as? String
+        }
+
+        evidenceEvents.append(EvidenceEvent(
+            timestamp: Date(),
+            workspace: workspace,
+            evidenceID: text("evidence_id"),
+            operationID: text("operation_id"),
+            criterion: text("criterion_id"),
+            verificationState: text("verification_state"),
+            operationState: text("operation_state"),
+            storageStatus: text("storage_status"),
+            sourceBinding: text("source_binding"),
+            sourceStateID: optionalText("source_state_id"),
+            projectContextDigest: optionalText("project_context_digest"),
+            policyHash: text("policy_hash"),
+            catalogHash: text("catalog_hash"),
+            catalogVersion: text("catalog_version"),
+            blockReason: optionalText("block_reason")
+        ))
     }
 
     private func changeEvent(from line: String, workspace: String) -> ChangeEvent? {
@@ -1153,6 +1309,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
                 kind = "System"
             }
 
+            captureEvidenceEvent(from: line, workspace: workspace)
             let summary = line.count <= 140 ? line : String(line.prefix(137)) + "..."
             activityEvents.append(ActivityEvent(timestamp: Date(), kind: kind, workspace: workspace, summary: summary, detail: line))
             if let change = changeEvent(from: line, workspace: workspace) {
@@ -1166,17 +1323,28 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if changeEvents.count > maxChangeEvents {
             changeEvents.removeFirst(changeEvents.count - maxChangeEvents)
         }
+        if evidenceEvents.count > maxEvidenceEvents {
+            evidenceEvents.removeFirst(evidenceEvents.count - maxEvidenceEvents)
+        }
         if tabs.selectedTabViewItem?.identifier as? String == "activity" {
             refreshActivityFilter()
         }
         if tabs.selectedTabViewItem?.identifier as? String == "changes" {
             changesTableView.reloadData()
         }
+        if tabs.selectedTabViewItem?.identifier as? String == "evidence" {
+            evidenceTableView.reloadData()
+        }
     }
 
     @objc private func showChanges() {
         changesTableView.reloadData()
         tabs.selectTabViewItem(withIdentifier: "changes")
+    }
+
+    @objc private func showEvidence() {
+        evidenceTableView.reloadData()
+        tabs.selectTabViewItem(withIdentifier: "evidence")
     }
 
     @objc private func showDiagnostics() {
