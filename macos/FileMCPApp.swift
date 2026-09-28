@@ -743,7 +743,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
 
     private func updateAPIKeyPlaceholder() {
         let hasSavedKey = storage.hasSavedAPIKey
-        apiKeyField.placeholderString = hasSavedKey ? "Saved — leave blank to keep it" : "sk-..."
+        apiKeyField.placeholderString = hasSavedKey ? "Saved â€” leave blank to keep it" : "sk-..."
         apiKeyStatusLabel.stringValue = hasSavedKey ? "API key is saved in Keychain" : "No API key is saved"
         deleteKeyButton.isEnabled = hasSavedKey
     }
@@ -1047,7 +1047,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Runtime failed"
         case .starting:
-            startButton.title = "Connecting…"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
+            startButton.title = "Connectingâ€¦"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime starting"
         case .running:
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
@@ -1059,7 +1059,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Reconnect cooldown"
         case .stopping:
-            startButton.title = "Disconnecting…"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
+            startButton.title = "Disconnectingâ€¦"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime stopping"
         }
         startButton.contentTintColor = .white
@@ -1138,7 +1138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let aboutItem = NSMenuItem(title: "About FileMCP", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         aboutItem.target = NSApp
         appMenu.addItem(aboutItem)
-        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettingsWindow), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "Settingsâ€¦", action: #selector(showSettingsWindow), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
         appMenu.addItem(.separator())
