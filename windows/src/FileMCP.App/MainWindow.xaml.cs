@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using FileMCP.Core;
+using FileMCP.App.Presentation;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 
@@ -25,6 +26,7 @@ public partial class MainWindow : Window
     private readonly Forms.NotifyIcon _trayIcon;
     private FileMcpSettings _settings;
     private bool _quitting;
+    private bool _navigationCompact;
     private UsagePeriodPreset _selectedOverviewPeriod = UsagePeriodPreset.Today;
     private DateTimeOffset _lastOverviewPeriodRefreshUtc = DateTimeOffset.MinValue;
     private int _overviewPeriodQueryGeneration;
@@ -934,6 +936,7 @@ public partial class MainWindow : Window
     {
         UpdateWorkspaceStatus(key, state);
         UpdateConnectButton();
+        UpdateShellContext();
 
         if (state.Status == LocalMcpRuntimeStatus.Failed && !string.IsNullOrEmpty(state.Error))
             ShowError($"Drive {key}: {state.Error}");
@@ -945,6 +948,49 @@ public partial class MainWindow : Window
             UpdateWorkspaceStatus(key, _runtimes.TryGetValue(key, out var runtime) ? runtime.State : LocalMcpRuntimeState.Stopped);
 
         UpdateConnectButton();
+        UpdateShellContext();
+    }
+
+    private void UpdateShellContext()
+    {
+        var connected = _runtimes.Values.Count(runtime => runtime.State.Status == LocalMcpRuntimeStatus.Running);
+        var active = WorkspaceKeys.Where(key => EnabledBox(key).IsChecked == true).ToArray();        ShellStatusBadge.Status = connected switch
+        {
+            0 => PresentationStatus.Stopped,
+            _ when connected == active.Length && active.Length > 0 => PresentationStatus.Healthy,
+            _ => PresentationStatus.Degraded,
+        };
+
+        ShellWorkspaceText.Text = active.Length == 0
+            ? "No workspace enabled"
+            : "Workspaces " + string.Join(" Â· ", active);
+    }
+
+    private void NavigateHome_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = OverviewTab;
+    private void NavigateConnections_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = ConnectionTab;
+    private void NavigateSettings_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = SettingsTab;
+    private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
+
+    private void CompactNavigation_Click(object sender, RoutedEventArgs e)
+    {
+        _navigationCompact = !_navigationCompact;
+        NavigationColumn.Width = new GridLength(_navigationCompact ? 72 : 188);
+        NavigationBrand.Visibility = _navigationCompact ? Visibility.Collapsed : Visibility.Visible;
+        CompactNavigationButton.Content = _navigationCompact ? "Expand" : "Collapse";
+
+        SetNavigationButtonPresentation(NavHomeButton, "Home", "H");
+        SetNavigationButtonPresentation(NavConnectionsButton, "Connections", "C");
+        SetNavigationButtonPresentation(NavSettingsButton, "Settings", "S");
+        SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
+
+        ShellWorkspaceText.Visibility = _navigationCompact ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void SetNavigationButtonPresentation(System.Windows.Controls.Button button, string fullLabel, string compactLabel)
+    {
+        button.Content = _navigationCompact ? compactLabel : fullLabel;
+        button.HorizontalContentAlignment = _navigationCompact ? System.Windows.HorizontalAlignment.Center : System.Windows.HorizontalAlignment.Left;
+        button.ToolTip = _navigationCompact ? fullLabel : null;
     }
 
     private void UpdateWorkspaceStatus(string key, LocalMcpRuntimeState state)

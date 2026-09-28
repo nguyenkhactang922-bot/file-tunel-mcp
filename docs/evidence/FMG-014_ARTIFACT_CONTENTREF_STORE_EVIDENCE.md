@@ -96,3 +96,18 @@ Local Windows host does not provide macOS `swiftc`; exact-head native macOS comp
 7. merged-main Verify SUCCESS on all three native lanes;
 8. mark FMG-014 DONE / MAIN VERIFIED;
 9. claim FMG-015 only after step 8.
+
+
+## Post-main-sync local verification
+
+Synced foundation/UI main through `7e8590a` (FMUX-003 merged) without dropping FMG-014 scope.
+
+PASS after sync:
+- project-state contract;
+- FMUX app-shell contract;
+- FMUX canonical feedback-components contract;
+- FMG-014 artifact ContentRef contract;
+- `dotnet build windows/FileMCP.Windows.sln -c Release -warnaserror`: 0 warnings / 0 errors;
+- Windows core integration: `windows-artifact-contentref-store: ok`, 776 assertions.
+
+NEXT: finalize merge commit, push exact head, require native macOS + Windows x64 + Windows ARM64 Verify.
