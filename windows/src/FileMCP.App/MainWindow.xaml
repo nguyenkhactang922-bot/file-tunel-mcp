@@ -359,6 +359,26 @@
             <TabItem Header="Connection" x:Name="ConnectionTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
+                        <controls:PageHeader x:Name="ConnectionsHeader"
+                                             Title="Connections"
+                                             Description="Runtime credentials, Secure MCP Tunnel configuration and connectivity health."
+                                             ShowStatus="True"
+                                             Status="Stopped"
+                                             Margin="0,0,0,12"/>
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <controls:StatusBadge x:Name="ConnectionCredentialBadge" Status="Unavailable" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock FontWeight="SemiBold" Text="Runtime credential"/>
+                                    <TextBlock x:Name="ConnectionDiagnosticsText" Style="{StaticResource FileMcpCaptionText}"
+                                               Text="No runtime is connected." TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="140"/>

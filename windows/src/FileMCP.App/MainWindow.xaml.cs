@@ -602,6 +602,32 @@ public partial class MainWindow : Window
         var saved = _credentialStore.HasSavedApiKey;
         ApiKeyStatusText.Text = saved ? "API key is saved in Windows Credential Manager" : "No API key is saved";
         DeleteApiKeyButton.IsEnabled = saved;
+        ConnectionCredentialBadge.Status = saved ? PresentationStatus.Passed : PresentationStatus.Warning;
+        UpdateConnectionExperience();
+    }
+
+    private void UpdateConnectionExperience()
+    {
+        if (!IsLoaded && ConnectionsHeader is null)
+            return;
+
+        var enabled = WorkspaceKeys.Where(key => EnabledBox(key).IsChecked == true).ToArray();
+        var running = _runtimes.Values.Count(runtime => runtime.State.Status == LocalMcpRuntimeStatus.Running);
+        var failed = _runtimes.Values.Count(runtime => runtime.State.Status == LocalMcpRuntimeStatus.Failed);
+
+        ConnectionsHeader.Status = failed > 0
+            ? PresentationStatus.Failed
+            : running > 0 && running == enabled.Length
+                ? PresentationStatus.Connected
+                : running > 0
+                    ? PresentationStatus.Degraded
+                    : PresentationStatus.Stopped;
+
+        var configuredTunnels = enabled.Count(key => !string.IsNullOrWhiteSpace(TunnelBox(key).Text));
+        ConnectionDiagnosticsText.Text =
+            $"{running} connected / {enabled.Length} enabled workspace(s); " +
+            $"{configuredTunnels} tunnel ID(s) configured; " +
+            (_credentialStore.HasSavedApiKey ? "credential stored securely." : "credential missing.");
     }
 
     private async void Connect_Click(object sender, RoutedEventArgs e)
@@ -973,6 +999,7 @@ public partial class MainWindow : Window
 
         UpdateConnectButton();
         UpdateShellContext();
+        UpdateConnectionExperience();
         if (MainTabs.SelectedItem == WorkspacesTab) RefreshWorkspaceRows();
     }
 
