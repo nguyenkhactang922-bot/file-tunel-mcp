@@ -1,6 +1,6 @@
 # FMG-014 — Ephemeral Artifact / ContentRef Store Evidence
 
-Status: LOCAL VERIFIED / CROSS-PLATFORM CI PENDING
+Status: EXACT-HEAD NATIVE VERIFIED / REVIEW PENDING
 
 Branch: `chatgpt/FMG-014-artifact-contentref-store`
 
@@ -111,3 +111,21 @@ PASS after sync:
 - Windows core integration: `windows-artifact-contentref-store: ok`, 776 assertions.
 
 NEXT: finalize merge commit, push exact head, require native macOS + Windows x64 + Windows ARM64 Verify.
+
+
+## Exact-head cross-platform native verification
+
+Candidate: `c7f921e4036a7ac4be9b350b215f055e706ddd60`.
+
+GitHub Verify run `36413985720`: SUCCESS.
+- macOS: SUCCESS. Static `swiftc -warnings-as-errors`, full `tests/test_swift_runtime.sh` including `swift-artifact-contentref-store: ok`, and app build completed.
+- Windows x64: SUCCESS. FMG-014 contract, Release build, Windows integration/runtime, x64/ARM64 packaging and smoke completed.
+- Windows ARM64: SUCCESS. Native ARM64 contract/build/package/smoke completed.
+- No retry was required on the final exact-head run.
+
+The previous macOS-only failures were corrected narrowly:
+- `19ae4f8`: Swift warnings-as-errors compatibility fixes;
+- `81f3f23`: macOS integration test failed only because a throwing call was placed inside a non-throwing `precondition` autoclosure;
+- `c7f921e4036a7ac4be9b350b215f055e706ddd60`: moved that throwing call outside the autoclosure; all native lanes then passed.
+
+FMG-014 is EXACT-HEAD NATIVE VERIFIED. Remaining gates: scoped review -> PR/merge -> merged-main Verify -> DONE / MAIN VERIFIED -> claim FMG-015.

@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: finalize the post-main-sync FMG-014 merge commit on `chatgpt/FMG-014-artifact-contentref-store`, push the exact synchronized head, require native macOS + Windows x64 + Windows ARM64 Verify, perform scoped review, merge only green exact head, verify merged main, then mark FMG-014 DONE / MAIN VERIFIED and claim FMG-015.
+AUTHORITATIVE NEXT_EXACT_ACTION: perform scoped review of exact-head FMG-014 candidate `c7f921e4036a7ac4be9b350b215f055e706ddd60` after native Verify run `36413985720` SUCCESS on macOS + Windows x64 + Windows ARM64; open/merge PR only if review remains clean; verify merged main on all three native lanes; then mark FMG-014 DONE / MAIN VERIFIED and claim FMG-015.
 
 FPA-004 product/release scope is resolved by ADR-0003. V11-009 upstream integration remains an external authority gate and does not block the active FMG complete-upgrade implementation program.
