@@ -381,7 +381,7 @@ Negative tests:
 
 ## FMG-012 — Cross-Platform Adversarial Contract Gate
 
-State: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-001 through FMG-011
 
 Scope:
@@ -399,7 +399,7 @@ Acceptance:
 
 ## FMG-013 — Full Regression + Live MCP Proof
 
-State: BLOCKED
+State: ACTIVE / LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING
 Depends: FMG-012
 
 Scope:

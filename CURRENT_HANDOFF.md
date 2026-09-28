@@ -126,7 +126,7 @@ FMG-026, not FMG-013, is the complete upgrade completion gate.
 
 State: CLAIMED / ACTIVE.
 
-Branch: `chatgpt/FMG-001-canonical-catalog`.
+Branch: `chatgpt/FMUX-002-app-shell`.
 
 NEXT_EXACT_ACTION: implement FMG-003 Server-Owned Policy + Migration only: restricted/workspace-auto/custom profiles, legacy EnableCommands migration, policy generation/hash, risk/effect authorization, effective catalog filtering and runtime reauthorization. Do not begin FMG-004 or later tasks.
 
@@ -243,7 +243,7 @@ NEXT_EXACT_ACTION: harden existing write/delete mutations only: expected-version
 FMG-008: DONE / MAIN VERIFIED. Final candidate `35ef237a0f4d32f0940491b9163a0dcbea7e6c61` merged by PR #12 as main `8a58a223814505518e581ebe79856846555cb4b4`; merged-main Verify `36212103370` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows core 655 assertions and Release build PASS. Evidence: `docs/evidence/FMG-008_EXISTING_MUTATION_HARDENING_EVIDENCE.md`.
 
 FMG-009: CLAIMED / ACTIVE on `chatgpt/FMG-009-apply-edits`.
-Branch: `chatgpt/FMG-009-apply-edits`
+Branch: `chatgpt/FMUX-002-app-shell`
 
 NEXT_EXACT_ACTION: implement FMG-009 Atomic Versioned `apply_edits` only: canonical range-edit primitive, expected strong version, explicit coordinate system, non-overlap validation, BOM/newline preservation, dry-run, staging, final version/Mutation Guard/policy/cancellation rechecks, atomic publish, and adversarial/fault-injection coverage. Do not begin FMG-010 before FMG-009 MAIN VERIFIED.
 
@@ -321,6 +321,64 @@ Local evidence: all Phase A contract/adversarial scripts PASS; Windows runtime 7
 
 NEXT_EXACT_ACTION: commit/push exact FMG-012 evidence candidate, require native Verify on the final exact head, perform scoped gate review, merge only green exact head, verify merged main, mark FMG-012 DONE / MAIN VERIFIED, then claim FMG-013.
 
+## FMG-012 closure / FMG-013 claim
+
+FMG-012: DONE / MAIN VERIFIED. Final candidate `364b7945f2885e5ec39ee1ad1da9e8a08618735c` merged by PR #18 as main `d3a3670f6fb60ab75d8471b3d982c811337fa951`; merged-main Verify `36297870457` SUCCESS on macOS + Windows x64 + Windows ARM64; local merged-main Windows runtime 750 assertions and Release build PASS.
+
+FMG-013: CLAIMED / ACTIVE on `chatgpt/FMG-013-full-regression-live-proof`.
+
+NEXT_EXACT_ACTION: execute Foundation Full Regression + Live MCP Proof only: full regression contracts/runtime/package/native verification plus live MCP catalog/tool/correlation proof against the current connector. Fix only concrete failing stages. FMG-013 is foundation MAIN VERIFIED, not complete-upgrade completion.
+
+## FMG-013 live proof blocker
+
+FMG-013: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE on `chatgpt/FMG-013-full-regression-live-proof`.
+
+Completed evidence: source/full regression/native Verify PASS; claim-head Verify `36298103299` SUCCESS on macOS + Windows x64 + Windows ARM64. Current source catalog is 23 tools / version 1.6.0.
+
+Live blocker: current FileMCP PID 11960 runs old binary `D:\Tools\FileMCP\dist\windows-x64\FileMCP-release\FileMCP.exe` (SHA-256 `7689540f1ff4cc080064eb1ccaf33a5b4a8b1a736b2f10b52988505e6e7c2807`) and this ChatGPT connector exposes only 19 tools.
+
+Ready replacement: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe` (SHA-256 `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`).
+
+NEXT_EXACT_ACTION: after normal FileMCP desktop restart into the ready build and connector reconnection, resume FMG-013 at LIVE MCP PROOF ONLY; verify 23-tool catalog/current hash + live tool/correlation behavior. Do not rerun completed regression and do not claim FMG-014 before FMG-013 FOUNDATION MAIN VERIFIED.
+
+
+
+## FMG-013 post-restart checkpoint - 2026-09-28
+
+Desktop/runtime replacement is now verified: PID `10688` is running `dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe` with SHA-256 `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`.
+
+The remaining blocker is ChatGPT connector discovery/cache: this chat still exposes only 19 FileMCP tools.
+
+NEXT_EXACT_ACTION: do not rerun regression. Reconnect/rediscover the FileMCP connector so the chat advertises 23 tools; then run LIVE MCP PROOF ONLY (catalog version/hash + live tool/correlation behavior), exact-head native Verify, review, merge, merged-main verification, then claim FMG-014.
+
+
+### FMG-013 live correlation sub-proof - 2026-09-28
+
+Live correlation on the active ready build is PASS: existing `chat_instance_id` resumed with `resumed=true`, and a bound read using the same `_filemcp_chat` handle succeeded. Remaining gate is only ChatGPT connector rediscovery from 19 to 23 tools plus catalog version/hash/new-tool live parity.
+
+
+## FMG-013 reconnect verification - 2026-09-28
+
+Fresh reconnect verification PASSed for runtime/tunnel/correlation: ready binary PID `10688`, tunnel health `live`, readiness `ready`, main-channel probe `ok`, control-plane forwarding to local MCP returns service status `200`, and logical chat correlation resume + bound read PASS.
+
+The current ChatGPT registry is still 19 tools. NEXT_EXACT_ACTION remains: refresh/rediscover the connector until 23 canonical tools are advertised, then run only the remaining live catalog/hash/new-tool parity proof. Do not rerun completed regression. FMG-014 remains BLOCKED.
+
+
+### FMG-013 rediscovery diagnosis - 2026-09-28
+
+19/23 is not policy filtering: active profile is `legacy-command-compatible` and that profile allows all tools. Tunnel is healthy and live `tools/call` traffic reaches the new runtime, but no `tools/list` discovery request is visible after the new runtime startup. Remaining gate is external connector/control-plane rediscovery; do not run exact-head Verify or merge until the live registry actually advertises 23 tools and catalog/hash parity is proven.
+
+
+### FMG-013 targeted connector refresh checkpoint - 2026-09-28T15:49:09+07:00
+
+Restarted only the D-workspace tunnel-client while preserving FileMCP desktop/server. D tunnel recovered healthy/ready with new PID 2552, but this ChatGPT session still exposes 19 FileMCP tools. NEXT_EXACT_ACTION remains external ChatGPT connector rediscovery/reload to 23 tools, then run LIVE MCP PROOF ONLY for exec_process/apply_edits/project_context/evidence_get + catalog/hash/correlation. FMG-014 remains BLOCKED.
+
+
+## FMG-013 live 23-tool proof PASS - 2026-09-28T15:59:05+07:00
+
+The refreshed FileMCP connector now exposes the canonical 23 tools. Live `exec_process`, `project_context`, versioned atomic `apply_edits`, `evidence_get` negative-path dispatch, exact catalog version/hash parity, and correlation resume/bound read are verified. FMG-013 is LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING.
+
+NEXT_EXACT_ACTION: commit/push the exact FMG-013 live-evidence candidate, require native Verify on macOS + Windows x64 + Windows ARM64 for that exact head, perform scoped review, open/merge PR only on green exact-head evidence, verify merged main, then mark FMG-013 DONE / FOUNDATION MAIN VERIFIED and claim FMG-014. Do not rerun completed foundation regression.
 ## FMUX product-experience track
 
 Design gate: PASS / FROZEN on 2026-09-28.
@@ -347,14 +405,10 @@ Merge main: `ee85ba494f36be6d15757fe338588cc92651518a`.
 Merged-main Verify: run `36400920401` SUCCESS on Windows x64 / Windows ARM64 / macOS.
 Local proof: project-state contract PASS; FMUX presentation contract PASS; Windows Release build 0 warnings / 0 errors; Windows runtime 750 assertions PASS.
 
-FMUX-002: CLAIMED / ACTIVE on `chatgpt/FMUX-002-app-shell`.
-Scope: App Shell + Navigation only: labeled sidebar, content host, workspace/global health context, compact mode, persistent Settings placement, Windows/macOS semantic parity. Preserve legacy page functionality during incremental migration. Do not begin FMUX-003 before FMUX-002 MAIN VERIFIED.
-
-NEXT_EXACT_ACTION: implement FMUX-002 shell/navigation only, then run local build/runtime/FMUX shell contracts, exact-head native Verify, review/merge/main verification.
-
-## FMUX-002 local verification
-
-FMUX-002: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-002-app-shell`.
-Local proof: project-state contract PASS; FMUX app-shell contract PASS; Windows Release build 0 warnings/errors; Windows runtime 750 assertions PASS; macOS build-script syntax PASS.
+FMUX-002: ACTIVE / LOCAL + NATIVE VERIFIED on `chatgpt/FMUX-002-app-shell`.
+Candidate head before main-sync merge: `94e93fb82a58102caff2e0f5bc615e46e7cd4706`.
+Exact-head native Verify: run `36404297279` SUCCESS on Windows x64 / Windows ARM64 / macOS.
+Scope: App Shell + Navigation only: labeled sidebar, content host, workspace/global health context, compact mode, persistent Settings placement, Windows/macOS semantic parity. Legacy pages remain hosted during incremental migration. FMUX-003 remains BLOCKED until FMUX-002 MAIN VERIFIED.
 Evidence: `docs/evidence/FMUX-002_APP_SHELL_NAVIGATION_EVIDENCE.md`.
-NEXT_EXACT_ACTION: commit/push exact FMUX-002 candidate, require native Verify, scoped review, merge exact green head, merged-main verification, then claim FMUX-003.
+
+NEXT_EXACT_ACTION: finish main-sync conflict resolution, rerun only state/shell/build gates affected by the merge, push final exact head, require native Verify on that head, review, merge, merged-main verification, then claim FMUX-003.
