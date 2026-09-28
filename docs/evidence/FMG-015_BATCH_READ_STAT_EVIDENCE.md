@@ -1,6 +1,6 @@
 # FMG-015 Batch Read / Stat Evidence
 
-Status: LOCAL VERIFIED / MAIN SYNC + NATIVE CI PENDING
+Status: SYNCHRONIZED LOCAL VERIFIED / NATIVE CI PENDING
 
 Branch: `chatgpt/FMG-015-batch-read-stat`
 
@@ -58,3 +58,15 @@ FMG-015 itself passed before the first unrelated failure, and the isolated FMG-0
 7. PR/merge;
 8. merged-main Verify;
 9. mark FMG-015 DONE / MAIN VERIFIED and claim FMG-016.
+
+## Main synchronization checkpoint
+
+PASS:
+- merged concurrent FMUX-005 through FMUX-009 main changes without dropping FMG-015;
+- affected FMUX contract gates PASS;
+- FMG-015 contract PASS after synchronization;
+- Windows Release build PASS with 0 warnings / 0 errors;
+- FMG-015 isolated integration PASS with 20 assertions;
+- branch is behind fork/main by 0 commits at synchronized head.
+
+NEXT_EXACT_ACTION: push the exact synchronized head, require native Verify on macOS + Windows x64 + Windows ARM64, fix only concrete failing stages, then scoped review -> PR/merge -> merged-main Verify -> FMG-015 MAIN VERIFIED -> FMG-016.

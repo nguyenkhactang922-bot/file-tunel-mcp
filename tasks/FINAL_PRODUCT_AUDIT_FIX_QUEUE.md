@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: commit the LOCAL VERIFIED FMG-015 candidate on `chatgpt/FMG-015-batch-read-stat`, sync latest fork/main, rerun affected local gates, push exact synchronized head, require native Verify on macOS + Windows x64 + Windows ARM64, scoped review, PR/merge and merged-main verification; only then mark FMG-015 DONE / MAIN VERIFIED and claim FMG-016.
+AUTHORITATIVE NEXT_EXACT_ACTION: push the exact synchronized FMG-015 head on `chatgpt/FMG-015-batch-read-stat`, require native Verify on macOS + Windows x64 + Windows ARM64, fix only concrete failing stages, perform scoped review, PR/merge and merged-main verification; only then mark FMG-015 DONE / MAIN VERIFIED and claim FMG-016.
