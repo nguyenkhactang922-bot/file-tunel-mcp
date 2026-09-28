@@ -991,12 +991,6 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         workspaceRootLabel.stringValue = root.isEmpty ? "Not configured" : root
         workspacePolicyLabel.stringValue = policyProfilePopup.titleOfSelectedItem ?? "Default"
 
-        guard let runtime else {
-            workspaceStatusLabel.stringValue = "Stopped"
-            workspaceConnectionLabel.stringValue = "Disconnected"
-            return
-        }
-
         switch runtime.state {
         case .stopped:
             workspaceStatusLabel.stringValue = "Stopped"
