@@ -281,7 +281,7 @@ Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 
 ## FMG-013 implementation
 
-State: BLOCKED / LIVE DEPLOYMENT STALE.
+State: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE.
 Branch: `chatgpt/FMG-013-full-regression-live-proof`.
 Depends: FMG-012 DONE / MAIN VERIFIED.
 Scope: Foundation Full Regression + Live MCP Proof only. No new feature scope unless verification finds a concrete defect.
@@ -303,3 +303,12 @@ Desktop deployment is current:
 - SHA-256 `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`.
 
 This chat still exposes 19 FileMCP tools, so the required live 23-tool catalog/hash proof is not yet satisfied. Foundation regression/native CI remain PASS and must not be rerun solely because connector discovery is stale. FMG-014 remains BLOCKED.
+
+
+## FMG-013 reconnect verification - 2026-09-28
+
+State remains BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE.
+
+Verified current runtime/tunnel: ready binary PID `10688`; tunnel `healthz=live`, `readyz=ready`; main MCP channel probe `ok`; direct route to `127.0.0.1:8008`; successful control-plane-to-MCP forwarding observed; fresh logical correlation resume and bound read PASS.
+
+ChatGPT still exposes 19/23 tools, so FMG-013 cannot be marked FOUNDATION MAIN VERIFIED and FMG-014 cannot be claimed.

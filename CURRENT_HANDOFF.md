@@ -331,7 +331,7 @@ NEXT_EXACT_ACTION: execute Foundation Full Regression + Live MCP Proof only: ful
 
 ## FMG-013 live proof blocker
 
-FMG-013: BLOCKED / LIVE DEPLOYMENT STALE on `chatgpt/FMG-013-full-regression-live-proof`.
+FMG-013: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE on `chatgpt/FMG-013-full-regression-live-proof`.
 
 Completed evidence: source/full regression/native Verify PASS; claim-head Verify `36298103299` SUCCESS on macOS + Windows x64 + Windows ARM64. Current source catalog is 23 tools / version 1.6.0.
 
@@ -355,3 +355,10 @@ NEXT_EXACT_ACTION: do not rerun regression. Reconnect/rediscover the FileMCP con
 ### FMG-013 live correlation sub-proof - 2026-09-28
 
 Live correlation on the active ready build is PASS: existing `chat_instance_id` resumed with `resumed=true`, and a bound read using the same `_filemcp_chat` handle succeeded. Remaining gate is only ChatGPT connector rediscovery from 19 to 23 tools plus catalog version/hash/new-tool live parity.
+
+
+## FMG-013 reconnect verification - 2026-09-28
+
+Fresh reconnect verification PASSed for runtime/tunnel/correlation: ready binary PID `10688`, tunnel health `live`, readiness `ready`, main-channel probe `ok`, control-plane forwarding to local MCP returns service status `200`, and logical chat correlation resume + bound read PASS.
+
+The current ChatGPT registry is still 19 tools. NEXT_EXACT_ACTION remains: refresh/rediscover the connector until 23 canonical tools are advertised, then run only the remaining live catalog/hash/new-tool parity proof. Do not rerun completed regression. FMG-014 remains BLOCKED.

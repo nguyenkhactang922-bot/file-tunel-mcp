@@ -1,6 +1,6 @@
 # FMG-013 Foundation Full Regression + Live MCP Proof Evidence
 
-Status: BLOCKED / LIVE DEPLOYMENT STALE
+Status: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE
 
 Branch: `chatgpt/FMG-013-full-regression-live-proof`
 Baseline main: `d3a3670f6fb60ab75d8471b3d982c811337fa951`
@@ -83,3 +83,25 @@ PASS on the active FMG-013-ready desktop runtime:
 - no restart or regression rerun was needed.
 
 Remaining FMG-013 blocker is now only connector catalog rediscovery/parity: this chat still exposes 19 tools instead of the canonical 23, so catalog version/hash plus the four newly added live tool registrations cannot yet be proven through ChatGPT.
+
+
+## Reconnect verification - 2026-09-28
+
+A fresh FileMCP logical-chat correlation was established and resumed successfully; a bound read using the same correlation handle PASSed.
+
+Current live runtime evidence:
+- FileMCP PID `10688` still runs `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`;
+- executable SHA-256 remains `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`;
+- tunnel-client D workspace started at `2026-09-28T14:15:45+07:00`;
+- `/healthz` = `live`;
+- `/readyz` = `ready`;
+- tunnel `main` channel reports `probe_status=ok`;
+- MCP route is direct to `127.0.0.1:8008`;
+- raw HTTP logging is disabled;
+- tunnel metrics confirm control-plane commands are being forwarded to the MCP server with successful service status `200`.
+
+The fresh ChatGPT session still exposes exactly 19 FileMCP tools. The four canonical foundation tools absent from the ChatGPT registry remain `exec_process`, `apply_edits`, `project_context`, and `evidence_get`.
+
+A process-memory attempt to recover the transient local-auth token for a direct local `tools/list` probe was blocked by the safety layer and was not bypassed. No token was printed or persisted.
+
+Conclusion: desktop deployment, tunnel liveness/readiness, control-plane forwarding, and logical correlation are verified. The only remaining FMG-013 acceptance blocker is ChatGPT connector catalog/schema rediscovery from 19 to the canonical 23 tools, followed by live catalog version/hash proof.

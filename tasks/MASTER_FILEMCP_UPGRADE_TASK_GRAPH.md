@@ -399,7 +399,7 @@ Acceptance:
 
 ## FMG-013 — Full Regression + Live MCP Proof
 
-State: BLOCKED / LIVE DEPLOYMENT STALE
+State: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE
 Depends: FMG-012
 
 Scope:
