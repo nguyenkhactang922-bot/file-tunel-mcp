@@ -138,3 +138,31 @@ PASS:
 After this run completed, fork/main advanced to FMUX-010 (`61359a9f98ddda9b78cb85ae87042620ab50f94f`). FMG-015 merged that main state. Post-sync local proof is PASS: FMG-015 contract, FMUX-010 Evidence contract, Windows Release build 0 warnings/errors, and full Windows regression 796 assertions.
 
 NEXT_EXACT_ACTION: exact-head native Verify on the synchronized post-FMUX-010 head; then scoped review -> PR/merge -> merged-main Verify -> FMG-015 MAIN VERIFIED -> FMG-016.
+
+## Final synchronized exact-head Verify + scoped review
+
+Head: `2ff1442f7b40767efd227c6295acaf6952778438`.
+Verify run: `36445207427`.
+
+PASS:
+- macOS native Verify: SUCCESS;
+- Windows x64 native Verify: SUCCESS;
+- Windows ARM64 native Verify: SUCCESS;
+- branch was synchronized with fork/main `61359a9f98ddda9b78cb85ae87042620ab50f94f` before the run;
+- post-sync local FMG-015 contract PASS;
+- post-sync FMUX-010 Evidence contract PASS;
+- Windows Release build 0 warnings / 0 errors;
+- full Windows regression 796 assertions PASS.
+
+Scoped review PASS:
+- canonical additions are exactly `batch_stat` and `batch_read`;
+- both tools remain read-only: risk=low, effect=read, capability=filesystem.read, openWorldHint=false;
+- every path is independently resolved under SafePathResolver; no batch authorization amplification path was found;
+- aggregate ToolBudget is shared across the batch and cannot be reset per entry;
+- ContentRef spill uses the already strong-versioned snapshot bytes instead of reopening the workspace path;
+- FileVersionService performs final independent content-hash verification against the expected native identity/metadata snapshot;
+- BatchFileService has no EvidenceStore/TelemetryPersistence/observability/evidence blob coupling and no secret/token persistence;
+- no temporary/debug/scratch artifacts are present in the branch diff;
+- catalog/tool-surface parity remains 25 tools at SHA-256 `70faaa4cb370589191084ef76dfbcb502d810f5c8c658f0e1da80e9ec194a8c7`.
+
+NEXT_EXACT_ACTION: commit this evidence-only closure state, push exact head, require native Verify on all three lanes, then PR/merge and merged-main Verify. FMG-016 remains blocked until FMG-015 MAIN VERIFIED.

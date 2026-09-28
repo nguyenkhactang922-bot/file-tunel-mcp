@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: push the synchronized FMG-015 head, require native Verify on macOS + Windows x64 + Windows ARM64, then scoped review, PR/merge and merged-main verification; only then mark FMG-015 DONE / MAIN VERIFIED and claim FMG-016.
+AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the FMG-015 evidence-only closure head, require native Verify on macOS + Windows x64 + Windows ARM64, then PR/merge and merged-main verification; only then mark FMG-015 DONE / MAIN VERIFIED and claim FMG-016.
