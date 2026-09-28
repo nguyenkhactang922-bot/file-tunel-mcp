@@ -1013,8 +1013,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             return
         }
         let event = filteredActivityEvents[row]
-        activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)
-\(event.detail)"
+        activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)\n\(event.detail)"
     }
 
     private func recordActivity(_ text: String) {
@@ -1306,7 +1305,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Runtime failed"
         case .starting:
-            startButton.title = "ConnectingÃ¢â‚¬Â¦"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
+            startButton.title = "ConnectingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime starting"
         case .running:
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
@@ -1318,7 +1317,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Reconnect cooldown"
         case .stopping:
-            startButton.title = "DisconnectingÃ¢â‚¬Â¦"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
+            startButton.title = "DisconnectingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime stopping"
         }
         startButton.contentTintColor = .white
@@ -1398,7 +1397,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let aboutItem = NSMenuItem(title: "About FileMCP", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         aboutItem.target = NSApp
         appMenu.addItem(aboutItem)
-        let settingsItem = NSMenuItem(title: "SettingsÃ¢â‚¬Â¦", action: #selector(showSettingsWindow), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "SettingsÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦", action: #selector(showSettingsWindow), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
         appMenu.addItem(.separator())
