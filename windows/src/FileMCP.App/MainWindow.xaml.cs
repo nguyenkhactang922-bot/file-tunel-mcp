@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using FileMCP.Core;
+using FileMCP.App.Presentation;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 
@@ -953,18 +954,16 @@ public partial class MainWindow : Window
     private void UpdateShellContext()
     {
         var connected = _runtimes.Values.Count(runtime => runtime.State.Status == LocalMcpRuntimeStatus.Running);
-        var active = WorkspaceKeys.Where(key => EnabledBox(key).IsChecked == true).ToArray();
-
-        ShellHealthText.Text = connected switch
+        var active = WorkspaceKeys.Where(key => EnabledBox(key).IsChecked == true).ToArray();        ShellStatusBadge.Status = connected switch
         {
-            0 => "Runtime stopped",
-            _ when connected == active.Length && active.Length > 0 => $"Healthy · {connected} connected",
-            _ => $"{connected} connected · {Math.Max(0, active.Length - connected)} inactive",
+            0 => PresentationStatus.Stopped,
+            _ when connected == active.Length && active.Length > 0 => PresentationStatus.Healthy,
+            _ => PresentationStatus.Degraded,
         };
 
         ShellWorkspaceText.Text = active.Length == 0
             ? "No workspace enabled"
-            : "Workspaces " + string.Join(" · ", active);
+            : "Workspaces " + string.Join(" Â· ", active);
     }
 
     private void NavigateHome_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = OverviewTab;
