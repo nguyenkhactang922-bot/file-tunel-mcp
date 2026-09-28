@@ -281,7 +281,7 @@ Evidence: `docs/evidence/FMG-012_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 
 ## FMG-013 implementation
 
-State: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE.
+State: LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING.
 Branch: `chatgpt/FMG-013-full-regression-live-proof`.
 Depends: FMG-012 DONE / MAIN VERIFIED.
 Scope: Foundation Full Regression + Live MCP Proof only. No new feature scope unless verification finds a concrete defect.
@@ -317,3 +317,10 @@ ChatGPT still exposes 19/23 tools, so FMG-013 cannot be marked FOUNDATION MAIN V
 ## FMG-013 connector refresh checkpoint - 2026-09-28T15:49:09+07:00
 
 Targeted D tunnel reconnect completed successfully (PID 2620 -> 2552; health live; readiness ready) without rerunning regression. ChatGPT-visible registry remains 19/23, with exec_process/apply_edits/project_context/evidence_get absent. State remains BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE. FMG-014 remains blocked.
+
+
+## FMG-013 live connector acceptance - 2026-09-28T15:59:05+07:00
+
+State: LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING.
+
+Canonical live registry: 23 tools; catalog version `1.6.0`; catalog SHA-256 `98ba484931717cc7ee8efbce83941afc33aa5fbaddb6b667882100a423bfacee`. Live proofs PASS for exec_process, project_context, apply_edits, evidence_get dispatch/error semantics, and logical-chat correlation. Remaining work is exact-head native Verify -> scoped review -> PR/merge -> merged-main verification. FMG-014 remains BLOCKED until FMG-013 FOUNDATION MAIN VERIFIED.

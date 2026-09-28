@@ -132,7 +132,7 @@ Detailed specification: foundation graph FMG-012.
 
 ## FMG-013 - Foundation Full Regression + Live MCP Proof
 
-State: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE
+State: ACTIVE / LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING
 Depends: FMG-012
 Detailed specification: foundation graph FMG-013.
 

@@ -1,6 +1,6 @@
 # FMG-013 Foundation Full Regression + Live MCP Proof Evidence
 
-Status: BLOCKED / CHATGPT CONNECTOR DISCOVERY STALE
+Status: LIVE VERIFIED / EXACT-HEAD NATIVE CI PENDING
 
 Branch: `chatgpt/FMG-013-full-regression-live-proof`
 Baseline main: `d3a3670f6fb60ab75d8471b3d982c811337fa951`
@@ -129,3 +129,20 @@ A targeted control-plane reconnect was attempted without rerunning regression:
 - `exec_process`, `apply_edits`, `project_context`, and `evidence_get` remain absent from the current chat tool surface.
 
 Conclusion: tunnel/runtime reconnect is PASS but does not refresh ChatGPT connector schema in-place. FMG-013 remains BLOCKED only on external connector/control-plane rediscovery to the canonical 23-tool catalog. Do not rerun completed regression and do not claim FMG-014.
+
+
+## Live 23-tool connector proof - 2026-09-28T15:59:05+07:00
+
+PASS against the refreshed FileMCP connector surface:
+- ChatGPT exposed the canonical 23-tool registry, including `exec_process`, `apply_edits`, `project_context`, and `evidence_get`.
+- The 23 advertised tool names exactly match the packaged `tool_catalog.v1.json`.
+- Packaged catalog version: `1.6.0`.
+- Packaged catalog SHA-256: `98ba484931717cc7ee8efbce83941afc33aa5fbaddb6b667882100a423bfacee`.
+- Active desktop remains PID `10688` at `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`, SHA-256 `cc91cc9d16c1c0d95363bc83e5ae3ea2edf45058817182d08736181e68f23d10`.
+- `exec_process` LIVE PASS: direct PowerShell argv execution returned `FMG013_EXEC_PROCESS_LIVE_OK`, terminal_state=`exited`, exit_code=`0`, no truncation.
+- `project_context` LIVE PASS: schema `1.0.0`, context digest returned, `source_trust=repository_untrusted`, `grants_authority=false`, active policy profile `legacy-command-compatible`.
+- `apply_edits` LIVE PASS: a dedicated temporary file was read for a strong version, atomically edited with expected_version, returned `committed=true` / `edits_applied=1`, reread as `FMG013_AFTER`, then deleted.
+- `evidence_get` LIVE dispatch/error-contract PASS: a syntactically valid nonexistent evidence id reached the live handler and returned the expected `Evidence record not found` error. Positive durable evidence creation remains covered by the completed FMG-011/FMG-012 regression suites; the ChatGPT tool wrapper does not expose MCP request-level `_meta["io.filemcp/evidence"]` needed to create a new durable record from this chat.
+- Live correlation PASS on the 23-tool connector: the same opaque `chat_instance_id` resumed with `resumed=true` and a bound `read_file_range` succeeded.
+
+FMG-013 live MCP acceptance is satisfied. Remaining gate: commit/push this exact evidence candidate, require exact-head native Verify on macOS + Windows x64 + Windows ARM64, scoped review, PR/merge, merged-main verification, then mark FMG-013 DONE / FOUNDATION MAIN VERIFIED and claim FMG-014.
