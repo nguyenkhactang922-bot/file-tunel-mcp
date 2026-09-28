@@ -471,7 +471,7 @@ final class ArtifactContentStore {
 
     func usage(workspaceAuthorityID: String) throws -> ArtifactStoreUsage {
         try Self.validateWorkspaceAuthority(workspaceAuthorityID)
-        return try withLock {
+        return withLock {
             let nowMs = epochMs(now())
             let live = references.filter { $0.expiresEpochMs > nowMs }
             return ArtifactStoreUsage(
