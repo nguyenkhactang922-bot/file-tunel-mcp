@@ -32,6 +32,6 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the exact LIVE VERIFIED FMG-013 evidence candidate on `chatgpt/FMG-013-full-regression-live-proof`; require native macOS + Windows x64 + Windows ARM64 Verify on the exact head; perform scoped review; merge only green exact head; verify merged main; mark FMG-013 DONE / FOUNDATION MAIN VERIFIED; then claim FMG-014.
+AUTHORITATIVE NEXT_EXACT_ACTION: record final synchronized FMG-014 evidence for code candidate `15babd9f9eee540fef2f008b6ea6ce6340b33109` / Verify run `36416421696`, push the docs-only closure head, require exact-head native Verify, perform scoped review, merge only green exact head, verify merged main, then mark FMG-014 DONE / MAIN VERIFIED and claim FMG-015.
 
 FPA-004 product/release scope is resolved by ADR-0003. V11-009 upstream integration remains an external authority gate and does not block the active FMG complete-upgrade implementation program.

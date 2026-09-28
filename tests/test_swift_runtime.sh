@@ -336,6 +336,215 @@ SWIFT
 swiftc -framework Security -framework CryptoKit -o "$TMP_DIR/tool-budget-cursor-test" macos/ToolExecutionContext.swift macos/AuthenticatedCursorCodec.swift "$TMP_DIR/main.swift"
 "$TMP_DIR/tool-budget-cursor-test"
 
+cat >"$TMP_DIR/main.swift" <<'SWIFT'
+import Foundation
+
+func expectArtifactFailure(_ label: String, containing needle: String, _ body: () throws -> Void) {
+    do {
+        try body()
+        fatalError("expected artifact failure: \(label)")
+    } catch {
+        precondition(error.localizedDescription.localizedCaseInsensitiveContains(needle), "\(label): unexpected error: \(error)")
+    }
+}
+
+let artifactArea = FileManager.default.temporaryDirectory.appendingPathComponent("filemcp-artifact-test-\(UUID().uuidString)", isDirectory: true)
+let workspaceA = artifactArea.appendingPathComponent("workspace-a", isDirectory: true)
+let workspaceB = artifactArea.appendingPathComponent("workspace-b", isDirectory: true)
+try FileManager.default.createDirectory(at: workspaceA, withIntermediateDirectories: true)
+try FileManager.default.createDirectory(at: workspaceB, withIntermediateDirectories: true)
+defer { try? FileManager.default.removeItem(at: artifactArea) }
+
+var clock = Date(timeIntervalSince1970: 1_797_936_000)
+let workspaceAID = ArtifactContentStore.workspaceAuthorityID(workspaceA)
+let workspaceBID = ArtifactContentStore.workspaceAuthorityID(workspaceB)
+
+func artifactOptions(
+    _ name: String,
+    maxItem: Int64 = 1024 * 1024,
+    maxWorkspace: Int64 = 4 * 1024 * 1024,
+    maxGlobal: Int64 = 8 * 1024 * 1024,
+    fault: ((String, Int64) -> Error?)? = nil
+) -> ArtifactContentStoreOptions {
+    var options = ArtifactContentStoreOptions()
+    options.rootURL = artifactArea.appendingPathComponent(name, isDirectory: true)
+    options.workspaceRootForIsolation = workspaceA
+    options.maxItemBytes = maxItem
+    options.maxWorkspaceBytes = maxWorkspace
+    options.maxGlobalBytes = maxGlobal
+    options.defaultTTL = 60 * 60
+    options.maxTTL = 24 * 60 * 60
+    options.now = { clock }
+    options.faultInjector = fault
+    return options
+}
+
+let store = try ArtifactContentStore(options: artifactOptions("primary"))
+let payload = Data("FMG-014 streamed artifact payload".utf8)
+let descriptor = try store.put(
+    data: payload,
+    workspaceAuthorityID: workspaceAID,
+    contentClass: ArtifactContentClass.toolOutput.rawValue,
+    mediaType: "text/plain",
+    ttl: 30 * 60,
+    leaseID: "lease-primary",
+    leaseTTL: 10 * 60)
+precondition(descriptor.contentRef.hasPrefix("cr1."), "ContentRef must be opaque/authenticated")
+precondition(descriptor.blobID.hasPrefix("sha256:") && descriptor.blobID.count == 71, "blob id must use SHA-256")
+precondition(descriptor.sizeBytes == Int64(payload.count), "artifact size mismatch")
+precondition(store.hasCurrentUserOnlyPermissionsForTest(), "artifact root POSIX permissions are not current-user-only")
+precondition(!store.rootURLForTest.path.hasPrefix(workspaceA.path + "/"), "artifact store must stay outside workspace")
+
+let memoryOutput = OutputStream.toMemory()
+try store.copy(descriptor.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown, to: memoryOutput)
+let copied = memoryOutput.property(forKey: .dataWrittenToMemoryStreamKey) as? Data
+precondition(copied == payload, "artifact streamed roundtrip mismatch")
+
+let reopened = try ArtifactContentStore(options: artifactOptions("primary"))
+let resolved = try reopened.resolve(descriptor.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
+precondition(resolved.blobID == descriptor.blobID && resolved.referenceID == descriptor.referenceID, "ContentRef did not survive restart")
+
+let tamperedTail = descriptor.contentRef.last == "A" ? "B" : "A"
+let tampered = String(descriptor.contentRef.dropLast()) + tamperedTail
+expectArtifactFailure("tamper", containing: "authentication") {
+    _ = try reopened.resolve(tampered, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
+}
+expectArtifactFailure("cross-workspace", containing: "workspace") {
+    _ = try reopened.resolve(descriptor.contentRef, workspaceAuthorityID: workspaceBID, contentClassAllowed: ArtifactContentClass.isKnown)
+}
+expectArtifactFailure("policy recheck", containing: "denied") {
+    _ = try reopened.resolve(descriptor.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: { _ in false })
+}
+
+let foreign = try ArtifactContentStore(options: artifactOptions("foreign-installation"))
+try foreign.initialize()
+expectArtifactFailure("cross-installation", containing: "authentication") {
+    _ = try foreign.resolve(descriptor.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
+}
+
+clock = clock.addingTimeInterval(11 * 60)
+expectArtifactFailure("lease expiry", containing: "lease expired") {
+    _ = try reopened.resolve(descriptor.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
+}
+
+let expiryStore = try ArtifactContentStore(options: artifactOptions("expiry"))
+let expiryRef = try expiryStore.put(
+    data: Data("expires".utf8),
+    workspaceAuthorityID: workspaceAID,
+    contentClass: ArtifactContentClass.toolOutput.rawValue,
+    ttl: 2 * 60)
+clock = clock.addingTimeInterval(3 * 60)
+expectArtifactFailure("ref expiry", containing: "expired") {
+    _ = try expiryStore.resolve(expiryRef.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
+}
+let gc = try expiryStore.collectGarbage()
+let expiryUsage = try expiryStore.usage(workspaceAuthorityID: workspaceAID)
+precondition(gc.expiredReferencesRemoved == 1 && expiryUsage.referenceCount == 0 && expiryUsage.blobCount == 0, "TTL GC did not remove expired content")
+
+clock = Date(timeIntervalSince1970: 1_797_939_600)
+let corruptStore = try ArtifactContentStore(options: artifactOptions("corrupt"))
+let corrupt = try corruptStore.put(
+    data: Data("integrity".utf8),
+    workspaceAuthorityID: workspaceAID,
+    contentClass: ArtifactContentClass.checkpoint.rawValue)
+try Data("INT3GRITY".utf8).write(to: corruptStore.blobURLForTest(corrupt.blobID))
+expectArtifactFailure("corruption", containing: "corrupt") {
+    _ = try corruptStore.resolve(corrupt.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
+}
+
+let mismatchStore = try ArtifactContentStore(options: artifactOptions("metadata-mismatch"))
+let mismatch = try mismatchStore.put(
+    data: Data("metadata".utf8),
+    workspaceAuthorityID: workspaceAID,
+    contentClass: ArtifactContentClass.toolOutput.rawValue)
+var mismatchJSON = try String(contentsOf: mismatchStore.indexURLForTest, encoding: .utf8)
+mismatchJSON = mismatchJSON.replacingOccurrences(of: "\"contentClass\":\"TOOL_OUTPUT\"", with: "\"contentClass\":\"PTY_OUTPUT\"")
+try mismatchJSON.data(using: .utf8)!.write(to: mismatchStore.indexURLForTest)
+let mismatchReloaded = try ArtifactContentStore(options: artifactOptions("metadata-mismatch"))
+expectArtifactFailure("metadata mismatch", containing: "metadata mismatch") {
+    _ = try mismatchReloaded.resolve(mismatch.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
+}
+
+let quotaStore = try ArtifactContentStore(options: artifactOptions("quota", maxItem: 8, maxWorkspace: 8, maxGlobal: 8))
+let quotaFirst = try quotaStore.put(
+    data: Data("12345678".utf8),
+    workspaceAuthorityID: workspaceAID,
+    contentClass: ArtifactContentClass.toolOutput.rawValue)
+expectArtifactFailure("quota", containing: "quota") {
+    _ = try quotaStore.put(data: Data("x".utf8), workspaceAuthorityID: workspaceAID, contentClass: ArtifactContentClass.toolOutput.rawValue)
+}
+let quotaUsage = try quotaStore.usage(workspaceAuthorityID: workspaceAID)
+precondition(quotaUsage.referenceCount == 1 && quotaUsage.blobCount == 1 && quotaUsage.globalBytes == 8, "quota failure left partial durable state")
+let quotaBlobURL = try quotaStore.blobURLForTest(quotaFirst.blobID)
+precondition(FileManager.default.fileExists(atPath: quotaBlobURL.path), "quota failure damaged committed blob")
+
+let diskFullStore = try ArtifactContentStore(options: artifactOptions("disk-full", fault: { stage, _ in
+    stage == "before-index-commit" ? NSError(domain: "FileMCP.Test", code: 28, userInfo: [NSLocalizedDescriptionKey: "simulated disk full"]) : nil
+}))
+expectArtifactFailure("disk full", containing: "disk full") {
+    _ = try diskFullStore.put(data: Data("must-rollback".utf8), workspaceAuthorityID: workspaceAID, contentClass: ArtifactContentClass.quarantine.rawValue)
+}
+let diskUsage = try diskFullStore.usage(workspaceAuthorityID: workspaceAID)
+precondition(diskUsage.referenceCount == 0 && diskUsage.blobCount == 0, "disk-full failure committed metadata")
+let diskBlobFiles = FileManager.default.enumerator(at: diskFullStore.rootURLForTest.appendingPathComponent("blobs"), includingPropertiesForKeys: [.isRegularFileKey])?
+    .compactMap { $0 as? URL }
+    .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true } ?? []
+precondition(diskBlobFiles.isEmpty, "disk-full rollback left a blob")
+
+let concurrentStore = try ArtifactContentStore(options: artifactOptions("concurrent", maxItem: 1024, maxWorkspace: 1024, maxGlobal: 1024))
+let concurrentPayload = Data(repeating: 0x5A, count: 64)
+let group = DispatchGroup()
+let queue = DispatchQueue(label: "filemcp-artifact-concurrency", attributes: .concurrent)
+let resultsLock = NSLock()
+var concurrentResults: [ArtifactContentDescriptor] = []
+var concurrentError: Error?
+for _ in 0..<16 {
+    group.enter()
+    queue.async {
+        defer { group.leave() }
+        do {
+            let item = try concurrentStore.put(
+                data: concurrentPayload,
+                workspaceAuthorityID: workspaceAID,
+                contentClass: ArtifactContentClass.ptyOutput.rawValue,
+                leaseID: "pty-session",
+                leaseTTL: 20 * 60)
+            resultsLock.lock()
+            concurrentResults.append(item)
+            resultsLock.unlock()
+        } catch {
+            resultsLock.lock()
+            concurrentError = error
+            resultsLock.unlock()
+        }
+    }
+}
+group.wait()
+precondition(concurrentError == nil && concurrentResults.count == 16, "concurrent puts failed: \(String(describing: concurrentError))")
+let concurrentUsage = try concurrentStore.usage(workspaceAuthorityID: workspaceAID)
+precondition(concurrentUsage.referenceCount == 16 && concurrentUsage.blobCount == 1 && concurrentUsage.globalBytes == 64 && concurrentUsage.workspaceBytes == 64, "concurrent puts did not deduplicate")
+for item in concurrentResults {
+    _ = try concurrentStore.delete(item.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
+}
+let deletedUsage = try concurrentStore.usage(workspaceAuthorityID: workspaceAID)
+precondition(deletedUsage.referenceCount == 0 && deletedUsage.blobCount == 0 && deletedUsage.globalBytes == 0, "concurrent-delete cleanup failed")
+
+var badOptions = ArtifactContentStoreOptions()
+badOptions.rootURL = workspaceA.appendingPathComponent(".artifact-store", isDirectory: true)
+badOptions.workspaceRootForIsolation = workspaceA
+expectArtifactFailure("repository store root", containing: "outside") {
+    _ = try ArtifactContentStore(options: badOptions)
+}
+precondition(!FileManager.default.fileExists(atPath: store.rootURLForTest.appendingPathComponent("evidence-v1.json").path), "artifact content leaked into evidence store")
+
+print("swift-artifact-contentref-store: ok")
+SWIFT
+
+swiftc -framework Security -framework CryptoKit -o "$TMP_DIR/artifact-store-test" \
+    macos/ArtifactContentStore.swift \
+    "$TMP_DIR/main.swift"
+"$TMP_DIR/artifact-store-test"
+
 case "$(uname -m)" in
     arm64|aarch64) TUNNEL_TARGET="darwin-arm64" ;;
     x86_64|amd64) TUNNEL_TARGET="darwin-amd64" ;;
