@@ -34,13 +34,14 @@ enum FileMCPFeedbackComponents {
     static func statusBadge(_ status: FileMCPPresentationStatus) -> NSTextField {
         let descriptor = FileMCPPresentationStatusCatalog.describe(status)
         let label = NSTextField(labelWithString: descriptor.label)
+        let color = FileMCPPresentationStatusCatalog.color(descriptor.severity)
         label.font = .systemFont(ofSize: 11, weight: .semibold)
-        label.textColor = FileMCPPresentationStatusCatalog.color(descriptor.severity)
+        label.textColor = color
         label.wantsLayer = true
         label.layer?.cornerRadius = 7
         label.layer?.borderWidth = 1
-        label.layer?.borderColor = label.textColor.cgColor
-        label.layer?.backgroundColor = label.textColor.withAlphaComponent(0.08).cgColor
+        label.layer?.borderColor = color.cgColor
+        label.layer?.backgroundColor = color.withAlphaComponent(0.08).cgColor
         label.alignment = .center
         label.setAccessibilityLabel("\(descriptor.label) status")
         return label
@@ -48,8 +49,10 @@ enum FileMCPFeedbackComponents {
 
     static func inlineNotice(_ feedback: FileMCPPresentationFeedback) -> NSView {
         let title = NSTextField(labelWithString: feedback.title)
+        let color = FileMCPPresentationStatusCatalog.color(feedback.severity)
         title.font = .systemFont(ofSize: 12, weight: .semibold)
-        title.textColor = FileMCPPresentationStatusCatalog.color(feedback.severity)
+        title.textColor = color
+
         let message = NSTextField(wrappingLabelWithString: feedback.message)
         let stack = NSStackView(views: [title, message])
         stack.orientation = .vertical
@@ -59,7 +62,7 @@ enum FileMCPFeedbackComponents {
         stack.wantsLayer = true
         stack.layer?.cornerRadius = 8
         stack.layer?.borderWidth = 1
-        stack.layer?.borderColor = title.textColor.cgColor
+        stack.layer?.borderColor = color.cgColor
         stack.setAccessibilityLabel("\(feedback.title). \(feedback.message)")
         return stack
     }
@@ -68,14 +71,17 @@ enum FileMCPFeedbackComponents {
         let titleLabel = NSTextField(labelWithString: title)
         titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
         titleLabel.alignment = .center
+
         let messageLabel = NSTextField(wrappingLabelWithString: message)
         messageLabel.alignment = .center
         messageLabel.textColor = .secondaryLabelColor
+
         var views: [NSView] = [titleLabel, messageLabel]
         if let actionTitle, let action {
             let button = NSButton(title: actionTitle, target: target, action: action)
             views.append(button)
         }
+
         let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .centerX
@@ -87,16 +93,19 @@ enum FileMCPFeedbackComponents {
     static func pageHeader(title: String, description: String?, status: FileMCPPresentationStatus? = nil) -> NSView {
         let titleLabel = NSTextField(labelWithString: title)
         titleLabel.font = .systemFont(ofSize: 26, weight: .semibold)
+
         let textStack = NSStackView()
         textStack.orientation = .vertical
         textStack.alignment = .leading
         textStack.spacing = 3
         textStack.addArrangedSubview(titleLabel)
+
         if let description, !description.isEmpty {
             let descriptionLabel = NSTextField(wrappingLabelWithString: description)
             descriptionLabel.textColor = .secondaryLabelColor
             textStack.addArrangedSubview(descriptionLabel)
         }
+
         let row = NSStackView(views: [textStack])
         row.orientation = .horizontal
         row.alignment = .top
