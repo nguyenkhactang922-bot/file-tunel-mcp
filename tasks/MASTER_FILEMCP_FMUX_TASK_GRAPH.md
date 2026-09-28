@@ -29,7 +29,7 @@ Accessibility, security truthfulness, theme behavior and no-fake-state rules app
 
 ## FMUX-001 — Presentation Foundation
 
-State: ACTIVE / LOCAL VERIFIED / NATIVE macOS CI PENDING
+State: ACTIVE / LOCAL + NATIVE VERIFIED / REVIEW PENDING
 Depends: ADR-0007 / FMUX design gate PASS.
 
 Scope:

@@ -1,8 +1,9 @@
 # FMUX-001 Presentation Foundation Evidence
 
-Status: LOCAL VERIFIED / NATIVE macOS CI PENDING
+Status: LOCAL + NATIVE VERIFIED / REVIEW PENDING
 Date: 2026-09-28
 Branch: chatgpt/FMUX-complete-scope-freeze
+Candidate head before evidence refresh: 9735881c467cf99426d1f1a707ff02b392506b04
 
 ## Scope implemented
 
@@ -22,7 +23,7 @@ macOS:
 
 No product page redesign was performed. FMUX-002 was not started.
 
-## Verification
+## Local verification
 
 Windows Release build:
 - PASS
@@ -32,7 +33,7 @@ Windows Release build:
 Windows runtime regression:
 - PASS
 - 750 assertions
-- catalog hash unchanged: 8c5365afc0ae89e417c144ba77bbdc6a068e3fdbeefd92d674a62e1647c69d91
+- canonical catalog hash unchanged: 8c5365afc0ae89e417c144ba77bbdc6a068e3fdbeefd92d674a62e1647c69d91
 
 FMUX presentation contract:
 - PASS
@@ -44,8 +45,18 @@ FMUX presentation contract:
 macOS build-script syntax:
 - PASS via Git Bash.
 
-Native macOS compile:
-- PENDING CI because local Windows host has no native macOS Swift/AppKit toolchain.
+Project-state contract:
+- PASS on chatgpt/FMUX-complete-scope-freeze.
+
+## Native exact-head verification
+
+GitHub Verify run 36394903071:
+- verify-windows: SUCCESS;
+- verify-windows-arm64: SUCCESS;
+- verify-macos: SUCCESS;
+- macOS Build app: SUCCESS.
+
+This run verified candidate head 9735881c467cf99426d1f1a707ff02b392506b04.
 
 ## Safety / regression review
 
@@ -58,6 +69,9 @@ Native macOS compile:
 
 ## Next exact action
 
-Commit/push exact FMUX-001 candidate.
-Require native Verify / macOS compile evidence on exact head.
-Do not start FMUX-002 before FMUX-001 MAIN VERIFIED.
+Commit/push this evidence refresh.
+Require native Verify on the final exact evidence head.
+Perform scoped PR review.
+Merge only exact green head.
+Then verify merged main and mark FMUX-001 DONE / MAIN VERIFIED.
+Do not start FMUX-002 first.
