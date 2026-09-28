@@ -350,3 +350,8 @@ Desktop/runtime replacement is now verified: PID `10688` is running `dist\window
 The remaining blocker is ChatGPT connector discovery/cache: this chat still exposes only 19 FileMCP tools.
 
 NEXT_EXACT_ACTION: do not rerun regression. Reconnect/rediscover the FileMCP connector so the chat advertises 23 tools; then run LIVE MCP PROOF ONLY (catalog version/hash + live tool/correlation behavior), exact-head native Verify, review, merge, merged-main verification, then claim FMG-014.
+
+
+### FMG-013 live correlation sub-proof - 2026-09-28
+
+Live correlation on the active ready build is PASS: existing `chat_instance_id` resumed with `resumed=true`, and a bound read using the same `_filemcp_chat` handle succeeded. Remaining gate is only ChatGPT connector rediscovery from 19 to 23 tools plus catalog version/hash/new-tool live parity.

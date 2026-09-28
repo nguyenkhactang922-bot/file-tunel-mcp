@@ -73,3 +73,13 @@ Conclusion:
 - do not rerun foundation regression;
 - do not claim FMG-013 PASS and do not claim FMG-014;
 - NEXT_EXACT_ACTION is LIVE MCP PROOF ONLY after ChatGPT connector rediscovery/reconnection exposes the current 23-tool registry, then verify catalog version/hash and live correlation behavior.
+
+
+## Live correlation sub-proof - 2026-09-28
+
+PASS on the active FMG-013-ready desktop runtime:
+- `filemcp_observability_connect` resumed the existing opaque handle with `resumed=true`;
+- a bound `read_file_range` call using the same `_filemcp_chat` handle succeeded against `Tools/FileMCP/AGENTS.md`;
+- no restart or regression rerun was needed.
+
+Remaining FMG-013 blocker is now only connector catalog rediscovery/parity: this chat still exposes 19 tools instead of the canonical 23, so catalog version/hash plus the four newly added live tool registrations cannot yet be proven through ChatGPT.
