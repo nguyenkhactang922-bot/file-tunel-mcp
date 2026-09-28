@@ -82,6 +82,7 @@ final class FileVersionService {
 
         var data = Data()
         data.reserveCapacity(Int(before.sizeBytes))
+        var firstChunk = true
         while true {
             let chunk = try handle.read(upToCount: Self.hashChunkBytes) ?? Data()
             if chunk.isEmpty { break }
@@ -89,6 +90,10 @@ final class FileVersionService {
                 throw FileVersionServiceError.invalid("File is larger than the 5 MB limit for this tool")
             }
             data.append(chunk)
+            if firstChunk {
+                firstChunk = false
+                readStageForTests?("after_first_chunk")
+            }
         }
         let after = try snapshot(path: target)
         guard before == after, Int64(data.count) == before.sizeBytes else {
@@ -97,6 +102,10 @@ final class FileVersionService {
 
         let canonicalRelative = relativePathForVersion(target)
         let contentHash = Self.sha256Tagged(data)
+        let verifiedContentHash = try verifyCurrentContentHash(path: target, expected: before, maxBytes: maxBytes)
+        guard contentHash == verifiedContentHash else {
+            throw FileVersionServiceError.invalid("File changed while its strong version was being captured")
+        }
         let payload = FileVersionPayload(
             schema: Self.tokenSchemaVersion,
             pathFingerprint: Self.sha256Tagged(Data((resolver.root.path + "\0" + canonicalRelative + "\0" + target.path).utf8)),
@@ -226,6 +235,36 @@ final class FileVersionService {
         let handle = try FileHandle(forReadingFrom: path)
         defer { try? handle.close() }
         return try snapshot(fileDescriptor: handle.fileDescriptor)
+    }
+
+    private func verifyCurrentContentHash(path: URL, expected: FileSnapshot, maxBytes: Int) throws -> String {
+        let handle = try FileHandle(forReadingFrom: path)
+        defer { try? handle.close() }
+
+        let verifyBefore = try snapshot(fileDescriptor: handle.fileDescriptor)
+        guard verifyBefore == expected else {
+            throw FileVersionServiceError.invalid("File changed while its strong version was being captured")
+        }
+
+        var hasher = SHA256()
+        var total: Int64 = 0
+        while true {
+            let chunk = try handle.read(upToCount: Self.hashChunkBytes) ?? Data()
+            if chunk.isEmpty { break }
+            let (next, overflow) = total.addingReportingOverflow(Int64(chunk.count))
+            guard !overflow, next <= Int64(maxBytes) else {
+                throw FileVersionServiceError.invalid("File changed while its strong version was being captured")
+            }
+            total = next
+            hasher.update(data: chunk)
+        }
+
+        let verifyAfter = try snapshot(fileDescriptor: handle.fileDescriptor)
+        guard verifyAfter == expected, total == expected.sizeBytes else {
+            throw FileVersionServiceError.invalid("File changed while its strong version was being captured")
+        }
+
+        return "sha256:" + hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     private func snapshot(fileDescriptor: Int32) throws -> FileSnapshot {

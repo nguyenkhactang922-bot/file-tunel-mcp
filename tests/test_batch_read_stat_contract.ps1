@@ -23,8 +23,10 @@ if ($BatchStat.definition.inputSchema.additionalProperties -ne $false -or $Batch
 
 $Win = Get-Content "windows/src/FileMCP.Core/BatchFileService.cs" -Raw
 $WinTools = Get-Content "windows/src/FileMCP.Core/LocalTools.cs" -Raw
+$WinVersion = Get-Content "windows/src/FileMCP.Core/FileVersionService.cs" -Raw
 $Mac = Get-Content "macos/BatchFileService.swift" -Raw
 $MacServer = Get-Content "macos/LocalMCPServer.swift" -Raw
+$MacVersion = Get-Content "macos/FileVersionService.swift" -Raw
 $WinTests = Get-Content "windows/tests/FileMCP.Core.Tests/Program.cs" -Raw
 $SwiftTests = Get-Content "tests/test_swift_runtime.sh" -Raw
 
@@ -60,6 +62,13 @@ foreach ($Needle in @(
     "truncation_reason"
 )) { Require-Contains $Mac $Needle "macOS FMG-015 invariant missing: $Needle" }
 
+foreach ($Needle in @("after_first_chunk", "VerifyCurrentContentHash")) {
+    Require-Contains $WinVersion $Needle "Windows strong-read hardening missing: $Needle"
+}
+foreach ($Needle in @("after_first_chunk", "verifyCurrentContentHash")) {
+    Require-Contains $MacVersion $Needle "macOS strong-read hardening missing: $Needle"
+}
+
 foreach ($Needle in @('"batch_stat"', '"batch_read"', "BatchFileService")) {
     Require-Contains $WinTools $Needle "Windows LocalTools missing FMG-015 handler: $Needle"
     Require-Contains $MacServer $Needle "macOS LocalMCPServer missing FMG-015 handler: $Needle"
@@ -79,6 +88,7 @@ foreach ($Needle in @(
     "mcp-batch-stat: ok",
     "mcp-batch-read: ok",
     "mcp-batch-budget: ok",
+    "swift-file-version-mid-read-mutation: ok",
     "macos/BatchFileService.swift",
     "macos/ArtifactContentStore.swift"
 )) { Require-Contains $SwiftTests $Needle "macOS FMG-015 test/wiring missing: $Needle" }

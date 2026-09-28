@@ -3614,7 +3614,7 @@ internal static class Program
             Enumerable.Repeat((byte)0x43, 32).ToArray(),
             readStageForTests: stage =>
             {
-                if (stage == "after_snapshot" && !mutated)
+                if (stage == "after_first_chunk" && !mutated)
                 {
                     mutated = true;
                     using var writer = new FileStream(mutatePath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);

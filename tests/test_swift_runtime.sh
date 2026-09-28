@@ -2326,6 +2326,72 @@ let narrowAfterUnrelatedUntracked = try safeGitServer.captureSourceStateRefForTe
 precondition(narrowAfterUnrelatedUntracked["source_state_id"] as? String == narrowBeforeUnrelatedUntracked["source_state_id"] as? String)
 print("swift-file-version-source-state: ok")
 
+let fmg015RaceURL = root.appendingPathComponent("fmg015-mid-read-race.bin")
+try Data(repeating: 0x6d, count: 256 * 1024).write(to: fmg015RaceURL)
+let fmg015RaceResolver = try SafePathResolver(rootPath: root.path)
+var fmg015RaceMutated = false
+let fmg015RaceVersions = try FileVersionService(
+    resolver: fmg015RaceResolver,
+    keyData: Data(repeating: 0x44, count: 32),
+    readStageForTests: { stage in
+        guard stage == "after_first_chunk", !fmg015RaceMutated else { return }
+        fmg015RaceMutated = true
+        guard let writer = try? FileHandle(forWritingTo: fmg015RaceURL) else {
+            preconditionFailure("could not open FMG-015 mutation fixture")
+        }
+        do {
+            try writer.seek(toOffset: 0)
+            try writer.write(contentsOf: Data([0x58]))
+            try writer.synchronize()
+            try writer.close()
+        } catch {
+            preconditionFailure("could not mutate FMG-015 fixture: \(error)")
+        }
+    })
+do {
+    _ = try fmg015RaceVersions.readVersioned(relativePath: "fmg015-mid-read-race.bin", maxBytes: 512 * 1024)
+    preconditionFailure("same-size mid-read mutation must fail strong read")
+} catch {
+    precondition(
+        error.localizedDescription.localizedCaseInsensitiveContains("changed"),
+        "unexpected FMG-015 mid-read mutation error: \(error)")
+}
+precondition(fmg015RaceMutated, "FMG-015 mutation hook did not execute")
+print("swift-file-version-mid-read-mutation: ok")
+
+let fmg015RaceURL = root.appendingPathComponent("fmg015-mid-read-race.bin")
+try Data(repeating: 0x6d, count: 256 * 1024).write(to: fmg015RaceURL)
+let fmg015RaceResolver = try SafePathResolver(rootPath: root.path)
+var fmg015RaceMutated = false
+let fmg015RaceVersions = try FileVersionService(
+    resolver: fmg015RaceResolver,
+    keyData: Data(repeating: 0x44, count: 32),
+    readStageForTests: { stage in
+        guard stage == "after_first_chunk", !fmg015RaceMutated else { return }
+        fmg015RaceMutated = true
+        guard let writer = try? FileHandle(forWritingTo: fmg015RaceURL) else {
+            preconditionFailure("could not open FMG-015 mutation fixture")
+        }
+        do {
+            try writer.seek(toOffset: 0)
+            try writer.write(contentsOf: Data([0x58]))
+            try writer.synchronize()
+            try writer.close()
+        } catch {
+            preconditionFailure("could not mutate FMG-015 fixture: \(error)")
+        }
+    })
+do {
+    _ = try fmg015RaceVersions.readVersioned(relativePath: "fmg015-mid-read-race.bin", maxBytes: 512 * 1024)
+    preconditionFailure("same-size mid-read mutation must fail strong read")
+} catch {
+    precondition(
+        error.localizedDescription.localizedCaseInsensitiveContains("changed"),
+        "unexpected FMG-015 mid-read mutation error: \(error)")
+}
+precondition(fmg015RaceMutated, "FMG-015 mutation hook did not execute")
+print("swift-file-version-mid-read-mutation: ok")
+
 let fmg011ServerStoreURL = root.appendingPathComponent("server-evidence.json")
 let server = try LocalMCPServer(
     port: 18088,
@@ -3607,12 +3673,7 @@ MODERN_CHAT_RESUME="$(curl -fsS -X POST "$BASE_URL" \
 printf '%s' "$MODERN_CHAT_RESUME" | grep -q '"resultType":"complete"'
 printf '%s' "$MODERN_CHAT_RESUME" | plutil -extract result.structuredContent.resumed raw -expect bool -o - - | grep -qx 'true'
 echo "logical-chat-facade-modern: ok"
-printf '%s' "$TOOLS" | plutil -extract result.tools.0.outputSchema.properties.result.type raw -expect string -o - - | grep -qx 'array'
-printf '%s' "$TOOLS" | plutil -extract result.tools.1.outputSchema.properties.result.type raw -expect string -o - - | grep -qx 'string'
-printf '%s' "$TOOLS" | plutil -extract result.tools.2.outputSchema.properties.content.type raw -expect string -o - - | grep -qx 'string'
-printf '%s' "$TOOLS" | plutil -extract result.tools.0.annotations.openWorldHint raw -expect bool -o - - | grep -qx 'false'
-printf '%s' "$TOOLS" | plutil -extract result.tools.5.annotations.destructiveHint raw -expect bool -o - - | grep -qx 'true'
-printf '%s' "$TOOLS" | python3 -c 'import json,sys; d=json.load(sys.stdin); by={t["name"]:t for t in d["result"]["tools"]}; assert by["exec_process"]["annotations"]["openWorldHint"] is True; assert by["run_command"]["annotations"]["openWorldHint"] is True'
+printf '%s' "$TOOLS" | python3 -c 'import json,sys; d=json.load(sys.stdin); by={t["name"]:t for t in d["result"]["tools"]}; assert by["list_files"]["outputSchema"]["properties"]["result"]["type"]=="array"; assert by["read_file"]["outputSchema"]["properties"]["result"]["type"]=="string"; assert by["read_file_range"]["outputSchema"]["properties"]["content"]["type"]=="string"; assert by["list_files"]["annotations"]["openWorldHint"] is False; assert by["delete_file"]["annotations"]["destructiveHint"] is True; assert by["exec_process"]["annotations"]["openWorldHint"] is True; assert by["run_command"]["annotations"]["openWorldHint"] is True'
 
 MODERN_CALL="$(curl -fsS -X POST "$BASE_URL" \
     -H 'Content-Type: application/json' \

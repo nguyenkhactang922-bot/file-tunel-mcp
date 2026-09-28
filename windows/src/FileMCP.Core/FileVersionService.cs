@@ -63,6 +63,7 @@ internal sealed class FileVersionService
 
         using var buffer = new MemoryStream((int)Math.Min(before.SizeBytes, maxBytes));
         var chunk = new byte[HashChunkBytes];
+        var firstChunk = true;
         while (true)
         {
             var read = stream.Read(chunk, 0, chunk.Length);
@@ -70,6 +71,11 @@ internal sealed class FileVersionService
             if (buffer.Length + read > maxBytes)
                 throw new FileMcpException("File is larger than the 5 MB limit for this tool");
             buffer.Write(chunk, 0, read);
+            if (firstChunk)
+            {
+                firstChunk = false;
+                _readStageForTests?.Invoke("after_first_chunk");
+            }
         }
         var data = buffer.ToArray();
         var after = SnapshotPath(target);
@@ -79,6 +85,9 @@ internal sealed class FileVersionService
 
         var canonicalRelative = _resolver.RelativePath(target);
         var contentHash = Sha256Tagged(data);
+        var verifiedContentHash = VerifyCurrentContentHash(target, before, maxBytes);
+        if (!string.Equals(contentHash, verifiedContentHash, StringComparison.Ordinal))
+            throw new FileMcpException("File changed while its strong version was being captured");
         var payload = new FileVersionPayload(
             TokenSchemaVersion,
             FingerprintPath(target, canonicalRelative),
@@ -187,6 +196,39 @@ internal sealed class FileVersionService
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.None);
         return Snapshot(stream.SafeFileHandle);
+    }
+
+    private static string VerifyCurrentContentHash(string path, FileSnapshot expected, int maxBytes)
+    {
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete,
+            HashChunkBytes,
+            FileOptions.SequentialScan);
+        var verifyBefore = Snapshot(stream.SafeFileHandle);
+        EnsureUnchanged(expected, verifyBefore);
+
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var chunk = new byte[HashChunkBytes];
+        long total = 0;
+        while (true)
+        {
+            var read = stream.Read(chunk, 0, chunk.Length);
+            if (read == 0) break;
+            total = checked(total + read);
+            if (total > maxBytes)
+                throw new FileMcpException("File changed while its strong version was being captured");
+            hash.AppendData(chunk, 0, read);
+        }
+
+        var verifyAfter = Snapshot(stream.SafeFileHandle);
+        EnsureUnchanged(expected, verifyAfter);
+        if (total != expected.SizeBytes)
+            throw new FileMcpException("File changed while its strong version was being captured");
+
+        return "sha256:" + Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
     }
 
     private static FileSnapshot Snapshot(SafeFileHandle handle)
