@@ -358,3 +358,9 @@ Scope: App Shell + Navigation only: labeled sidebar, content host, workspace/glo
 Evidence: `docs/evidence/FMUX-002_APP_SHELL_NAVIGATION_EVIDENCE.md`.
 
 NEXT_EXACT_ACTION: finish main-sync conflict resolution, rerun only state/shell/build gates affected by the merge, push final exact head, require native Verify on that head, review, merge, merged-main verification, then claim FMUX-003.
+
+## FMUX-002 main-sync verification
+
+FMUX-002 final merged candidate is LOCAL VERIFIED after syncing latest main/FM G-013.
+Local post-sync proof: project-state PASS; FMUX shell contract PASS; Windows Release 0 warnings/errors; Windows runtime 750 assertions PASS.
+NEXT_EXACT_ACTION: push exact final head, require native Verify on Windows x64 / Windows ARM64 / macOS, review, merge, merged-main verification, then mark FMUX-002 MAIN VERIFIED and claim FMUX-003.

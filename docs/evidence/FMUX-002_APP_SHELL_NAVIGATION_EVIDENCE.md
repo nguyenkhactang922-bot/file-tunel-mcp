@@ -58,3 +58,14 @@ Perform scoped review.
 Merge only exact green head.
 Verify merged main.
 Then mark FMUX-002 DONE / MAIN VERIFIED and claim FMUX-003.
+
+## Final main-sync candidate verification
+
+Main sync merge head: `c4f0cb8` (resolve current full SHA dynamically).
+Local post-sync gates:
+- project-state contract: PASS;
+- FMUX app-shell contract: PASS;
+- Windows Release build: PASS, 0 warnings / 0 errors;
+- Windows runtime: PASS, 750 assertions.
+
+The earlier exact-head native Verify run `36404297279` proved candidate `94e93fb82a58102caff2e0f5bc615e46e7cd4706`. Because `main` advanced with FMG-013 and was merged into FMUX-002, a fresh native Verify is required on the new final exact head before merge.
