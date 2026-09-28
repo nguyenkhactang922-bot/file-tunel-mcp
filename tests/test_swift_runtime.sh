@@ -2469,7 +2469,8 @@ precondition((qListed["count"] as? NSNumber)?.intValue ?? 0 >= 1, "quarantine_li
 let qGot = try qCall(primaryQTools, "quarantine_get", ["quarantine_ref": qRef])
 precondition(qString(qGot, "original_relative_path") == "file.txt" && qString(qGot, "state") == "quarantined" && (qGot["entry_count"] as? NSNumber)?.intValue == 1, "quarantine_get must authenticate manifest")
 let qRestored = try qCall(primaryQTools, "quarantine_restore", ["quarantine_ref": qRef])
-precondition(qString(qRestored, "state") == "restored" && String(data: try Data(contentsOf: qFile), encoding: .utf8) == "hello quarantine", "quarantine file restore failed")
+let qRestoredText = String(data: try Data(contentsOf: qFile), encoding: .utf8)
+precondition(qString(qRestored, "state") == "restored" && qRestoredText == "hello quarantine", "quarantine file restore failed")
 expectQFailure("double restore", containing: "already restored") {
     _ = try qCall(primaryQTools, "quarantine_restore", ["quarantine_ref": qRef])
 }
@@ -2497,7 +2498,8 @@ expectQFailure("stale source", containing: "changed") {
         "relative_path": "stale.txt", "expected_version": qString(qStaleDry, "source_version"),
     ])
 }
-precondition(String(data: try Data(contentsOf: qStale), encoding: .utf8) == "version-b", "stale delete damaged newer source")
+let qStaleText = String(data: try Data(contentsOf: qStale), encoding: .utf8)
+precondition(qStaleText == "version-b", "stale delete damaged newer source")
 
 // Path swap after package verification must not delete replacement.
 let qSwap = qWorkspace.appendingPathComponent("swap.txt")
@@ -2514,7 +2516,8 @@ expectQFailure("path swap", containing: "mutation guard") {
         "relative_path": "swap.txt", "expected_version": qString(qSwapDry, "source_version"),
     ])
 }
-precondition(String(data: try Data(contentsOf: qSwap), encoding: .utf8) == "replacement", "path-swap failure deleted replacement")
+let qSwapText = String(data: try Data(contentsOf: qSwap), encoding: .utf8)
+precondition(qSwapText == "replacement", "path-swap failure deleted replacement")
 
 // Expiry blocks metadata access and restore.
 let qExpire = qWorkspace.appendingPathComponent("expire.txt")
@@ -2552,7 +2555,8 @@ expectQFailure("destination race", containing: "mutation guard") {
         "quarantine_ref": qString(qRaceDeleted, "quarantine_ref"), "target_relative_path": "race-target.txt",
     ])
 }
-precondition(String(data: try Data(contentsOf: qRaceTarget), encoding: .utf8) == "competitor", "destination race overwrote competitor")
+let qRaceTargetText = String(data: try Data(contentsOf: qRaceTarget), encoding: .utf8)
+precondition(qRaceTargetText == "competitor", "destination race overwrote competitor")
 
 // Tree partial failure rolls back completely.
 let qTree = qWorkspace.appendingPathComponent("tree", isDirectory: true)
