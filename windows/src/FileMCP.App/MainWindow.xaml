@@ -77,10 +77,14 @@
 
                 <Button x:Name="NavHomeButton" Content="Home" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateHome_Click" AutomationProperties.Name="Home"/>
+                <Button x:Name="NavWorkspacesButton" Content="Workspaces" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateWorkspaces_Click" AutomationProperties.Name="Workspaces"/>
                 <Button x:Name="NavConnectionsButton" Content="Connections" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateConnections_Click" AutomationProperties.Name="Connections"/>
                 <Button x:Name="NavSettingsButton" Content="Settings" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateSettings_Click" AutomationProperties.Name="Settings"/>
+                <Button x:Name="NavActivityButton" Content="Activity" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateActivity_Click" AutomationProperties.Name="Activity"/>
                 <Button x:Name="NavDiagnosticsButton" Content="Diagnostics" HorizontalContentAlignment="Left"
                         Margin="0,8,0,4" Click="NavigateDiagnostics_Click" AutomationProperties.Name="Diagnostics"/>
             </StackPanel>
@@ -324,9 +328,59 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+            <TabItem Header="Workspaces" x:Name="WorkspacesTab">
+                <Grid Margin="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="3*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <controls:PageHeader Title="Workspaces" Description="Configured roots, health and policy context." Margin="0,0,0,12"/>
+                        <Button x:Name="WorkspaceCRow" Content="Drive C" Tag="C" Click="WorkspaceRow_Click" HorizontalContentAlignment="Left" Margin="0,0,0,6"/>
+                        <Button x:Name="WorkspaceDRow" Content="Drive D" Tag="D" Click="WorkspaceRow_Click" HorizontalContentAlignment="Left" Margin="0,0,0,6"/>
+                        <Button x:Name="WorkspaceERow" Content="Drive E" Tag="E" Click="WorkspaceRow_Click" HorizontalContentAlignment="Left" Margin="0,0,0,6"/>
+                        <Button x:Name="WorkspaceFRow" Content="Drive F" Tag="F" Click="WorkspaceRow_Click" HorizontalContentAlignment="Left"/>
+                    </StackPanel>
+                    <Border Grid.Column="1" Style="{StaticResource FileMcpCardBorder}">
+                        <StackPanel>
+                            <TextBlock x:Name="WorkspaceDetailTitle" Style="{StaticResource FileMcpSectionTitleText}" Text="Select a workspace"/>
+                            <controls:StatusBadge x:Name="WorkspaceDetailStatus" Status="Unavailable" HorizontalAlignment="Left" Margin="0,8,0,12"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Root"/>
+                            <TextBlock x:Name="WorkspaceDetailRoot" Text="-" TextWrapping="Wrap" Margin="0,2,0,10"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Policy profile"/>
+                            <TextBlock x:Name="WorkspaceDetailPolicy" Text="-" Margin="0,2,0,10"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Connection"/>
+                            <TextBlock x:Name="WorkspaceDetailConnection" Text="-" TextWrapping="Wrap" Margin="0,2,0,10"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Activity"/>
+                            <TextBlock x:Name="WorkspaceDetailActivity" Text="-" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
             <TabItem Header="Connection" x:Name="ConnectionTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
+                        <controls:PageHeader x:Name="ConnectionsHeader"
+                                             Title="Connections"
+                                             Description="Runtime credentials, Secure MCP Tunnel configuration and connectivity health."
+                                             ShowStatus="True"
+                                             Status="Stopped"
+                                             Margin="0,0,0,12"/>
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <controls:StatusBadge x:Name="ConnectionCredentialBadge" Status="Unavailable" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock FontWeight="SemiBold" Text="Runtime credential"/>
+                                    <TextBlock x:Name="ConnectionDiagnosticsText" Style="{StaticResource FileMcpCaptionText}"
+                                               Text="No runtime is connected." TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="140"/>
@@ -398,7 +452,11 @@
             <TabItem Header="Settings" x:Name="SettingsTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
-                        <TextBlock FontWeight="SemiBold" Text="Workspace roots"/>
+                        <controls:PageHeader Title="Settings"
+                                             Description="Workspace access, policy, execution, Git, telemetry and appearance."
+                                             Margin="0,0,0,12"/>
+                        <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Workspace &amp; access"/>
+                        <TextBlock FontWeight="SemiBold" Text="Workspace roots" Margin="0,6,0,0"/>
                         <TextBlock Margin="0,4,0,10" Foreground="Gray" TextWrapping="Wrap"
                                    Text="Enable the drives you want FileMCP to expose. Every workspace remains isolated to its configured root."/>
 
@@ -449,20 +507,23 @@
                             </Grid>
                         </Border>
 
-                        <StackPanel Margin="0,14,0,0">
-                            <TextBlock Text="Execution policy" FontWeight="SemiBold"/>
-                            <ComboBox x:Name="PolicyProfileComboBox" Margin="0,6,0,0" SelectedValuePath="Tag">
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,16,0,0">
+                            <StackPanel>
+                            <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Policy"/>
+                            <TextBlock Text="Execution policy" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                            <ComboBox x:Name="PolicyProfileComboBox" Margin="0,6,0,0" SelectedValuePath="Tag" SelectionChanged="PolicyProfileComboBox_SelectionChanged">
                                 <ComboBoxItem Content="Restricted (legacy-safe compatibility)" Tag="restricted"/>
                                 <ComboBoxItem Content="Workspace auto" Tag="workspace-auto"/>
                                 <ComboBoxItem Content="Custom (advanced local policy)" Tag="custom"/>
                                 <ComboBoxItem Content="Legacy command compatible (migrated only)" Tag="legacy-command-compatible" IsEnabled="False"/>
                             </ComboBox>
-                            <TextBlock Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
-                                       Text="Policy is owned by local settings. Workspace auto never enables shell or open-world network tools; legacy command mode appears only for migrated configurations."/>
+                            <TextBlock x:Name="PolicyExplanationText" Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
+                                       Text="Policy is owned by local settings."/>
                             <CheckBox x:Name="EnableCommandsCheckBox" Visibility="Collapsed"/>
-                        </StackPanel>
+                            </StackPanel>
+                        </Border>
 
-                        <Expander x:Name="AdvancedExpander" Header="Advanced options" Margin="0,16,0,0">
+                        <Expander x:Name="AdvancedExpander" Header="Advanced execution, Git &amp; telemetry" Margin="0,16,0,0">
                             <StackPanel Margin="0,12,0,0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -550,12 +611,75 @@
                             </StackPanel>
                         </Expander>
 
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Appearance"/>
+                                <TextBlock Margin="0,6,0,0" Text="Follows system appearance and high-contrast settings."/>
+                                <TextBlock Margin="0,4,0,0" Style="{StaticResource FileMcpCaptionText}"
+                                           Text="Manual theme override is not exposed because the current desktop shell follows system resources."/>
+                            </StackPanel>
+                        </Border>
+
                         <Button x:Name="SaveSettingsButton" Content="Save settings" HorizontalAlignment="Right" Margin="0,16,0,0" Click="SaveSettings_Click"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="Logs">
+            <TabItem Header="Activity" x:Name="ActivityTab">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="220"/>
+                        </Grid.ColumnDefinitions>
+                        <controls:PageHeader Title="Activity"
+                                             Description="Structured runtime, workspace and error events. Raw logs remain under Diagnostics."/>
+                        <ComboBox x:Name="ActivityFilterCombo" Grid.Column="1" SelectedIndex="0"
+                                  SelectionChanged="ActivityFilterCombo_SelectionChanged">
+                            <ComboBoxItem Content="All activity" Tag="all"/>
+                            <ComboBoxItem Content="Errors only" Tag="error"/>
+                            <ComboBoxItem Content="Workspace/runtime" Tag="runtime"/>
+                            <ComboBoxItem Content="Settings/connection" Tag="settings"/>
+                        </ComboBox>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3*"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+                        <DataGrid x:Name="ActivityGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True"
+                                  SelectionMode="Single"
+                                  SelectionChanged="ActivityGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="90"/>
+                                <DataGridTextColumn Header="Type" Binding="{Binding Kind}" Width="110"/>
+                                <DataGridTextColumn Header="Workspace" Binding="{Binding Workspace}" Width="90"/>
+                                <DataGridTextColumn Header="Summary" Binding="{Binding Summary}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Border Grid.Column="1" Margin="12,0,0,0" Style="{StaticResource FileMcpCardBorder}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Event detail"/>
+                                <TextBlock x:Name="ActivityDetailText" Margin="0,8,0,0" Text="Select an activity event." TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock x:Name="ActivityCountText" Grid.Row="2" Margin="0,8,0,0"
+                               Style="{StaticResource FileMcpCaptionText}" Text="0 events"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Diagnostics">
                 <Grid Margin="10">
                     <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"

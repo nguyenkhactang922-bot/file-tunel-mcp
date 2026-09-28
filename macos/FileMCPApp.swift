@@ -188,12 +188,23 @@ private final class RuntimeStorage {
     }
 }
 
-private final class MainViewController: NSViewController, NSTabViewDelegate {
+private struct ActivityEvent {
+    let timestamp: Date
+    let kind: String
+    let workspace: String
+    let summary: String
+    let detail: String
+}
+
+private final class MainViewController: NSViewController, NSTabViewDelegate, NSTableViewDataSource, NSTableViewDelegate {
     private let storage = RuntimeStorage()
     private let runtime = LocalMCPRuntime()
     private var logBuffer = ""
     private var logFlushScheduled = false
     private let maxLogCharacters = 500_000
+    private var activityEvents: [ActivityEvent] = []
+    private var filteredActivityEvents: [ActivityEvent] = []
+    private let maxActivityEvents = 500
 
     private let tunnelIDField = NSTextField()
     private let apiKeyField = NSSecureTextField()
@@ -206,7 +217,11 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let execEnvironmentAllowListField = NSTextField()
     private let enableCommandsCheckbox = NSButton(checkboxWithTitle: "Allow shell commands", target: nil, action: nil)
     private let policyProfilePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let policyExplanationLabel = NSTextField(wrappingLabelWithString: "Policy is owned by local settings.")
     private let logView = NSTextView()
+    private let activityTableView = NSTableView()
+    private let activityDetailLabel = NSTextField(wrappingLabelWithString: "Select an activity event.")
+    private let activityFilterPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let saveConnectionButton = LoadingButton(title: "Save connection", target: nil, action: nil)
     private let saveSettingsButton = LoadingButton(title: "Save settings", target: nil, action: nil)
     private let startButton = NSButton(title: "Connect", target: nil, action: nil)
@@ -215,10 +230,16 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let advancedToggleButton = NSButton(title: "Advanced options", target: nil, action: nil)
     private let advancedSettingsGroup = NSStackView()
     private let apiKeyStatusLabel = NSTextField(labelWithString: "")
+    private let connectionStatusLabel = NSTextField(labelWithString: "Runtime stopped")
+    private let connectionDiagnosticsLabel = NSTextField(wrappingLabelWithString: "No runtime is connected.")
     private let shellStatusLabel = NSTextField(labelWithString: "Runtime stopped")
     private let homeStatusLabel = NSTextField(labelWithString: "Runtime stopped")
     private let homeWorkspaceLabel = NSTextField(labelWithString: "No workspace selected")
     private let homeRecentEventLabel = NSTextField(labelWithString: "No recent issue")
+    private let workspaceRootLabel = NSTextField(labelWithString: "Not configured")
+    private let workspaceStatusLabel = NSTextField(labelWithString: "Stopped")
+    private let workspacePolicyLabel = NSTextField(labelWithString: "Default")
+    private let workspaceConnectionLabel = NSTextField(labelWithString: "Disconnected")
     private var lastImportantEvent = "No recent issue"
     private let tabs = NSTabView()
 
@@ -274,6 +295,36 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         logView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         logView.textContainer?.widthTracksTextView = false
         logScroll.documentView = logView
+
+        activityTableView.delegate = self
+        activityTableView.dataSource = self
+        activityTableView.headerView = NSTableHeaderView()
+        activityTableView.usesAlternatingRowBackgroundColors = true
+        activityTableView.allowsMultipleSelection = false
+
+        let timeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("activity-time"))
+        timeColumn.title = "Time"
+        timeColumn.width = 72
+        activityTableView.addTableColumn(timeColumn)
+
+        let typeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("activity-type"))
+        typeColumn.title = "Type"
+        typeColumn.width = 90
+        activityTableView.addTableColumn(typeColumn)
+
+        let workspaceColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("activity-workspace"))
+        workspaceColumn.title = "Workspace"
+        workspaceColumn.width = 84
+        activityTableView.addTableColumn(workspaceColumn)
+
+        let summaryColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("activity-summary"))
+        summaryColumn.title = "Summary"
+        summaryColumn.width = 260
+        activityTableView.addTableColumn(summaryColumn)
+
+        activityFilterPopup.addItems(withTitles: ["All activity", "Errors only", "Workspace/runtime", "Settings/connection"])
+        activityFilterPopup.target = self
+        activityFilterPopup.action = #selector(activityFilterChanged)
 
         startButton.target = self
         startButton.action = #selector(startTunnel)
@@ -381,7 +432,26 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         connectionSpacer.setContentHuggingPriority(.defaultLow, for: .vertical)
         connectionSpacer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
+        connectionStatusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        connectionDiagnosticsLabel.textColor = .secondaryLabelColor
+        connectionDiagnosticsLabel.maximumNumberOfLines = 3
+
+        let connectionHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Connections",
+            description: "Runtime credentials, Secure MCP Tunnel configuration and connectivity health."
+        )
+
+        let connectionSummary = NSStackView(views: [
+            connectionStatusLabel,
+            connectionDiagnosticsLabel,
+        ])
+        connectionSummary.orientation = .vertical
+        connectionSummary.alignment = .leading
+        connectionSummary.spacing = 4
+
         let connectionRoot = NSStackView(views: [
+            connectionHeader,
+            connectionSummary,
             connectionForm,
             primaryActions,
             divider,
@@ -425,6 +495,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             ("Custom (advanced local policy)", FileMCPPolicyProfiles.custom, true),
             ("Legacy command compatible (migrated only)", FileMCPPolicyProfiles.legacyCommandCompatible, false),
         ]
+        policyProfilePopup.target = self
+        policyProfilePopup.action = #selector(policyProfileChanged)
         for (title, value, enabled) in policyOptions {
             policyProfilePopup.addItem(withTitle: title)
             if let item = policyProfilePopup.lastItem {
@@ -432,11 +504,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
                 item.isEnabled = enabled
             }
         }
-        let policyWarning = NSTextField(wrappingLabelWithString: "Policy is owned by local settings. Workspace auto never enables shell or open-world network tools; legacy command mode is retained only for migrated configurations.")
-        policyWarning.font = .systemFont(ofSize: 10)
-        policyWarning.textColor = .secondaryLabelColor
-        policyWarning.maximumNumberOfLines = 0
-        policyWarning.preferredMaxLayoutWidth = Layout.contentWidth
+        policyExplanationLabel.font = .systemFont(ofSize: 10)
+        policyExplanationLabel.textColor = .secondaryLabelColor
+        policyExplanationLabel.maximumNumberOfLines = 0
+        policyExplanationLabel.preferredMaxLayoutWidth = Layout.contentWidth
 
         let policyRow = fieldRow("Policy", policyProfilePopup)
         let profileRow = fieldRow("Profile", profileField)
@@ -457,17 +528,36 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         advancedSettingsGroup.isHidden = true
         advancedSettingsGroup.translatesAutoresizingMaskIntoConstraints = false
 
+        let workspaceSection = NSTextField(labelWithString: "Workspace & access")
+        workspaceSection.font = .systemFont(ofSize: 13, weight: .semibold)
+        let policySection = NSTextField(labelWithString: "Policy")
+        policySection.font = .systemFont(ofSize: 13, weight: .semibold)
+        let appearanceSection = NSTextField(labelWithString: "Appearance")
+        appearanceSection.font = .systemFont(ofSize: 13, weight: .semibold)
+        let appearanceExplanation = NSTextField(wrappingLabelWithString: "Follows macOS system appearance and accessibility contrast settings. Manual theme override is not exposed.")
+        appearanceExplanation.font = .systemFont(ofSize: 10)
+        appearanceExplanation.textColor = .secondaryLabelColor
+
+        let settingsHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Settings",
+            description: "Workspace access, policy, execution, Git, telemetry and appearance."
+        )
         let settingsForm = NSStackView(views: [
+            settingsHeader,
+            workspaceSection,
             directoryRow,
+            policySection,
             policyRow,
-            policyWarning,
+            policyExplanationLabel,
             advancedToggleButton,
             advancedSettingsGroup,
+            appearanceSection,
+            appearanceExplanation,
         ])
         settingsForm.orientation = .vertical
         settingsForm.alignment = .leading
         settingsForm.spacing = 8
-        settingsForm.setCustomSpacing(14, after: policyWarning)
+        settingsForm.setCustomSpacing(14, after: policyExplanationLabel)
         settingsForm.setCustomSpacing(10, after: advancedToggleButton)
         settingsForm.translatesAutoresizingMaskIntoConstraints = false
 
@@ -489,6 +579,33 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         logScroll.translatesAutoresizingMaskIntoConstraints = false
         logScroll.setContentHuggingPriority(.defaultLow, for: .vertical)
         logScroll.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        let activityScroll = NSScrollView()
+        activityScroll.documentView = activityTableView
+        activityScroll.hasVerticalScroller = true
+        activityScroll.borderType = .bezelBorder
+        activityScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let activityHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Activity",
+            description: "Structured runtime, workspace and error events. Raw logs remain under Diagnostics."
+        )
+        let activityRoot = NSStackView(views: [activityHeader, activityFilterPopup, activityScroll, activityDetailLabel])
+        activityRoot.orientation = .vertical
+        activityRoot.alignment = .leading
+        activityRoot.spacing = 8
+        activityRoot.translatesAutoresizingMaskIntoConstraints = false
+        activityDetailLabel.maximumNumberOfLines = 6
+
+        let activityPage = NSView()
+        activityPage.addSubview(activityRoot)
+        NSLayoutConstraint.activate([
+            activityRoot.leadingAnchor.constraint(equalTo: activityPage.leadingAnchor, constant: 12),
+            activityRoot.trailingAnchor.constraint(equalTo: activityPage.trailingAnchor, constant: -12),
+            activityRoot.topAnchor.constraint(equalTo: activityPage.topAnchor, constant: 12),
+            activityRoot.bottomAnchor.constraint(equalTo: activityPage.bottomAnchor, constant: -12),
+            activityScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
+        ])
+
         let logPage = NSView()
         logPage.addSubview(logScroll)
         NSLayoutConstraint.activate([
@@ -537,6 +654,39 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             homeContent.topAnchor.constraint(equalTo: homePage.topAnchor, constant: 12),
         ])
 
+        workspaceRootLabel.maximumNumberOfLines = 2
+        workspaceRootLabel.lineBreakMode = .byTruncatingMiddle
+        workspaceStatusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        workspacePolicyLabel.textColor = .secondaryLabelColor
+        workspaceConnectionLabel.textColor = .secondaryLabelColor
+
+        let workspaceContent = NSStackView(views: [
+            FileMCPFeedbackComponents.pageHeader(
+                title: "Workspaces",
+                description: "Configured root, health and policy context."
+            ),
+            NSTextField(labelWithString: "Root"),
+            workspaceRootLabel,
+            NSTextField(labelWithString: "Status"),
+            workspaceStatusLabel,
+            NSTextField(labelWithString: "Policy profile"),
+            workspacePolicyLabel,
+            NSTextField(labelWithString: "Connection"),
+            workspaceConnectionLabel,
+        ])
+        workspaceContent.orientation = .vertical
+        workspaceContent.alignment = .leading
+        workspaceContent.spacing = 8
+        workspaceContent.translatesAutoresizingMaskIntoConstraints = false
+
+        let workspacesPage = NSView()
+        workspacesPage.addSubview(workspaceContent)
+        NSLayoutConstraint.activate([
+            workspaceContent.leadingAnchor.constraint(equalTo: workspacesPage.leadingAnchor, constant: 12),
+            workspaceContent.trailingAnchor.constraint(lessThanOrEqualTo: workspacesPage.trailingAnchor, constant: -12),
+            workspaceContent.topAnchor.constraint(equalTo: workspacesPage.topAnchor, constant: 12),
+        ])
+
         tabs.tabViewType = .noTabsNoBorder
         tabs.translatesAutoresizingMaskIntoConstraints = false
         tabs.delegate = self
@@ -544,6 +694,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         let homeTab = NSTabViewItem(identifier: "home")
         homeTab.label = "Home"
         homeTab.view = homePage
+
+        let workspacesTab = NSTabViewItem(identifier: "workspaces")
+        workspacesTab.label = "Workspaces"
+        workspacesTab.view = workspacesPage
 
         let configTab = NSTabViewItem(identifier: "config")
         configTab.label = "Connection"
@@ -553,13 +707,19 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         settingsTab.label = "Settings"
         settingsTab.view = settingsPage
 
+        let activityTab = NSTabViewItem(identifier: "activity")
+        activityTab.label = "Activity"
+        activityTab.view = activityPage
+
         let logTab = NSTabViewItem(identifier: "log")
-        logTab.label = "Logs"
+        logTab.label = "Diagnostics"
         logTab.view = logPage
 
         tabs.addTabViewItem(homeTab)
+        tabs.addTabViewItem(workspacesTab)
         tabs.addTabViewItem(configTab)
         tabs.addTabViewItem(settingsTab)
+        tabs.addTabViewItem(activityTab)
         tabs.addTabViewItem(logTab)
         tabs.selectTabViewItem(withIdentifier: "home")
 
@@ -589,8 +749,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             brandSubtitle,
             NSBox(),
             navigationButton("Home", action: #selector(showHome)),
+            navigationButton("Workspaces", action: #selector(showWorkspaces)),
             navigationButton("Connections", action: #selector(showConnections)),
             navigationButton("Settings", action: #selector(showSettings)),
+            navigationButton("Activity", action: #selector(showActivity)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
             NSView(),
             shellStatusLabel,
@@ -679,6 +841,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         tunnelIDField.stringValue = defaults.string(forKey: ConfigKey.tunnelID) ?? ""
         apiKeyField.stringValue = ""
         updateAPIKeyPlaceholder()
+        updatePolicyExplanation()
         profileField.stringValue = defaults.string(forKey: ConfigKey.profile) ?? "filemcp"
         portField.stringValue = defaults.string(forKey: ConfigKey.port) ?? "8008"
         directoryField.stringValue = defaults.string(forKey: ConfigKey.allowedDirectory) ?? defaultDirectory()
@@ -700,9 +863,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
 
     private func updateAPIKeyPlaceholder() {
         let hasSavedKey = storage.hasSavedAPIKey
-        apiKeyField.placeholderString = hasSavedKey ? "Saved — leave blank to keep it" : "sk-..."
+        apiKeyField.placeholderString = hasSavedKey ? "Saved - leave blank to keep it" : "sk-..."
         apiKeyStatusLabel.stringValue = hasSavedKey ? "API key is saved in Keychain" : "No API key is saved"
         deleteKeyButton.isEnabled = hasSavedKey
+        refreshConnectionDiagnostics()
     }
 
     private func defaultDirectory() -> String {
@@ -755,12 +919,135 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         tabs.selectTabViewItem(withIdentifier: "home")
     }
 
+    @objc private func showWorkspaces() {
+        refreshWorkspaceSummary()
+        tabs.selectTabViewItem(withIdentifier: "workspaces")
+    }
+
     @objc private func showConnections() {
         tabs.selectTabViewItem(withIdentifier: "config")
     }
 
+    @objc private func policyProfileChanged() {
+        updatePolicyExplanation()
+    }
+
+    private func updatePolicyExplanation() {
+        let profile = policyProfilePopup.selectedItem?.representedObject as? String ?? FileMCPPolicyProfiles.restricted
+        switch profile {
+        case FileMCPPolicyProfiles.restricted:
+            policyExplanationLabel.stringValue = "Restricted keeps the legacy-safe surface and does not grant shell or open-world network authority."
+        case FileMCPPolicyProfiles.workspaceAuto:
+            policyExplanationLabel.stringValue = "Workspace auto enables the safe workspace-oriented capability set while keeping shell and open-world network tools disabled."
+        case FileMCPPolicyProfiles.custom:
+            policyExplanationLabel.stringValue = "Custom uses explicit local policy configuration; server-owned policy remains authoritative."
+        case FileMCPPolicyProfiles.legacyCommandCompatible:
+            policyExplanationLabel.stringValue = "Legacy command compatible is retained only for migrated configurations and cannot be selected for new policy changes."
+        default:
+            policyExplanationLabel.stringValue = "Policy is owned by local settings and enforced by the server."
+        }
+    }
+
     @objc private func showSettings() {
         tabs.selectTabViewItem(withIdentifier: "settings")
+    }
+
+    @objc private func showActivity() {
+        refreshActivityFilter()
+        tabs.selectTabViewItem(withIdentifier: "activity")
+    }
+
+    @objc private func activityFilterChanged() {
+        refreshActivityFilter()
+    }
+
+    private func refreshActivityFilter() {
+        let selected = activityFilterPopup.indexOfSelectedItem
+        filteredActivityEvents = activityEvents.filter { event in
+            switch selected {
+            case 1: return event.kind == "Error"
+            case 2: return event.kind == "Runtime"
+            case 3: return event.kind == "Settings"
+            default: return true
+            }
+        }.reversed()
+        activityTableView.reloadData()
+        if activityTableView.selectedRow >= filteredActivityEvents.count {
+            activityTableView.deselectAll(nil)
+            activityDetailLabel.stringValue = "Select an activity event."
+        }
+    }
+
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        tableView == activityTableView ? filteredActivityEvents.count : 0
+    }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard tableView == activityTableView,
+              row >= 0,
+              row < filteredActivityEvents.count,
+              let tableColumn else { return nil }
+
+        let event = filteredActivityEvents[row]
+        let text: String
+        switch tableColumn.identifier.rawValue {
+        case "activity-time":
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm:ss"
+            text = formatter.string(from: event.timestamp)
+        case "activity-type": text = event.kind
+        case "activity-workspace": text = event.workspace
+        default: text = event.summary
+        }
+
+        let label = NSTextField(labelWithString: text)
+        label.lineBreakMode = .byTruncatingTail
+        return label
+    }
+
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        guard notification.object as? NSTableView === activityTableView else { return }
+        let row = activityTableView.selectedRow
+        guard row >= 0, row < filteredActivityEvents.count else {
+            activityDetailLabel.stringValue = "Select an activity event."
+            return
+        }
+        let event = filteredActivityEvents[row]
+        activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)\n\(event.detail)"
+    }
+
+    private func recordActivity(_ text: String) {
+        for rawLine in text.split(whereSeparator: { $0.isNewline }) {
+            let line = String(rawLine).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { continue }
+
+            var workspace = "Global"
+            if line.hasPrefix("["), let close = line.firstIndex(of: "]") {
+                workspace = String(line[line.index(after: line.startIndex)..<close])
+            }
+
+            let lower = line.lowercased()
+            let kind: String
+            if lower.contains("error") || lower.contains("failed") || lower.contains("could not") {
+                kind = "Error"
+            } else if lower.contains("settings") || lower.contains("connection") {
+                kind = "Settings"
+            } else if lower.contains("runtime") || lower.contains("tunnel") || workspace != "Global" {
+                kind = "Runtime"
+            } else {
+                kind = "System"
+            }
+
+            let summary = line.count <= 140 ? line : String(line.prefix(137)) + "..."
+            activityEvents.append(ActivityEvent(timestamp: Date(), kind: kind, workspace: workspace, summary: summary, detail: line))
+        }
+
+        if activityEvents.count > maxActivityEvents {
+            activityEvents.removeFirst(activityEvents.count - maxActivityEvents)
+        }
+        if tabs.selectedTabViewItem?.identifier as? String == "activity" {
+            refreshActivityFilter()
+        }
     }
 
     @objc private func showDiagnostics() {
@@ -938,6 +1225,60 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         }
     }
 
+    private func refreshConnectionDiagnostics() {
+        let hasKey = storage.hasSavedAPIKey
+        let tunnel = tunnelIDField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch runtime.state {
+        case .stopped:
+            connectionStatusLabel.stringValue = "Runtime stopped"
+        case .failed:
+            connectionStatusLabel.stringValue = "Runtime failed"
+        case .starting:
+            connectionStatusLabel.stringValue = "Connecting"
+        case .running:
+            connectionStatusLabel.stringValue = "Connected"
+        case .restarting:
+            connectionStatusLabel.stringValue = "Reconnecting"
+        case .cooldown:
+            connectionStatusLabel.stringValue = "Reconnect cooldown"
+        case .stopping:
+            connectionStatusLabel.stringValue = "Disconnecting"
+        }
+        connectionDiagnosticsLabel.stringValue =
+            "\(tunnel.isEmpty ? "No tunnel ID configured" : "Tunnel ID configured"); " +
+            (hasKey ? "credential stored securely in Keychain." : "credential missing.")
+    }
+
+    private func refreshWorkspaceSummary() {
+        let root = directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        workspaceRootLabel.stringValue = root.isEmpty ? "Not configured" : root
+        workspacePolicyLabel.stringValue = policyProfilePopup.titleOfSelectedItem ?? "Default"
+
+        switch runtime.state {
+        case .stopped:
+            workspaceStatusLabel.stringValue = "Stopped"
+            workspaceConnectionLabel.stringValue = "Disconnected"
+        case .failed:
+            workspaceStatusLabel.stringValue = "Failed"
+            workspaceConnectionLabel.stringValue = "Attention required"
+        case .starting:
+            workspaceStatusLabel.stringValue = "Starting"
+            workspaceConnectionLabel.stringValue = "Connecting"
+        case .running:
+            workspaceStatusLabel.stringValue = "Healthy"
+            workspaceConnectionLabel.stringValue = "Connected"
+        case .restarting:
+            workspaceStatusLabel.stringValue = "Reconnecting"
+            workspaceConnectionLabel.stringValue = "Connected"
+        case .cooldown:
+            workspaceStatusLabel.stringValue = "Cooldown"
+            workspaceConnectionLabel.stringValue = "Waiting to reconnect"
+        case .stopping:
+            workspaceStatusLabel.stringValue = "Stopping"
+            workspaceConnectionLabel.stringValue = "Disconnecting"
+        }
+    }
+
     private func refreshHomeSummary(state: LocalMCPRuntimeState) {
         homeWorkspaceLabel.stringValue = directoryField.stringValue.isEmpty ? "No workspace selected" : directoryField.stringValue
         homeRecentEventLabel.stringValue = lastImportantEvent
@@ -954,6 +1295,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
 
     private func updateRunButton(state: LocalMCPRuntimeState) {
         refreshHomeSummary(state: state)
+        refreshWorkspaceSummary()
+        refreshConnectionDiagnostics()
         switch state {
         case .stopped:
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
@@ -962,7 +1305,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Runtime failed"
         case .starting:
-            startButton.title = "Connecting…"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
+            startButton.title = "ConnectingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime starting"
         case .running:
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
@@ -974,13 +1317,14 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
             shellStatusLabel.stringValue = "Reconnect cooldown"
         case .stopping:
-            startButton.title = "Disconnecting…"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
+            startButton.title = "DisconnectingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime stopping"
         }
         startButton.contentTintColor = .white
     }
 
     private func appendLog(_ text: String) {
+        recordActivity(text)
         logBuffer += text
         if logBuffer.count > maxLogCharacters {
             let overflow = logBuffer.count - maxLogCharacters
@@ -1053,7 +1397,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let aboutItem = NSMenuItem(title: "About FileMCP", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         aboutItem.target = NSApp
         appMenu.addItem(aboutItem)
-        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettingsWindow), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "SettingsÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦", action: #selector(showSettingsWindow), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
         appMenu.addItem(.separator())

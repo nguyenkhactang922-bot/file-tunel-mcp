@@ -32,6 +32,8 @@ public partial class MainWindow : Window
     private int _overviewPeriodQueryGeneration;
     private bool _overviewPeriodQueryRunning;
     private string _logBuffer = "";
+    private readonly List<ActivityRow> _activityRows = new();
+    private const int MaxActivityRows = 500;
     private string _lastImportantEvent = "No recent issue";
     private const int MaxLogCharacters = 500_000;
 
@@ -593,8 +595,31 @@ public partial class MainWindow : Window
         if (PolicyProfileComboBox.SelectedValue is null) PolicyProfileComboBox.SelectedValue = FileMcpPolicyProfiles.Restricted;
         EnableCommandsCheckBox.IsChecked = settings.PolicyProfile == FileMcpPolicyProfiles.LegacyCommandCompatible;
         ExecEnvironmentAllowListBox.Text = string.Join(", ", settings.ExecEnvironmentAllowList);
+        UpdatePolicyExplanation();
         OtlpEnabledCheckBox.IsChecked = settings.OtlpEnabled;
         OtlpEndpointBox.Text = string.IsNullOrWhiteSpace(settings.OtlpEndpoint) ? OtlpTelemetrySettings.DefaultEndpoint : settings.OtlpEndpoint;
+    }
+
+    private void PolicyProfileComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdatePolicyExplanation();
+    }
+
+    private void UpdatePolicyExplanation()
+    {
+        var profile = PolicyProfileComboBox.SelectedValue?.ToString() ?? FileMcpPolicyProfiles.Restricted;
+        PolicyExplanationText.Text = profile switch
+        {
+            FileMcpPolicyProfiles.Restricted =>
+                "Restricted keeps the legacy-safe surface. It does not grant shell or open-world network authority.",
+            FileMcpPolicyProfiles.WorkspaceAuto =>
+                "Workspace auto enables the safe workspace-oriented capability set while keeping shell and open-world network tools disabled.",
+            FileMcpPolicyProfiles.Custom =>
+                "Custom uses the explicit local policy configuration. Advanced authority remains constrained by the server-owned policy model.",
+            FileMcpPolicyProfiles.LegacyCommandCompatible =>
+                "Legacy command compatible is retained only for migrated configurations and cannot be selected for new policy changes.",
+            _ => "Policy is owned by local settings and enforced by the server.",
+        };
     }
 
     private void UpdateApiKeyStatus()
@@ -602,6 +627,32 @@ public partial class MainWindow : Window
         var saved = _credentialStore.HasSavedApiKey;
         ApiKeyStatusText.Text = saved ? "API key is saved in Windows Credential Manager" : "No API key is saved";
         DeleteApiKeyButton.IsEnabled = saved;
+        ConnectionCredentialBadge.Status = saved ? PresentationStatus.Passed : PresentationStatus.Warning;
+        UpdateConnectionExperience();
+    }
+
+    private void UpdateConnectionExperience()
+    {
+        if (!IsLoaded && ConnectionsHeader is null)
+            return;
+
+        var enabled = WorkspaceKeys.Where(key => EnabledBox(key).IsChecked == true).ToArray();
+        var running = _runtimes.Values.Count(runtime => runtime.State.Status == LocalMcpRuntimeStatus.Running);
+        var failed = _runtimes.Values.Count(runtime => runtime.State.Status == LocalMcpRuntimeStatus.Failed);
+
+        ConnectionsHeader.Status = failed > 0
+            ? PresentationStatus.Failed
+            : running > 0 && running == enabled.Length
+                ? PresentationStatus.Connected
+                : running > 0
+                    ? PresentationStatus.Degraded
+                    : PresentationStatus.Stopped;
+
+        var configuredTunnels = enabled.Count(key => !string.IsNullOrWhiteSpace(TunnelBox(key).Text));
+        ConnectionDiagnosticsText.Text =
+            $"{running} connected / {enabled.Length} enabled workspace(s); " +
+            $"{configuredTunnels} tunnel ID(s) configured; " +
+            (_credentialStore.HasSavedApiKey ? "credential stored securely." : "credential missing.");
     }
 
     private async void Connect_Click(object sender, RoutedEventArgs e)
@@ -973,6 +1024,8 @@ public partial class MainWindow : Window
 
         UpdateConnectButton();
         UpdateShellContext();
+        UpdateConnectionExperience();
+        if (MainTabs.SelectedItem == WorkspacesTab) RefreshWorkspaceRows();
     }
 
     private void UpdateShellContext()
@@ -991,8 +1044,18 @@ public partial class MainWindow : Window
     }
 
     private void NavigateHome_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = OverviewTab;
+    private void NavigateWorkspaces_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = WorkspacesTab;
+        RefreshWorkspaceRows();
+    }
     private void NavigateConnections_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = ConnectionTab;
     private void NavigateSettings_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = SettingsTab;
+    private void NavigateActivity_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = ActivityTab;
+        RefreshActivityGrid();
+    }
     private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
 
     private void CompactNavigation_Click(object sender, RoutedEventArgs e)
@@ -1003,8 +1066,10 @@ public partial class MainWindow : Window
         CompactNavigationButton.Content = _navigationCompact ? "Expand" : "Collapse";
 
         SetNavigationButtonPresentation(NavHomeButton, "Home", "H");
+        SetNavigationButtonPresentation(NavWorkspacesButton, "Workspaces", "W");
         SetNavigationButtonPresentation(NavConnectionsButton, "Connections", "C");
         SetNavigationButtonPresentation(NavSettingsButton, "Settings", "S");
+        SetNavigationButtonPresentation(NavActivityButton, "Activity", "A");
         SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
 
         ShellWorkspaceText.Visibility = _navigationCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -1015,6 +1080,51 @@ public partial class MainWindow : Window
         button.Content = _navigationCompact ? compactLabel : fullLabel;
         button.HorizontalContentAlignment = _navigationCompact ? System.Windows.HorizontalAlignment.Center : System.Windows.HorizontalAlignment.Left;
         button.ToolTip = _navigationCompact ? fullLabel : null;
+    }
+
+    private void RefreshWorkspaceRows()
+    {
+        foreach (var key in WorkspaceKeys)
+        {
+            var button = key switch
+            {
+                "C" => WorkspaceCRow,
+                "D" => WorkspaceDRow,
+                "E" => WorkspaceERow,
+                "F" => WorkspaceFRow,
+                _ => throw new ArgumentOutOfRangeException(nameof(key)),
+            };
+            var enabled = EnabledBox(key).IsChecked == true;
+            var state = _runtimes[key].State.Status;
+            var stateText = enabled ? state.ToString() : "Disabled";
+            var root = PathBox(key).Text.Trim();
+            button.Content = $"Drive {key}  |  {stateText}" + (root.Length == 0 ? string.Empty : $"  |  {root}");
+        }
+    }
+
+    private void WorkspaceRow_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button button || button.Tag is not string key)
+            return;
+
+        var enabled = EnabledBox(key).IsChecked == true;
+        var state = _runtimes[key].State.Status;
+        WorkspaceDetailTitle.Text = $"Drive {key}";
+        WorkspaceDetailRoot.Text = string.IsNullOrWhiteSpace(PathBox(key).Text) ? "Not configured" : PathBox(key).Text.Trim();
+        WorkspaceDetailPolicy.Text = string.IsNullOrWhiteSpace(ProfileBoxFor(key).Text) ? "Default" : ProfileBoxFor(key).Text.Trim();
+        WorkspaceDetailConnection.Text = enabled
+            ? $"{state} | {TunnelBox(key).Text.Trim()}"
+            : "Disabled";
+        WorkspaceDetailActivity.Text = OverviewStatusText(key).Text;
+        WorkspaceDetailStatus.Status = !enabled
+            ? PresentationStatus.Unavailable
+            : state switch
+            {
+                LocalMcpRuntimeStatus.Running => PresentationStatus.Healthy,
+                LocalMcpRuntimeStatus.Failed => PresentationStatus.Failed,
+                LocalMcpRuntimeStatus.Starting or LocalMcpRuntimeStatus.Restarting => PresentationStatus.Starting,
+                _ => PresentationStatus.Stopped,
+            };
     }
 
     private void UpdateWorkspaceStatus(string key, LocalMcpRuntimeState state)
@@ -1150,8 +1260,79 @@ public partial class MainWindow : Window
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
 
+    private sealed record ActivityRow(
+        DateTimeOffset Timestamp,
+        string Kind,
+        string Workspace,
+        string Summary,
+        string Detail)
+    {
+        public string Time => Timestamp.ToLocalTime().ToString("HH:mm:ss");
+    }
+
+    private void RecordActivity(string text)
+    {
+        foreach (var rawLine in text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0) continue;
+
+            var workspace = "Global";
+            if (line.StartsWith("[") && line.IndexOf(']') is var close && close > 1)
+                workspace = line[1..close];
+
+            var lower = line.ToLowerInvariant();
+            var kind = lower.Contains("error") || lower.Contains("failed") || lower.Contains("could not")
+                ? "Error"
+                : lower.Contains("settings") || lower.Contains("connection")
+                    ? "Settings"
+                    : lower.Contains("runtime") || lower.Contains("tunnel") || workspace != "Global"
+                        ? "Runtime"
+                        : "System";
+
+            var summary = line.Length <= 140 ? line : line[..137] + "...";
+            _activityRows.Add(new ActivityRow(DateTimeOffset.Now, kind, workspace, summary, line));
+        }
+
+        if (_activityRows.Count > MaxActivityRows)
+            _activityRows.RemoveRange(0, _activityRows.Count - MaxActivityRows);
+
+        if (IsLoaded && MainTabs.SelectedItem == ActivityTab)
+            RefreshActivityGrid();
+    }
+
+    private void RefreshActivityGrid()
+    {
+        var filter = (ActivityFilterCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
+        IEnumerable<ActivityRow> rows = _activityRows;
+        rows = filter switch
+        {
+            "error" => rows.Where(row => row.Kind == "Error"),
+            "runtime" => rows.Where(row => row.Kind == "Runtime"),
+            "settings" => rows.Where(row => row.Kind == "Settings"),
+            _ => rows,
+        };
+
+        var visible = rows.Reverse().ToArray();
+        ActivityGrid.ItemsSource = visible;
+        ActivityCountText.Text = $"{visible.Length} shown | {_activityRows.Count} retained (max {MaxActivityRows})";
+    }
+
+    private void ActivityFilterCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded) RefreshActivityGrid();
+    }
+
+    private void ActivityGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ActivityDetailText.Text = ActivityGrid.SelectedItem is ActivityRow row
+            ? $"{row.Timestamp.ToLocalTime():yyyy-MM-dd HH:mm:ss}\nType: {row.Kind}\nWorkspace: {row.Workspace}\n\n{row.Detail}"
+            : "Select an activity event.";
+    }
+
     private void AppendLog(string text)
     {
+        RecordActivity(text);
         _logBuffer += text;
         if (_logBuffer.Length > MaxLogCharacters)
             _logBuffer = "[...older log truncated...]\n" + _logBuffer[^MaxLogCharacters..];
