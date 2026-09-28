@@ -187,7 +187,7 @@ final class QuarantineService {
         guard maxItems > 0, maxItems <= 1000 else {
             throw QuarantineServiceError.invalid("max_items must be between 1 and 1000")
         }
-        return try withLock {
+        return withLock {
             let nowMs = epochMs(options.now())
             let items = records
                 .filter { $0.workspaceAuthorityID == workspaceAuthorityID }
