@@ -335,6 +335,6 @@ Authorities:
 - docs/design/FMUX_DECISION_MATRIX_V1.md
 - tasks/MASTER_FILEMCP_FMUX_TASK_GRAPH.md
 
-FMUX-001: ACTIVE / LOCAL VERIFIED / CLEAN-BRANCH NATIVE CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
+FMUX-001: ACTIVE / LOCAL + NATIVE VERIFIED / FINAL-HEAD CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
 Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
 NEXT_EXACT_ACTION: finish exact-head native verification, review/merge FMUX-001, then claim FMUX-002. FMG-026 scope remains unchanged.

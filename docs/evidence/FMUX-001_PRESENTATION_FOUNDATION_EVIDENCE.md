@@ -1,6 +1,6 @@
 # FMUX-001 Presentation Foundation Evidence
 
-Status: LOCAL VERIFIED / CLEAN-BRANCH NATIVE CI PENDING
+Status: LOCAL + NATIVE VERIFIED / FINAL-HEAD CI PENDING
 Date: 2026-09-28
 Branch: chatgpt/FMUX-001-presentation-foundation
 
@@ -50,6 +50,15 @@ The initial FMUX branch was found during review to include unrelated FMG-012/FMG
 A clean branch was rebuilt from fork/main and only FMUX commits were retained.
 The clean branch diff contains FMUX/state/build-wiring files only.
 
+## Native clean-head verification
+
+GitHub Verify run 36396400218 on clean head 13e33043df82811931a5e302481d3bbc23c17b6b:
+- verify-windows: SUCCESS;
+- verify-windows-arm64: SUCCESS;
+- verify-macos: SUCCESS;
+- macOS Build app: SUCCESS.
+
+PR #20 changed-file review: 21 files, FMUX/state/build-wiring scope only. No FMG-012/FMG-013 evidence or task files are included.
 ## Safety / regression review
 
 - no runtime or MCP authority changed;
@@ -61,9 +70,9 @@ The clean branch diff contains FMUX/state/build-wiring files only.
 
 ## Next exact action
 
-Run local state/diff gates on the clean branch.
-Commit/push the clean-branch metadata/evidence refresh.
-Require native Verify on that exact clean head.
+Local state/diff gates on the clean branch are PASS.
+Commit/push this native-evidence refresh.
+Require native Verify on the final exact evidence head.
 Review changed-file scope.
 Merge only exact green clean head.
 Then verify merged main and mark FMUX-001 DONE / MAIN VERIFIED.
