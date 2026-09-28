@@ -105,3 +105,15 @@ The fresh ChatGPT session still exposes exactly 19 FileMCP tools. The four canon
 A process-memory attempt to recover the transient local-auth token for a direct local `tools/list` probe was blocked by the safety layer and was not bypassed. No token was printed or persisted.
 
 Conclusion: desktop deployment, tunnel liveness/readiness, control-plane forwarding, and logical correlation are verified. The only remaining FMG-013 acceptance blocker is ChatGPT connector catalog/schema rediscovery from 19 to the canonical 23 tools, followed by live catalog version/hash proof.
+
+
+## Connector rediscovery diagnosis - 2026-09-28
+
+Additional root-cause checks:
+- active policy profile is `legacy-command-compatible`;
+- source policy implementation allows all tool definitions for that profile, so 19/23 is not caused by policy filtering;
+- tunnel runtime is healthy and continues forwarding live `tools/call` traffic successfully;
+- tunnel metrics and operator logs show no `tools/list` discovery request reaching the new runtime since its current startup;
+- no available ChatGPT/plugin management action in this session exposes a safe connector-schema refresh/rediscovery operation.
+
+Interpretation: the remaining 19/23 mismatch is consistent with stale connector/control-plane discovery state outside the FileMCP runtime. This is still a hard FMG-013 acceptance blocker because the required live 23-tool catalog/hash proof has not occurred.
