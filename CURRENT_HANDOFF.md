@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-012-cross-platform-gate`
+Branch: `chatgpt/FMUX-001-presentation-foundation`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -320,3 +320,21 @@ FMG-012: ACTIVE / LOCAL VERIFIED / FINAL-HEAD NATIVE CI PENDING on `chatgpt/FMG-
 Local evidence: all Phase A contract/adversarial scripts PASS; Windows runtime 750 assertions PASS; Release build 0 warnings/errors; x64 + ARM64 package builds/static integrity PASS. Local GUI smoke is environment-blocked because the live FileMCP singleton is the MCP bridge; claim-head native Verify `36297166252` SUCCESS on macOS + Windows x64 + Windows ARM64.
 
 NEXT_EXACT_ACTION: commit/push exact FMG-012 evidence candidate, require native Verify on the final exact head, perform scoped gate review, merge only green exact head, verify merged main, mark FMG-012 DONE / MAIN VERIFIED, then claim FMG-013.
+
+## FMUX product-experience track
+
+Design gate: PASS / FROZEN on 2026-09-28.
+Authorities:
+- docs/adr/0007-product-ui-ux-architecture-and-fmux-track.md
+- docs/audit/FMUX_INDEPENDENT_MULTI_ROUND_UI_UX_AUDIT_2026-09-28.md
+- docs/audit/FMUX_FINAL_REPAIR_REAUDIT_2026-09-28.md
+- docs/design/FMUX_PRODUCT_EXPERIENCE_ARCHITECTURE_V1.md
+- docs/design/FMUX_DESIGN_SYSTEM_AND_COMPONENT_SPEC_V1.md
+- docs/design/FMUX_INTERACTION_STATE_AND_FMG_MAPPING_V1.md
+- docs/design/FMUX_DEPENDENCY_GRAPH_V1.md
+- docs/design/FMUX_DECISION_MATRIX_V1.md
+- tasks/MASTER_FILEMCP_FMUX_TASK_GRAPH.md
+
+FMUX-001: ACTIVE / LOCAL + NATIVE VERIFIED / FINAL-HEAD CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
+Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
+NEXT_EXACT_ACTION: finish exact-head native verification, review/merge FMUX-001, then claim FMUX-002. FMG-026 scope remains unchanged.
