@@ -85,6 +85,8 @@
                         Margin="0,0,0,4" Click="NavigateSettings_Click" AutomationProperties.Name="Settings"/>
                 <Button x:Name="NavActivityButton" Content="Activity" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateActivity_Click" AutomationProperties.Name="Activity"/>
+                <Button x:Name="NavChangesButton" Content="Changes" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateChanges_Click" AutomationProperties.Name="Changes"/>
                 <Button x:Name="NavDiagnosticsButton" Content="Diagnostics" HorizontalContentAlignment="Left"
                         Margin="0,8,0,4" Click="NavigateDiagnostics_Click" AutomationProperties.Name="Diagnostics"/>
             </StackPanel>
@@ -676,6 +678,59 @@
                     </Grid>
                     <TextBlock x:Name="ActivityCountText" Grid.Row="2" Margin="0,8,0,0"
                                Style="{StaticResource FileMcpCaptionText}" Text="0 events"/>
+                </Grid>
+            </TabItem>
+
+
+
+            <TabItem Header="Changes" x:Name="ChangesTab">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <controls:PageHeader Title="Changes"
+                                         Description="Observed mutation results, version context and stale/conflict states. No synthetic diff is generated."/>
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3*"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+                        <DataGrid x:Name="ChangesGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  EnableRowVirtualization="True"
+                                  EnableColumnVirtualization="True"
+                                  SelectionMode="Single"
+                                  SelectionChanged="ChangesGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="90"/>
+                                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
+                                <DataGridTextColumn Header="Workspace" Binding="{Binding Workspace}" Width="90"/>
+                                <DataGridTextColumn Header="Operation" Binding="{Binding Operation}" Width="120"/>
+                                <DataGridTextColumn Header="Summary" Binding="{Binding Summary}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Border Grid.Column="1" Margin="12,0,0,0" Style="{StaticResource FileMcpCardBorder}">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Change detail"/>
+                                <controls:StatusBadge x:Name="ChangeDetailStatus" Status="Unavailable" HorizontalAlignment="Left" Margin="0,8,0,8"/>
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="File / target"/>
+                                <TextBlock x:Name="ChangeDetailTarget" Text="Not emitted by runtime event" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Version context"/>
+                                <TextBlock x:Name="ChangeDetailVersion" Text="Not emitted by runtime event" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Preview / result"/>
+                                <TextBox x:Name="ChangeDetailText" IsReadOnly="True" TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto" MinHeight="160"
+                                         Text="Select a captured mutation event."/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock x:Name="ChangesCountText" Grid.Row="2" Margin="0,8,0,0"
+                               Style="{StaticResource FileMcpCaptionText}"
+                               Text="0 captured mutation events"/>
                 </Grid>
             </TabItem>
 

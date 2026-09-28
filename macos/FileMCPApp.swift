@@ -196,6 +196,15 @@ private struct ActivityEvent {
     let detail: String
 }
 
+private struct ChangeEvent {
+    let timestamp: Date
+    let status: String
+    let workspace: String
+    let operation: String
+    let summary: String
+    let detail: String
+}
+
 private final class MainViewController: NSViewController, NSTabViewDelegate, NSTableViewDataSource, NSTableViewDelegate {
     private let storage = RuntimeStorage()
     private let runtime = LocalMCPRuntime()
@@ -204,7 +213,9 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private let maxLogCharacters = 500_000
     private var activityEvents: [ActivityEvent] = []
     private var filteredActivityEvents: [ActivityEvent] = []
+    private var changeEvents: [ChangeEvent] = []
     private let maxActivityEvents = 500
+    private let maxChangeEvents = 250
 
     private let tunnelIDField = NSTextField()
     private let apiKeyField = NSSecureTextField()
@@ -222,6 +233,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private let activityTableView = NSTableView()
     private let activityDetailLabel = NSTextField(wrappingLabelWithString: "Select an activity event.")
     private let activityFilterPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let changesTableView = NSTableView()
+    private let changesDetailLabel = NSTextField(wrappingLabelWithString: "Select a captured mutation event.")
     private let saveConnectionButton = LoadingButton(title: "Save connection", target: nil, action: nil)
     private let saveSettingsButton = LoadingButton(title: "Save settings", target: nil, action: nil)
     private let startButton = NSButton(title: "Connect", target: nil, action: nil)
@@ -325,6 +338,24 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         activityFilterPopup.addItems(withTitles: ["All activity", "Errors only", "Workspace/runtime", "Settings/connection"])
         activityFilterPopup.target = self
         activityFilterPopup.action = #selector(activityFilterChanged)
+
+        changesTableView.delegate = self
+        changesTableView.dataSource = self
+        changesTableView.headerView = NSTableHeaderView()
+        changesTableView.usesAlternatingRowBackgroundColors = true
+        changesTableView.allowsMultipleSelection = false
+        for (identifier, title, width) in [
+            ("change-time", "Time", 72.0),
+            ("change-status", "Status", 82.0),
+            ("change-workspace", "Workspace", 84.0),
+            ("change-operation", "Operation", 104.0),
+            ("change-summary", "Summary", 250.0),
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = width
+            changesTableView.addTableColumn(column)
+        }
 
         startButton.target = self
         startButton.action = #selector(startTunnel)
@@ -606,6 +637,33 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             activityScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
         ])
 
+        let changesScroll = NSScrollView()
+        changesScroll.documentView = changesTableView
+        changesScroll.hasVerticalScroller = true
+        changesScroll.borderType = .bezelBorder
+        changesScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let changesHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Changes",
+            description: "Observed mutation results and stale/conflict states. No synthetic diff is generated."
+        )
+        changesDetailLabel.maximumNumberOfLines = 10
+        let changesRoot = NSStackView(views: [changesHeader, changesScroll, changesDetailLabel])
+        changesRoot.orientation = .vertical
+        changesRoot.alignment = .leading
+        changesRoot.spacing = 8
+        changesRoot.translatesAutoresizingMaskIntoConstraints = false
+
+        let changesPage = NSView()
+        changesPage.addSubview(changesRoot)
+        NSLayoutConstraint.activate([
+            changesRoot.leadingAnchor.constraint(equalTo: changesPage.leadingAnchor, constant: 12),
+            changesRoot.trailingAnchor.constraint(equalTo: changesPage.trailingAnchor, constant: -12),
+            changesRoot.topAnchor.constraint(equalTo: changesPage.topAnchor, constant: 12),
+            changesRoot.bottomAnchor.constraint(equalTo: changesPage.bottomAnchor, constant: -12),
+            changesScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
+        ])
+
         let logPage = NSView()
         logPage.addSubview(logScroll)
         NSLayoutConstraint.activate([
@@ -711,6 +769,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         activityTab.label = "Activity"
         activityTab.view = activityPage
 
+        let changesTab = NSTabViewItem(identifier: "changes")
+        changesTab.label = "Changes"
+        changesTab.view = changesPage
+
         let logTab = NSTabViewItem(identifier: "log")
         logTab.label = "Diagnostics"
         logTab.view = logPage
@@ -720,6 +782,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         tabs.addTabViewItem(configTab)
         tabs.addTabViewItem(settingsTab)
         tabs.addTabViewItem(activityTab)
+        tabs.addTabViewItem(changesTab)
         tabs.addTabViewItem(logTab)
         tabs.selectTabViewItem(withIdentifier: "home")
 
@@ -753,6 +816,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             navigationButton("Connections", action: #selector(showConnections)),
             navigationButton("Settings", action: #selector(showSettings)),
             navigationButton("Activity", action: #selector(showActivity)),
+            navigationButton("Changes", action: #selector(showChanges)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
             NSView(),
             shellStatusLabel,
@@ -979,10 +1043,31 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        tableView == activityTableView ? filteredActivityEvents.count : 0
+        if tableView == activityTableView { return filteredActivityEvents.count }
+        if tableView == changesTableView { return changeEvents.count }
+        return 0
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        if tableView == changesTableView {
+            guard row >= 0, row < changeEvents.count, let tableColumn else { return nil }
+            let event = changeEvents[changeEvents.count - 1 - row]
+            let text: String
+            switch tableColumn.identifier.rawValue {
+            case "change-time":
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm:ss"
+                text = formatter.string(from: event.timestamp)
+            case "change-status": text = event.status
+            case "change-workspace": text = event.workspace
+            case "change-operation": text = event.operation
+            default: text = event.summary
+            }
+            let label = NSTextField(labelWithString: text)
+            label.lineBreakMode = .byTruncatingTail
+            return label
+        }
+
         guard tableView == activityTableView,
               row >= 0,
               row < filteredActivityEvents.count,
@@ -1006,7 +1091,18 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
-        guard notification.object as? NSTableView === activityTableView else { return }
+        guard let table = notification.object as? NSTableView else { return }
+        if table === changesTableView {
+            let row = changesTableView.selectedRow
+            guard row >= 0, row < changeEvents.count else {
+                changesDetailLabel.stringValue = "Select a captured mutation event."
+                return
+            }
+            let event = changeEvents[changeEvents.count - 1 - row]
+            changesDetailLabel.stringValue = "\(event.status) | \(event.operation) | \(event.workspace)\nFile/version context: not emitted by runtime event\n\n\(event.detail)"
+            return
+        }
+        guard table === activityTableView else { return }
         let row = activityTableView.selectedRow
         guard row >= 0, row < filteredActivityEvents.count else {
             activityDetailLabel.stringValue = "Select an activity event."
@@ -1014,6 +1110,25 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         }
         let event = filteredActivityEvents[row]
         activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)\n\(event.detail)"
+    }
+
+    private func changeEvent(from line: String, workspace: String) -> ChangeEvent? {
+        let lower = line.lowercased()
+        let operation: String
+        if lower.contains("apply_edits") { operation = "apply_edits" }
+        else if lower.contains("write_file") { operation = "write_file" }
+        else if lower.contains("delete_file") { operation = "delete_file" }
+        else if lower.contains("delete_directory") { operation = "delete_directory" }
+        else { return nil }
+
+        let status: String
+        if lower.contains("changed since") || lower.contains("stale") { status = "Stale" }
+        else if lower.contains("conflict") || lower.contains("overlapping") { status = "Conflict" }
+        else if lower.contains("error") || lower.contains("failed") || lower.contains("refused") { status = "Failed" }
+        else { status = "Applied" }
+
+        let summary = line.count <= 160 ? line : String(line.prefix(157)) + "..."
+        return ChangeEvent(timestamp: Date(), status: status, workspace: workspace, operation: operation, summary: summary, detail: line)
     }
 
     private func recordActivity(_ text: String) {
@@ -1040,14 +1155,28 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
 
             let summary = line.count <= 140 ? line : String(line.prefix(137)) + "..."
             activityEvents.append(ActivityEvent(timestamp: Date(), kind: kind, workspace: workspace, summary: summary, detail: line))
+            if let change = changeEvent(from: line, workspace: workspace) {
+                changeEvents.append(change)
+            }
         }
 
         if activityEvents.count > maxActivityEvents {
             activityEvents.removeFirst(activityEvents.count - maxActivityEvents)
         }
+        if changeEvents.count > maxChangeEvents {
+            changeEvents.removeFirst(changeEvents.count - maxChangeEvents)
+        }
         if tabs.selectedTabViewItem?.identifier as? String == "activity" {
             refreshActivityFilter()
         }
+        if tabs.selectedTabViewItem?.identifier as? String == "changes" {
+            changesTableView.reloadData()
+        }
+    }
+
+    @objc private func showChanges() {
+        changesTableView.reloadData()
+        tabs.selectTabViewItem(withIdentifier: "changes")
     }
 
     @objc private func showDiagnostics() {
