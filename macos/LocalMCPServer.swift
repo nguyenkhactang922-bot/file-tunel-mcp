@@ -119,12 +119,12 @@ struct LocalToolCallOutput {
 
 final class LocalTools {
     private static let handlerToolNames: Set<String> = [
-        "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "git_init", "git_status", "git_log", "git_diff",
+        "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "search_content", "search_filenames",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "project_context", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
-        "list_files", "batch_stat", "batch_read", "search_content", "search_filenames",
+        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "exec_process",
     ]
     private let resolver: SafePathResolver
@@ -136,6 +136,7 @@ final class LocalTools {
     private let fileVersions: FileVersionService
     private let batchFiles: BatchFileService
     private let mutationGuard: AuthorizedPathSnapshotService
+    private let quarantine: QuarantineService
     private let projectContext: ProjectContextService
     private let beforeMutationCommitForTests: ((String) -> Void)?
     private let applyEditsStageForTests: ((String) -> Void)?
@@ -144,7 +145,7 @@ final class LocalTools {
     private let commandSlots = DispatchSemaphore(value: 2)
     private let gitSlots = DispatchSemaphore(value: 3)
     private let serializedToolNames: Set<String> = [
-        "write_file", "delete_file", "delete_directory", "apply_edits", "run_command",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "run_command",
         "git_init", "git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push",
     ]
     private let skippedSearchDirectories: Set<String> = [
@@ -169,13 +170,43 @@ final class LocalTools {
         execEnvironmentAllowList: [String] = [],
         beforeMutationCommitForTests: ((String) -> Void)? = nil,
         applyEditsStageForTests: ((String) -> Void)? = nil,
-        skillRegistry: CodexSkillRegistry? = nil
+        skillRegistry: CodexSkillRegistry? = nil,
+        artifactStore: ArtifactContentStore? = nil,
+        quarantineOptions: QuarantineServiceOptions? = nil,
+        quarantineStageForTests: ((String) -> Void)? = nil
     ) throws {
         self.resolver = resolver
         let versionService = try FileVersionService(resolver: resolver)
         self.fileVersions = versionService
-        self.batchFiles = BatchFileService(resolver: resolver, versions: versionService)
-        self.mutationGuard = AuthorizedPathSnapshotService(resolver: resolver)
+
+        let artifactLock = NSLock()
+        var sharedArtifactStore = artifactStore
+        let artifactFactory: () throws -> ArtifactContentStore = {
+            artifactLock.lock()
+            defer { artifactLock.unlock() }
+            if let sharedArtifactStore { return sharedArtifactStore }
+            var artifactOptions = ArtifactContentStoreOptions()
+            artifactOptions.workspaceRootForIsolation = resolver.root
+            let created = try ArtifactContentStore(options: artifactOptions)
+            sharedArtifactStore = created
+            return created
+        }
+        self.batchFiles = BatchFileService(
+            resolver: resolver,
+            versions: versionService,
+            artifactFactory: artifactFactory
+        )
+        let guardService = AuthorizedPathSnapshotService(resolver: resolver)
+        self.mutationGuard = guardService
+        self.quarantine = try QuarantineService(
+            resolver: resolver,
+            versions: versionService,
+            mutationGuard: guardService,
+            artifactFactory: artifactFactory,
+            policy: policy,
+            options: quarantineOptions ?? QuarantineServiceOptions(),
+            stageForTests: quarantineStageForTests
+        )
         self.projectContext = try ProjectContextService(resolver: resolver, policy: policy, skills: skillRegistry)
         self.beforeMutationCommitForTests = beforeMutationCommitForTests
         self.applyEditsStageForTests = applyEditsStageForTests
@@ -240,6 +271,32 @@ final class LocalTools {
             return objectOutput(try batchFiles.read(
                 requests: try anyArray(arguments, "requests", maximum: BatchFileService.maxBatchEntries),
                 context: executionContext
+            ))
+        case "quarantine_delete":
+            return objectOutput(try quarantine.delete(
+                relativePath: requiredString(arguments, "relative_path"),
+                expectedVersion: string(arguments, "expected_version", default: ""),
+                dryRun: bool(arguments, "dry_run", default: false),
+                ttlSeconds: int(arguments, "ttl_seconds", default: 0),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
+            ))
+        case "quarantine_list":
+            return objectOutput(try quarantine.list(
+                maxItems: int(arguments, "max_items", default: 100)
+            ))
+        case "quarantine_get":
+            return objectOutput(try quarantine.get(
+                quarantineRef: requiredString(arguments, "quarantine_ref")
+            ))
+        case "quarantine_restore":
+            return objectOutput(try quarantine.restore(
+                quarantineRef: requiredString(arguments, "quarantine_ref"),
+                targetRelativePath: string(arguments, "target_relative_path", default: ""),
+                replaceExisting: bool(arguments, "replace_existing", default: false),
+                expectedTargetVersion: string(arguments, "expected_target_version", default: ""),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
             ))
         case "search_content":
             return objectOutput(try searchContent(

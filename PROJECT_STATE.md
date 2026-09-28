@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-015-batch-read-stat`
+Active branch: `chatgpt/FMG-016-quarantine-restore`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -567,3 +567,20 @@ NEXT_EXACT_ACTION: push the synchronized FMG-015 head, require native Verify all
 State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
 Head `2ff1442`; Verify run `36445207427`: SUCCESS on macOS / Windows x64 / Windows ARM64. Scoped review PASS: read-only authority, per-entry path/version checks, aggregate budget, snapshot-bound ContentRef spill, no evidence/telemetry blob coupling, no temp/debug artifacts.
 NEXT_EXACT_ACTION: commit/push evidence-only closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-015 DONE / MAIN VERIFIED -> claim FMG-016.
+
+## FMG-015 closure / FMG-016 claim
+
+FMG-015: DONE / MAIN VERIFIED. PR #33 merged as `0c4562197cf91675cba9329ba154e76cfb102f1e`; merged-main Verify `36446607396` SUCCESS on macOS / Windows x64 / Windows ARM64.
+
+FMG-016: CLAIMED / ACTIVE on `chatgpt/FMG-016-quarantine-restore`.
+NEXT_EXACT_ACTION: implement quarantine_delete/list/get/restore with expected-version + Mutation Guard, verified artifact-backed payload/manifest, bounded TTL/quota, guarded atomic single-file restore, tree rollback transaction and explicit restored / rolled_back / partial_recovery_required terminal states. FMG-017 remains BLOCKED until FMG-016 MAIN VERIFIED.
+
+## FMG-016 local verification checkpoint - 2026-09-29
+
+State: LOCAL VERIFIED / MAIN SYNC + NATIVE CI PENDING.
+Branch: `chatgpt/FMG-016-quarantine-restore`.
+Catalog: 1.8.0 / 29 canonical tools / SHA-256 `717917385167e7c9877f83d60165e295ea703c25f37a2422cdd6ab2abc4cb50e`.
+Local proof: quarantine contract + catalog/parity PASS; Release build 0 warnings/errors; Windows full runtime 818 assertions PASS; macOS script syntax PASS; diff check PASS.
+Hardening: durable quarantine state is `prepared` before destructive commit and `quarantined` only after source deletion + record persistence; ArtifactContentStore construction is lazy so volume-root non-artifact operations remain functional without weakening artifact isolation.
+Evidence: `docs/evidence/FMG-016_QUARANTINE_DELETE_RESTORE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit local checkpoint -> merge latest fork/main -> preserve FMUX-014 + FMG-016 authority -> rerun affected gates -> push exact synchronized head -> native Verify all three lanes -> review/merge -> merged-main Verify -> FMG-016 MAIN VERIFIED.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.7.0",
+  "catalogVersion": "1.8.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -524,6 +524,398 @@
         "annotations": {
           "readOnlyHint": true,
           "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "quarantine_delete",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "delete",
+      "capabilities": [
+        "filesystem.read",
+        "filesystem.delete"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "quarantine_delete",
+        "description": "Safely quarantine a file or directory tree before deleting it. Dry-run returns the required source version; commit requires expected_version and verifies the artifact-backed package before source deletion.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "relative_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expected_version": {
+              "type": "string"
+            },
+            "dry_run": {
+              "type": "boolean"
+            },
+            "ttl_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 604800
+            }
+          },
+          "required": [
+            "relative_path"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "dry_run": {
+              "type": "boolean"
+            },
+            "relative_path": {
+              "type": "string"
+            },
+            "source_version": {
+              "type": "string"
+            },
+            "is_tree": {
+              "type": "boolean"
+            },
+            "entry_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ttl_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "quarantine_ref": {
+              "type": "string"
+            },
+            "original_relative_path": {
+              "type": "string"
+            },
+            "manifest_hash": {
+              "type": "string"
+            },
+            "expires_epoch_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "quarantined"
+              ]
+            }
+          },
+          "required": [
+            "dry_run"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "quarantine_list",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "metadata",
+      "capabilities": [
+        "filesystem.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "quarantine_list",
+        "description": "List metadata-only quarantine records for the current workspace. Artifact payload bytes are not returned.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "max_items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "quarantine_ref": {
+                    "type": "string"
+                  },
+                  "original_relative_path": {
+                    "type": "string"
+                  },
+                  "source_version": {
+                    "type": "string"
+                  },
+                  "manifest_hash": {
+                    "type": "string"
+                  },
+                  "is_tree": {
+                    "type": "boolean"
+                  },
+                  "created_epoch_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "expires_epoch_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "expired": {
+                    "type": "boolean"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "prepared",
+                      "quarantined",
+                      "restored",
+                      "rolled_back",
+                      "partial_recovery_required"
+                    ]
+                  },
+                  "last_restore_target": {
+                    "type": "string"
+                  },
+                  "recovery_ref": {
+                    "type": "string"
+                  },
+                  "entry_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "total_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "quarantine_ref",
+                  "original_relative_path",
+                  "source_version",
+                  "manifest_hash",
+                  "is_tree",
+                  "created_epoch_ms",
+                  "expires_epoch_ms",
+                  "expired",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "workspace_authority_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "items",
+            "count",
+            "workspace_authority_id"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "quarantine_get",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "metadata",
+      "capabilities": [
+        "filesystem.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "quarantine_get",
+        "description": "Get authenticated metadata for one quarantine item in the current workspace and verify its manifest ContentRef.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "quarantine_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "quarantine_ref"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "quarantine_ref": {
+              "type": "string"
+            },
+            "original_relative_path": {
+              "type": "string"
+            },
+            "source_version": {
+              "type": "string"
+            },
+            "manifest_hash": {
+              "type": "string"
+            },
+            "is_tree": {
+              "type": "boolean"
+            },
+            "created_epoch_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "expires_epoch_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "expired": {
+              "type": "boolean"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "prepared",
+                "quarantined",
+                "restored",
+                "rolled_back",
+                "partial_recovery_required"
+              ]
+            },
+            "last_restore_target": {
+              "type": "string"
+            },
+            "recovery_ref": {
+              "type": "string"
+            },
+            "entry_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_bytes": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "quarantine_ref",
+            "original_relative_path",
+            "source_version",
+            "manifest_hash",
+            "is_tree",
+            "created_epoch_ms",
+            "expires_epoch_ms",
+            "expired",
+            "state",
+            "entry_count",
+            "total_bytes"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "quarantine_restore",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "write",
+      "capabilities": [
+        "filesystem.read",
+        "filesystem.write"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "quarantine_restore",
+        "description": "Restore an authenticated quarantine item. Existing file targets require explicit replace_existing plus expected_target_version. Tree restores require an absent target and use rollback checkpoint material.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "quarantine_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "target_relative_path": {
+              "type": "string"
+            },
+            "replace_existing": {
+              "type": "boolean"
+            },
+            "expected_target_version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "quarantine_ref"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "quarantine_ref": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "restored",
+                "rolled_back",
+                "partial_recovery_required"
+              ]
+            },
+            "target_relative_path": {
+              "type": "string"
+            },
+            "recovery_ref": {
+              "type": "string"
+            },
+            "restore_error": {
+              "type": "string"
+            },
+            "rollback_error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "quarantine_ref",
+            "state",
+            "target_relative_path"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
           "openWorldHint": false
         }
       }

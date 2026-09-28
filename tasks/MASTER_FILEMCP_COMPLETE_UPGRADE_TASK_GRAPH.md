@@ -207,7 +207,7 @@ Negative tests:
 
 ## FMG-016 - Quarantine Delete / Restore
 
-State: BLOCKED
+State: CLAIMED / ACTIVE
 Depends: FMG-014, FMG-008, FMG-011
 
 Scope:

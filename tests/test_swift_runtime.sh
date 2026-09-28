@@ -404,8 +404,11 @@ let reopened = try ArtifactContentStore(options: artifactOptions("primary"))
 let resolved = try reopened.resolve(descriptor.contentRef, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
 precondition(resolved.blobID == descriptor.blobID && resolved.referenceID == descriptor.referenceID, "ContentRef did not survive restart")
 
-let tamperedTail = descriptor.contentRef.last == "A" ? "B" : "A"
-let tampered = String(descriptor.contentRef.dropLast()) + tamperedTail
+var tamperedParts = descriptor.contentRef.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+precondition(tamperedParts.count == 3 && tamperedParts[2].count > 1, "ContentRef signature segment missing")
+let firstSignatureCharacter = tamperedParts[2].first!
+tamperedParts[2] = String(firstSignatureCharacter == "A" ? "B" : "A") + tamperedParts[2].dropFirst()
+let tampered = tamperedParts.joined(separator: ".")
 expectArtifactFailure("tamper", containing: "authentication") {
     _ = try reopened.resolve(tampered, workspaceAuthorityID: workspaceAID, contentClassAllowed: ArtifactContentClass.isKnown)
 }
@@ -1299,6 +1302,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/AuthorizedPathSnapshot.swift \
     macos/ArtifactContentStore.swift \
     macos/BatchFileService.swift \
+    macos/QuarantineService.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -2360,6 +2364,282 @@ precondition(fmg015RaceMutated, "FMG-015 mutation hook did not execute")
 print("swift-file-version-mid-read-mutation: ok")
 
 
+
+// FMG-016 Quarantine Delete / Restore.
+let qArea = root.appendingPathComponent("quarantine-restore", isDirectory: true)
+let qWorkspace = qArea.appendingPathComponent("workspace", isDirectory: true)
+try FileManager.default.createDirectory(at: qWorkspace, withIntermediateDirectories: true)
+let qResolver = try SafePathResolver(rootPath: qWorkspace.path)
+var qClock = Date(timeIntervalSince1970: 1_798_000_000)
+
+func qStore(
+    _ name: String,
+    maxItem: Int64 = 1024 * 1024,
+    fault: ((String, Int64) -> Error?)? = nil
+) throws -> ArtifactContentStore {
+    var options = ArtifactContentStoreOptions()
+    options.rootURL = qArea.appendingPathComponent(name).appendingPathComponent("artifacts", isDirectory: true)
+    options.workspaceRootForIsolation = qWorkspace
+    options.maxItemBytes = maxItem
+    options.maxWorkspaceBytes = max(maxItem, 4 * 1024 * 1024)
+    options.maxGlobalBytes = max(maxItem, 8 * 1024 * 1024)
+    options.defaultTTL = 30 * 60
+    options.maxTTL = 24 * 60 * 60
+    options.now = { qClock }
+    options.faultInjector = fault
+    return try ArtifactContentStore(options: options)
+}
+
+func qOptions(
+    _ name: String,
+    fault: ((String) -> Error?)? = nil
+) -> QuarantineServiceOptions {
+    var options = QuarantineServiceOptions()
+    options.metadataRootURL = qArea.appendingPathComponent(name).appendingPathComponent("metadata", isDirectory: true)
+    options.defaultTTL = 30 * 60
+    options.maxTTL = 24 * 60 * 60
+    options.maxTreeEntries = 100
+    options.maxTreeBytes = 8 * 1024 * 1024
+    options.now = { qClock }
+    options.faultInjector = fault
+    return options
+}
+
+func qTools(
+    _ name: String,
+    stage: ((String) -> Void)? = nil,
+    store: ArtifactContentStore? = nil,
+    options: QuarantineServiceOptions? = nil
+) throws -> LocalTools {
+    try LocalTools(
+        resolver: qResolver,
+        gitUserName: "FileMCP Test",
+        gitUserEmail: "filemcp@example.invalid",
+        policy: ServerPolicy.fromLegacy(enableCommands: false),
+        artifactStore: store ?? qStore(name),
+        quarantineOptions: options ?? qOptions(name),
+        quarantineStageForTests: stage
+    )
+}
+
+func qCall(_ tools: LocalTools, _ name: String, _ arguments: [String: Any]) throws -> [String: Any] {
+    try tools.call(name: name, arguments: arguments).structuredContent
+}
+
+func qString(_ value: [String: Any], _ key: String) -> String {
+    guard let result = value[key] as? String else { preconditionFailure("missing string \(key)") }
+    return result
+}
+
+func expectQFailure(_ label: String, containing needle: String, _ body: () throws -> Void) {
+    do {
+        try body()
+        preconditionFailure("\(label) should fail")
+    } catch {
+        precondition(
+            error.localizedDescription.lowercased().contains(needle.lowercased()),
+            "\(label) wrong error: \(error.localizedDescription)"
+        )
+    }
+}
+
+let primaryQTools = try qTools("primary")
+precondition(
+    primaryQTools.hasTool(named: "quarantine_delete") &&
+    primaryQTools.hasTool(named: "quarantine_list") &&
+    primaryQTools.hasTool(named: "quarantine_get") &&
+    primaryQTools.hasTool(named: "quarantine_restore"),
+    "FMG-016 quarantine tools are policy-visible"
+)
+
+let qFile = qWorkspace.appendingPathComponent("file.txt")
+try Data("hello quarantine".utf8).write(to: qFile)
+let qDry = try qCall(primaryQTools, "quarantine_delete", [
+    "relative_path": "file.txt", "dry_run": true, "ttl_seconds": 600,
+])
+let qSourceVersion = qString(qDry, "source_version")
+precondition((qDry["dry_run"] as? Bool) == true && (qDry["is_tree"] as? Bool) == false && FileManager.default.fileExists(atPath: qFile.path), "quarantine dry-run must not delete")
+let qDeleted = try qCall(primaryQTools, "quarantine_delete", [
+    "relative_path": "file.txt", "expected_version": qSourceVersion, "ttl_seconds": 600,
+])
+let qRef = qString(qDeleted, "quarantine_ref")
+precondition(qRef.hasPrefix("cr1.") && qString(qDeleted, "state") == "quarantined" && !FileManager.default.fileExists(atPath: qFile.path), "quarantine delete must verify package before source delete")
+let qListed = try qCall(primaryQTools, "quarantine_list", ["max_items": 20])
+precondition((qListed["count"] as? NSNumber)?.intValue ?? 0 >= 1, "quarantine_list must return metadata")
+let qGot = try qCall(primaryQTools, "quarantine_get", ["quarantine_ref": qRef])
+precondition(qString(qGot, "original_relative_path") == "file.txt" && qString(qGot, "state") == "quarantined" && (qGot["entry_count"] as? NSNumber)?.intValue == 1, "quarantine_get must authenticate manifest")
+let qRestored = try qCall(primaryQTools, "quarantine_restore", ["quarantine_ref": qRef])
+precondition(qString(qRestored, "state") == "restored" && String(data: try Data(contentsOf: qFile), encoding: .utf8) == "hello quarantine", "quarantine file restore failed")
+expectQFailure("double restore", containing: "already restored") {
+    _ = try qCall(primaryQTools, "quarantine_restore", ["quarantine_ref": qRef])
+}
+
+// Empty directory is a valid tree package with zero manifest children.
+let qEmpty = qWorkspace.appendingPathComponent("empty-tree", isDirectory: true)
+try FileManager.default.createDirectory(at: qEmpty, withIntermediateDirectories: false)
+let qEmptyDry = try qCall(primaryQTools, "quarantine_delete", ["relative_path": "empty-tree", "dry_run": true])
+let qEmptyDeleted = try qCall(primaryQTools, "quarantine_delete", [
+    "relative_path": "empty-tree", "expected_version": qString(qEmptyDry, "source_version"),
+])
+let qEmptyRestored = try qCall(primaryQTools, "quarantine_restore", [
+    "quarantine_ref": qString(qEmptyDeleted, "quarantine_ref"),
+    "target_relative_path": "empty-tree-restored",
+])
+precondition(qString(qEmptyRestored, "state") == "restored" && FileManager.default.fileExists(atPath: qWorkspace.appendingPathComponent("empty-tree-restored").path), "empty tree quarantine restore failed")
+
+// Stale expected version must fail closed.
+let qStale = qWorkspace.appendingPathComponent("stale.txt")
+try Data("version-a".utf8).write(to: qStale)
+let qStaleDry = try qCall(primaryQTools, "quarantine_delete", ["relative_path": "stale.txt", "dry_run": true])
+try Data("version-b".utf8).write(to: qStale)
+expectQFailure("stale source", containing: "changed") {
+    _ = try qCall(primaryQTools, "quarantine_delete", [
+        "relative_path": "stale.txt", "expected_version": qString(qStaleDry, "source_version"),
+    ])
+}
+precondition(String(data: try Data(contentsOf: qStale), encoding: .utf8) == "version-b", "stale delete damaged newer source")
+
+// Path swap after package verification must not delete replacement.
+let qSwap = qWorkspace.appendingPathComponent("swap.txt")
+try Data("authorized".utf8).write(to: qSwap)
+let qSwapTools = try qTools("path-swap", stage: { stage in
+    if stage == "after_package_verified" {
+        try? FileManager.default.removeItem(at: qSwap)
+        try? Data("replacement".utf8).write(to: qSwap)
+    }
+})
+let qSwapDry = try qCall(qSwapTools, "quarantine_delete", ["relative_path": "swap.txt", "dry_run": true])
+expectQFailure("path swap", containing: "mutation guard") {
+    _ = try qCall(qSwapTools, "quarantine_delete", [
+        "relative_path": "swap.txt", "expected_version": qString(qSwapDry, "source_version"),
+    ])
+}
+precondition(String(data: try Data(contentsOf: qSwap), encoding: .utf8) == "replacement", "path-swap failure deleted replacement")
+
+// Expiry blocks metadata access and restore.
+let qExpire = qWorkspace.appendingPathComponent("expire.txt")
+try Data("expires".utf8).write(to: qExpire)
+let qExpiryTools = try qTools("expiry")
+let qExpiryDry = try qCall(qExpiryTools, "quarantine_delete", ["relative_path": "expire.txt", "dry_run": true, "ttl_seconds": 60])
+let qExpiryDeleted = try qCall(qExpiryTools, "quarantine_delete", [
+    "relative_path": "expire.txt", "expected_version": qString(qExpiryDry, "source_version"), "ttl_seconds": 60,
+])
+let qExpiryRef = qString(qExpiryDeleted, "quarantine_ref")
+qClock = qClock.addingTimeInterval(61)
+expectQFailure("expired get", containing: "expired") {
+    _ = try qCall(qExpiryTools, "quarantine_get", ["quarantine_ref": qExpiryRef])
+}
+expectQFailure("expired restore", containing: "expired") {
+    _ = try qCall(qExpiryTools, "quarantine_restore", ["quarantine_ref": qExpiryRef])
+}
+qClock = Date(timeIntervalSince1970: 1_798_003_600)
+
+// Destination appearing after plan must be preserved.
+let qRaceSource = qWorkspace.appendingPathComponent("race-source.txt")
+let qRaceTarget = qWorkspace.appendingPathComponent("race-target.txt")
+try Data("race".utf8).write(to: qRaceSource)
+let qRaceTools = try qTools("destination-race", stage: { stage in
+    if stage == "after_restore_plan" {
+        try? Data("competitor".utf8).write(to: qRaceTarget)
+    }
+})
+let qRaceDry = try qCall(qRaceTools, "quarantine_delete", ["relative_path": "race-source.txt", "dry_run": true])
+let qRaceDeleted = try qCall(qRaceTools, "quarantine_delete", [
+    "relative_path": "race-source.txt", "expected_version": qString(qRaceDry, "source_version"),
+])
+expectQFailure("destination race", containing: "mutation guard") {
+    _ = try qCall(qRaceTools, "quarantine_restore", [
+        "quarantine_ref": qString(qRaceDeleted, "quarantine_ref"), "target_relative_path": "race-target.txt",
+    ])
+}
+precondition(String(data: try Data(contentsOf: qRaceTarget), encoding: .utf8) == "competitor", "destination race overwrote competitor")
+
+// Tree partial failure rolls back completely.
+let qTree = qWorkspace.appendingPathComponent("tree", isDirectory: true)
+try FileManager.default.createDirectory(at: qTree.appendingPathComponent("sub"), withIntermediateDirectories: true)
+try Data("alpha".utf8).write(to: qTree.appendingPathComponent("a.txt"))
+try Data("bravo".utf8).write(to: qTree.appendingPathComponent("sub/b.txt"))
+var qTreeInjected = false
+let qTreeRestoreRoot = qWorkspace.appendingPathComponent("tree-restored", isDirectory: true)
+let qTreeTools = try qTools("tree-rollback", stage: { stage in
+    if stage == "after_tree_publish:a.txt" && !qTreeInjected {
+        qTreeInjected = true
+        try? Data("conflict".utf8).write(to: qTreeRestoreRoot.appendingPathComponent("sub/b.txt"))
+    }
+})
+let qTreeDry = try qCall(qTreeTools, "quarantine_delete", ["relative_path": "tree", "dry_run": true])
+let qTreeDeleted = try qCall(qTreeTools, "quarantine_delete", [
+    "relative_path": "tree", "expected_version": qString(qTreeDry, "source_version"),
+])
+let qTreeResult = try qCall(qTreeTools, "quarantine_restore", [
+    "quarantine_ref": qString(qTreeDeleted, "quarantine_ref"), "target_relative_path": "tree-restored",
+])
+precondition(qTreeInjected && qString(qTreeResult, "state") == "rolled_back" && !FileManager.default.fileExists(atPath: qTreeRestoreRoot.path), "tree restore failure did not rollback")
+
+// Rollback identity failure retains CHECKPOINT recovery material.
+let qPartial = qWorkspace.appendingPathComponent("tree-partial", isDirectory: true)
+try FileManager.default.createDirectory(at: qPartial.appendingPathComponent("sub"), withIntermediateDirectories: true)
+try Data("alpha".utf8).write(to: qPartial.appendingPathComponent("a.txt"))
+try Data("bravo".utf8).write(to: qPartial.appendingPathComponent("sub/b.txt"))
+let qPartialRestore = qWorkspace.appendingPathComponent("tree-partial-restored", isDirectory: true)
+let qPartialMoved = qWorkspace.appendingPathComponent("tree-partial-moved", isDirectory: true)
+var qPartialPrimary = false
+var qPartialRollback = false
+let qPartialTools = try qTools("tree-partial-recovery", stage: { stage in
+    if stage == "after_tree_publish:a.txt" && !qPartialPrimary {
+        qPartialPrimary = true
+        try? Data("conflict".utf8).write(to: qPartialRestore.appendingPathComponent("sub/b.txt"))
+    }
+    if stage == "before_tree_rollback" && !qPartialRollback {
+        qPartialRollback = true
+        try? FileManager.default.moveItem(at: qPartialRestore, to: qPartialMoved)
+        try? FileManager.default.createDirectory(at: qPartialRestore, withIntermediateDirectories: false)
+        try? Data("competitor".utf8).write(to: qPartialRestore.appendingPathComponent("competitor.txt"))
+    }
+})
+let qPartialDry = try qCall(qPartialTools, "quarantine_delete", ["relative_path": "tree-partial", "dry_run": true])
+let qPartialDeleted = try qCall(qPartialTools, "quarantine_delete", [
+    "relative_path": "tree-partial", "expected_version": qString(qPartialDry, "source_version"),
+])
+let qPartialResult = try qCall(qPartialTools, "quarantine_restore", [
+    "quarantine_ref": qString(qPartialDeleted, "quarantine_ref"), "target_relative_path": "tree-partial-restored",
+])
+precondition(qPartialPrimary && qPartialRollback && qString(qPartialResult, "state") == "partial_recovery_required" && !(qPartialResult["recovery_ref"] as? String ?? "").isEmpty, "rollback failure did not retain recovery artifact")
+
+// Artifact quota exhaustion and metadata disk-full leave source intact.
+let qQuotaFile = qWorkspace.appendingPathComponent("quota.txt")
+try Data("payload-too-large".utf8).write(to: qQuotaFile)
+let qQuotaStore = try qStore("quota", maxItem: 8)
+let qQuotaTools = try qTools("quota", store: qQuotaStore)
+let qQuotaDry = try qCall(qQuotaTools, "quarantine_delete", ["relative_path": "quota.txt", "dry_run": true])
+expectQFailure("artifact quota", containing: "quota") {
+    _ = try qCall(qQuotaTools, "quarantine_delete", [
+        "relative_path": "quota.txt", "expected_version": qString(qQuotaDry, "source_version"),
+    ])
+}
+precondition(FileManager.default.fileExists(atPath: qQuotaFile.path), "artifact quota failure deleted source")
+
+let qMetadataFile = qWorkspace.appendingPathComponent("metadata-fail.txt")
+try Data("metadata survives".utf8).write(to: qMetadataFile)
+let qMetadataTools = try qTools(
+    "metadata-disk-full",
+    store: qStore("metadata-disk-full"),
+    options: qOptions("metadata-disk-full", fault: { stage in
+        stage == "before-index-commit"
+            ? NSError(domain: "FileMCP.Test", code: 28, userInfo: [NSLocalizedDescriptionKey: "simulated metadata disk full"])
+            : nil
+    })
+)
+let qMetadataDry = try qCall(qMetadataTools, "quarantine_delete", ["relative_path": "metadata-fail.txt", "dry_run": true])
+expectQFailure("metadata disk full", containing: "disk full") {
+    _ = try qCall(qMetadataTools, "quarantine_delete", [
+        "relative_path": "metadata-fail.txt", "expected_version": qString(qMetadataDry, "source_version"),
+    ])
+}
+precondition(FileManager.default.fileExists(atPath: qMetadataFile.path), "metadata disk-full failure deleted source")
+
+print("swift-quarantine-restore: ok")
+
 let fmg011ServerStoreURL = root.appendingPathComponent("server-evidence.json")
 let server = try LocalMCPServer(
     port: 18088,
@@ -2425,6 +2705,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/AuthorizedPathSnapshot.swift \
     macos/ArtifactContentStore.swift \
     macos/BatchFileService.swift \
+    macos/QuarantineService.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"
@@ -2458,7 +2739,7 @@ UNAVAILABLE_EVIDENCE_BASE_URL="http://127.0.0.1:18091/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.7.0"
+CATALOG_VERSION="1.8.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'

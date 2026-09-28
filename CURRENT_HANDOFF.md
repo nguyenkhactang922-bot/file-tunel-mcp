@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-015-batch-read-stat`
+Branch: `chatgpt/FMG-016-quarantine-restore`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -629,3 +629,25 @@ NEXT_EXACT_ACTION: push the synchronized FMG-015 head, require native Verify all
 State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
 Head `2ff1442`; Verify run `36445207427`: SUCCESS on macOS / Windows x64 / Windows ARM64. Scoped review PASS: read-only authority, per-entry path/version checks, aggregate budget, snapshot-bound ContentRef spill, no evidence/telemetry blob coupling, no temp/debug artifacts.
 NEXT_EXACT_ACTION: commit/push evidence-only closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-015 DONE / MAIN VERIFIED -> claim FMG-016.
+
+## FMG-015 closure / FMG-016 claim - 2026-09-28
+
+FMG-015: DONE / MAIN VERIFIED.
+- PR #33 head: `fb0318837c36cb428c27cb34a8162a55a38b46f9`.
+- Merge main: `0c4562197cf91675cba9329ba154e76cfb102f1e`.
+- Merged-main Verify: `36446607396` SUCCESS on macOS / Windows x64 / Windows ARM64.
+
+FMG-016: CLAIMED / ACTIVE on `chatgpt/FMG-016-quarantine-restore` from verified main `0c4562197cf91675cba9329ba154e76cfb102f1e`.
+Locked canonical surface: `quarantine_delete`, `quarantine_list`, `quarantine_get`, `quarantine_restore`; catalog target 1.8.0 / 29 tools.
+Implementation order: single-file artifact package + guarded restore -> metadata list/get -> tree package + rollback checkpoint transaction -> negative/fault tests -> cross-platform parity -> exact-head Verify -> review -> PR/merge -> merged-main Verify.
+FMG-017 remains BLOCKED until FMG-016 MAIN VERIFIED.
+
+## FMG-016 local verification checkpoint - 2026-09-29
+
+State: LOCAL VERIFIED / MAIN SYNC + NATIVE CI PENDING.
+Branch: `chatgpt/FMG-016-quarantine-restore`.
+Catalog: 1.8.0 / 29 canonical tools / SHA-256 `717917385167e7c9877f83d60165e295ea703c25f37a2422cdd6ab2abc4cb50e`.
+Local proof: quarantine contract + catalog/parity PASS; Release build 0 warnings/errors; Windows full runtime 818 assertions PASS; macOS script syntax PASS; diff check PASS.
+Hardening: durable quarantine state is `prepared` before destructive commit and `quarantined` only after source deletion + record persistence; ArtifactContentStore construction is lazy so volume-root non-artifact operations remain functional without weakening artifact isolation.
+Evidence: `docs/evidence/FMG-016_QUARANTINE_DELETE_RESTORE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit local checkpoint -> merge latest fork/main -> preserve FMUX-014 + FMG-016 authority -> rerun affected gates -> push exact synchronized head -> native Verify all three lanes -> review/merge -> merged-main Verify -> FMG-016 MAIN VERIFIED.
