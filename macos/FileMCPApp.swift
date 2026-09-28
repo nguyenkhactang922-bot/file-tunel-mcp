@@ -215,6 +215,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let advancedToggleButton = NSButton(title: "Advanced options", target: nil, action: nil)
     private let advancedSettingsGroup = NSStackView()
     private let apiKeyStatusLabel = NSTextField(labelWithString: "")
+    private let connectionStatusLabel = NSTextField(labelWithString: "Runtime stopped")
+    private let connectionDiagnosticsLabel = NSTextField(wrappingLabelWithString: "No runtime is connected.")
     private let shellStatusLabel = NSTextField(labelWithString: "Runtime stopped")
     private let homeStatusLabel = NSTextField(labelWithString: "Runtime stopped")
     private let homeWorkspaceLabel = NSTextField(labelWithString: "No workspace selected")
@@ -385,7 +387,26 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         connectionSpacer.setContentHuggingPriority(.defaultLow, for: .vertical)
         connectionSpacer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
+        connectionStatusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        connectionDiagnosticsLabel.textColor = .secondaryLabelColor
+        connectionDiagnosticsLabel.maximumNumberOfLines = 3
+
+        let connectionHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Connections",
+            description: "Runtime credentials, Secure MCP Tunnel configuration and connectivity health."
+        )
+
+        let connectionSummary = NSStackView(views: [
+            connectionStatusLabel,
+            connectionDiagnosticsLabel,
+        ])
+        connectionSummary.orientation = .vertical
+        connectionSummary.alignment = .leading
+        connectionSummary.spacing = 4
+
         let connectionRoot = NSStackView(views: [
+            connectionHeader,
+            connectionSummary,
             connectionForm,
             primaryActions,
             divider,
@@ -743,9 +764,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
 
     private func updateAPIKeyPlaceholder() {
         let hasSavedKey = storage.hasSavedAPIKey
-        apiKeyField.placeholderString = hasSavedKey ? "Saved â€” leave blank to keep it" : "sk-..."
+        apiKeyField.placeholderString = hasSavedKey ? "Saved - leave blank to keep it" : "sk-..."
         apiKeyStatusLabel.stringValue = hasSavedKey ? "API key is saved in Keychain" : "No API key is saved"
         deleteKeyButton.isEnabled = hasSavedKey
+        refreshConnectionDiagnostics()
     }
 
     private func defaultDirectory() -> String {
@@ -986,6 +1008,30 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         }
     }
 
+    private func refreshConnectionDiagnostics() {
+        let hasKey = storage.hasSavedAPIKey
+        let tunnel = tunnelIDField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch runtime.state {
+        case .stopped:
+            connectionStatusLabel.stringValue = "Runtime stopped"
+        case .failed:
+            connectionStatusLabel.stringValue = "Runtime failed"
+        case .starting:
+            connectionStatusLabel.stringValue = "Connecting"
+        case .running:
+            connectionStatusLabel.stringValue = "Connected"
+        case .restarting:
+            connectionStatusLabel.stringValue = "Reconnecting"
+        case .cooldown:
+            connectionStatusLabel.stringValue = "Reconnect cooldown"
+        case .stopping:
+            connectionStatusLabel.stringValue = "Disconnecting"
+        }
+        connectionDiagnosticsLabel.stringValue =
+            "\(tunnel.isEmpty ? "No tunnel ID configured" : "Tunnel ID configured"); " +
+            (hasKey ? "credential stored securely in Keychain." : "credential missing.")
+    }
+
     private func refreshWorkspaceSummary() {
         let root = directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         workspaceRootLabel.stringValue = root.isEmpty ? "Not configured" : root
@@ -1033,6 +1079,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private func updateRunButton(state: LocalMCPRuntimeState) {
         refreshHomeSummary(state: state)
         refreshWorkspaceSummary()
+        refreshConnectionDiagnostics()
         switch state {
         case .stopped:
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
