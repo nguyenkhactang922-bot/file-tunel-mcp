@@ -1419,26 +1419,16 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
                 expiry = "N/A"
             }
             artifactEntryDetailLabel.stringValue =
-                "Path: \(entry.path)
-" +
-                "State: \(entry.state)
-" +
-                "Delivery: \(entry.delivery)
-" +
-                "Size: \(entry.sizeBytes.map { "\($0) B" } ?? "N/A")
-" +
-                "Max inline bytes: \(entry.maxBytes.map { "\($0) B" } ?? "N/A")
-" +
-                "Version strength: \(entry.versionStrength ?? "N/A")
-" +
-                "ContentRef: \(contentRef)
-" +
-                "Expires: \(expiry)
-" +
-                "Blob ID: \(entry.blobID ?? "N/A")
-" +
-                "Error: \(entry.errorCode ?? "N/A")
-" +
+                "Path: \(entry.path)\n" +
+                "State: \(entry.state)\n" +
+                "Delivery: \(entry.delivery)\n" +
+                "Size: \(entry.sizeBytes.map { "\($0) B" } ?? "N/A")\n" +
+                "Max inline bytes: \(entry.maxBytes.map { "\($0) B" } ?? "N/A")\n" +
+                "Version strength: \(entry.versionStrength ?? "N/A")\n" +
+                "ContentRef: \(contentRef)\n" +
+                "Expires: \(expiry)\n" +
+                "Blob ID: \(entry.blobID ?? "N/A")\n" +
+                "Error: \(entry.errorCode ?? "N/A")\n" +
                 "Message: \(entry.message ?? "N/A")"
             return
         }
