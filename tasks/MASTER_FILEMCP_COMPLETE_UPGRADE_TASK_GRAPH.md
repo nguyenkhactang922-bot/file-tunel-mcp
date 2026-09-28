@@ -140,7 +140,7 @@ FMG-013 is FOUNDATION MAIN VERIFIED only; it is not the final complete-upgrade c
 
 ## FMG-014 - Ephemeral Artifact / ContentRef Store
 
-State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-013, FMG-004, FMG-006, FMG-011
 
 Scope:
@@ -179,7 +179,7 @@ Cross-platform:
 
 ## FMG-015 - Batch Read / Stat
 
-State: BLOCKED
+State: CLAIMED / ACTIVE
 Depends: FMG-014, FMG-004, FMG-006
 
 Scope:

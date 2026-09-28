@@ -509,3 +509,18 @@ Native Verify run: `36416421696` SUCCESS on macOS / Windows x64 / native Windows
 Post-main-sync local proof: project-state + FMUX presentation/home + FMG-014 contract PASS; Windows Release 0 warnings/errors; Windows integration 776 assertions PASS.
 Security hardening: ContentRef base64url decoder now rejects non-canonical encodings on Windows and macOS before HMAC acceptance.
 NEXT_EXACT_ACTION: commit/push this evidence-only closure head -> exact-head native Verify -> scoped review -> PR/merge -> merged-main Verify -> FMG-014 DONE / MAIN VERIFIED -> claim FMG-015.
+
+
+## FMG-014 closure / FMG-015 claim - 2026-09-28
+
+FMG-014: DONE / MAIN VERIFIED.
+- Final evidence head: `d4d2c75ce91efd1b1b3f5f87d58e86f52f6ced53`.
+- Exact-head push Verify run `36416843308`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #26 Verify run `36417272966`: SUCCESS on all three native lanes.
+- PR #26 merged to fork `main` as `d7669ed0d60c51eb1cfb12813abc8f34d3d3ff0e`.
+- Merged-main Verify run `36417632075`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Content-addressed blob store, authenticated canonical ContentRef, installation/workspace/class/expiry/lease binding, quota/TTL GC, current-user permissions, streaming I/O and negative/adversarial coverage are MAIN VERIFIED.
+
+FMG-015: CLAIMED / ACTIVE on `chatgpt/FMG-015-batch-read-stat`.
+
+NEXT_EXACT_ACTION: implement FMG-015 Batch Read / Stat only: `batch_stat` + `batch_read`, per-entry SafePathResolver/version authorization, aggregate ToolBudget, deterministic per-entry states, cancellation with explicit partial result, version token per eligible file, and optional FMG-014 ContentRef for oversized items. Cover mixed valid/escape paths, duplicates, huge lists, mid-batch cancellation, file mutation during read and artifact quota exhaustion. Do not begin FMG-016 before FMG-015 MAIN VERIFIED.

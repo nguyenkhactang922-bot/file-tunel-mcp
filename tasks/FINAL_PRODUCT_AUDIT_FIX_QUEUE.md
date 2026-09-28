@@ -32,6 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: record final synchronized FMG-014 evidence for code candidate `15babd9f9eee540fef2f008b6ea6ce6340b33109` / Verify run `36416421696`, push the docs-only closure head, require exact-head native Verify, perform scoped review, merge only green exact head, verify merged main, then mark FMG-014 DONE / MAIN VERIFIED and claim FMG-015.
-
-FPA-004 product/release scope is resolved by ADR-0003. V11-009 upstream integration remains an external authority gate and does not block the active FMG complete-upgrade implementation program.
+AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-015 Batch Read / Stat only on `chatgpt/FMG-015-batch-read-stat`; add batch_stat + batch_read with per-entry SafePathResolver/version checks, aggregate ToolBudget, deterministic per-entry outcomes, explicit partial cancellation and optional FMG-014 ContentRef for oversized payloads; cover mixed valid/escape paths, duplicates, huge lists, mid-batch mutation/cancellation and artifact quota exhaustion; do not begin FMG-016 before FMG-015 MAIN VERIFIED.
