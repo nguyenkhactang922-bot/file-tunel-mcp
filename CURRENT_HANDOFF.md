@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMUX-001-presentation-foundation`
+Branch: `chatgpt/FMUX-002-app-shell`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -338,3 +338,23 @@ Authorities:
 FMUX-001: ACTIVE / LOCAL + NATIVE VERIFIED / FINAL-HEAD CI PENDING on branch `chatgpt/FMUX-001-presentation-foundation`.
 Evidence: `docs/evidence/FMUX-001_PRESENTATION_FOUNDATION_EVIDENCE.md`.
 NEXT_EXACT_ACTION: finish exact-head native verification, review/merge FMUX-001, then claim FMUX-002. FMG-026 scope remains unchanged.
+
+## FMUX-001 closure / FMUX-002 claim
+
+FMUX-001: DONE / MAIN VERIFIED.
+PR: #20.
+Merge main: `ee85ba494f36be6d15757fe338588cc92651518a`.
+Merged-main Verify: run `36400920401` SUCCESS on Windows x64 / Windows ARM64 / macOS.
+Local proof: project-state contract PASS; FMUX presentation contract PASS; Windows Release build 0 warnings / 0 errors; Windows runtime 750 assertions PASS.
+
+FMUX-002: CLAIMED / ACTIVE on `chatgpt/FMUX-002-app-shell`.
+Scope: App Shell + Navigation only: labeled sidebar, content host, workspace/global health context, compact mode, persistent Settings placement, Windows/macOS semantic parity. Preserve legacy page functionality during incremental migration. Do not begin FMUX-003 before FMUX-002 MAIN VERIFIED.
+
+NEXT_EXACT_ACTION: implement FMUX-002 shell/navigation only, then run local build/runtime/FMUX shell contracts, exact-head native Verify, review/merge/main verification.
+
+## FMUX-002 local verification
+
+FMUX-002: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMUX-002-app-shell`.
+Local proof: project-state contract PASS; FMUX app-shell contract PASS; Windows Release build 0 warnings/errors; Windows runtime 750 assertions PASS; macOS build-script syntax PASS.
+Evidence: `docs/evidence/FMUX-002_APP_SHELL_NAVIGATION_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push exact FMUX-002 candidate, require native Verify, scoped review, merge exact green head, merged-main verification, then claim FMUX-003.

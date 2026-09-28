@@ -4,7 +4,7 @@ import Security
 private let appName = "FileMCP"
 
 private enum Layout {
-    static let windowWidth: CGFloat = 440
+    static let windowWidth: CGFloat = 620
     static let collapsedWindowHeight: CGFloat = 350
     static let expandedWindowHeight: CGFloat = 450
     static let footerHeight: CGFloat = 52
@@ -215,6 +215,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private let advancedToggleButton = NSButton(title: "Advanced options", target: nil, action: nil)
     private let advancedSettingsGroup = NSStackView()
     private let apiKeyStatusLabel = NSTextField(labelWithString: "")
+    private let shellStatusLabel = NSTextField(labelWithString: "Runtime stopped")
     private let tabs = NSTabView()
 
     override func loadView() { view = NSView() }
@@ -493,7 +494,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
             logScroll.bottomAnchor.constraint(equalTo: logPage.bottomAnchor, constant: -12),
         ])
 
-        tabs.tabViewType = .topTabsBezelBorder
+        tabs.tabViewType = .noTabsNoBorder
         tabs.translatesAutoresizingMaskIntoConstraints = false
         tabs.delegate = self
 
@@ -512,6 +513,51 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         tabs.addTabViewItem(configTab)
         tabs.addTabViewItem(settingsTab)
         tabs.addTabViewItem(logTab)
+
+        func navigationButton(_ title: String, action: Selector) -> NSButton {
+            let button = NSButton(title: title, target: self, action: action)
+            button.bezelStyle = .inline
+            button.isBordered = false
+            button.alignment = .left
+            button.font = .systemFont(ofSize: 13, weight: .medium)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.widthAnchor.constraint(equalToConstant: 132).isActive = true
+            return button
+        }
+
+        let brandTitle = NSTextField(labelWithString: "FileMCP")
+        brandTitle.font = .systemFont(ofSize: 18, weight: .semibold)
+        let brandSubtitle = NSTextField(labelWithString: "Local agent gateway")
+        brandSubtitle.font = .systemFont(ofSize: 10.5)
+        brandSubtitle.textColor = .secondaryLabelColor
+
+        shellStatusLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        shellStatusLabel.textColor = .secondaryLabelColor
+        shellStatusLabel.maximumNumberOfLines = 2
+
+        let sidebar = NSStackView(views: [
+            brandTitle,
+            brandSubtitle,
+            NSBox(),
+            navigationButton("Connections", action: #selector(showConnections)),
+            navigationButton("Settings", action: #selector(showSettings)),
+            navigationButton("Diagnostics", action: #selector(showDiagnostics)),
+            NSView(),
+            shellStatusLabel,
+        ])
+        sidebar.orientation = .vertical
+        sidebar.alignment = .leading
+        sidebar.spacing = 8
+        sidebar.translatesAutoresizingMaskIntoConstraints = false
+        sidebar.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        sidebar.setContentHuggingPriority(.required, for: .horizontal)
+        sidebar.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        let shell = NSStackView(views: [sidebar, tabs])
+        shell.orientation = .horizontal
+        shell.alignment = .top
+        shell.spacing = 0
+        shell.translatesAutoresizingMaskIntoConstraints = false
 
         let footerDivider = NSBox()
         footerDivider.boxType = .separator
@@ -534,13 +580,15 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
         footer.addSubview(footerDivider)
         footer.addSubview(quitRow)
 
-        view.addSubview(tabs)
+        view.addSubview(shell)
         view.addSubview(footer)
         NSLayoutConstraint.activate([
-            tabs.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
-            tabs.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            tabs.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
-            tabs.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -8),
+            shell.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
+            shell.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+            shell.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
+            shell.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -8),
+            sidebar.widthAnchor.constraint(equalToConstant: 156),
+            tabs.widthAnchor.constraint(greaterThanOrEqualToConstant: Layout.contentWidth + 24),
             footer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             footer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             footer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -651,6 +699,19 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
     private func saveAllConfiguration() {
         saveConnectionConfiguration()
         saveSettingsConfiguration()
+    }
+
+    @objc private func showConnections() {
+        tabs.selectTabViewItem(withIdentifier: "config")
+    }
+
+    @objc private func showSettings() {
+        tabs.selectTabViewItem(withIdentifier: "settings")
+    }
+
+    @objc private func showDiagnostics() {
+        tabs.selectTabViewItem(withIdentifier: "log")
+        flushLogBuffer()
     }
 
     @objc private func chooseDirectory() {
@@ -825,14 +886,27 @@ private final class MainViewController: NSViewController, NSTabViewDelegate {
 
     private func updateRunButton(state: LocalMCPRuntimeState) {
         switch state {
-        case .stopped, .failed:
+        case .stopped:
             startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
+            shellStatusLabel.stringValue = "Runtime stopped"
+        case .failed:
+            startButton.title = "Connect"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = true
+            shellStatusLabel.stringValue = "Runtime failed"
         case .starting:
             startButton.title = "Connecting…"; startButton.bezelColor = .controlAccentColor; startButton.isEnabled = false
-        case .running, .restarting, .cooldown:
+            shellStatusLabel.stringValue = "Runtime starting"
+        case .running:
             startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
+            shellStatusLabel.stringValue = "Runtime connected"
+        case .restarting:
+            startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
+            shellStatusLabel.stringValue = "Runtime reconnecting"
+        case .cooldown:
+            startButton.title = "Disconnect"; startButton.bezelColor = .systemRed; startButton.isEnabled = true
+            shellStatusLabel.stringValue = "Reconnect cooldown"
         case .stopping:
             startButton.title = "Disconnecting…"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
+            shellStatusLabel.stringValue = "Runtime stopping"
         }
         startButton.contentTintColor = .white
     }
