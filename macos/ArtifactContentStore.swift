@@ -976,7 +976,8 @@ final class ArtifactContentStore {
             .replacingOccurrences(of: "_", with: "/")
         let remainder = base64.count % 4
         if remainder != 0 { base64 += String(repeating: "=", count: 4 - remainder) }
-        return Data(base64Encoded: base64)
+        guard let decoded = Data(base64Encoded: base64), base64URL(decoded) == value else { return nil }
+        return decoded
     }
 
     private struct StoreIdentity: Codable {

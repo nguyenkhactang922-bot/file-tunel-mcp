@@ -850,7 +850,9 @@ internal sealed class ArtifactContentStore
         if (string.IsNullOrWhiteSpace(value)) throw new FormatException();
         var normalized = value.Replace('-', '+').Replace('_', '/');
         normalized += new string('=', (4 - normalized.Length % 4) % 4);
-        return Convert.FromBase64String(normalized);
+        var decoded = Convert.FromBase64String(normalized);
+        if (!string.Equals(Base64Url(decoded), value, StringComparison.Ordinal)) throw new FormatException();
+        return decoded;
     }
 
     private sealed class StoreIdentity
