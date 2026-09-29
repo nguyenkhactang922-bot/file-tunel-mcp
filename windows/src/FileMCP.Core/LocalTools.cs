@@ -12,6 +12,7 @@ internal sealed partial class LocalTools
     private readonly ServerPolicy _policy;
     private readonly ExecProcessEnvironmentAuthority _execEnvironment;
     private readonly FileVersionService _fileVersions;
+    private readonly EditAdapterService _editAdapters;
     private readonly BatchFileService _batchFiles;
     private readonly AuthorizedPathSnapshotService _mutationGuard;
     private readonly QuarantineService _quarantine;
@@ -28,17 +29,17 @@ internal sealed partial class LocalTools
     private static readonly HashSet<string> HandlerToolNames = new(StringComparer.Ordinal)
     {
         "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "project_context", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     };
     private static readonly HashSet<string> SerializedToolNames = new(StringComparer.Ordinal)
     {
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "run_command",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "run_command",
         "git_init", "git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push",
     };
     private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "exec_process",
+        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "exec_process",
     };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -65,6 +66,7 @@ internal sealed partial class LocalTools
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
+        _editAdapters = new EditAdapterService(_fileVersions);
         var lazyArtifacts = artifactStore is not null
             ? new Lazy<ArtifactContentStore>(() => artifactStore, LazyThreadSafetyMode.ExecutionAndPublication)
             : new Lazy<ArtifactContentStore>(
@@ -196,6 +198,27 @@ internal sealed partial class LocalTools
                     GetRequiredString(arguments, "coordinate_system"),
                     GetString(arguments, "column_encoding", ""),
                     GetRequiredArray(arguments, "edits"),
+                    GetBool(arguments, "dry_run", false),
+                    GetBool(arguments, "preserve_line_endings", true),
+                    GetBool(arguments, "preserve_bom", true),
+                    preparedPolicy,
+                    effectiveCancellation,
+                    executionContext)),
+                "apply_search_replace" => ObjectOutput(ApplySearchReplace(
+                    GetRequiredString(arguments, "relative_path"),
+                    GetRequiredString(arguments, "expected_version"),
+                    GetRequiredString(arguments, "search"),
+                    GetRequiredString(arguments, "replacement"),
+                    GetBool(arguments, "dry_run", false),
+                    GetBool(arguments, "preserve_line_endings", true),
+                    GetBool(arguments, "preserve_bom", true),
+                    preparedPolicy,
+                    effectiveCancellation,
+                    executionContext)),
+                "apply_unified_diff" => ObjectOutput(ApplyUnifiedDiff(
+                    GetRequiredString(arguments, "relative_path"),
+                    GetRequiredString(arguments, "expected_version"),
+                    GetRequiredString(arguments, "unified_diff"),
                     GetBool(arguments, "dry_run", false),
                     GetBool(arguments, "preserve_line_endings", true),
                     GetBool(arguments, "preserve_bom", true),
@@ -740,6 +763,70 @@ internal sealed partial class LocalTools
     {
         var normalized = (value ?? "").Trim();
         return normalized.Length == 0 ? null : normalized;
+    }
+
+    private JsonObject ApplySearchReplace(
+        string relativePath,
+        string expectedVersion,
+        string search,
+        string replacement,
+        bool dryRun,
+        bool preserveLineEndings,
+        bool preserveBom,
+        PolicySnapshot preparedPolicy,
+        CancellationToken cancellationToken,
+        ToolExecutionContext? executionContext)
+    {
+        var compiled = _editAdapters.CompileSearchReplace(
+            relativePath,
+            expectedVersion,
+            search,
+            replacement,
+            cancellationToken,
+            executionContext);
+        return ApplyEdits(
+            relativePath,
+            expectedVersion,
+            "byte",
+            "",
+            compiled.Edits,
+            dryRun,
+            preserveLineEndings,
+            preserveBom,
+            preparedPolicy,
+            cancellationToken,
+            executionContext);
+    }
+
+    private JsonObject ApplyUnifiedDiff(
+        string relativePath,
+        string expectedVersion,
+        string unifiedDiff,
+        bool dryRun,
+        bool preserveLineEndings,
+        bool preserveBom,
+        PolicySnapshot preparedPolicy,
+        CancellationToken cancellationToken,
+        ToolExecutionContext? executionContext)
+    {
+        var compiled = _editAdapters.CompileUnifiedDiff(
+            relativePath,
+            expectedVersion,
+            unifiedDiff,
+            cancellationToken,
+            executionContext);
+        return ApplyEdits(
+            relativePath,
+            expectedVersion,
+            "byte",
+            "",
+            compiled.Edits,
+            dryRun,
+            preserveLineEndings,
+            preserveBom,
+            preparedPolicy,
+            cancellationToken,
+            executionContext);
     }
 
     private JsonObject ApplyEdits(

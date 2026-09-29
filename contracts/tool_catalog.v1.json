@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.8.0",
+  "catalogVersion": "1.9.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -1316,6 +1316,251 @@
             "expected_version",
             "coordinate_system",
             "edits"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "dry_run": {
+              "type": "boolean"
+            },
+            "committed": {
+              "type": "boolean"
+            },
+            "edits_applied": {
+              "type": "integer"
+            },
+            "bytes_before": {
+              "type": "integer"
+            },
+            "bytes_after": {
+              "type": "integer"
+            },
+            "coordinate_system": {
+              "type": "string"
+            },
+            "column_encoding": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "before_version": {
+              "type": "string"
+            },
+            "after_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "preserved_bom": {
+              "type": "boolean"
+            },
+            "line_ending": {
+              "type": "string"
+            },
+            "preview": {
+              "type": "string"
+            },
+            "cancelled_after_commit": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "dry_run",
+            "committed",
+            "edits_applied",
+            "bytes_before",
+            "bytes_after",
+            "coordinate_system",
+            "before_version",
+            "preserved_bom",
+            "line_ending",
+            "column_encoding",
+            "after_version"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "apply_search_replace",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "write",
+      "capabilities": [
+        "filesystem.write"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "apply_search_replace",
+        "description": "Compile an unambiguous exact search/replace into canonical byte edits and execute through apply_edits. Never writes directly; zero or multiple matches fail closed.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "relative_path": {
+              "type": "string",
+              "description": "Relative file path."
+            },
+            "expected_version": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Required opaque strong version token from read_file/read_file_range."
+            },
+            "search": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Exact UTF-8 text that must occur exactly once."
+            },
+            "replacement": {
+              "type": "string",
+              "description": "Replacement UTF-8 text."
+            },
+            "dry_run": {
+              "type": "boolean",
+              "default": false
+            },
+            "preserve_line_endings": {
+              "type": "boolean",
+              "default": true
+            },
+            "preserve_bom": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "required": [
+            "relative_path",
+            "expected_version",
+            "search",
+            "replacement"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "dry_run": {
+              "type": "boolean"
+            },
+            "committed": {
+              "type": "boolean"
+            },
+            "edits_applied": {
+              "type": "integer"
+            },
+            "bytes_before": {
+              "type": "integer"
+            },
+            "bytes_after": {
+              "type": "integer"
+            },
+            "coordinate_system": {
+              "type": "string"
+            },
+            "column_encoding": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "before_version": {
+              "type": "string"
+            },
+            "after_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "preserved_bom": {
+              "type": "boolean"
+            },
+            "line_ending": {
+              "type": "string"
+            },
+            "preview": {
+              "type": "string"
+            },
+            "cancelled_after_commit": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "dry_run",
+            "committed",
+            "edits_applied",
+            "bytes_before",
+            "bytes_after",
+            "coordinate_system",
+            "before_version",
+            "preserved_bom",
+            "line_ending",
+            "column_encoding",
+            "after_version"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "apply_unified_diff",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "write",
+      "capabilities": [
+        "filesystem.write"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "apply_unified_diff",
+        "description": "Compile a single-file unified diff into canonical byte edits and execute through apply_edits. Headers, context, hunk counts and overlap are validated fail-closed.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "relative_path": {
+              "type": "string",
+              "description": "Relative file path; unified diff headers must resolve to this same path."
+            },
+            "expected_version": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Required opaque strong version token from read_file/read_file_range."
+            },
+            "unified_diff": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Single-file unified diff. Context/removal lines must match the expected-version source exactly."
+            },
+            "dry_run": {
+              "type": "boolean",
+              "default": false
+            },
+            "preserve_line_endings": {
+              "type": "boolean",
+              "default": true
+            },
+            "preserve_bom": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "required": [
+            "relative_path",
+            "expected_version",
+            "unified_diff"
           ],
           "additionalProperties": false
         },

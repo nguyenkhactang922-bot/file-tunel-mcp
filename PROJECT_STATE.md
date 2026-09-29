@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-016-quarantine-restore`
+Active branch: `chatgpt/FMG-017-model-friendly-edit-adapters`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -627,3 +627,33 @@ Candidate `8dd03ede244da123c41fd035d740b33b52526a11`; Verify run `36461989589`: 
 Scoped review PASS for package-before-delete, expected-version + Mutation Guard + policy reauthorization, guarded atomic single-file restore, checkpoint-backed tree transaction, identity-safe rollback and retained recovery artifact on rollback failure.
 Evidence: `docs/evidence/FMG-016_QUARANTINE_DELETE_RESTORE_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-016 DONE / MAIN VERIFIED -> claim FMG-017.
+
+## FMG-016 final closure / FMG-017 claim
+
+FMG-016: DONE / MAIN VERIFIED.
+- PR #35 head: `6e14773880a92e2413ec4d51793a2f04f3a8f705`.
+- Merge main: `59073351ee77505659aa6a426fe73ff08a29b085`.
+- Final exact-head Verify: `36511125923` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Merged-main Verify: `36511411880` SUCCESS.
+- Evidence: `docs/evidence/FMG-016_QUARANTINE_DELETE_RESTORE_EVIDENCE.md`.
+
+FMG-017: CLAIMED / ACTIVE on `chatgpt/FMG-017-model-friendly-edit-adapters`.
+NEXT_EXACT_ACTION: implement model-friendly edit adapters only: `apply_search_replace` + `apply_unified_diff`, preview/dry-run, deterministic compilation to canonical `apply_edits`, no direct writes, expected-version preservation, exact BOM/newline inheritance, ambiguity fail-closed, and negative tests for zero/multiple match, malformed diff, overlapping hunks, stale version, path-header escape and cancellation. Do not begin FMG-018 before FMG-017 MAIN VERIFIED.
+
+## FMG-017 local verification checkpoint
+
+State: LOCAL VERIFIED / MAIN SYNC + NATIVE CI PENDING on `chatgpt/FMG-017-model-friendly-edit-adapters`.
+Catalog: 1.9.0 / 31 canonical tools / SHA-256 `7b053baec3ddd1ce8789e651bdd0e9f6d1354387c03f2ddf8a1a05763d32d4d8`.
+Local proof: edit-adapter contract + catalog/parity + dependent mutation/version contracts PASS; Windows Release 0 warnings/errors; FMG-017 isolation 16 assertions PASS; full Windows regression 834 assertions PASS; diff check PASS. macOS implementation/runtime harness is wired; native Swift verification is pending GitHub macOS Verify because this Windows host has no usable Swift toolchain.
+Evidence: `docs/evidence/FMG-017_MODEL_FRIENDLY_EDIT_ADAPTERS_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit local-verified FMG-017 candidate, sync latest fork/main, rerun affected local gates, push exact synchronized head, require native Verify macOS + Windows x64 + native Windows ARM64, scoped review, PR/merge, merged-main Verify, then mark FMG-017 DONE / MAIN VERIFIED and claim FMG-018.
+
+
+## FMG-017 exact-head native verification / scoped review
+
+State: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
+Candidate: `5abe84a2c4b455b645307e70bacec86bdc1b5e9f`.
+Verify run `36518117949`: SUCCESS on macOS / Windows x64 / native Windows ARM64. Initial run `36517765343` exposed only a Swift test call-label error; remediation was test-only.
+Scoped review PASS: adapters are compile-only, preserve expected_version, delegate every write to canonical apply_edits, and fail closed on ambiguity/malformed diff/overlap/path escape/stale source/cancellation.
+Evidence: `docs/evidence/FMG-017_MODEL_FRIENDLY_EDIT_ADAPTERS_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push the evidence-only closure head, require exact-head native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-017 DONE / MAIN VERIFIED -> claim FMG-018.

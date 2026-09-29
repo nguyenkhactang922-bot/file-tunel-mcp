@@ -42,6 +42,7 @@ jobs:
             macos/LogicalChatCorrelation.swift \
             macos/ArtifactContentStore.swift \
             macos/BatchFileService.swift \
+            macos/EditAdapterService.swift \
             macos/QuarantineService.swift \
             macos/EvidenceSupport.swift \
             macos/ToolCatalog.swift \
@@ -142,6 +143,10 @@ jobs:
       - name: Verify atomic apply_edits contract
         shell: pwsh
         run: ./tests/test_apply_edits_contract.ps1
+
+      - name: Verify model-friendly edit adapters contract
+        shell: pwsh
+        run: ./tests/test_edit_adapters_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh
@@ -261,6 +266,10 @@ jobs:
       - name: Verify atomic apply_edits contract
         shell: pwsh
         run: ./tests/test_apply_edits_contract.ps1
+
+      - name: Verify model-friendly edit adapters contract
+        shell: pwsh
+        run: ./tests/test_edit_adapters_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh

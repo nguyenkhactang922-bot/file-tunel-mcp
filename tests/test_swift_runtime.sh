@@ -1302,6 +1302,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/AuthorizedPathSnapshot.swift \
     macos/ArtifactContentStore.swift \
     macos/BatchFileService.swift \
+    macos/EditAdapterService.swift \
     macos/QuarantineService.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
@@ -2001,6 +2002,250 @@ let fmg009StageText = try String(contentsOf: fmg009StageURL, encoding: .utf8)
 precondition(fmg009StageText == "original")
 
 print("swift-apply-edits: ok")
+
+precondition(fmg009Tools.hasTool(named: "apply_search_replace") && fmg009Tools.hasTool(named: "apply_unified_diff"))
+
+let fmg017SearchURL = fmg009Root.appendingPathComponent("adapter-search.txt")
+try Data("alpha\nbeta\ngamma\n".utf8).write(to: fmg017SearchURL)
+let fmg017SearchVersion = try fmg009Version("adapter-search.txt")
+let fmg017SearchDry = try fmg009Tools.call(
+    name: "apply_search_replace",
+    arguments: [
+        "relative_path": "adapter-search.txt",
+        "expected_version": fmg017SearchVersion,
+        "search": "beta",
+        "replacement": "BETA",
+        "dry_run": true,
+    ]
+)
+let fmg017SearchCanonical = try fmg009Tools.call(
+    name: "apply_edits",
+    arguments: applyArgs(
+        "adapter-search.txt",
+        fmg017SearchVersion,
+        "byte",
+        [byteEdit(6, 10, "BETA")],
+        dryRun: true
+    )
+)
+precondition(
+    fmg017SearchDry.structuredContent["preview"] as? String ==
+    fmg017SearchCanonical.structuredContent["preview"] as? String
+)
+let fmg017SearchDryText = try String(contentsOf: fmg017SearchURL, encoding: .utf8)
+precondition(fmg017SearchDryText == "alpha\nbeta\ngamma\n")
+let fmg017SearchCommit = try fmg009Tools.call(
+    name: "apply_search_replace",
+    arguments: [
+        "relative_path": "adapter-search.txt",
+        "expected_version": fmg017SearchVersion,
+        "search": "beta",
+        "replacement": "BETA",
+    ]
+)
+precondition(fmg017SearchCommit.structuredContent["committed"] as? Bool == true)
+let fmg017SearchCommitText = try String(contentsOf: fmg017SearchURL, encoding: .utf8)
+precondition(fmg017SearchCommitText == "alpha\nBETA\ngamma\n")
+print("swift-edit-search-replace: ok")
+
+let fmg017DiffURL = fmg009Root.appendingPathComponent("adapter-diff.txt")
+try Data("one\ntwo\nthree\n".utf8).write(to: fmg017DiffURL)
+let fmg017DiffVersion = try fmg009Version("adapter-diff.txt")
+let fmg017Patch = """
+--- a/adapter-diff.txt
++++ b/adapter-diff.txt
+@@ -1,3 +1,3 @@
+ one
+-two
++TWO
+ three
+"""
+let fmg017DiffDry = try fmg009Tools.call(
+    name: "apply_unified_diff",
+    arguments: [
+        "relative_path": "adapter-diff.txt",
+        "expected_version": fmg017DiffVersion,
+        "unified_diff": fmg017Patch,
+        "dry_run": true,
+    ]
+)
+let fmg017DiffCanonical = try fmg009Tools.call(
+    name: "apply_edits",
+    arguments: applyArgs(
+        "adapter-diff.txt",
+        fmg017DiffVersion,
+        "byte",
+        [byteEdit(0, Data("one\ntwo\nthree\n".utf8).count, "one\nTWO\nthree\n")],
+        dryRun: true
+    )
+)
+precondition(
+    fmg017DiffDry.structuredContent["preview"] as? String ==
+    fmg017DiffCanonical.structuredContent["preview"] as? String
+)
+let fmg017DiffCommit = try fmg009Tools.call(
+    name: "apply_unified_diff",
+    arguments: [
+        "relative_path": "adapter-diff.txt",
+        "expected_version": fmg017DiffVersion,
+        "unified_diff": fmg017Patch,
+    ]
+)
+precondition(fmg017DiffCommit.structuredContent["committed"] as? Bool == true)
+let fmg017DiffText = try String(contentsOf: fmg017DiffURL, encoding: .utf8)
+precondition(fmg017DiffText == "one\nTWO\nthree\n")
+print("swift-edit-unified-diff: ok")
+
+let fmg017ZeroURL = fmg009Root.appendingPathComponent("adapter-zero.txt")
+try Data("alpha\n".utf8).write(to: fmg017ZeroURL)
+let fmg017ZeroVersion = try fmg009Version("adapter-zero.txt")
+do {
+    _ = try fmg009Tools.call(
+        name: "apply_search_replace",
+        arguments: [
+            "relative_path": "adapter-zero.txt",
+            "expected_version": fmg017ZeroVersion,
+            "search": "missing",
+            "replacement": "x",
+        ]
+    )
+    preconditionFailure("FMG-017 zero match must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("zero locations"))
+}
+
+let fmg017MultiURL = fmg009Root.appendingPathComponent("adapter-multi.txt")
+try Data("same same\n".utf8).write(to: fmg017MultiURL)
+let fmg017MultiVersion = try fmg009Version("adapter-multi.txt")
+do {
+    _ = try fmg009Tools.call(
+        name: "apply_search_replace",
+        arguments: [
+            "relative_path": "adapter-multi.txt",
+            "expected_version": fmg017MultiVersion,
+            "search": "same",
+            "replacement": "x",
+        ]
+    )
+    preconditionFailure("FMG-017 multiple matches must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("ambiguous"))
+}
+
+let fmg017StaleURL = fmg009Root.appendingPathComponent("adapter-stale.txt")
+try Data("version-a\n".utf8).write(to: fmg017StaleURL)
+let fmg017StaleVersion = try fmg009Version("adapter-stale.txt")
+try Data("version-b\n".utf8).write(to: fmg017StaleURL)
+do {
+    _ = try fmg009Tools.call(
+        name: "apply_search_replace",
+        arguments: [
+            "relative_path": "adapter-stale.txt",
+            "expected_version": fmg017StaleVersion,
+            "search": "version-a",
+            "replacement": "changed",
+        ]
+    )
+    preconditionFailure("FMG-017 stale version must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("changed"))
+}
+
+let fmg017CancelURL = fmg009Root.appendingPathComponent("adapter-cancel.txt")
+try Data("alpha\n".utf8).write(to: fmg017CancelURL)
+let fmg017CancelVersion = try fmg009Version("adapter-cancel.txt")
+let fmg017CancelContext = try ToolExecutionContext(meta: nil, cancellationProbe: { true })
+do {
+    _ = try fmg009Tools.call(
+        name: "apply_search_replace",
+        arguments: [
+            "relative_path": "adapter-cancel.txt",
+            "expected_version": fmg017CancelVersion,
+            "search": "alpha",
+            "replacement": "ALPHA",
+        ],
+        executionContext: fmg017CancelContext
+    )
+    preconditionFailure("FMG-017 cancellation must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("cancelled"))
+}
+
+let fmg017BadURL = fmg009Root.appendingPathComponent("adapter-bad-diff.txt")
+try Data("one\ntwo\nthree\n".utf8).write(to: fmg017BadURL)
+let fmg017BadVersion = try fmg009Version("adapter-bad-diff.txt")
+do {
+    _ = try fmg009Tools.call(
+        name: "apply_unified_diff",
+        arguments: [
+            "relative_path": "adapter-bad-diff.txt",
+            "expected_version": fmg017BadVersion,
+            "unified_diff": "--- a/adapter-bad-diff.txt\n+++ b/adapter-bad-diff.txt\nnot-a-hunk\n",
+        ]
+    )
+    preconditionFailure("FMG-017 malformed diff must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("malformed"))
+}
+
+do {
+    _ = try fmg009Tools.call(
+        name: "apply_unified_diff",
+        arguments: [
+            "relative_path": "adapter-bad-diff.txt",
+            "expected_version": fmg017BadVersion,
+            "unified_diff": "--- a/../escape.txt\n+++ b/../escape.txt\n@@ -1,1 +1,1 @@\n-one\n+ONE\n",
+        ]
+    )
+    preconditionFailure("FMG-017 path escape must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("escapes"))
+}
+
+let fmg017Overlap = """
+--- a/adapter-bad-diff.txt
++++ b/adapter-bad-diff.txt
+@@ -1,2 +1,2 @@
+ one
+-two
++TWO
+@@ -2,2 +2,2 @@
+ two
+-three
++THREE
+"""
+do {
+    _ = try fmg009Tools.call(
+        name: "apply_unified_diff",
+        arguments: [
+            "relative_path": "adapter-bad-diff.txt",
+            "expected_version": fmg017BadVersion,
+            "unified_diff": fmg017Overlap,
+        ]
+    )
+    preconditionFailure("FMG-017 overlapping hunks must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("overlapping"))
+}
+
+let fmg017BomURL = fmg009Root.appendingPathComponent("adapter-bom-crlf.txt")
+var fmg017BomData = Data([0xEF, 0xBB, 0xBF])
+fmg017BomData.append(Data("alpha\r\nbeta\r\n".utf8))
+try fmg017BomData.write(to: fmg017BomURL)
+let fmg017BomVersion = try fmg009Version("adapter-bom-crlf.txt")
+_ = try fmg009Tools.call(
+    name: "apply_search_replace",
+    arguments: [
+        "relative_path": "adapter-bom-crlf.txt",
+        "expected_version": fmg017BomVersion,
+        "search": "beta",
+        "replacement": "B\nC",
+    ]
+)
+let fmg017BomBytes = try Data(contentsOf: fmg017BomURL)
+precondition(Array(fmg017BomBytes.prefix(3)) == [0xEF, 0xBB, 0xBF])
+precondition(String(decoding: fmg017BomBytes.dropFirst(3), as: UTF8.self) == "alpha\r\nB\r\nC\r\n")
+print("swift-edit-adapter-negative: ok")
 
 let fmg010Root = root.appendingPathComponent("project-context")
 let fmg010Deep = fmg010Root.appendingPathComponent("sub/deep")
@@ -2709,6 +2954,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/AuthorizedPathSnapshot.swift \
     macos/ArtifactContentStore.swift \
     macos/BatchFileService.swift \
+    macos/EditAdapterService.swift \
     macos/QuarantineService.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
@@ -2743,7 +2989,7 @@ UNAVAILABLE_EVIDENCE_BASE_URL="http://127.0.0.1:18091/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.8.0"
+CATALOG_VERSION="1.9.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
