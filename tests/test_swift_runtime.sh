@@ -2332,7 +2332,22 @@ let fmg018CacheFiles = FileManager.default.enumerator(at: fmg018Cache, including
 precondition(fmg018CacheFiles.count == 1)
 let fmg018CacheText = try String(contentsOf: fmg018CacheFiles[0], encoding: .utf8)
 precondition(!fmg018CacheText.contains("TOP_SECRET_RAW_BODY_FMG018"))
-try "{not-json".write(to: fmg018CacheFiles[0], atomically: true, encoding: .utf8)
+
+let fmg018ProfileMismatchText = fmg018CacheText.replacingOccurrences(
+    of: "\"provider_version\":\"lexical-v1\"",
+    with: "\"provider_version\":\"lexical-mismatch-v0\""
+)
+precondition(fmg018ProfileMismatchText != fmg018CacheText)
+try fmg018ProfileMismatchText.write(to: fmg018CacheFiles[0], atomically: true, encoding: .utf8)
+let fmg018ProfileRebuilt = try fmg018Tools.getRepositoryIntelligence(repoPath: "repo")
+precondition(!fmg018ProfileRebuilt.cacheHit)
+precondition(fmg018ProfileRebuilt.generationID == fmg018First.generationID)
+
+let fmg018CacheFilesAfterProfileMismatch = FileManager.default.enumerator(at: fmg018Cache, includingPropertiesForKeys: nil)?
+    .compactMap { $0 as? URL }
+    .filter { $0.pathExtension == "json" } ?? []
+precondition(fmg018CacheFilesAfterProfileMismatch.count == 1)
+try "{not-json".write(to: fmg018CacheFilesAfterProfileMismatch[0], atomically: true, encoding: .utf8)
 let fmg018Rebuilt = try fmg018Tools.getRepositoryIntelligence(repoPath: "repo")
 precondition(!fmg018Rebuilt.cacheHit)
 precondition(fmg018Rebuilt.generationID == fmg018First.generationID)
@@ -2349,6 +2364,40 @@ let fmg018PostChangeCacheFiles = FileManager.default.enumerator(at: fmg018Cache,
     .compactMap { $0 as? URL }
     .filter { $0.pathExtension == "json" } ?? []
 precondition(fmg018PostChangeCacheFiles.count == 1)
+
+var fmg018InsideCacheRejected = false
+do {
+    _ = try RepositoryIntelligenceService(
+        workspaceRoot: fmg018Workspace,
+        containsWorkspaceURL: { _ in true },
+        gitRepo: { _ in fmg018Workspace.appendingPathComponent("repo") },
+        listTracked: { _ in "" },
+        captureSourceState: { _ in ["source_state_id": "sha256:inside-cache"] },
+        cacheRoot: fmg018Workspace.appendingPathComponent("cache-inside")
+    )
+} catch {
+    fmg018InsideCacheRejected = error.localizedDescription.lowercased().contains("outside the workspace")
+}
+precondition(fmg018InsideCacheRejected)
+
+let fmg018GiantInventory = (0...RepositoryIntelligenceService.maxTrackedFiles)
+    .map { "file-\($0).cs" }
+    .joined(separator: "\0") + "\0"
+let fmg018GiantService = try RepositoryIntelligenceService(
+    workspaceRoot: fmg018Workspace,
+    containsWorkspaceURL: { _ in true },
+    gitRepo: { _ in fmg018Workspace.appendingPathComponent("repo") },
+    listTracked: { _ in fmg018GiantInventory },
+    captureSourceState: { _ in ["source_state_id": "sha256:giant-repo"] },
+    cacheRoot: fmg018Root.appendingPathComponent("giant-cache")
+)
+var fmg018GiantRejected = false
+do {
+    _ = try fmg018GiantService.getOrBuild(repoPath: "repo")
+} catch {
+    fmg018GiantRejected = error.localizedDescription.lowercased().contains("tracked inventory exceeds")
+}
+precondition(fmg018GiantRejected)
 
 let fmg018CancelledContext = try ToolExecutionContext(meta: nil, cancellationProbe: { true })
 var fmg018Cancelled = false

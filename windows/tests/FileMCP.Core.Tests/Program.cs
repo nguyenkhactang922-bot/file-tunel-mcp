@@ -3012,6 +3012,15 @@ internal static class Program
         Assert(cacheFiles.Length == 1, "repository intelligence writes one metadata cache generation");
         var cacheJson = File.ReadAllText(cacheFiles[0], Encoding.UTF8);
         Assert(!cacheJson.Contains("TOP_SECRET_RAW_BODY_FMG018", StringComparison.Ordinal), "metadata cache does not persist raw full-source body");
+
+        var profileMismatch = JsonNode.Parse(cacheJson)!.AsObject();
+        profileMismatch["provider_version"] = "lexical-mismatch-v0";
+        File.WriteAllText(cacheFiles[0], profileMismatch.ToJsonString(), new UTF8Encoding(false));
+        var profileRebuilt = await tools.GetRepositoryIntelligenceAsync("repo");
+        Assert(!profileRebuilt.CacheHit && profileRebuilt.GenerationId == first.GenerationId, "provider/profile cache mismatch rebuilds deterministically");
+
+        cacheFiles = Directory.EnumerateFiles(cacheRoot, "*.json", SearchOption.AllDirectories).ToArray();
+        Assert(cacheFiles.Length == 1, "provider/profile mismatch rebuild leaves one current cache generation");
         File.WriteAllText(cacheFiles[0], "{not-json", new UTF8Encoding(false));
         var rebuilt = await tools.GetRepositoryIntelligenceAsync("repo");
         Assert(!rebuilt.CacheHit && rebuilt.GenerationId == first.GenerationId, "corrupt cache is deleted and deterministically rebuilt");
@@ -3051,6 +3060,22 @@ internal static class Program
             () => giant.GetOrBuildAsync("repo"),
             "tracked inventory exceeds",
             "giant repository inventory fails closed at bounded file cap");
+
+        var insideCacheRejected = false;
+        try
+        {
+            _ = new RepositoryIntelligenceService(
+                new SafePathResolver(workspace),
+                (_, _) => Task.FromResult(workspace),
+                (_, _, _, _, _) => Task.FromResult(""),
+                (_, _) => Task.FromResult(new JsonObject { ["source_state_id"] = "sha256:inside-cache" }),
+                cacheRoot: Path.Combine(workspace, "cache-inside"));
+        }
+        catch (FileMcpException ex)
+        {
+            insideCacheRejected = ex.Message.Contains("outside the workspace", StringComparison.OrdinalIgnoreCase);
+        }
+        Assert(insideCacheRejected, "repository intelligence rejects cache root inside workspace");
 
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();

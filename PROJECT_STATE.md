@@ -689,3 +689,10 @@ NEXT_EXACT_ACTION: commit/push this two-line macOS compile fix and require a new
 
 Run `36534896586` on `c55c568f12b5304262379856498d19dd5156228b`: Windows x64 SUCCESS; Windows ARM64 SUCCESS; macOS Static verification SUCCESS, then Swift integration failed exactly at `fmg018Second.cacheHit`. The cache publish/load path was intact, but stale-generation cleanup compared file-URL objects directly. Remediation changes cleanup identity to standardized file paths so the just-published current generation cannot be removed due URL representation differences. Cache remains rebuildable/non-authoritative; SourceStateRef, provider semantics and tool surface are unchanged.
 NEXT_EXACT_ACTION: commit/push this macOS cache-generation fix and require a new exact-head native Verify on all three lanes.
+
+## FMG-018 exact-head verification / scoped review hardening
+
+Product head `a5903e51ce5b188f8c22462433964cde1f8a2211` passed native Verify run `36536956563` on macOS / Windows x64 / native Windows ARM64.
+Scoped review found product guards already implemented for giant inventory and provider/profile cache identity; Windows had direct coverage, while Swift lacked explicit proof and cache-root-inside-workspace coverage was not direct. Test-only hardening adds explicit cache identity mismatch, in-workspace cache rejection and giant-repository checks on macOS plus matching cache identity/cache-root checks on Windows. No repository-intelligence product semantics changed after the green product head.
+Local affected-stage proof: Windows repo-intelligence-only 28 assertions PASS; test project build 0 warnings/errors; Swift harness syntax PASS; diff check PASS.
+NEXT_EXACT_ACTION: commit/push this test/review-hardening closure head, require exact-head native Verify all three lanes, then scoped review -> PR/merge -> merged-main Verify -> FMG-018 DONE / MAIN VERIFIED -> claim FMG-019.
