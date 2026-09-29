@@ -1095,9 +1095,10 @@ let ptyNative = try ptyReadUntil(
 let ptyOwnedListAfterNative = try ptyTools.call(name: "pty_list", arguments: [:])
 let ptyOwnedSessionsAfterNative = ptyOwnedListAfterNative.structuredContent["sessions"] as? [[String: Any]] ?? []
 let ptyOwnedMetaAfterNative = ptyOwnedSessionsAfterNative.first(where: { ($0["session_id"] as? String) == ptyOwnedSession }) ?? [:]
+let ptyChildPIDDiagnostic = (try? String(contentsOf: ptyChildPIDFile, encoding: .utf8)) ?? "<missing>"
 precondition(
     ptyNative.text.contains("FMG020_TTY:1:1"),
-    "forkpty child must observe terminal stdin/stdout; observed=\(ptyNative.text) state=\(ptyNative.state) meta=\(ptyOwnedMetaAfterNative)"
+    "POSIX PTY child must observe terminal stdin/stdout; observed=\(ptyNative.text) state=\(ptyNative.state) child_pid_file=\(ptyChildPIDDiagnostic) meta=\(ptyOwnedMetaAfterNative)"
 )
 
 waitFor({

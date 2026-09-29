@@ -984,3 +984,20 @@ Unchanged: workspace scope, opaque session IDs, policy reauthorization, ring/cur
 
 Local affected proof: persistent-PTY contract PASS; Swift runtime shell syntax PASS; macOS build shell syntax PASS; `git diff --check` PASS. Native typecheck/integration remains pending on macOS CI.
 NEXT_EXACT_ACTION: verify remote/main state, commit/push this exact macOS launcher remediation, then require exact-head native Verify on macOS / Windows x64 / Windows ARM64.
+
+## FMG-020 macOS PTY raw-FD remediation
+
+Exact-head `c8b0d2a263110570789787d8734cb5694d4f2c59`, Verify run `36601440168`, proved the new `openpty + posix_spawn` launcher passes macOS static/typecheck but integration still returns an owned live session with `state=running`, `exit_code=null`, and `end_cursor=0`.
+
+The next remediation is isolated to the PTY master I/O layer:
+- replace Foundation `FileHandle` reads/writes with raw `Darwin.read/write` loops;
+- retry `EINTR`;
+- treat PTY-master `EIO` as a transient slave-lifecycle condition while the owned child is still running, instead of silently terminating the reader;
+- preserve bounded partial-write handling;
+- resize/close now use the same raw descriptors;
+- native failure diagnostics include the descendant PID-file state, which distinguishes fixture execution from an output-reader failure.
+
+Unchanged: `openpty + posix_spawn` launch topology, process-group ownership, workspace/session scope, policy reauthorization, ring/cursor/TTL/spill semantics, restart-no-resume, and PTY evidence/telemetry privacy.
+
+Local affected proof already PASS: persistent-PTY contract; Swift runtime shell syntax; `git diff --check`.
+NEXT_EXACT_ACTION: verify remote/main/PR state, commit/push the raw-FD remediation, require exact-head native Verify, then inspect only any failing lane/stage.

@@ -32,8 +32,8 @@ struct PersistentPtyOptions {
 private final class PosixPtyHost {
     let processID: pid_t
     let processGroupID: pid_t
-    private let readHandle: FileHandle
-    private let writeHandle: FileHandle
+    private let readFD: Int32
+    private let writeFD: Int32
     private let stateLock = NSLock()
     private let exitGroup = DispatchGroup()
     private var running = true
@@ -43,8 +43,8 @@ private final class PosixPtyHost {
     private init(processID: pid_t, masterReadFD: Int32, masterWriteFD: Int32) {
         self.processID = processID
         self.processGroupID = processID
-        self.readHandle = FileHandle(fileDescriptor: masterReadFD, closeOnDealloc: true)
-        self.writeHandle = FileHandle(fileDescriptor: masterWriteFD, closeOnDealloc: true)
+        self.readFD = masterReadFD
+        self.writeFD = masterWriteFD
         exitGroup.enter()
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
@@ -253,11 +253,47 @@ private final class PosixPtyHost {
     }
 
     func read(upToCount count: Int) throws -> Data {
-        try readHandle.read(upToCount: count) ?? Data()
+        guard count > 0 else { return Data() }
+        var buffer = [UInt8](repeating: 0, count: count)
+        while true {
+            let result = buffer.withUnsafeMutableBytes { raw -> Int in
+                Darwin.read(readFD, raw.baseAddress, count)
+            }
+            if result > 0 { return Data(buffer.prefix(result)) }
+            if result == 0 { return Data() }
+            if errno == EINTR { continue }
+            if errno == EIO {
+                // PTY masters can report EIO around slave lifecycle transitions.
+                // Keep the reader alive while the owned child is still running.
+                if isRunning {
+                    usleep(10_000)
+                    continue
+                }
+                return Data()
+            }
+            throw MCPServerError.operationFailed(
+                "Could not read POSIX PTY master: \(String(cString: strerror(errno)))"
+            )
+        }
     }
 
     func write(_ data: Data) throws {
-        try writeHandle.write(contentsOf: data)
+        if data.isEmpty { return }
+        try data.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress else { return }
+            var offset = 0
+            while offset < raw.count {
+                let result = Darwin.write(writeFD, base.advanced(by: offset), raw.count - offset)
+                if result > 0 {
+                    offset += result
+                    continue
+                }
+                if result < 0 && errno == EINTR { continue }
+                throw MCPServerError.operationFailed(
+                    "Could not write POSIX PTY master: \(String(cString: strerror(errno)))"
+                )
+            }
+        }
     }
 
     func waitForExit() -> Int32 {
@@ -277,7 +313,7 @@ private final class PosixPtyHost {
             ws_xpixel: 0,
             ws_ypixel: 0
         )
-        let result = ioctl(readHandle.fileDescriptor, UInt(TIOCSWINSZ), &size)
+        let result = ioctl(readFD, UInt(TIOCSWINSZ), &size)
         guard result == 0 else {
             throw MCPServerError.operationFailed(
                 "Could not resize POSIX PTY: \(String(cString: strerror(errno)))"
@@ -343,8 +379,8 @@ private final class PosixPtyHost {
         }
         closed = true
         stateLock.unlock()
-        try? readHandle.close()
-        try? writeHandle.close()
+        _ = Darwin.close(readFD)
+        _ = Darwin.close(writeFD)
     }
 
     deinit {
