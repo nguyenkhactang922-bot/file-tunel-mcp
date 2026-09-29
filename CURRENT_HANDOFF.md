@@ -762,3 +762,30 @@ NEXT_EXACT_ACTION: commit local-verified candidate, sync latest fork/main, rerun
 
 Run `36524611510` on `f5e9190`: Windows x64 + ARM64 SUCCESS; macOS static/catalog SUCCESS; macOS integration timed out only because the pre-listener fixture watchdog was 15s after FMG-018 added bounded Git/SourceStateRef adversarial scans. Remediation is test-only: readiness deadline 15s -> 45s. FMG-018 contract + diff check PASS; product semantics unchanged.
 NEXT_EXACT_ACTION: commit/push remediation and require exact-head native Verify all three lanes. FMG-019 remains BLOCKED.
+
+## FMG-018 exact-head native verification / scoped review - 2026-09-29
+
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
+
+Candidate: `f1517f84cb5d7f8ae1dce329d1673b97dda7c58f`.
+Native Verify: run `36525032038` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Attempt-1 remediation in `f1517f8` is test-harness only:
+- FMG-018 cache fixtures use a unique sibling temporary cache base, isolated from the resolver workspace;
+- pre-listener macOS fixture readiness watchdog increased from 15s to 45s for the added bounded Git/SourceStateRef adversarial scans;
+- no repository-intelligence product authority/catalog/runtime semantics changed.
+
+Scoped review PASS:
+- inventory is Git-tracked only (`git ls-files --cached -z --`) and bounded;
+- paths are normalized/resolved through existing workspace authority;
+- vendor/generated/binary/oversized inputs degrade or skip deterministically;
+- lexical provider emits provider id/version, parser-profile hash and `completeness=heuristic`;
+- cache is metadata-only; raw source is not persisted;
+- cache freshness binds SourceStateRef + provider/profile and stale/corrupt cache is deleted/rebuilt;
+- SourceStateRef is rechecked immediately before cache publish and in-flight source changes fail;
+- indexing is ToolBudget/cancellation bounded;
+- outputs explicitly report `grants_authority=false`;
+- baseline tool/catalog surface remains unchanged; FMG-019 query facade is still BLOCKED.
+
+Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify all three lanes, then PR/review/merge -> merged-main Verify -> FMG-018 DONE / MAIN VERIFIED -> claim FMG-019.

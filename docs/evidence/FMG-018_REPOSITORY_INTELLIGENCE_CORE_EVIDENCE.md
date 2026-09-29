@@ -81,3 +81,24 @@ Run `36524611510` on `f5e9190197e92f386fcc89e951ac57ee23688ef3`:
 Remediation: test-only increase of the bounded macOS fixture readiness deadline from 15s to 45s. Product repository-intelligence code, catalog and authority are unchanged.
 Local affected proof: FMG-018 contract PASS; diff check PASS.
 NEXT_EXACT_ACTION: commit/push test-only remediation and require a new exact-head native Verify on macOS + Windows x64 + native Windows ARM64.
+
+## Exact-head native verification and scoped review
+
+Candidate `f1517f84cb5d7f8ae1dce329d1673b97dda7c58f`.
+Verify run `36525032038`: SUCCESS on macOS, Windows x64 and native Windows ARM64.
+
+The attempt-1 remediation commit is test-only: FMG-018 cache fixtures were isolated under a unique sibling temporary cache base and the pre-listener macOS readiness watchdog was increased from 15 seconds to 45 seconds. Product repository-intelligence code, catalog and authority are unchanged by that remediation.
+
+Scoped review PASS:
+- Git-tracked-only bounded inventory;
+- SafePathResolver / existing Git authority reuse;
+- provider id/version/parser profile + heuristic completeness truth labeling;
+- metadata-only cache with no raw source persistence;
+- SourceStateRef-bound freshness and pre-publish recheck;
+- stale/corrupt cache delete/rebuild;
+- bounded/cancellable indexing;
+- deterministic generated/vendor/binary/unsupported-language degradation;
+- no authorization decisions depend on intelligence results;
+- no FMG-019 MCP facade/tool exposure is claimed.
+
+NEXT_EXACT_ACTION: evidence-only closure commit -> exact-head native Verify -> PR/merge -> merged-main Verify -> FMG-018 DONE / MAIN VERIFIED -> FMG-019.
