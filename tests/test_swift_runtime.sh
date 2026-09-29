@@ -1314,6 +1314,56 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
 cat >"$TMP_DIR/main.swift" <<'SWIFT'
 import Foundation
 
+let root = FileManager.default.temporaryDirectory.appendingPathComponent("filemcp-repo-intelligence-negative")
+try? FileManager.default.removeItem(at: root)
+try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+let workspace = root.appendingPathComponent("workspace")
+try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+
+var insideCacheRejected = false
+do {
+    _ = try RepositoryIntelligenceService(
+        workspaceRoot: workspace,
+        containsWorkspaceURL: { _ in true },
+        gitRepo: { _ in workspace },
+        listTracked: { _ in "" },
+        captureSourceState: { _ in ["source_state_id": "sha256:inside-cache"] },
+        cacheRoot: workspace.appendingPathComponent("cache-inside")
+    )
+} catch {
+    insideCacheRejected = error.localizedDescription.lowercased().contains("outside the workspace")
+}
+precondition(insideCacheRejected)
+
+let giantInventory = (0...RepositoryIntelligenceService.maxTrackedFiles)
+    .map { "file-\($0).cs" }
+    .joined(separator: "\0") + "\0"
+let giantService = try RepositoryIntelligenceService(
+    workspaceRoot: workspace,
+    containsWorkspaceURL: { _ in true },
+    gitRepo: { _ in workspace },
+    listTracked: { _ in giantInventory },
+    captureSourceState: { _ in ["source_state_id": "sha256:giant-repo"] },
+    cacheRoot: root.appendingPathComponent("giant-cache")
+)
+var giantRejected = false
+do {
+    _ = try giantService.getOrBuild(repoPath: ".")
+} catch {
+    giantRejected = error.localizedDescription.lowercased().contains("tracked inventory exceeds")
+}
+precondition(giantRejected)
+print("swift-repository-intelligence-negative: ok")
+SWIFT
+swiftc -framework CryptoKit -o "$TMP_DIR/repo-intelligence-negative-test" \
+    macos/ToolExecutionContext.swift \
+    macos/RepositoryIntelligence.swift \
+    "$TMP_DIR/main.swift"
+"$TMP_DIR/repo-intelligence-negative-test"
+
+cat >"$TMP_DIR/main.swift" <<'SWIFT'
+import Foundation
+
 let root = FileManager.default.temporaryDirectory.appendingPathComponent("filemcp-server-test")
 try? FileManager.default.removeItem(at: root)
 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -2364,40 +2414,6 @@ let fmg018PostChangeCacheFiles = FileManager.default.enumerator(at: fmg018Cache,
     .compactMap { $0 as? URL }
     .filter { $0.pathExtension == "json" } ?? []
 precondition(fmg018PostChangeCacheFiles.count == 1)
-
-var fmg018InsideCacheRejected = false
-do {
-    _ = try RepositoryIntelligenceService(
-        workspaceRoot: fmg018Workspace,
-        containsWorkspaceURL: { _ in true },
-        gitRepo: { _ in fmg018Workspace.appendingPathComponent("repo") },
-        listTracked: { _ in "" },
-        captureSourceState: { _ in ["source_state_id": "sha256:inside-cache"] },
-        cacheRoot: fmg018Workspace.appendingPathComponent("cache-inside")
-    )
-} catch {
-    fmg018InsideCacheRejected = error.localizedDescription.lowercased().contains("outside the workspace")
-}
-precondition(fmg018InsideCacheRejected)
-
-let fmg018GiantInventory = (0...RepositoryIntelligenceService.maxTrackedFiles)
-    .map { "file-\($0).cs" }
-    .joined(separator: "\0") + "\0"
-let fmg018GiantService = try RepositoryIntelligenceService(
-    workspaceRoot: fmg018Workspace,
-    containsWorkspaceURL: { _ in true },
-    gitRepo: { _ in fmg018Workspace.appendingPathComponent("repo") },
-    listTracked: { _ in fmg018GiantInventory },
-    captureSourceState: { _ in ["source_state_id": "sha256:giant-repo"] },
-    cacheRoot: fmg018Root.appendingPathComponent("giant-cache")
-)
-var fmg018GiantRejected = false
-do {
-    _ = try fmg018GiantService.getOrBuild(repoPath: "repo")
-} catch {
-    fmg018GiantRejected = error.localizedDescription.lowercased().contains("tracked inventory exceeds")
-}
-precondition(fmg018GiantRejected)
 
 let fmg018CancelledContext = try ToolExecutionContext(meta: nil, cancellationProbe: { true })
 var fmg018Cancelled = false
