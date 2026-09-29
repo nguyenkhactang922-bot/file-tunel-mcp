@@ -840,3 +840,32 @@ Completed after source audit:
 - no uncommitted local source from either directory was discarded; no alternate runtime/project code was selected for import because canonical audit/design already contains the accepted stronger decisions.
 
 Canonical PROJECT_ROOT remains `D:\Tools\FileMCP` only. FMG-020 remains the active implementation track.
+
+## FMG-020 macOS parity local checkpoint - 2026-09-29
+
+State: LOCAL CROSS-PLATFORM VERIFIED / NATIVE CI PENDING.
+
+Windows checkpoint remains PASS and was not rerun:
+- native ConPTY implementation;
+- `windows-pty-only-tests: ok (23 assertions)`;
+- Release build 0 warnings / 0 errors.
+
+New macOS implementation:
+- real POSIX PTY via `forkpty`;
+- process-group ownership validation before group signaling;
+- native `TIOCSWINSZ` resize;
+- Ctrl-C terminal byte semantics and terminate signal;
+- workspace-scoped opaque sessions, bounded ring/cursors, idle/max TTL, optional `PTY_OUTPUT` spill/delete;
+- LocalTools parity for `pty_start/read/write/resize/signal/stop/list`;
+- server shutdown stops owned PTY sessions;
+- native Swift acceptance covers actual TTY, write/read, resize, Ctrl-C, session tamper, restart-no-resume, policy revoke, child-tree cleanup, output flood/spill, future cursor, idle TTL and hard lifetime.
+
+Local affected-stage proof:
+- project-state contract PASS;
+- catalog contract PASS: 1.11.0 / 41 tools / SHA-256 `d997f8c9ea814876e48ba83f888355b75aad4c0215fc92eca9397f457a42cdbc`;
+- persistent-PTY cross-platform contract PASS;
+- Swift runtime shell syntax PASS;
+- macOS build shell syntax PASS;
+- `git diff --check` PASS.
+
+NEXT_EXACT_ACTION: commit/push this exact FMG-020 candidate, require native Verify on macOS / Windows x64 / Windows ARM64, fix only failing lane/stage if any, then scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.

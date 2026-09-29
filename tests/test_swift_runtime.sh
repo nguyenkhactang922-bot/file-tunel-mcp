@@ -995,6 +995,20 @@ chmod +x "$TMP_DIR/tunnel-client"
 
 cat >"$TMP_DIR/main.swift" <<'SWIFT'
 import Foundation
+import Darwin
+
+if CommandLine.arguments.count >= 3 && CommandLine.arguments[1] == "pty-tree-parent-fixture" {
+    let pidFile = CommandLine.arguments[2]
+    let child = Process()
+    child.executableURL = URL(fileURLWithPath: "/bin/sleep")
+    child.arguments = ["20"]
+    try child.run()
+    try String(child.processIdentifier).write(toFile: pidFile, atomically: true, encoding: .utf8)
+    print("FMG020_TTY:\(isatty(STDIN_FILENO)):\(isatty(STDOUT_FILENO))")
+    fflush(stdout)
+    Thread.sleep(forTimeInterval: 20)
+    exit(0)
+}
 
 func waitFor(_ predicate: () -> Bool, timeout: TimeInterval, label: String) {
     let deadline = Date().addingTimeInterval(timeout)
@@ -1010,10 +1024,293 @@ func isFailed(_ state: LocalMCPRuntimeState) -> Bool {
     return false
 }
 
+func ptyReadUntil(
+    _ tools: LocalTools,
+    sessionID: String,
+    cursor: String = "",
+    contains marker: String,
+    timeout: TimeInterval
+) throws -> (text: String, cursor: String, state: String) {
+    var text = ""
+    var currentCursor = cursor
+    var state = "running"
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        let output = try tools.call(
+            name: "pty_read",
+            arguments: [
+                "session_id": sessionID,
+                "cursor": currentCursor,
+                "max_bytes": 65_536,
+            ]
+        )
+        text += output.structuredContent["text"] as? String ?? ""
+        currentCursor = output.structuredContent["next_cursor"] as? String ?? currentCursor
+        state = output.structuredContent["state"] as? String ?? state
+        if text.contains(marker) || state != "running" { break }
+        Thread.sleep(forTimeInterval: 0.05)
+    }
+    return (text, currentCursor, state)
+}
+
+func ptyState(_ service: PersistentPtyService, sessionID: String) -> String? {
+    guard let sessions = service.list()["sessions"] as? [[String: Any]] else { return nil }
+    return sessions.first(where: { ($0["session_id"] as? String) == sessionID })?["state"] as? String
+}
+
 let root = FileManager.default.temporaryDirectory.appendingPathComponent("filemcp-runtime-test-\(UUID().uuidString)")
 try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 defer { try? FileManager.default.removeItem(at: root) }
-let profile = "runtime-test-\(UUID().uuidString)"
+
+// FMG-020 native macOS PTY acceptance.
+let ptyResolver = try SafePathResolver(rootPath: root.path)
+let ptyPolicy = try ServerPolicy.fromLegacy(enableCommands: true)
+let ptyTools = try LocalTools(
+    resolver: ptyResolver,
+    gitUserName: "",
+    gitUserEmail: "",
+    policy: ptyPolicy
+)
+
+let ptyChildPIDFile = root.appendingPathComponent("pty-child.pid")
+let ptyOwnedStart = try ptyTools.call(
+    name: "pty_start",
+    arguments: [
+        "executable": CommandLine.arguments[0],
+        "arguments": ["pty-tree-parent-fixture", ptyChildPIDFile.path],
+        "columns": 90,
+        "rows": 24,
+    ]
+)
+let ptyOwnedSession = ptyOwnedStart.structuredContent["session_id"] as! String
+precondition(ptyOwnedStart.structuredContent["actual_pty"] as? Bool == true)
+precondition(ptyOwnedStart.structuredContent["pty_backend"] as? String == "macos-posix-forkpty")
+
+let ptyNative = try ptyReadUntil(
+    ptyTools,
+    sessionID: ptyOwnedSession,
+    contains: "FMG020_TTY:",
+    timeout: 8
+)
+precondition(ptyNative.text.contains("FMG020_TTY:1:1"), "forkpty child must observe terminal stdin/stdout")
+
+waitFor({
+    FileManager.default.fileExists(atPath: ptyChildPIDFile.path)
+}, timeout: 5, label: "PTY descendant pid file")
+let ptyChildPID = pid_t(
+    Int32(
+        try String(contentsOf: ptyChildPIDFile, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    )!
+)
+
+let ptyResize = try ptyTools.call(
+    name: "pty_resize",
+    arguments: ["session_id": ptyOwnedSession, "columns": 120, "rows": 40]
+)
+precondition(ptyResize.structuredContent["columns"] as? Int == 120)
+precondition(ptyResize.structuredContent["rows"] as? Int == 40)
+
+_ = try ptyTools.call(name: "pty_stop", arguments: ["session_id": ptyOwnedSession])
+waitFor({
+    errno = 0
+    return kill(ptyChildPID, 0) != 0 && errno == ESRCH
+}, timeout: 5, label: "PTY descendant process-tree cleanup")
+
+let ptyCatStart = try ptyTools.call(
+    name: "pty_start",
+    arguments: [
+        "executable": "/bin/cat",
+        "arguments": [],
+        "columns": 100,
+        "rows": 30,
+    ]
+)
+let ptyCatSession = ptyCatStart.structuredContent["session_id"] as! String
+_ = try ptyTools.call(
+    name: "pty_write",
+    arguments: ["session_id": ptyCatSession, "data": "FMG020_WRITE_READ\\n"]
+)
+let ptyRoundTrip = try ptyReadUntil(
+    ptyTools,
+    sessionID: ptyCatSession,
+    contains: "FMG020_WRITE_READ",
+    timeout: 5
+)
+precondition(ptyRoundTrip.text.contains("FMG020_WRITE_READ"))
+_ = try ptyTools.call(
+    name: "pty_signal",
+    arguments: ["session_id": ptyCatSession, "signal": "ctrl_c"]
+)
+let ptyAfterSignal = try ptyReadUntil(
+    ptyTools,
+    sessionID: ptyCatSession,
+    cursor: ptyRoundTrip.cursor,
+    contains: "__PTY_EXIT__",
+    timeout: 5
+)
+precondition(ptyAfterSignal.state != "running", "Ctrl-C must terminate foreground cat process")
+
+var ptyTamperRejected = false
+do {
+    _ = try ptyTools.call(
+        name: "pty_read",
+        arguments: ["session_id": ptyCatSession + "tamper", "cursor": ""]
+    )
+} catch {
+    ptyTamperRejected = error.localizedDescription.lowercased().contains("unknown")
+}
+precondition(ptyTamperRejected)
+
+var ptyInvalidResizeRejected = false
+do {
+    _ = try ptyTools.call(
+        name: "pty_resize",
+        arguments: ["session_id": ptyCatSession, "columns": 0, "rows": 20]
+    )
+} catch {
+    ptyInvalidResizeRejected = error.localizedDescription.lowercased().contains("size")
+}
+precondition(ptyInvalidResizeRejected)
+
+let ptyList = try ptyTools.call(name: "pty_list", arguments: [:])
+precondition(ptyList.structuredContent["workspace_scoped"] as? Bool == true)
+precondition(ptyList.structuredContent["restart_resume_supported"] as? Bool == false)
+
+let restartedPtyTools = try LocalTools(
+    resolver: ptyResolver,
+    gitUserName: "",
+    gitUserEmail: "",
+    enableCommands: true
+)
+let restartedPtyList = try restartedPtyTools.call(name: "pty_list", arguments: [:])
+precondition(restartedPtyList.structuredContent["count"] as? Int == 0)
+restartedPtyTools.stopAllPtySessions()
+
+let policyPtyStart = try ptyTools.call(
+    name: "pty_start",
+    arguments: ["executable": "/bin/cat", "arguments": []]
+)
+let policyPtySession = policyPtyStart.structuredContent["session_id"] as! String
+try ptyPolicy.update(.fromLegacy(enableCommands: false))
+var ptyPolicyRevoked = false
+do {
+    _ = try ptyTools.call(
+        name: "pty_write",
+        arguments: ["session_id": policyPtySession, "data": "SHOULD_NOT_RUN\\n"]
+    )
+} catch {
+    ptyPolicyRevoked = error.localizedDescription.lowercased().contains("policy")
+}
+precondition(ptyPolicyRevoked)
+ptyTools.stopAllPtySessions()
+
+// Service-level bounded ring, spill, cursor and TTL proof.
+let ptyArtifactRoot = root.deletingLastPathComponent()
+    .appendingPathComponent("filemcp-pty-artifacts-\\(UUID().uuidString)", isDirectory: true)
+defer { try? FileManager.default.removeItem(at: ptyArtifactRoot) }
+var ptyArtifactOptions = ArtifactContentStoreOptions()
+ptyArtifactOptions.rootURL = ptyArtifactRoot
+ptyArtifactOptions.workspaceRootForIsolation = root
+let ptyArtifactStore = try ArtifactContentStore(options: ptyArtifactOptions)
+var ptyOptions = PersistentPtyOptions()
+ptyOptions.maxSessions = 4
+ptyOptions.maxRingBytes = 64 * 1024
+ptyOptions.spillChunkBytes = 16 * 1024
+ptyOptions.defaultIdleTTL = 1
+ptyOptions.maxIdleTTL = 10
+ptyOptions.defaultMaxLifetime = 10
+ptyOptions.maxLifetime = 20
+ptyOptions.spillTTL = 5 * 60
+let ptyService = try PersistentPtyService(
+    resolver: ptyResolver,
+    environmentAuthority: try ExecProcessEnvironmentAuthority(),
+    artifactFactory: { ptyArtifactStore },
+    options: ptyOptions
+)
+
+let ptyFloodCommand = "i=0; while [ $i -lt 5000 ]; do printf '0123456789abcdef0123456789abcdef\\\\n'; i=$((i+1)); done"
+let ptyFlood = try ptyService.start(
+    executable: "/bin/sh",
+    arguments: ["-c", ptyFloodCommand],
+    cwd: "",
+    environmentOverrides: [:],
+    columns: 100,
+    rows: 30,
+    idleTTLSeconds: 10,
+    maxLifetimeSeconds: 10,
+    spillOutput: true
+)
+let ptyFloodSession = ptyFlood["session_id"] as! String
+waitFor({
+    ptyState(ptyService, sessionID: ptyFloodSession) != "running"
+}, timeout: 8, label: "PTY output flood exit")
+let ptyFloodRead = try ptyService.read(
+    sessionID: ptyFloodSession,
+    cursor: "0",
+    maxBytes: 64 * 1024,
+    context: nil
+)
+precondition(ptyFloodRead["cursor_evicted"] as? Bool == true)
+precondition((ptyFloodRead["spill_refs"] as? [String])?.isEmpty == false)
+let ptyUsageBeforeStop = try ptyArtifactStore.usage(
+    workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(root)
+)
+precondition(ptyUsageBeforeStop.referenceCount > 0)
+_ = try ptyService.stop(sessionID: ptyFloodSession)
+let ptyUsageAfterStop = try ptyArtifactStore.usage(
+    workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(root)
+)
+precondition(ptyUsageAfterStop.referenceCount == 0)
+
+var ptyFutureCursorRejected = false
+do {
+    _ = try ptyService.read(
+        sessionID: ptyFloodSession,
+        cursor: "999999999",
+        maxBytes: 1024,
+        context: nil
+    )
+} catch {
+    ptyFutureCursorRejected = error.localizedDescription.lowercased().contains("beyond current output")
+}
+precondition(ptyFutureCursorRejected)
+
+let ptyIdle = try ptyService.start(
+    executable: "/bin/cat",
+    arguments: [],
+    cwd: "",
+    environmentOverrides: [:],
+    columns: 80,
+    rows: 24,
+    idleTTLSeconds: 1,
+    maxLifetimeSeconds: 10,
+    spillOutput: false
+)
+let ptyIdleSession = ptyIdle["session_id"] as! String
+Thread.sleep(forTimeInterval: 1.2)
+ptyService.sweepNowForTests()
+precondition(ptyState(ptyService, sessionID: ptyIdleSession) == "idle_expired")
+
+let ptyLifetime = try ptyService.start(
+    executable: "/bin/cat",
+    arguments: [],
+    cwd: "",
+    environmentOverrides: [:],
+    columns: 80,
+    rows: 24,
+    idleTTLSeconds: 10,
+    maxLifetimeSeconds: 1,
+    spillOutput: false
+)
+let ptyLifetimeSession = ptyLifetime["session_id"] as! String
+Thread.sleep(forTimeInterval: 1.2)
+ptyService.sweepNowForTests()
+precondition(ptyState(ptyService, sessionID: ptyLifetimeSession) == "lifetime_expired")
+ptyService.stopAll()
+print("swift-persistent-pty: ok")
+
+let profile = "runtime-test-\\(UUID().uuidString)"
 let profileDirectory = root.appendingPathComponent("tunnel-profiles", isDirectory: true)
 let authCapture = root.appendingPathComponent("local-auth-headers.txt")
 setenv("MCP_TEST_ENV_CAPTURE", authCapture.path, 1)
@@ -1318,6 +1615,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/RepositoryIntelligence.swift \
     macos/RepositoryIntelligenceQuery.swift \
     macos/QuarantineService.swift \
+    macos/PersistentPty.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -3370,6 +3668,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/RepositoryIntelligence.swift \
     macos/RepositoryIntelligenceQuery.swift \
     macos/QuarantineService.swift \
+    macos/PersistentPty.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"

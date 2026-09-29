@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: from canonical PROJECT_ROOT `D:\Tools\FileMCP` only, continue FMG-020 from the Windows PTY checkpoint only: implement the same session contract on macOS using a real POSIX PTY, wire pty_start/read/write/resize/signal/stop/list into macOS LocalTools and native Swift runtime/build lists, then cross-platform FMG-020 contract, affected local gates, full Windows regression, exact-head native Verify, scoped review, PR/merge and merged-main verification. Do not begin FMG-021 before FMG-020 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: from canonical PROJECT_ROOT `D:\Tools\FileMCP` only, commit/push the exact FMG-020 cross-platform PTY candidate, require native Verify on macOS + Windows x64 + Windows ARM64, fix only a failing lane/stage if one appears, then scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021. Do not create another worktree and do not begin FMG-021 before FMG-020 MAIN VERIFIED.
