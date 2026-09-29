@@ -1092,7 +1092,7 @@ let ptyNative = try ptyReadUntil(
     contains: "FMG020_TTY:",
     timeout: 8
 )
-precondition(ptyNative.text.contains("FMG020_TTY:1:1"), "forkpty child must observe terminal stdin/stdout")
+precondition(ptyNative.text.contains("FMG020_TTY:1:1"), "forkpty child must observe terminal stdin/stdout; observed=\(ptyNative.text)")
 
 waitFor({
     FileManager.default.fileExists(atPath: ptyChildPIDFile.path)

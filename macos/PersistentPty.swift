@@ -90,23 +90,66 @@ private final class PosixPtyHost {
             free(cwdCString)
         }
 
-        var argv: [UnsafeMutablePointer<CChar>?] = ([executable] + arguments).map { strdup($0) }
-        argv.append(nil)
-        defer {
-            for pointer in argv {
-                if let pointer { free(pointer) }
+        let argumentStrings = [executable] + arguments
+        let argvPointer = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(
+            capacity: argumentStrings.count + 1
+        )
+        argvPointer.initialize(repeating: nil, count: argumentStrings.count + 1)
+        var allocatedArgCount = 0
+        do {
+            for (index, value) in argumentStrings.enumerated() {
+                guard let pointer = strdup(value) else {
+                    throw MCPServerError.operationFailed("Could not allocate PTY argv")
+                }
+                argvPointer[index] = pointer
+                allocatedArgCount += 1
             }
+        } catch {
+            for index in 0..<allocatedArgCount {
+                if let pointer = argvPointer[index] { free(pointer) }
+            }
+            argvPointer.deinitialize(count: argumentStrings.count + 1)
+            argvPointer.deallocate()
+            throw error
+        }
+        defer {
+            for index in 0..<allocatedArgCount {
+                if let pointer = argvPointer[index] { free(pointer) }
+            }
+            argvPointer.deinitialize(count: argumentStrings.count + 1)
+            argvPointer.deallocate()
         }
 
         let environmentStrings = environment
             .map { "\($0.key)=\($0.value)" }
             .sorted()
-        var envp: [UnsafeMutablePointer<CChar>?] = environmentStrings.map { strdup($0) }
-        envp.append(nil)
-        defer {
-            for pointer in envp {
-                if let pointer { free(pointer) }
+        let envPointer = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(
+            capacity: environmentStrings.count + 1
+        )
+        envPointer.initialize(repeating: nil, count: environmentStrings.count + 1)
+        var allocatedEnvCount = 0
+        do {
+            for (index, value) in environmentStrings.enumerated() {
+                guard let pointer = strdup(value) else {
+                    throw MCPServerError.operationFailed("Could not allocate PTY environment")
+                }
+                envPointer[index] = pointer
+                allocatedEnvCount += 1
             }
+        } catch {
+            for index in 0..<allocatedEnvCount {
+                if let pointer = envPointer[index] { free(pointer) }
+            }
+            envPointer.deinitialize(count: environmentStrings.count + 1)
+            envPointer.deallocate()
+            throw error
+        }
+        defer {
+            for index in 0..<allocatedEnvCount {
+                if let pointer = envPointer[index] { free(pointer) }
+            }
+            envPointer.deinitialize(count: environmentStrings.count + 1)
+            envPointer.deallocate()
         }
 
         var masterFD: Int32 = -1
@@ -122,11 +165,7 @@ private final class PosixPtyHost {
             if chdir(cwdCString) != 0 {
                 _exit(126)
             }
-            argv.withUnsafeMutableBufferPointer { argvBuffer in
-                envp.withUnsafeMutableBufferPointer { envBuffer in
-                    _ = execve(executableCString, argvBuffer.baseAddress, envBuffer.baseAddress)
-                }
-            }
+            _ = execve(executableCString, argvPointer, envPointer)
             _exit(127)
         }
 

@@ -179,8 +179,8 @@ internal static class Program
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 29, "catalog non-shell local tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 30, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 36, "catalog non-shell local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 37, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 2, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
@@ -3791,7 +3791,7 @@ internal static class Program
         var safe = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
         var full = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", true);
         Assert(safe.ToolDefinitions.Count == 28 && !safe.HasTool("run_command"), "safe tool count");
-        Assert(full.ToolDefinitions.Count == 30 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
+        Assert(full.ToolDefinitions.Count == 37 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
 
         var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
         var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);

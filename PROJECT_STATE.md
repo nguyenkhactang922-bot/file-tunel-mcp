@@ -869,3 +869,28 @@ Local affected-stage proof:
 - `git diff --check` PASS.
 
 NEXT_EXACT_ACTION: commit/push this exact FMG-020 candidate, require native Verify on macOS / Windows x64 / Windows ARM64, fix only failing lane/stage if any, then scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.
+
+## FMG-020 exact-head Verify remediation - 2026-09-29
+
+Exact-head `72383d140e8d9c5bc256783119a58945e417cfaf`, Verify run `36597408414`:
+- Windows ARM64: SUCCESS.
+- Windows x64: FAIL only at stale canonical-tool count assertions after catalog 1.11.0 / 41 tools.
+- macOS: static/typecheck/catalog and pre-PTY runtime stages PASS; FAIL at native forkpty TTY assertion `forkpty child must observe terminal stdin/stdout`.
+
+Remediation currently local:
+- Windows test expectations updated to 36 non-shell local tools / 37 full local tools, with full runtime semantics unchanged.
+- macOS `PosixPtyHost` now allocates stable heap-backed argv/envp pointer arrays before `forkpty`; child `execve` no longer enters Swift Array buffer closures after fork. This is a fork-safety/lifetime fix, not a PTY authority redesign.
+- native PTY assertion now includes observed output in failure diagnostics.
+
+Affected local proof:
+- canonical catalog contract PASS: 1.11.0 / 41 tools / SHA-256 `d997f8c9ea814876e48ba83f888355b75aad4c0215fc92eca9397f457a42cdbc`;
+- persistent-PTY contract PASS;
+- Windows full core runtime PASS: 899 assertions;
+- Windows PTY-only PASS: 23 assertions;
+- project-state contract PASS;
+- Swift runtime shell syntax PASS;
+- macOS build shell syntax PASS;
+- `git diff --check` PASS.
+
+Native macOS forkpty proof remains pending and must be established by the next exact-head native Verify. Do not claim FMG-020 MAIN VERIFIED until macOS + Windows x64 + Windows ARM64 all pass on the same exact head, then PR/review/merge and merged-main Verify succeed.
+NEXT_EXACT_ACTION: inspect latest `fork/main`, remote FMG-020 branch and PR state before side effects; if no duplicate/newer head exists, commit/push this exact remediation candidate and require a new exact-head native Verify.
