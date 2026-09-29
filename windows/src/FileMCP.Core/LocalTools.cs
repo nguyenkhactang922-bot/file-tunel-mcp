@@ -17,6 +17,7 @@ internal sealed partial class LocalTools
     private readonly AuthorizedPathSnapshotService _mutationGuard;
     private readonly QuarantineService _quarantine;
     private readonly ProjectContextService _projectContext;
+    private readonly RepositoryIntelligenceService _repositoryIntelligence;
     private readonly Action<string>? _beforeMutationCommitForTests;
     private readonly Action<string>? _applyEditsStageForTests;
     private readonly bool _enableCommands;
@@ -62,7 +63,9 @@ internal sealed partial class LocalTools
         CodexSkillRegistry? skillRegistry = null,
         ArtifactContentStore? artifactStore = null,
         QuarantineServiceOptions? quarantineOptions = null,
-        Action<string>? quarantineStageForTests = null)
+        Action<string>? quarantineStageForTests = null,
+        IRepositoryIntelligenceProvider? repositoryIntelligenceProvider = null,
+        string? repositoryIntelligenceCacheRoot = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
@@ -87,6 +90,14 @@ internal sealed partial class LocalTools
             quarantineOptions,
             quarantineStageForTests);
         _projectContext = new ProjectContextService(_resolver, policy, skillRegistry);
+        _repositoryIntelligence = new RepositoryIntelligenceService(
+            _resolver,
+            (repoPath, cancellationToken) => GitRepoAsync(repoPath, cancellationToken),
+            (repo, arguments, outputLimitBytes, trimOutput, cancellationToken) =>
+                RunGitAsync(repo, arguments, outputLimitBytes, trimOutput, cancellationToken),
+            (repoPath, cancellationToken) => CaptureSourceStateRefAsync(repoPath, null, cancellationToken),
+            repositoryIntelligenceProvider,
+            repositoryIntelligenceCacheRoot);
         _beforeMutationCommitForTests = beforeMutationCommitForTests;
         _applyEditsStageForTests = applyEditsStageForTests;
         _gitUserName = gitUserName;
@@ -105,6 +116,11 @@ internal sealed partial class LocalTools
 
     public bool HasTool(string name) => HandlerToolNames.Contains(name) && _policy.IsAllowed(name);
     internal bool SupportsBudget(string name) => BudgetedToolNames.Contains(name);
+
+    internal Task<RepositoryIntelligenceSnapshot> GetRepositoryIntelligenceAsync(
+        string repoPath,
+        CancellationToken cancellationToken = default) =>
+        _repositoryIntelligence.GetOrBuildAsync(repoPath, cancellationToken);
 
     internal string CaptureProjectContextDigest(string repoPath)
     {

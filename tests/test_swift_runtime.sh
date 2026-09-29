@@ -1304,6 +1304,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/BatchFileService.swift \
     macos/EditAdapterService.swift \
     macos/QuarantineService.swift \
+    macos/RepositoryIntelligence.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -2247,6 +2248,122 @@ precondition(Array(fmg017BomBytes.prefix(3)) == [0xEF, 0xBB, 0xBF])
 precondition(String(decoding: fmg017BomBytes.dropFirst(3), as: UTF8.self) == "alpha\r\nB\r\nC\r\n")
 print("swift-edit-adapter-negative: ok")
 
+
+let fmg018Root = root.appendingPathComponent("repository-intelligence")
+let fmg018Workspace = fmg018Root.appendingPathComponent("workspace")
+let fmg018Cache = fmg018Root.appendingPathComponent("cache")
+try FileManager.default.createDirectory(at: fmg018Workspace, withIntermediateDirectories: true)
+try FileManager.default.createDirectory(at: fmg018Cache, withIntermediateDirectories: true)
+let fmg018Resolver = try SafePathResolver(rootPath: fmg018Workspace.path)
+let fmg018Tools = try LocalTools(
+    resolver: fmg018Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    repositoryIntelligenceCacheRoot: fmg018Cache
+)
+_ = try fmg018Tools.call(name: "git_init", arguments: ["repo_path": "repo"])
+for directory in ["repo/vendor", "repo/obj", "repo/Sub", "repo/Bad"] {
+    try FileManager.default.createDirectory(
+        at: fmg018Workspace.appendingPathComponent(directory),
+        withIntermediateDirectories: true
+    )
+}
+_ = try fmg018Tools.call(name: "write_file", arguments: [
+    "relative_path": "repo/Alpha.cs",
+    "content": "using Beta;\nnamespace Demo;\npublic class Alpha { public string Secret => \"TOP_SECRET_RAW_BODY_FMG018\"; }\n",
+])
+_ = try fmg018Tools.call(name: "write_file", arguments: [
+    "relative_path": "repo/Beta.cs",
+    "content": "namespace Demo;\npublic class Beta { }\n",
+])
+_ = try fmg018Tools.call(name: "write_file", arguments: [
+    "relative_path": "repo/tool.py",
+    "content": "from helper import value\nclass Tool:\n    pass\n\ndef run():\n    return value\n",
+])
+_ = try fmg018Tools.call(name: "write_file", arguments: [
+    "relative_path": "repo/notes.xyz",
+    "content": "unsupported language metadata only\n",
+])
+_ = try fmg018Tools.call(name: "write_file", arguments: [
+    "relative_path": "repo/vendor/Generated.cs",
+    "content": "public class MustBeIgnored { }\n",
+])
+_ = try fmg018Tools.call(name: "write_file", arguments: [
+    "relative_path": "repo/obj/GeneratedToo.cs",
+    "content": "public class MustAlsoBeIgnored { }\n",
+])
+_ = try fmg018Tools.call(name: "write_file", arguments: [
+    "relative_path": "repo/Sub/CaseName.cs",
+    "content": "public class CaseName { }\n",
+])
+try Data([0xC3, 0x28, 0xFF]).write(
+    to: fmg018Workspace.appendingPathComponent("repo/Bad/Binary.cs")
+)
+_ = try fmg018Tools.call(name: "git_add", arguments: ["repo_path": "repo", "paths": "."])
+_ = try fmg018Tools.call(name: "git_commit", arguments: [
+    "repo_path": "repo",
+    "message": "repository intelligence fixture",
+])
+
+let fmg018First = try fmg018Tools.getRepositoryIntelligence(repoPath: "repo")
+precondition(fmg018First.providerID == LexicalSymbolProvider.id)
+precondition(fmg018First.providerVersion == LexicalSymbolProvider.version)
+precondition(fmg018First.completeness == LexicalSymbolProvider.heuristicCompleteness)
+precondition(!fmg018First.cacheHit)
+precondition(fmg018First.files.contains { $0.path == "Alpha.cs" && $0.language == "csharp" })
+precondition(fmg018First.files.contains { $0.path == "tool.py" && $0.language == "python" })
+precondition(fmg018First.files.contains { $0.path == "notes.xyz" && $0.language == "unknown" && $0.symbols.isEmpty })
+precondition(!fmg018First.files.contains { $0.path.lowercased().contains("vendor/") || $0.path.lowercased().contains("obj/") })
+precondition(fmg018First.files.contains { $0.path == "Sub/CaseName.cs" })
+precondition(fmg018First.files.contains { $0.path == "Bad/Binary.cs" && $0.language == "binary_or_non_utf8" && $0.symbols.isEmpty })
+precondition(fmg018First.files.first(where: { $0.path == "Alpha.cs" })!.symbols.contains { $0.name == "Alpha" })
+precondition(fmg018First.files.first(where: { $0.path == "tool.py" })!.symbols.contains { $0.name == "Tool" && $0.kind == "class" })
+precondition(fmg018First.relations.contains { $0.source == "Alpha.cs" && $0.target == "Beta.cs" && $0.reason == "import" })
+
+let fmg018Second = try fmg018Tools.getRepositoryIntelligence(repoPath: "repo")
+precondition(fmg018Second.cacheHit)
+precondition(fmg018Second.sourceStateID == fmg018First.sourceStateID)
+precondition(fmg018Second.generationID == fmg018First.generationID)
+
+let fmg018CacheFiles = FileManager.default.enumerator(at: fmg018Cache, includingPropertiesForKeys: nil)?
+    .compactMap { $0 as? URL }
+    .filter { $0.pathExtension == "json" } ?? []
+precondition(fmg018CacheFiles.count == 1)
+let fmg018CacheText = try String(contentsOf: fmg018CacheFiles[0], encoding: .utf8)
+precondition(!fmg018CacheText.contains("TOP_SECRET_RAW_BODY_FMG018"))
+try "{not-json".write(to: fmg018CacheFiles[0], atomically: true, encoding: .utf8)
+let fmg018Rebuilt = try fmg018Tools.getRepositoryIntelligence(repoPath: "repo")
+precondition(!fmg018Rebuilt.cacheHit)
+precondition(fmg018Rebuilt.generationID == fmg018First.generationID)
+
+_ = try fmg018Tools.call(name: "write_file", arguments: [
+    "relative_path": "repo/Alpha.cs",
+    "content": "using Beta;\nnamespace Demo;\npublic class Alpha { public int Changed => 2; }\n",
+])
+let fmg018Changed = try fmg018Tools.getRepositoryIntelligence(repoPath: "repo")
+precondition(!fmg018Changed.cacheHit)
+precondition(fmg018Changed.sourceStateID != fmg018First.sourceStateID)
+precondition(fmg018Changed.generationID != fmg018First.generationID)
+let fmg018PostChangeCacheFiles = FileManager.default.enumerator(at: fmg018Cache, includingPropertiesForKeys: nil)?
+    .compactMap { $0 as? URL }
+    .filter { $0.pathExtension == "json" } ?? []
+precondition(fmg018PostChangeCacheFiles.count == 1)
+
+let fmg018CancelledContext = try ToolExecutionContext(meta: nil, cancellationProbe: { true })
+var fmg018Cancelled = false
+do {
+    _ = try fmg018Tools.getRepositoryIntelligence(
+        repoPath: "repo",
+        executionContext: fmg018CancelledContext
+    )
+} catch {
+    fmg018Cancelled = true
+}
+precondition(fmg018Cancelled)
+precondition(fmg018CancelledContext.truncationReason == "cancelled")
+print("swift-repository-intelligence-core: ok")
+
 let fmg010Root = root.appendingPathComponent("project-context")
 let fmg010Deep = fmg010Root.appendingPathComponent("sub/deep")
 try FileManager.default.createDirectory(at: fmg010Deep, withIntermediateDirectories: true)
@@ -2956,6 +3073,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/BatchFileService.swift \
     macos/EditAdapterService.swift \
     macos/QuarantineService.swift \
+    macos/RepositoryIntelligence.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"

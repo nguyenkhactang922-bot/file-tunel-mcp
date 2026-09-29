@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-017-model-friendly-edit-adapters`
+Active branch: `chatgpt/FMG-018-repo-intelligence-core`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -657,3 +657,25 @@ Verify run `36518117949`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
 Scoped review PASS: adapters are compile-only, preserve expected_version, delegate every write to canonical apply_edits, and fail closed on ambiguity/malformed diff/overlap/path escape/stale source/cancellation.
 Evidence: `docs/evidence/FMG-017_MODEL_FRIENDLY_EDIT_ADAPTERS_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push the evidence-only closure head, require exact-head native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-017 DONE / MAIN VERIFIED -> claim FMG-018.
+
+## FMG-017 closure / FMG-018 claim - 2026-09-29
+
+FMG-017: DONE / MAIN VERIFIED.
+- PR: #36.
+- Exact-head native Verify: run `36518798422` SUCCESS on macOS / Windows x64 / Windows ARM64.
+- Merge main: `4cc14b2cabe5ff23a8f8537e93a5a54c957f99a8`.
+- Merged-main Verify: run `36519464683` SUCCESS.
+
+FMG-018: CLAIMED / ACTIVE on `chatgpt/FMG-018-repo-intelligence-core`.
+Scope: RepositoryIntelligenceProvider interface + LexicalSymbolProvider + Git inventory + bounded symbol/import extraction + relation/ranking metadata + rebuildable cache + SourceStateRef invalidation. Repository intelligence is heuristic metadata only and never authorization.
+
+NEXT_EXACT_ACTION: implement FMG-018 only; then local contracts/build/runtime, exact-head native Verify, scoped review, PR/merge, merged-main Verify, FMG-018 MAIN VERIFIED -> claim FMG-019.
+
+## FMG-018 local verification checkpoint - 2026-09-29
+
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-018-repo-intelligence-core`.
+Resume classification after stream loss: INTERRUPTED at CODE stage; no running FMG-018 process/log/exit artifact. Resumed from existing Windows/macOS code only.
+Local proof: project-state + repository-intelligence contract PASS; Windows isolated repo-intelligence 20 assertions PASS; Windows Release 0 warnings/errors; Windows full runtime 859 assertions PASS; macOS runtime/build shell syntax PASS; diff check PASS.
+Tool surface remains catalog 1.9.0 / 31 canonical tools; FMG-019 facade remains BLOCKED.
+Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: inspect latest `fork/main` and remote FMG-018 branch/PR before side effects; if unique, commit/sync exact candidate -> native Verify -> scoped review -> PR/merge -> merged-main Verify -> FMG-018 MAIN VERIFIED -> FMG-019.

@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the FMG-017 evidence-only closure head, require exact-head native Verify on macOS + Windows x64 + native Windows ARM64, then create/reuse one PR, merge only the verified head, require merged-main Verify, mark FMG-017 DONE / MAIN VERIFIED, and claim FMG-018.
+AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-018 Repository Intelligence Core / Cache only on `chatgpt/FMG-018-repo-intelligence-core`: provider interface, dependency-free lexical provider, Git-tracked inventory with ignore policy, bounded symbol/import extraction, relation/ranking metadata, rebuildable cache, SourceStateRef generation/invalidation, no raw full-source persistence and no authorization dependency; then local negative tests -> native Verify -> review -> PR/merge -> merged-main Verify.

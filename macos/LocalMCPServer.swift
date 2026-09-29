@@ -139,6 +139,7 @@ final class LocalTools {
     private let mutationGuard: AuthorizedPathSnapshotService
     private let quarantine: QuarantineService
     private let projectContext: ProjectContextService
+    private var repositoryIntelligence: RepositoryIntelligenceService!
     private let beforeMutationCommitForTests: ((String) -> Void)?
     private let applyEditsStageForTests: ((String) -> Void)?
     private let toolSlots = DispatchSemaphore(value: 8)
@@ -174,7 +175,9 @@ final class LocalTools {
         skillRegistry: CodexSkillRegistry? = nil,
         artifactStore: ArtifactContentStore? = nil,
         quarantineOptions: QuarantineServiceOptions? = nil,
-        quarantineStageForTests: ((String) -> Void)? = nil
+        quarantineStageForTests: ((String) -> Void)? = nil,
+        repositoryIntelligenceProvider: (any RepositoryIntelligenceProvider)? = nil,
+        repositoryIntelligenceCacheRoot: URL? = nil
     ) throws {
         self.resolver = resolver
         let versionService = try FileVersionService(resolver: resolver)
@@ -217,11 +220,38 @@ final class LocalTools {
         self.policy = policy
         self.execEnvironment = try ExecProcessEnvironmentAuthority(patterns: execEnvironmentAllowList)
         self.enableCommands = policy.legacyUnsafeGitCompatibility
+        self.repositoryIntelligence = try RepositoryIntelligenceService(
+            workspaceRoot: resolver.root,
+            containsWorkspaceURL: { resolver.contains($0) },
+            gitRepo: { [unowned self] repoPath in
+                try self.gitRepo(repoPath)
+            },
+            listTracked: { [unowned self] repo in
+                try self.runGit(
+                    repo: repo,
+                    arguments: ["ls-files", "-z", "--cached"],
+                    outputLimitBytes: maxGitSafetyOutputBytes,
+                    trimOutput: false
+                )
+            },
+            captureSourceState: { [unowned self] repoPath in
+                try self.captureSourceStateRef(repoPath: repoPath)
+            },
+            provider: repositoryIntelligenceProvider,
+            cacheRoot: repositoryIntelligenceCacheRoot
+        )
         try CanonicalToolCatalog.shared.validateHandlerCoverage(handler: "local_tools", runtimeHandlerNames: Self.handlerToolNames)
     }
 
     var toolDefinitions: [[String: Any]] {
         try! policy.filterDefinitions(CanonicalToolCatalog.shared.toolDefinitions(handler: "local_tools", commandsEnabled: true))
+    }
+
+    func getRepositoryIntelligence(
+        repoPath: String,
+        executionContext: ToolExecutionContext? = nil
+    ) throws -> RepositoryIntelligenceSnapshot {
+        try repositoryIntelligence.getOrBuild(repoPath: repoPath, executionContext: executionContext)
     }
 
     func hasTool(named name: String) -> Bool {

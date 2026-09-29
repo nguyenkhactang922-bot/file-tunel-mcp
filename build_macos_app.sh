@@ -74,6 +74,7 @@ chmod 755 "$APP/Contents/MacOS/tunnel-client"
     "$ROOT/macos/FileVersionService.swift" \
     "$ROOT/macos/ProjectContextService.swift" \
     "$ROOT/macos/AuthorizedPathSnapshot.swift" \
+    "$ROOT/macos/RepositoryIntelligence.swift" \
     "$ROOT/macos/LocalMCPServer.swift" \
     "$ROOT/macos/TunnelSupervisor.swift" \
     "$ROOT/macos/LocalMCPRuntime.swift" \

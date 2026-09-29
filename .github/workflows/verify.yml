@@ -53,6 +53,7 @@ jobs:
             macos/FileVersionService.swift \
             macos/ProjectContextService.swift \
             macos/AuthorizedPathSnapshot.swift \
+            macos/RepositoryIntelligence.swift \
             macos/LocalMCPServer.swift \
             macos/TunnelSupervisor.swift \
             macos/LocalMCPRuntime.swift \
@@ -147,6 +148,10 @@ jobs:
       - name: Verify model-friendly edit adapters contract
         shell: pwsh
         run: ./tests/test_edit_adapters_contract.ps1
+
+      - name: Verify repository intelligence core contract
+        shell: pwsh
+        run: ./tests/test_repository_intelligence_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh
@@ -270,6 +275,10 @@ jobs:
       - name: Verify model-friendly edit adapters contract
         shell: pwsh
         run: ./tests/test_edit_adapters_contract.ps1
+
+      - name: Verify repository intelligence core contract
+        shell: pwsh
+        run: ./tests/test_repository_intelligence_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh
