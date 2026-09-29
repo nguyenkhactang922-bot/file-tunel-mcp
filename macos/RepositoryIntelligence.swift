@@ -560,7 +560,8 @@ final class RepositoryIntelligenceService {
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
         ) else { return }
-        for entry in entries where entry.pathExtension == "json" && entry != url {
+        let keepPath = url.standardizedFileURL.path
+        for entry in entries where entry.pathExtension == "json" && entry.standardizedFileURL.path != keepPath {
             try? FileManager.default.removeItem(at: entry)
         }
     }

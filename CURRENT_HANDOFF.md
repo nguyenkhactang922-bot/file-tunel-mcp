@@ -746,3 +746,8 @@ NEXT_EXACT_ACTION: inspect latest `fork/main` and remote FMG-018 branch/PR befor
 
 Run `36534587396` on `5ab626b38f3e04353d97f8744bd8c201590dce2d`: macOS failed only in Static verification because two `LexicalSymbolProvider` calls invoked static `requireContinue` through the instance context. Windows contract/integration continued green. Remediation is macOS compile-only: both calls now use `Self.requireContinue`; product repository-intelligence semantics are unchanged. Local affected-stage proof: Swift runtime/build shell syntax PASS; `git diff --check` PASS.
 NEXT_EXACT_ACTION: commit/push this two-line macOS compile fix and require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64.
+
+## FMG-018 native Verify attempt 2 remediation
+
+Run `36534896586` on `c55c568f12b5304262379856498d19dd5156228b`: Windows x64 SUCCESS; Windows ARM64 SUCCESS; macOS Static verification SUCCESS, then Swift integration failed exactly at `fmg018Second.cacheHit`. The cache publish/load path was intact, but stale-generation cleanup compared file-URL objects directly. Remediation changes cleanup identity to standardized file paths so the just-published current generation cannot be removed due URL representation differences. Cache remains rebuildable/non-authoritative; SourceStateRef, provider semantics and tool surface are unchanged.
+NEXT_EXACT_ACTION: commit/push this macOS cache-generation fix and require a new exact-head native Verify on all three lanes.
