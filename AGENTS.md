@@ -29,3 +29,15 @@
 - FMUX consumes core/runtime truth; presentation code must never grant authority, bypass policy, invent evidence, or expose unavailable FMG capability.
 - Preserve native stacks: Windows WPF and macOS AppKit unless a future product-authority ADR explicitly changes that boundary.
 - Do not start FMUX-002 before FMUX-001 MAIN VERIFIED; follow the frozen FMUX dependency graph thereafter.
+
+## Single-project-root lock
+
+- Canonical PROJECT_ROOT for FileMCP is **D:\Tools\FileMCP**.
+- Do not create Git worktrees, sibling FileMCP clones, temporary project roots, or directories such as `D:\Tools\FileMCP-*-worktree` for normal task execution.
+- Every coding chat must first verify `git rev-parse --show-toplevel` resolves to `D:/Tools/FileMCP`. If it does not, stop the coding action and return to the canonical root before reading/writing/building/committing.
+- Only one coding branch may be active in the canonical working tree at a time. Other chats may inspect/monitor state, but must not create alternate worktrees to work in parallel.
+- Branch changes happen in-place inside the canonical root after verifying a clean worktree and checking process/side-effect state. Preserve unfinished work with commits/remote branches; do not clone or worktree it into a sibling directory.
+- Historical branch refs may remain in Git for audit/recovery. They are not separate project roots and must not be materialized as sibling worktrees without explicit user authorization that supersedes this rule.
+- If a stale sibling FileMCP directory is ever discovered, audit it for unique unmerged changes first, salvage only compatible/stronger parts into the canonical branch, verify them, then delete the sibling directory.
+- Generated build/test/evidence artifacts must stay under the canonical repository's managed directories unless an external platform mandates another temporary location.
+- `Repo + Git + evidence + runtime state` remain source of truth; chat-stream continuity is not authority.

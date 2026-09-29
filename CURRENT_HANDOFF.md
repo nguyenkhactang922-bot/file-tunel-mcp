@@ -3,6 +3,7 @@
 ## Current status
 
 Project: FileMCP
+PROJECT_ROOT: `D:\Tools\FileMCP`
 Branch: `chatgpt/FMG-020-persistent-pty`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
@@ -860,3 +861,17 @@ State: WINDOWS PTY TARGETED VERIFIED / MACOS PARITY PENDING.
 Windows proof: Release build 0 warnings/errors; `windows-pty-only-tests: ok (23 assertions)`. ConPTY native terminal devices, ring routing, write/read, resize, Ctrl-C, tamper rejection, policy reauth, Job Object tree cleanup, bounded ring, PTY_OUTPUT spill/delete, cursor bounds, idle TTL, max lifetime and restart-no-resume all PASS.
 Evidence: `docs/evidence/FMG-020_PERSISTENT_PTY_SESSION_RUNTIME_EVIDENCE.md`.
 NEXT_EXACT_ACTION: port the same session contract to macOS using a real POSIX PTY (not pipes), wire seven LocalTools handlers + native Swift tests/build lists, then cross-platform FMG-020 contract -> affected local gates -> full Windows regression -> exact-head native Verify. FMG-021 remains BLOCKED until FMG-020 MAIN VERIFIED.
+
+## Single-root consolidation - 2026-09-29
+
+Canonical PROJECT_ROOT is now locked to `D:\Tools\FileMCP` only.
+All sibling FileMCP Git worktrees were audited and removed. `git worktree list` contains only the canonical root and `D:\Tools` contains only one `FileMCP*` directory: `D:\Tools\FileMCP`.
+Active branch: `chatgpt/FMG-020-persistent-pty`.
+Active head after preserving the useful FMG-013 Git-fixture hardening: `92e4496cb8c4127716d3478645da03a045b41dbe`.
+Stale PR #29 (`FMUX-007-settings-policy-v2`) was closed because it is superseded by merged FMUX work and would regress current UI/state.
+FMG-017 dirty worktree was discarded only after audit confirmed PR #36/main contains the larger verified adapter implementation.
+FMG-018 alternate worktree was not merged wholesale because main already contains the accepted PR #37 implementation and FMG-019 depends on that canonical model; its relevant negative/cache hardening is already covered on current main.
+FMG-013 dirty Git-fixture hardening was merged into FMG-020 and verified with `repo-query-only`: 18 assertions PASS, build 0 warnings / 0 errors.
+Evidence: `docs/evidence/SINGLE_ROOT_WORKTREE_CONSOLIDATION_2026-09-29.md`.
+
+NEXT_EXACT_ACTION: continue FMG-020 only from the current Windows PTY checkpoint inside `D:\Tools\FileMCP`; implement macOS real POSIX PTY parity, wire the seven PTY tools, then run FMG-020 contract/affected gates/full Windows regression/native Verify/review/PR/merge/merged-main Verify. Do not create another worktree.

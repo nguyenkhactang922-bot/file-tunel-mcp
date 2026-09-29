@@ -19,3 +19,17 @@ Current final-product work is tracked in `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md
 | OBS-011 | PASS | OBS-010 | bounded realtime graph + measurable health |
 | OBS-012 | PASS | OBS-011 | privacy/concurrency/corruption/migration/security regression |
 | OBS-013 | PASS | OBS-012,V11-008 | live ChatGPT connector correlation proof |
+
+## Single-root consolidation - 2026-09-29
+
+Canonical PROJECT_ROOT is now locked to `D:\Tools\FileMCP` only.
+All sibling FileMCP Git worktrees were audited and removed. `git worktree list` contains only the canonical root and `D:\Tools` contains only one `FileMCP*` directory: `D:\Tools\FileMCP`.
+Active branch: `chatgpt/FMG-020-persistent-pty`.
+Active head after preserving the useful FMG-013 Git-fixture hardening: `92e4496cb8c4127716d3478645da03a045b41dbe`.
+Stale PR #29 (`FMUX-007-settings-policy-v2`) was closed because it is superseded by merged FMUX work and would regress current UI/state.
+FMG-017 dirty worktree was discarded only after audit confirmed PR #36/main contains the larger verified adapter implementation.
+FMG-018 alternate worktree was not merged wholesale because main already contains the accepted PR #37 implementation and FMG-019 depends on that canonical model; its relevant negative/cache hardening is already covered on current main.
+FMG-013 dirty Git-fixture hardening was merged into FMG-020 and verified with `repo-query-only`: 18 assertions PASS, build 0 warnings / 0 errors.
+Evidence: `docs/evidence/SINGLE_ROOT_WORKTREE_CONSOLIDATION_2026-09-29.md`.
+
+Historical note: active FMG-020 continuation is tracked only in `CURRENT_HANDOFF.md` and `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`. Do not create another worktree.
