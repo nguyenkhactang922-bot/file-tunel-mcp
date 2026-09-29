@@ -3381,7 +3381,9 @@ import socket
 import time
 
 ports = (18088, 18089, 18090, 18091)
-deadline = time.monotonic() + 45.0
+# Native pre-listener fixtures include FMG-018 indexing and FMG-019 large-map/query coverage.
+# Keep this watchdog above loaded CI startup time; it does not alter product timeouts.
+deadline = time.monotonic() + 90.0
 pending = set(ports)
 while pending and time.monotonic() < deadline:
     for port in tuple(pending):

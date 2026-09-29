@@ -298,7 +298,7 @@ Negative tests:
 
 ## FMG-019 - repo_map / symbol_search / related_files
 
-State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING
+State: PR VERIFY TEST-HARNESS REMEDIATION PENDING
 Depends: FMG-018
 
 Scope:

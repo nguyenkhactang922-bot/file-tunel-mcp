@@ -97,3 +97,17 @@ Scoped review PASS:
 - cursor codec now rejects non-canonical Base64URL aliases cross-platform.
 
 State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
+
+## PR Verify attempt 1 remediation
+
+PR #38 Verify run `36545273004` on closure head `0bfa1017cbbee064d5343c19cfab5141e531bb30`:
+- Windows x64 SUCCESS;
+- native Windows ARM64 SUCCESS;
+- macOS static/catalog SUCCESS;
+- macOS integration failed only at pre-listener fixture readiness: ports `18088..18091` were not ready before the 45-second harness watchdog.
+
+The same product head already passed macOS native integration in push Verify runs `36544068228` and `36544798050`. The failure occurred after FMG-018/FMG-019 native fixtures had progressed through repository-query setup, before HTTP listener tests began.
+
+Remediation is test-harness only: extend the pre-listener readiness watchdog from 45s to 90s and document that this bound covers loaded CI startup for FMG-018 indexing + FMG-019 large-map/query fixtures. Product timeouts, query semantics, authority, catalog, SourceStateRef and ContentRef behavior are unchanged.
+
+NEXT_EXACT_ACTION: commit/push this test-only remediation, require exact-head Verify on macOS + Windows x64 + native Windows ARM64 (including PR checks), then merge PR #38 only on the exact remediated head and require merged-main Verify.

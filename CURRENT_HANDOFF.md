@@ -820,3 +820,8 @@ Native Verify run `36544068228`: SUCCESS on macOS / Windows x64 / native Windows
 Scoped review PASS: read-only/closed-world authority preserved; deterministic ranking/cursors; SourceStateRef freshness before return and post-publish; stale artifact cleanup; metadata-only ContentRef; canonical Base64URL cursor rejection cross-platform.
 Evidence: `docs/evidence/FMG-019_REPOSITORY_INTELLIGENCE_QUERY_FACADE_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify all three lanes, then PR/merge -> merged-main Verify -> mark FMG-019 DONE / MAIN VERIFIED -> claim FMG-020.
+
+## FMG-019 PR Verify attempt 1 remediation
+
+PR #38 run `36545273004`: Windows x64 + native ARM64 SUCCESS; macOS failed only on the pre-listener fixture readiness watchdog after FMG-019 increased native startup work. Remediation is test-only: readiness watchdog 45s -> 90s; product semantics unchanged.
+NEXT_EXACT_ACTION: commit/push remediation, require exact-head three-lane Verify/PR checks, then merge PR #38 with expected head SHA and require merged-main Verify.
