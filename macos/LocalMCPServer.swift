@@ -1512,6 +1512,37 @@ final class LocalTools {
         return digest
     }
 
+    func captureRepositoryIntelligence(
+        repoPath: String,
+        options: RepositoryIntelligenceOptions = RepositoryIntelligenceOptions(),
+        context: ToolExecutionContext? = nil,
+        provider: RepositoryIntelligenceProvider = LexicalSymbolProvider()
+    ) throws -> [String: Any] {
+        let service = RepositoryIntelligenceService(
+            resolver: resolver,
+            gitRepo: { [unowned self] path in
+                try self.gitRepo(path)
+            },
+            runGit: { [unowned self] repo, arguments, outputLimitBytes, trimOutput in
+                try self.runGit(
+                    repo: repo,
+                    arguments: arguments,
+                    outputLimitBytes: outputLimitBytes,
+                    trimOutput: trimOutput
+                )
+            },
+            captureSourceState: { [unowned self] path in
+                try self.captureSourceStateRef(repoPath: path)
+            }
+        )
+        return try service.capture(
+            repoPath: repoPath,
+            options: options,
+            context: context,
+            provider: provider
+        )
+    }
+
     func captureSourceStateRef(repoPath: String, relevantPaths: [String] = []) throws -> [String: Any] {
         let repo = try gitRepo(repoPath)
         let scopes = try normalizeSourceStateScopes(repo: repo, relevantPaths: relevantPaths)

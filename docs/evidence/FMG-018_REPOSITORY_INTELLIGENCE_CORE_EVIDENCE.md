@@ -45,3 +45,27 @@ Negative/edge coverage includes:
 5. exact-head native Verify macOS / Windows x64 / Windows ARM64;
 6. scoped review -> PR/merge -> merged-main Verify;
 7. mark FMG-018 DONE / MAIN VERIFIED -> claim FMG-019.
+
+## Cross-platform implementation checkpoint
+
+Status: LOCAL VERIFIED / NATIVE CI PENDING.
+
+macOS parity implemented:
+- `macos/RepositoryIntelligence.swift`: provider protocol, lexical heuristic provider, bounded tracked inventory, metadata-only cache, SourceStateRef recheck, stale/corrupt recovery, relations/ranking, cancellation/bounds, no authorization dependency;
+- `LocalTools.captureRepositoryIntelligence` reuses existing safe `gitRepo`, `runGit` and `captureSourceStateRef` primitives;
+- app build, CI typecheck and both native Swift runtime compile lists include the new file;
+- native Swift harness covers tracked-only inventory, symbol/import/relation, metadata-only cache, hit/stale/corrupt recovery, max-files bound, cancellation and in-flight SourceStateRef race.
+
+Local verification PASS:
+- repository-intelligence contract;
+- file-version/source-state contract;
+- project-context contract;
+- canonical catalog 1.9.0 / 31 tools unchanged;
+- cross-platform tool-surface parity;
+- project-state contract;
+- Windows Release build: 0 warnings / 0 errors;
+- FMG-018 isolation: 22 assertions PASS;
+- full Windows regression: 856 assertions PASS;
+- git diff check PASS.
+
+NEXT_EXACT_ACTION: commit local-verified cross-platform candidate, sync latest fork/main, rerun only affected gates if main advanced, push exact synchronized head, require native Verify on macOS + Windows x64 + native Windows ARM64, then scoped review -> PR/merge -> merged-main Verify -> FMG-018 DONE / MAIN VERIFIED -> claim FMG-019.

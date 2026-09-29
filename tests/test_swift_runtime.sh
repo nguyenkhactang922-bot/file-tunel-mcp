@@ -1303,6 +1303,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/ArtifactContentStore.swift \
     macos/BatchFileService.swift \
     macos/EditAdapterService.swift \
+    macos/RepositoryIntelligence.swift \
     macos/QuarantineService.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
@@ -2247,6 +2248,159 @@ precondition(Array(fmg017BomBytes.prefix(3)) == [0xEF, 0xBB, 0xBF])
 precondition(String(decoding: fmg017BomBytes.dropFirst(3), as: UTF8.self) == "alpha\r\nB\r\nC\r\n")
 print("swift-edit-adapter-negative: ok")
 
+let fmg018Root = root.appendingPathComponent("repo-intelligence")
+let fmg018Repo = fmg018Root.appendingPathComponent("repo")
+let fmg018Cache = root.appendingPathComponent("repo-intelligence-cache")
+try FileManager.default.createDirectory(at: fmg018Repo, withIntermediateDirectories: true)
+try runGitFixture(fmg018Repo, ["init", "-b", "main"])
+try runGitFixture(fmg018Repo, ["config", "user.name", "FileMCP Test"])
+try runGitFixture(fmg018Repo, ["config", "user.email", "filemcp@example.invalid"])
+try FileManager.default.createDirectory(at: fmg018Repo.appendingPathComponent("src"), withIntermediateDirectories: true)
+try FileManager.default.createDirectory(at: fmg018Repo.appendingPathComponent("docs"), withIntermediateDirectories: true)
+try FileManager.default.createDirectory(at: fmg018Repo.appendingPathComponent("vendor"), withIntermediateDirectories: true)
+try "using B;\nnamespace Demo;\npublic class A { public string Value => \"RAW_SECRET_MARKER_FMG018\"; }\n".write(
+    to: fmg018Repo.appendingPathComponent("src/A.cs"), atomically: true, encoding: .utf8)
+try "namespace Demo;\npublic class B { public static void Run() { } }\n".write(
+    to: fmg018Repo.appendingPathComponent("src/B.cs"), atomically: true, encoding: .utf8)
+try "namespace Demo;\npublic class CaseFile { }\n".write(
+    to: fmg018Repo.appendingPathComponent("src/CaseFile.cs"), atomically: true, encoding: .utf8)
+try "public class GeneratedShouldNotIndex { }\n".write(
+    to: fmg018Repo.appendingPathComponent("src/ignored.generated.cs"), atomically: true, encoding: .utf8)
+try "plain one\n".write(to: fmg018Repo.appendingPathComponent("docs/readme.txt"), atomically: true, encoding: .utf8)
+try "plain two\n".write(to: fmg018Repo.appendingPathComponent("docs/notes.txt"), atomically: true, encoding: .utf8)
+try "public class VendorShouldNotIndex { }\n".write(
+    to: fmg018Repo.appendingPathComponent("vendor/Vendor.cs"), atomically: true, encoding: .utf8)
+try Data([0x00, 0x01, 0x02, 0x03]).write(to: fmg018Repo.appendingPathComponent("blob.bin"))
+try "public class UntrackedShouldNotIndex { }\n".write(
+    to: fmg018Repo.appendingPathComponent("untracked.cs"), atomically: true, encoding: .utf8)
+try runGitFixture(fmg018Repo, ["add", "src", "docs", "vendor", "blob.bin"])
+try runGitFixture(fmg018Repo, ["commit", "-m", "fixture"])
+
+let fmg018Resolver = try SafePathResolver(rootPath: fmg018Root.path)
+let fmg018Tools = try LocalTools(
+    resolver: fmg018Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false)
+)
+let fmg018Baseline = try fmg018Tools.call(name: "read_file", arguments: ["relative_path": "repo/src/A.cs"])
+precondition((fmg018Baseline.structuredContent["result"] as? String)?.contains("RAW_SECRET_MARKER_FMG018") == true)
+
+var fmg018Options = RepositoryIntelligenceOptions()
+fmg018Options.cacheRootURL = fmg018Cache
+let fmg018First = try fmg018Tools.captureRepositoryIntelligence(repoPath: "repo", options: fmg018Options)
+precondition(fmg018First["provider_id"] as? String == LexicalSymbolProvider.id)
+precondition(fmg018First["provider_version"] as? String == LexicalSymbolProvider.version)
+precondition(fmg018First["completeness"] as? String == "heuristic")
+precondition(fmg018First["grants_authority"] as? Bool == false)
+precondition(fmg018First["raw_source_persisted"] as? Bool == false)
+precondition(fmg018First["cache_status"] as? String == "rebuilt")
+precondition(fmg018First["truncated"] as? Bool == false)
+precondition(!(fmg018First["source_state_id"] as? String ?? "").isEmpty)
+
+let fmg018Files = fmg018First["files"] as! [[String: Any]]
+let fmg018Paths = Set(fmg018Files.compactMap { $0["path"] as? String })
+precondition(fmg018Paths.contains("src/A.cs"))
+precondition(fmg018Paths.contains("src/B.cs"))
+precondition(fmg018Paths.contains("src/CaseFile.cs"))
+precondition(fmg018Paths.contains("docs/readme.txt"))
+precondition(fmg018Paths.contains("docs/notes.txt"))
+precondition(!fmg018Paths.contains("untracked.cs"))
+precondition(!fmg018Paths.contains("vendor/Vendor.cs"))
+precondition(!fmg018Paths.contains("src/ignored.generated.cs"))
+precondition(!fmg018Paths.contains("blob.bin"))
+
+let fmg018A = fmg018Files.first { $0["path"] as? String == "src/A.cs" }!
+let fmg018ASymbols = fmg018A["symbols"] as! [[String: Any]]
+let fmg018AImports = fmg018A["imports"] as! [[String: Any]]
+precondition(fmg018A["language"] as? String == "csharp")
+precondition(fmg018ASymbols.contains { $0["name"] as? String == "A" })
+precondition(fmg018AImports.contains { $0["target"] as? String == "B" })
+let fmg018Plain = fmg018Files.first { $0["path"] as? String == "docs/readme.txt" }!
+precondition(fmg018Plain["supported_language"] as? Bool == false)
+precondition((fmg018Plain["symbols"] as? [[String: Any]])?.isEmpty == true)
+
+let fmg018Relations = fmg018First["relations"] as! [[String: Any]]
+precondition(fmg018Relations.contains {
+    $0["source"] as? String == "src/A.cs" &&
+    $0["target"] as? String == "src/B.cs" &&
+    (($0["score"] as? NSNumber)?.doubleValue ?? 0) >= 0.5
+})
+precondition(fmg018Relations.contains {
+    $0["source"] as? String == "docs/readme.txt" &&
+    $0["target"] as? String == "docs/notes.txt" &&
+    $0["kind"] as? String == "file_level"
+})
+
+let fmg018CacheFiles = try FileManager.default.contentsOfDirectory(at: fmg018Cache, includingPropertiesForKeys: nil)
+    .filter { $0.pathExtension == "json" }
+precondition(fmg018CacheFiles.count == 1)
+let fmg018CacheData = try Data(contentsOf: fmg018CacheFiles[0])
+let fmg018CacheText = String(decoding: fmg018CacheData, as: UTF8.self)
+precondition(!fmg018CacheText.contains("RAW_SECRET_MARKER_FMG018"))
+
+let fmg018Hit = try fmg018Tools.captureRepositoryIntelligence(repoPath: "repo", options: fmg018Options)
+precondition(fmg018Hit["cache_status"] as? String == "hit")
+
+let fmg018BURL = fmg018Repo.appendingPathComponent("src/B.cs")
+let fmg018BHandle = try FileHandle(forWritingTo: fmg018BURL)
+try fmg018BHandle.seekToEnd()
+try fmg018BHandle.write(contentsOf: Data("// changed\n".utf8))
+try fmg018BHandle.close()
+let fmg018Stale = try fmg018Tools.captureRepositoryIntelligence(repoPath: "repo", options: fmg018Options)
+precondition(fmg018Stale["cache_status"] as? String == "rebuilt")
+precondition(fmg018Stale["cache_recovery"] as? String == "stale_deleted")
+
+try Data("{ definitely not json".utf8).write(to: fmg018CacheFiles[0])
+let fmg018Corrupt = try fmg018Tools.captureRepositoryIntelligence(repoPath: "repo", options: fmg018Options)
+precondition(fmg018Corrupt["cache_status"] as? String == "rebuilt")
+precondition(fmg018Corrupt["cache_recovery"] as? String == "corrupt_deleted")
+
+var fmg018Tiny = RepositoryIntelligenceOptions()
+fmg018Tiny.cacheRootURL = root.appendingPathComponent("repo-intelligence-cache-tiny")
+fmg018Tiny.maxTrackedFiles = 2
+let fmg018Bounded = try fmg018Tools.captureRepositoryIntelligence(repoPath: "repo", options: fmg018Tiny)
+precondition(fmg018Bounded["truncated"] as? Bool == true)
+precondition(fmg018Bounded["truncation_reason"] as? String == "max_tracked_files")
+precondition(fmg018Bounded["visited_count"] as? Int == 2)
+
+var fmg018Cancelled = false
+var fmg018Cancel = RepositoryIntelligenceOptions()
+fmg018Cancel.cacheRootURL = root.appendingPathComponent("repo-intelligence-cache-cancel")
+fmg018Cancel.stageForTests = { stage in
+    if stage == "before_inventory" { fmg018Cancelled = true }
+}
+let fmg018CancelContext = try ToolExecutionContext(meta: nil, cancellationProbe: { fmg018Cancelled })
+let fmg018Partial = try fmg018Tools.captureRepositoryIntelligence(
+    repoPath: "repo", options: fmg018Cancel, context: fmg018CancelContext)
+precondition(fmg018Partial["truncated"] as? Bool == true)
+precondition(fmg018Partial["truncation_reason"] as? String == "cancelled")
+
+var fmg018Mutated = false
+var fmg018Changing = RepositoryIntelligenceOptions()
+fmg018Changing.cacheRootURL = root.appendingPathComponent("repo-intelligence-cache-changing")
+fmg018Changing.stageForTests = { stage in
+    if stage == "before_source_state_recheck" && !fmg018Mutated {
+        fmg018Mutated = true
+        let url = fmg018Repo.appendingPathComponent("src/CaseFile.cs")
+        let handle = try! FileHandle(forWritingTo: url)
+        try! handle.seekToEnd()
+        try! handle.write(contentsOf: Data("// race\n".utf8))
+        try! handle.close()
+    }
+}
+do {
+    _ = try fmg018Tools.captureRepositoryIntelligence(repoPath: "repo", options: fmg018Changing)
+    preconditionFailure("FMG-018 stale in-flight generation must fail")
+} catch {
+    precondition(error.localizedDescription.contains("Repository changed while intelligence index was being built"))
+}
+let fmg018ChangingCache = fmg018Changing.cacheRootURL!
+let fmg018Published = (try? FileManager.default.contentsOfDirectory(at: fmg018ChangingCache, includingPropertiesForKeys: nil)
+    .filter { $0.pathExtension == "json" }.count) ?? 0
+precondition(fmg018Published == 0)
+print("swift-repository-intelligence: ok")
+
 let fmg010Root = root.appendingPathComponent("project-context")
 let fmg010Deep = fmg010Root.appendingPathComponent("sub/deep")
 try FileManager.default.createDirectory(at: fmg010Deep, withIntermediateDirectories: true)
@@ -2955,6 +3109,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/ArtifactContentStore.swift \
     macos/BatchFileService.swift \
     macos/EditAdapterService.swift \
+    macos/RepositoryIntelligence.swift \
     macos/QuarantineService.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"

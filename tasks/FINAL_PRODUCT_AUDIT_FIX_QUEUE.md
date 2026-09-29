@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: continue FMG-018 from the Windows core checkpoint only: port RepositoryIntelligenceProvider/LexicalSymbolProvider + tracked inventory/source-state/cache contract to macOS using existing safe Git + SourceStateRef primitives, wire native Swift tests/build lists, then cross-platform contract, affected local gates, full Windows regression, exact-head native Verify, scoped review, PR/merge and merged-main verification. Do not begin FMG-019 before FMG-018 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: commit the LOCAL VERIFIED FMG-018 cross-platform candidate on `chatgpt/FMG-018-repository-intelligence-core`, sync latest fork/main, rerun only affected gates if main advanced, push exact synchronized head, require native Verify on macOS + Windows x64 + native Windows ARM64, then scoped review, PR/merge and merged-main verification; only after merged-main SUCCESS mark FMG-018 DONE / MAIN VERIFIED and claim FMG-019.
