@@ -92,3 +92,12 @@ Merge main: `4cc14b2cabe5ff23a8f8537e93a5a54c957f99a8`.
 Final exact-head Verify: run `36518798422` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 Merged-main Verify: run `36519464683` SUCCESS.
 State: DONE / MAIN VERIFIED.
+
+## Final closure
+
+Final exact head: `7b5b1b566adce24f0f61e75a1ba7310af3560544`.
+Exact-head Verify: run `36518798422` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+PR: #36.
+Merge main: `4cc14b2cabe5ff23a8f8537e93a5a54c957f99a8`.
+Merged-main Verify: run `36519464683` SUCCESS.
+State: DONE / MAIN VERIFIED.

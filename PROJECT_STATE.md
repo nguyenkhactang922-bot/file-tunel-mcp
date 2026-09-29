@@ -668,3 +668,16 @@ FMG-017: DONE / MAIN VERIFIED.
 
 FMG-018: CLAIMED / ACTIVE on `chatgpt/FMG-018-repository-intelligence-core`.
 NEXT_EXACT_ACTION: implement FMG-018 Repository Intelligence Core / Cache only: RepositoryIntelligenceProvider interface, built-in lexical heuristic provider, Git-tracked inventory + ignored-directory policy, lightweight language-aware symbols/imports, file/symbol relation ranking, rebuildable metadata-only cache, SourceStateRef generation/invalidation, bounded cancellation, corruption/stale recovery, and no authorization dependency on intelligence. Do not begin FMG-019 before FMG-018 MAIN VERIFIED.
+
+## FMG-017 final closure / FMG-018 claim
+
+FMG-017: DONE / MAIN VERIFIED.
+- Exact verified head: `7b5b1b566adce24f0f61e75a1ba7310af3560544`.
+- Exact-head Verify: run `36518798422` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #36 merged.
+- Merge main: `4cc14b2cabe5ff23a8f8537e93a5a54c957f99a8`.
+- Merged-main Verify: run `36519464683` SUCCESS.
+- Evidence: `docs/evidence/FMG-017_MODEL_FRIENDLY_EDIT_ADAPTERS_EVIDENCE.md`.
+
+FMG-018: CLAIMED / ACTIVE on `chatgpt/FMG-018-repository-intelligence-core`.
+NEXT_EXACT_ACTION: implement FMG-018 Repository Intelligence Core / Cache only: RepositoryIntelligenceProvider interface, built-in LexicalSymbolProvider, Git-tracked inventory plus ignored-directory policy, language-aware lightweight symbol/import extraction, relation/ranking model, rebuildable metadata cache, SourceStateRef generation/invalidation, no raw full-source persistence by default; preserve baseline tools and authorization independence. Add negative coverage for giant repo, binary/vendor/generated files, case/path differences, stale/corrupt cache, parser/profile mismatch and cancellation. Do not begin FMG-019 before FMG-018 MAIN VERIFIED.
