@@ -83,3 +83,12 @@ Scoped review: PASS.
 - catalog remains 1.9.0 / 31 canonical tools / SHA-256 `7b053baec3ddd1ce8789e651bdd0e9f6d1354387c03f2ddf8a1a05763d32d4d8`.
 
 NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify on macOS + Windows x64 + native Windows ARM64, then create/reuse one PR, merge only the verified head, require merged-main Verify, mark FMG-017 DONE / MAIN VERIFIED, and claim FMG-018.
+
+## Final closure
+
+Final candidate head: `7b5b1b566adce24f0f61e75a1ba7310af3560544`.
+PR: #36.
+Merge main: `4cc14b2cabe5ff23a8f8537e93a5a54c957f99a8`.
+Final exact-head Verify: run `36518798422` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Merged-main Verify: run `36519464683` SUCCESS.
+State: DONE / MAIN VERIFIED.
