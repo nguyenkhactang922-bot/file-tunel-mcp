@@ -131,7 +131,7 @@ private final class PosixPtyHost {
         }
 
         guard pid > 0 else {
-            if masterFD >= 0 { close(masterFD) }
+            if masterFD >= 0 { Darwin.close(masterFD) }
             throw MCPServerError.operationFailed(
                 "Could not launch POSIX PTY process: \(String(cString: strerror(errno)))"
             )
@@ -140,7 +140,7 @@ private final class PosixPtyHost {
         let writeFD = dup(masterFD)
         guard writeFD >= 0 else {
             _ = kill(pid, SIGKILL)
-            close(masterFD)
+            Darwin.close(masterFD)
             var status: Int32 = 0
             _ = waitpid(pid, &status, 0)
             throw MCPServerError.operationFailed(
