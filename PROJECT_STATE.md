@@ -695,3 +695,8 @@ State: LOCAL VERIFIED / NATIVE CI PENDING.
 Local proof: repository-intelligence/source-state/project-context/catalog/parity/state contracts PASS; Windows Release 0 warnings/errors; FMG-018 isolation 22 assertions PASS; full Windows regression 856 assertions PASS; diff check PASS. macOS provider/service/cache parity + native tests are wired; native Swift typecheck/runtime remains pending GitHub macOS Verify.
 Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit local-verified candidate, sync latest fork/main, rerun affected gates if needed, push exact synchronized head, require native Verify macOS + Windows x64 + native Windows ARM64, scoped review, PR/merge, merged-main Verify, then mark FMG-018 DONE / MAIN VERIFIED and claim FMG-019.
+
+## FMG-018 native Verify attempt 1 remediation
+
+Run `36524611510` on `f5e9190`: Windows x64 + ARM64 SUCCESS; macOS static/catalog SUCCESS; macOS integration timed out only because the pre-listener fixture watchdog was 15s after FMG-018 added bounded Git/SourceStateRef adversarial scans. Remediation is test-only: readiness deadline 15s -> 45s. FMG-018 contract + diff check PASS; product semantics unchanged.
+NEXT_EXACT_ACTION: commit/push remediation and require exact-head native Verify all three lanes. FMG-019 remains BLOCKED.

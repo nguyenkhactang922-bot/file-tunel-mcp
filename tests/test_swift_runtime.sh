@@ -2250,7 +2250,8 @@ print("swift-edit-adapter-negative: ok")
 
 let fmg018Root = root.appendingPathComponent("repo-intelligence")
 let fmg018Repo = fmg018Root.appendingPathComponent("repo")
-let fmg018Cache = root.appendingPathComponent("repo-intelligence-cache")
+let fmg018CacheBase = root.deletingLastPathComponent().appendingPathComponent("filemcp-repo-intelligence-cache-\(UUID().uuidString)")
+let fmg018Cache = fmg018CacheBase.appendingPathComponent("primary")
 try FileManager.default.createDirectory(at: fmg018Repo, withIntermediateDirectories: true)
 try runGitFixture(fmg018Repo, ["init", "-b", "main"])
 try runGitFixture(fmg018Repo, ["config", "user.name", "FileMCP Test"])
@@ -2357,7 +2358,7 @@ precondition(fmg018Corrupt["cache_status"] as? String == "rebuilt")
 precondition(fmg018Corrupt["cache_recovery"] as? String == "corrupt_deleted")
 
 var fmg018Tiny = RepositoryIntelligenceOptions()
-fmg018Tiny.cacheRootURL = root.appendingPathComponent("repo-intelligence-cache-tiny")
+fmg018Tiny.cacheRootURL = fmg018CacheBase.appendingPathComponent("tiny")
 fmg018Tiny.maxTrackedFiles = 2
 let fmg018Bounded = try fmg018Tools.captureRepositoryIntelligence(repoPath: "repo", options: fmg018Tiny)
 precondition(fmg018Bounded["truncated"] as? Bool == true)
@@ -2366,7 +2367,7 @@ precondition(fmg018Bounded["visited_count"] as? Int == 2)
 
 var fmg018Cancelled = false
 var fmg018Cancel = RepositoryIntelligenceOptions()
-fmg018Cancel.cacheRootURL = root.appendingPathComponent("repo-intelligence-cache-cancel")
+fmg018Cancel.cacheRootURL = fmg018CacheBase.appendingPathComponent("cancel")
 fmg018Cancel.stageForTests = { stage in
     if stage == "before_inventory" { fmg018Cancelled = true }
 }
@@ -2378,7 +2379,7 @@ precondition(fmg018Partial["truncation_reason"] as? String == "cancelled")
 
 var fmg018Mutated = false
 var fmg018Changing = RepositoryIntelligenceOptions()
-fmg018Changing.cacheRootURL = root.appendingPathComponent("repo-intelligence-cache-changing")
+fmg018Changing.cacheRootURL = fmg018CacheBase.appendingPathComponent("changing")
 fmg018Changing.stageForTests = { stage in
     if stage == "before_source_state_recheck" && !fmg018Mutated {
         fmg018Mutated = true
@@ -3122,7 +3123,7 @@ import socket
 import time
 
 ports = (18088, 18089, 18090, 18091)
-deadline = time.monotonic() + 15.0
+deadline = time.monotonic() + 45.0
 pending = set(ports)
 while pending and time.monotonic() < deadline:
     for port in tuple(pending):

@@ -265,7 +265,7 @@ Negative tests:
 
 ## FMG-018 - Repository Intelligence Core / Cache
 
-State: LOCAL VERIFIED / NATIVE CI PENDING
+State: NATIVE VERIFY ATTEMPT 1 REMEDIATED / EXACT-HEAD VERIFY PENDING
 Depends: FMG-014, FMG-010, FMG-006
 
 Scope:

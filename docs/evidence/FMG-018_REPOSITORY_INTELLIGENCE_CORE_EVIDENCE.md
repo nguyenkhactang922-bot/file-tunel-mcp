@@ -69,3 +69,15 @@ Local verification PASS:
 - git diff check PASS.
 
 NEXT_EXACT_ACTION: commit local-verified cross-platform candidate, sync latest fork/main, rerun only affected gates if main advanced, push exact synchronized head, require native Verify on macOS + Windows x64 + native Windows ARM64, then scoped review -> PR/merge -> merged-main Verify -> FMG-018 DONE / MAIN VERIFIED -> claim FMG-019.
+
+## Native Verify attempt 1 remediation
+
+Run `36524611510` on `f5e9190197e92f386fcc89e951ac57ee23688ef3`:
+- Windows x64: SUCCESS;
+- native Windows ARM64: SUCCESS;
+- macOS static verification + catalog: SUCCESS;
+- macOS Integration: failed because the server fixture readiness watchdog remained 15 seconds while the new FMG-018 native adversarial block performs multiple bounded Git/SourceStateRef scans before listeners start. The harness killed the still-running fixture; no product Swift compile failure was reported.
+
+Remediation: test-only increase of the bounded macOS fixture readiness deadline from 15s to 45s. Product repository-intelligence code, catalog and authority are unchanged.
+Local affected proof: FMG-018 contract PASS; diff check PASS.
+NEXT_EXACT_ACTION: commit/push test-only remediation and require a new exact-head native Verify on macOS + Windows x64 + native Windows ARM64.
