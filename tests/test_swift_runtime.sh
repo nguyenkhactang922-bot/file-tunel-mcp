@@ -1353,6 +1353,34 @@ do {
     giantRejected = error.localizedDescription.lowercased().contains("tracked inventory exceeds")
 }
 precondition(giantRejected)
+
+let profileCache = root.appendingPathComponent("profile-cache")
+let profileSource: (String) throws -> [String: Any] = { _ in ["source_state_id": "sha256:profile-state"] }
+let profileService = try RepositoryIntelligenceService(
+    workspaceRoot: workspace,
+    containsWorkspaceURL: { _ in true },
+    gitRepo: { _ in workspace },
+    listTracked: { _ in "" },
+    captureSourceState: profileSource,
+    cacheRoot: profileCache
+)
+let profileFirst = try profileService.getOrBuild(repoPath: ".")
+precondition(!profileFirst.cacheHit)
+let profileCacheFiles = FileManager.default.enumerator(at: profileCache, includingPropertiesForKeys: nil)?
+    .compactMap { $0 as? URL }
+    .filter { $0.pathExtension == "json" } ?? []
+precondition(profileCacheFiles.count == 1)
+let profileCacheText = try String(contentsOf: profileCacheFiles[0], encoding: .utf8)
+let profileMismatchText = profileCacheText.replacingOccurrences(
+    of: "\"provider_version\":\"lexical-v1\"",
+    with: "\"provider_version\":\"lexical-mismatch-v0\""
+)
+precondition(profileMismatchText != profileCacheText)
+try profileMismatchText.write(to: profileCacheFiles[0], atomically: true, encoding: .utf8)
+let profileRebuilt = try profileService.getOrBuild(repoPath: ".")
+precondition(!profileRebuilt.cacheHit)
+precondition(profileRebuilt.generationID == profileFirst.generationID)
+
 print("swift-repository-intelligence-negative: ok")
 SWIFT
 swiftc -framework CryptoKit -o "$TMP_DIR/repo-intelligence-negative-test" \
@@ -2383,21 +2411,7 @@ precondition(fmg018CacheFiles.count == 1)
 let fmg018CacheText = try String(contentsOf: fmg018CacheFiles[0], encoding: .utf8)
 precondition(!fmg018CacheText.contains("TOP_SECRET_RAW_BODY_FMG018"))
 
-let fmg018ProfileMismatchText = fmg018CacheText.replacingOccurrences(
-    of: "\"provider_version\":\"lexical-v1\"",
-    with: "\"provider_version\":\"lexical-mismatch-v0\""
-)
-precondition(fmg018ProfileMismatchText != fmg018CacheText)
-try fmg018ProfileMismatchText.write(to: fmg018CacheFiles[0], atomically: true, encoding: .utf8)
-let fmg018ProfileRebuilt = try fmg018Tools.getRepositoryIntelligence(repoPath: "repo")
-precondition(!fmg018ProfileRebuilt.cacheHit)
-precondition(fmg018ProfileRebuilt.generationID == fmg018First.generationID)
-
-let fmg018CacheFilesAfterProfileMismatch = FileManager.default.enumerator(at: fmg018Cache, includingPropertiesForKeys: nil)?
-    .compactMap { $0 as? URL }
-    .filter { $0.pathExtension == "json" } ?? []
-precondition(fmg018CacheFilesAfterProfileMismatch.count == 1)
-try "{not-json".write(to: fmg018CacheFilesAfterProfileMismatch[0], atomically: true, encoding: .utf8)
+try "{not-json".write(to: fmg018CacheFiles[0], atomically: true, encoding: .utf8)
 let fmg018Rebuilt = try fmg018Tools.getRepositoryIntelligence(repoPath: "repo")
 precondition(!fmg018Rebuilt.cacheHit)
 precondition(fmg018Rebuilt.generationID == fmg018First.generationID)
