@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the FMG-018 evidence-only closure head, require exact-head native Verify on macOS + Windows x64 + native Windows ARM64, then open/review/merge PR, require merged-main Verify; only after merged-main SUCCESS mark FMG-018 DONE / MAIN VERIFIED and claim FMG-019.
+AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-019 only on `chatgpt/FMG-019-repository-intelligence-query-facade`: add bounded deterministic `repo_map`, `symbol_search`, and `related_files` over the FMG-018 MAIN VERIFIED core; preserve SourceStateRef/provider/profile freshness and ToolBudget/cursor contracts; use ContentRef spillover for oversized map output; fail explicitly on stale generation, invalid cursor and unavailable artifact. Do not begin FMG-020 before FMG-019 MAIN VERIFIED.

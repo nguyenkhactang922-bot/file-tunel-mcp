@@ -102,3 +102,12 @@ Scoped review PASS:
 - no FMG-019 MCP facade/tool exposure is claimed.
 
 NEXT_EXACT_ACTION: evidence-only closure commit -> exact-head native Verify -> PR/merge -> merged-main Verify -> FMG-018 DONE / MAIN VERIFIED -> FMG-019.
+
+## Final closure
+
+Final closure head: `cd24498aaebed4a6d639ddbce6ec59043e43d7f5`.
+Push Verify `36534517010`: macOS + ARM64 SUCCESS; the initial Windows x64 integration failure was the unrelated ProcessRunner bounded-output fixture and the single failed Windows job rerun SUCCESS on the same head.
+PR #37 merged as `02a4b60c1bd7afd5c5fbd2c5d467ba4f3a59fbee`.
+PR Verify `36536059112`: SUCCESS all three lanes.
+Merged-main Verify `36536725420`: SUCCESS all three lanes.
+State: DONE / MAIN VERIFIED.

@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-018-repository-intelligence-core`
+Branch: `chatgpt/FMG-019-repository-intelligence-query-facade`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -789,3 +789,17 @@ Scoped review PASS:
 
 Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify all three lanes, then PR/review/merge -> merged-main Verify -> FMG-018 DONE / MAIN VERIFIED -> claim FMG-019.
+
+## FMG-018 final closure / FMG-019 claim
+
+FMG-018: DONE / MAIN VERIFIED.
+- Final closure head: `cd24498aaebed4a6d639ddbce6ec59043e43d7f5`.
+- Push Verify run `36534517010`: macOS + native Windows ARM64 SUCCESS; Windows x64 initial transient ProcessRunner bounded-output fixture failure; rerun of the single failed Windows job SUCCESS on the same head.
+- PR #37 merged.
+- Merge main: `02a4b60c1bd7afd5c5fbd2c5d467ba4f3a59fbee`.
+- PR Verify run `36536059112`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Merged-main Verify run `36536725420`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
+
+FMG-019: CLAIMED / ACTIVE on `chatgpt/FMG-019-repository-intelligence-query-facade`.
+NEXT_EXACT_ACTION: implement only `repo_map`, `symbol_search`, and `related_files` over the FMG-018 MAIN VERIFIED repository-intelligence core. Preserve provider/version/heuristic completeness, deterministic ranking, SourceStateRef freshness, ToolBudget/cursor bounds, explicit stale-generation behavior, and optional ContentRef spillover for oversized maps. Add negative tests for ambiguous symbols, unsupported/no-symbol provider, stale generation during query, very large graph, invalid cursor, and unavailable artifact. Do not begin FMG-020 before FMG-019 MAIN VERIFIED.
