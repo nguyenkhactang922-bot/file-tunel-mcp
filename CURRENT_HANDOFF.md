@@ -709,3 +709,13 @@ Catalog: 1.9.0 / 31 canonical tools / SHA-256 `7b053baec3ddd1ce8789e651bdd0e9f6d
 Local proof: edit-adapter contract + catalog/parity + dependent mutation/version contracts PASS; Windows Release 0 warnings/errors; FMG-017 isolation 16 assertions PASS; full Windows regression 834 assertions PASS; diff check PASS. macOS implementation/runtime harness is wired; native Swift verification is pending GitHub macOS Verify because this Windows host has no usable Swift toolchain.
 Evidence: `docs/evidence/FMG-017_MODEL_FRIENDLY_EDIT_ADAPTERS_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit local-verified FMG-017 candidate, sync latest fork/main, rerun affected local gates, push exact synchronized head, require native Verify macOS + Windows x64 + native Windows ARM64, scoped review, PR/merge, merged-main Verify, then mark FMG-017 DONE / MAIN VERIFIED and claim FMG-018.
+
+
+## FMG-017 exact-head native verification / scoped review
+
+State: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
+Candidate: `5abe84a2c4b455b645307e70bacec86bdc1b5e9f`.
+Verify run `36518117949`: SUCCESS on macOS / Windows x64 / native Windows ARM64. Initial run `36517765343` exposed only a Swift test call-label error; remediation was test-only.
+Scoped review PASS: adapters are compile-only, preserve expected_version, delegate every write to canonical apply_edits, and fail closed on ambiguity/malformed diff/overlap/path escape/stale source/cancellation.
+Evidence: `docs/evidence/FMG-017_MODEL_FRIENDLY_EDIT_ADAPTERS_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push the evidence-only closure head, require exact-head native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-017 DONE / MAIN VERIFIED -> claim FMG-018.
