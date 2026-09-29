@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the FMG-018 evidence-only closure head, require exact-head native Verify on macOS + Windows x64 + native Windows ARM64, then open/review/merge PR, require merged-main Verify; only after merged-main SUCCESS mark FMG-018 DONE / MAIN VERIFIED and claim FMG-019.
+AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the FMG-019 PR #38 test-only macOS readiness remediation (45s -> 90s), require exact-head Verify / PR checks on macOS + Windows x64 + native Windows ARM64, then merge PR #38 only on that exact head, require merged-main Verify, mark FMG-019 DONE / MAIN VERIFIED and claim FMG-020.

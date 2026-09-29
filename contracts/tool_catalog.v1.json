@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.9.0",
+  "catalogVersion": "1.10.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -1758,6 +1758,468 @@
             "skill_instructions_included",
             "range",
             "next_cursor"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "repo_map",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "repo_map",
+        "description": "Return a bounded deterministic repository metadata map from the SourceStateRef-bound FMG-018 intelligence generation. Large metadata maps may spill to an authenticated TOOL_OUTPUT ContentRef when explicitly allowed; raw source is never persisted.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string",
+              "description": "Relative path to a Git repository under the shared root."
+            },
+            "cursor": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Authenticated continuation cursor from a previous page of the same query."
+            },
+            "max_items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            },
+            "allow_content_ref": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "repo_path"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "type": "string"
+            },
+            "query_kind": {
+              "type": "string"
+            },
+            "provider_id": {
+              "type": "string"
+            },
+            "provider_version": {
+              "type": "string"
+            },
+            "completeness": {
+              "type": "string"
+            },
+            "parser_profile_hash": {
+              "type": "string"
+            },
+            "source_state_id": {
+              "type": "string"
+            },
+            "grants_authority": {
+              "type": "boolean",
+              "const": false
+            },
+            "raw_source_persisted": {
+              "type": "boolean",
+              "const": false
+            },
+            "generation_truncated": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "generation_truncation_reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "next_cursor": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "partial": {
+              "type": "boolean"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "truncation_reason": {
+              "type": "string"
+            },
+            "total_items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "start_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "returned_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "items": {
+              "type": "array"
+            },
+            "artifact_state": {
+              "type": "string",
+              "enum": [
+                "not_requested",
+                "below_threshold",
+                "available",
+                "unavailable"
+              ]
+            },
+            "content_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "blob_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "expires_epoch_ms": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "schema_version",
+            "query_kind",
+            "provider_id",
+            "provider_version",
+            "completeness",
+            "parser_profile_hash",
+            "source_state_id",
+            "grants_authority",
+            "raw_source_persisted"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "symbol_search",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "symbol_search",
+        "description": "Search lexical symbols in the current repository-intelligence generation with deterministic exact/prefix/substring ranking. Ambiguity is reported explicitly; the tool never selects a symbol implicitly.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "kind": {
+              "type": "string",
+              "maxLength": 64,
+              "default": ""
+            },
+            "case_sensitive": {
+              "type": "boolean",
+              "default": false
+            },
+            "cursor": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Authenticated continuation cursor from a previous page of the same query."
+            },
+            "max_results": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          "required": [
+            "repo_path",
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "type": "string"
+            },
+            "query_kind": {
+              "type": "string"
+            },
+            "provider_id": {
+              "type": "string"
+            },
+            "provider_version": {
+              "type": "string"
+            },
+            "completeness": {
+              "type": "string"
+            },
+            "parser_profile_hash": {
+              "type": "string"
+            },
+            "source_state_id": {
+              "type": "string"
+            },
+            "grants_authority": {
+              "type": "boolean",
+              "const": false
+            },
+            "raw_source_persisted": {
+              "type": "boolean",
+              "const": false
+            },
+            "generation_truncated": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "generation_truncation_reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "next_cursor": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "partial": {
+              "type": "boolean"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "truncation_reason": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "kind_filter": {
+              "type": "string"
+            },
+            "symbol_support": {
+              "type": "boolean"
+            },
+            "ambiguous": {
+              "type": "boolean"
+            },
+            "exact_match_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_results": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "returned_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "results": {
+              "type": "array"
+            }
+          },
+          "required": [
+            "schema_version",
+            "query_kind",
+            "provider_id",
+            "provider_version",
+            "completeness",
+            "parser_profile_hash",
+            "source_state_id",
+            "grants_authority",
+            "raw_source_persisted"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "related_files",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "read",
+      "capabilities": [
+        "filesystem.read"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "related_files",
+        "description": "Return bounded deterministic incoming/outgoing file relationships from the current repository-intelligence generation, ranked by the FMG-018 concrete relation scores.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string"
+            },
+            "relative_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "min_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0
+            },
+            "cursor": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "Authenticated continuation cursor from a previous page of the same query."
+            },
+            "max_results": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          "required": [
+            "repo_path",
+            "relative_path"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "type": "string"
+            },
+            "query_kind": {
+              "type": "string"
+            },
+            "provider_id": {
+              "type": "string"
+            },
+            "provider_version": {
+              "type": "string"
+            },
+            "completeness": {
+              "type": "string"
+            },
+            "parser_profile_hash": {
+              "type": "string"
+            },
+            "source_state_id": {
+              "type": "string"
+            },
+            "grants_authority": {
+              "type": "boolean",
+              "const": false
+            },
+            "raw_source_persisted": {
+              "type": "boolean",
+              "const": false
+            },
+            "generation_truncated": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "generation_truncation_reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "next_cursor": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "partial": {
+              "type": "boolean"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "truncation_reason": {
+              "type": "string"
+            },
+            "relative_path": {
+              "type": "string"
+            },
+            "min_score": {
+              "type": "number"
+            },
+            "total_results": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "returned_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "results": {
+              "type": "array"
+            }
+          },
+          "required": [
+            "schema_version",
+            "query_kind",
+            "provider_id",
+            "provider_version",
+            "completeness",
+            "parser_profile_hash",
+            "source_state_id",
+            "grants_authority",
+            "raw_source_persisted"
           ],
           "additionalProperties": true
         },

@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-018-repository-intelligence-core`
+Active branch: `chatgpt/FMG-019-repository-intelligence-query-facade`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -727,3 +727,39 @@ Scoped review PASS:
 
 Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify all three lanes, then PR/review/merge -> merged-main Verify -> FMG-018 DONE / MAIN VERIFIED -> claim FMG-019.
+
+## FMG-018 final closure / FMG-019 claim
+
+FMG-018: DONE / MAIN VERIFIED.
+- Final closure head: `cd24498aaebed4a6d639ddbce6ec59043e43d7f5`.
+- Push Verify run `36534517010`: macOS + native Windows ARM64 SUCCESS; Windows x64 initial transient ProcessRunner bounded-output fixture failure; rerun of the single failed Windows job SUCCESS on the same head.
+- PR #37 merged.
+- Merge main: `02a4b60c1bd7afd5c5fbd2c5d467ba4f3a59fbee`.
+- PR Verify run `36536059112`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Merged-main Verify run `36536725420`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
+
+FMG-019: CLAIMED / ACTIVE on `chatgpt/FMG-019-repository-intelligence-query-facade`.
+NEXT_EXACT_ACTION: implement only `repo_map`, `symbol_search`, and `related_files` over the FMG-018 MAIN VERIFIED repository-intelligence core. Preserve provider/version/heuristic completeness, deterministic ranking, SourceStateRef freshness, ToolBudget/cursor bounds, explicit stale-generation behavior, and optional ContentRef spillover for oversized maps. Add negative tests for ambiguous symbols, unsupported/no-symbol provider, stale generation during query, very large graph, invalid cursor, and unavailable artifact. Do not begin FMG-020 before FMG-019 MAIN VERIFIED.
+
+## FMG-019 local verification checkpoint
+
+State: LOCAL VERIFIED / NATIVE CI PENDING.
+Catalog: 1.10.0 / 34 canonical tools / SHA-256 `a11c9512d6b182c13ad760709b99ff9224a702cb477953409e831d7d4e21289d`.
+Local proof: query contract + predecessor/source-state/project-context/catalog/parity and affected contracts PASS; Windows Release 0 warnings/errors; FMG-019 isolation 18 assertions PASS; full Windows regression 876 assertions PASS; diff check PASS. Cross-platform cursor codec was hardened against non-canonical Base64URL signature aliases discovered by full regression. macOS query implementation + native acceptance are wired; native Swift verification remains pending GitHub macOS Verify.
+Evidence: `docs/evidence/FMG-019_REPOSITORY_INTELLIGENCE_QUERY_FACADE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit local-verified FMG-019 candidate, sync latest fork/main, rerun affected local gates only if sync changes the candidate, push exact synchronized head, require native Verify macOS + Windows x64 + native Windows ARM64, scoped review, PR/merge, merged-main Verify, then mark FMG-019 DONE / MAIN VERIFIED and claim FMG-020.
+
+## FMG-019 exact-head native verification / scoped review
+
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
+Candidate: `fbdb9d5eb36e1b0a90aab64234c2ff7f12c83753`.
+Native Verify run `36544068228`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Scoped review PASS: read-only/closed-world authority preserved; deterministic ranking/cursors; SourceStateRef freshness before return and post-publish; stale artifact cleanup; metadata-only ContentRef; canonical Base64URL cursor rejection cross-platform.
+Evidence: `docs/evidence/FMG-019_REPOSITORY_INTELLIGENCE_QUERY_FACADE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify all three lanes, then PR/merge -> merged-main Verify -> mark FMG-019 DONE / MAIN VERIFIED -> claim FMG-020.
+
+## FMG-019 PR Verify attempt 1 remediation
+
+PR #38 run `36545273004`: Windows x64 + native ARM64 SUCCESS; macOS failed only on the pre-listener fixture readiness watchdog after FMG-019 increased native startup work. Remediation is test-only: readiness watchdog 45s -> 90s; product semantics unchanged.
+NEXT_EXACT_ACTION: commit/push remediation, require exact-head three-lane Verify/PR checks, then merge PR #38 with expected head SHA and require merged-main Verify.

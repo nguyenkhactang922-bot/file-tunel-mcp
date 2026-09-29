@@ -265,7 +265,7 @@ Negative tests:
 
 ## FMG-018 - Repository Intelligence Core / Cache
 
-State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-014, FMG-010, FMG-006
 
 Scope:
@@ -298,7 +298,7 @@ Negative tests:
 
 ## FMG-019 - repo_map / symbol_search / related_files
 
-State: BLOCKED
+State: PR VERIFY TEST-HARNESS REMEDIATION PENDING
 Depends: FMG-018
 
 Scope:

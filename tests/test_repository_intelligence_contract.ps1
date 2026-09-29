@@ -73,12 +73,8 @@ foreach ($Path in @("build_macos_app.sh", ".github/workflows/verify.yml", "tests
     Require-Contains $Text "RepositoryIntelligence.swift" "$Path does not compile RepositoryIntelligence.swift"
 }
 
-$PublicNames = @($Catalog.tools | ForEach-Object { $_.name })
-if ($PublicNames -contains "repo_map" -or $PublicNames -contains "symbol_search" -or $PublicNames -contains "related_files") {
-    throw "FMG-018 must not expose FMG-019 public query tools early."
-}
-if ($Catalog.catalogVersion -ne "1.9.0" -or $Catalog.tools.Count -ne 31) {
-    throw "FMG-018 core must not mutate the 1.9.0 / 31-tool public catalog."
+if ($Catalog.catalogVersion -ne "1.10.0" -or $Catalog.tools.Count -ne 34) {
+    throw "FMG-018 core invariants must remain compatible with the current 1.10.0 / 34-tool public catalog."
 }
 
 Require-Contains $MacTools "func captureRepositoryIntelligence(" "macOS LocalTools internal FMG-018 bridge missing."
@@ -86,4 +82,4 @@ Require-Contains $MacTools "self.gitRepo(path)" "macOS FMG-018 must reuse existi
 Require-Contains $MacTools "self.runGit(" "macOS FMG-018 must reuse existing safe runGit authority."
 Require-Contains $MacTools "self.captureSourceStateRef(repoPath: path)" "macOS FMG-018 must reuse existing SourceStateRef authority."
 
-Write-Host "repository-intelligence-contract: ok (core-only, metadata-cache, SourceStateRef-bound, no-authority, catalog unchanged)"
+Write-Host "repository-intelligence-contract: ok (metadata-cache, SourceStateRef-bound, no-authority, FMG-019-compatible)"
