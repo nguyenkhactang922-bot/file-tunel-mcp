@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the FMG-016 evidence-only closure head, require exact-head native Verify on macOS + Windows x64 + Windows ARM64, then PR/merge and merged-main verification; only after merged-main SUCCESS mark FMG-016 DONE / MAIN VERIFIED and claim FMG-017.
+AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-017 Model-Friendly Edit Adapters only on `chatgpt/FMG-017-model-friendly-edit-adapters`; add `apply_search_replace` + `apply_unified_diff` as adapters that compile deterministically to canonical `apply_edits`, preserve expected_version and BOM/newline semantics, support exact preview/dry-run, and fail closed on zero/multiple match, malformed/overlapping diff, stale version, path-header escape and cancellation. Do not begin FMG-018 before FMG-017 MAIN VERIFIED.

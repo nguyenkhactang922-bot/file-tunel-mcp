@@ -207,7 +207,7 @@ Negative tests:
 
 ## FMG-016 - Quarantine Delete / Restore
 
-State: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-014, FMG-008, FMG-011
 
 Scope:
@@ -238,7 +238,7 @@ Negative tests:
 
 ## FMG-017 - Model-Friendly Edit Adapters
 
-State: BLOCKED
+State: CLAIMED / ACTIVE
 Depends: FMG-013, FMG-009
 
 Scope:

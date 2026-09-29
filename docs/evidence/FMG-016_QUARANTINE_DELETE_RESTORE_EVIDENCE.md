@@ -131,3 +131,12 @@ Review note:
 - a durable `prepared` quarantine record may remain if source deletion succeeds but the post-delete metadata transition cannot persist. Recovery payload/manifest remain available and the operation does not falsely claim a successful terminal update. Restore accepts this recovery state.
 
 NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify on macOS + Windows x64 + Windows ARM64, then PR/merge -> merged-main Verify -> mark FMG-016 DONE / MAIN VERIFIED -> claim FMG-017.
+
+## Final closure
+
+Final candidate head: `6e14773880a92e2413ec4d51793a2f04f3a8f705`.
+PR: #35.
+Merge main: `59073351ee77505659aa6a426fe73ff08a29b085`.
+Final exact-head Verify: run `36511125923` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Merged-main Verify: run `36511411880` SUCCESS.
+State: DONE / MAIN VERIFIED.
