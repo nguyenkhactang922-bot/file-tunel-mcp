@@ -881,3 +881,24 @@ Verified after consolidation:
 Evidence: `docs/evidence/PROJECT_ROOT_CONSOLIDATION_EVIDENCE.md`.
 
 Continuation remains FMG-020 Persistent PTY from the canonical root only. Do not recreate a secondary worktree; the existing FMG-020 `NEXT_EXACT_ACTION` above remains authoritative.
+
+
+## D:\ root FileMCP cleanup - 2026-09-29
+
+Canonical PROJECT_ROOT remains `D:\Tools\FileMCP` only.
+
+Audited external siblings before deletion:
+- `D:\FileMCP-Lifecycle-Proof-20260922`: clean standalone toy lifecycle-proof repo; product source was not imported because canonical FileMCP has stronger real lifecycle proof. Provenance/evidence preserved at `docs/evidence/LEGACY_FILEMCP_LIFECYCLE_PROOF_2026-09-29.md`.
+- `D:\FileMCP-OSS-Audit`: clean cache of 11 pinned OSS reference clones already absorbed by the frozen OSS audit/design. Full origin + 40-character SHA manifest preserved at `docs/audit/OSS_AUDIT_PINNED_SOURCE_MANIFEST_2026-09-29.md`.
+
+No uncommitted source was discarded. No alternate project root is required for current work.
+FMG-020 remains the active implementation track and must continue from the canonical root only.
+
+## External D:\ FileMCP sibling cleanup - 2026-09-29
+
+Completed after source audit:
+- `D:\FileMCP-Lifecycle-Proof-20260922`: deleted; clean toy proof repo. Product source was not imported. Provenance/evidence preserved in `docs/evidence/LEGACY_FILEMCP_LIFECYCLE_PROOF_2026-09-29.md`.
+- `D:\FileMCP-OSS-Audit`: deleted; all 11 nested repos were clean. Exact origin/branch/full-SHA pins and canonical dispositions preserved in `docs/audit/OSS_AUDIT_PINNED_SOURCE_MANIFEST_2026-09-29.md`.
+- no uncommitted local source from either directory was discarded; no alternate runtime/project code was selected for import because canonical audit/design already contains the accepted stronger decisions.
+
+Canonical PROJECT_ROOT remains `D:\Tools\FileMCP` only. FMG-020 remains the active implementation track.
