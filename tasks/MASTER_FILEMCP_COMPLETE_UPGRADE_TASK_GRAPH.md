@@ -325,7 +325,7 @@ Negative tests:
 
 ## FMG-020 - Persistent PTY Session Runtime
 
-State: CLAIMED / ACTIVE
+State: WINDOWS PTY TARGETED VERIFIED / MACOS PARITY PENDING
 Depends: FMG-014, FMG-005, FMG-003, FMG-004
 
 Scope:

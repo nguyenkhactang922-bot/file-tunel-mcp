@@ -5,8 +5,8 @@ function Require-Contains([string]$Text, [string]$Needle, [string]$Message) {
 }
 
 $Catalog = Get-Content "contracts/tool_catalog.v1.json" -Raw | ConvertFrom-Json
-if ($Catalog.catalogVersion -ne "1.10.0") { throw "FMG-017 requires catalogVersion 1.10.0." }
-if ($Catalog.tools.Count -ne 34) { throw "FMG-017 requires exactly 34 canonical tools; got $($Catalog.tools.Count)." }
+if ($Catalog.catalogVersion -ne "1.11.0") { throw "FMG-017 requires catalogVersion 1.11.0." }
+if ($Catalog.tools.Count -ne 41) { throw "FMG-017 requires exactly 41 canonical tools; got $($Catalog.tools.Count)." }
 
 $Canonical = @($Catalog.tools | Where-Object name -eq "apply_edits")
 if ($Canonical.Count -ne 1) { throw "Canonical apply_edits is missing or duplicated." }
@@ -99,4 +99,4 @@ foreach ($Path in @("build_macos_app.sh", ".github/workflows/verify.yml", "tests
     Require-Contains $Text "EditAdapterService.swift" "$Path does not compile EditAdapterService.swift"
 }
 
-Write-Host "edit-adapters-contract: ok (catalog=1.10.0 tools=34 compile-only -> apply_edits parity)"
+Write-Host "edit-adapters-contract: ok (catalog=1.11.0 tools=41 compile-only -> apply_edits parity)"

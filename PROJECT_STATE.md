@@ -779,3 +779,22 @@ FMG-019: DONE / MAIN VERIFIED.
 
 FMG-020: CLAIMED / ACTIVE on `chatgpt/FMG-020-persistent-pty`.
 NEXT_EXACT_ACTION: audit existing process lifecycle, environment authority, artifact store, cursor/session identity, LocalTools/catalog and platform-specific primitives; freeze a persistent PTY contract for Windows ConPTY + macOS POSIX PTY, then implement the bounded session runtime without starting FMG-021.
+
+## FMG-019 closure / FMG-020 claim - 2026-09-29
+
+FMG-019: DONE / MAIN VERIFIED.
+- PR: #38.
+- Merge main: `3623f96c1d6041f46bc6fcb7781f11a17ccb1d29`.
+- Merged-main Verify: run `36550274743` SUCCESS on macOS / Windows x64 / Windows ARM64.
+
+FMG-020: CLAIMED / ACTIVE on `chatgpt/FMG-020-persistent-pty`.
+Scope: Windows ConPTY + macOS POSIX PTY/forkpty semantics; pty_start/read/write/resize/signal/stop/list; scoped opaque session IDs; exec_process environment authority reuse; bounded RAM ring + cursor reads; idle/max TTL; optional short-lived PTY_OUTPUT spillover; process-tree cleanup; restart never fakes resume; no PTY bytes in evidence/telemetry.
+
+NEXT_EXACT_ACTION: implement native PTY host + session manager + 7 tool facade only, then contract/native TTY tests -> local regression -> exact-head native Verify -> scoped review -> PR/merge -> merged-main Verify -> FMG-020 MAIN VERIFIED -> claim FMG-021.
+
+## FMG-020 Windows PTY checkpoint
+
+State: WINDOWS PTY TARGETED VERIFIED / MACOS PARITY PENDING.
+Windows proof: Release build 0 warnings/errors; `windows-pty-only-tests: ok (23 assertions)`. ConPTY native terminal devices, ring routing, write/read, resize, Ctrl-C, tamper rejection, policy reauth, Job Object tree cleanup, bounded ring, PTY_OUTPUT spill/delete, cursor bounds, idle TTL, max lifetime and restart-no-resume all PASS.
+Evidence: `docs/evidence/FMG-020_PERSISTENT_PTY_SESSION_RUNTIME_EVIDENCE.md`.
+NEXT_EXACT_ACTION: port the same session contract to macOS using a real POSIX PTY (not pipes), wire seven LocalTools handlers + native Swift tests/build lists, then cross-platform FMG-020 contract -> affected local gates -> full Windows regression -> exact-head native Verify. FMG-021 remains BLOCKED until FMG-020 MAIN VERIFIED.

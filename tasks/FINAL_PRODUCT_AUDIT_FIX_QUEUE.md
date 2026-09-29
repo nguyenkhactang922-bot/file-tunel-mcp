@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: FMG-020 is CLAIMED / ACTIVE on `chatgpt/FMG-020-persistent-pty`. Audit existing process lifecycle, environment authority, artifact store, authenticated cursor/session identity, LocalTools/catalog and platform PTY primitives; freeze the cross-platform persistent PTY contract, then implement Windows ConPTY + macOS POSIX PTY with bounded memory/output, scoped session IDs, TTL, spillover and ownership-safe cleanup. Do not begin FMG-021 before FMG-020 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: continue FMG-020 from the Windows PTY checkpoint only: implement the same session contract on macOS using a real POSIX PTY, wire pty_start/read/write/resize/signal/stop/list into macOS LocalTools and native Swift runtime/build lists, then cross-platform FMG-020 contract, affected local gates, full Windows regression, exact-head native Verify, scoped review, PR/merge and merged-main verification. Do not begin FMG-021 before FMG-020 MAIN VERIFIED.
