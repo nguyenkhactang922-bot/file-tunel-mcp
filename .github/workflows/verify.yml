@@ -46,7 +46,7 @@ jobs:
             macos/RepositoryIntelligence.swift \
             macos/RepositoryIntelligenceQuery.swift \
             macos/QuarantineService.swift \
-    macos/PersistentPty.swift \
+            macos/PersistentPty.swift \
             macos/EvidenceSupport.swift \
             macos/ToolCatalog.swift \
             macos/ServerPolicy.swift \
