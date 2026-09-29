@@ -1001,3 +1001,26 @@ Unchanged: `openpty + posix_spawn` launch topology, process-group ownership, wor
 
 Local affected proof already PASS: persistent-PTY contract; Swift runtime shell syntax; `git diff --check`.
 NEXT_EXACT_ACTION: verify remote/main/PR state, commit/push the raw-FD remediation, require exact-head native Verify, then inspect only any failing lane/stage.
+
+## FMG-020 macOS descendant-cleanup verification remediation - 2026-09-30
+
+Exact-head `4711a62962a98777768ea1f2ca2ef9970494c7a8`, Verify run `36602361704`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS Static/typecheck/catalog: SUCCESS.
+- macOS Integration: FAIL only at `PTY descendant process-tree cleanup` after `pty_stop`.
+
+The production stop path already proves process-group ownership and signals the owned group. The failing assertion required the descendant PID to disappear from the process table (`ESRCH`). On macOS a killed descendant can remain temporarily as a zombie until its reaper collects it; `kill(pid, 0)` remains successful even though the process is no longer runnable.
+
+Remediation is test-only:
+- add a fail-closed process-state probe using `/bin/ps -o state=`;
+- cleanup passes only when the PID is absent or in zombie state;
+- any live/runnable state still fails;
+- production PTY/session/process-group semantics are unchanged.
+
+Affected local proof:
+- persistent-PTY contract: PASS;
+- Swift runtime shell syntax: PASS;
+- `git diff --check`: PASS.
+
+NEXT_EXACT_ACTION: verify latest main/remote branch state, commit/push this test-only remediation, require exact-head native Verify on macOS / Windows x64 / Windows ARM64; if green, scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.

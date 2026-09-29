@@ -1024,6 +1024,38 @@ func isFailed(_ state: LocalMCPRuntimeState) -> Bool {
     return false
 }
 
+func processIsRunnable(_ pid: pid_t) -> Bool {
+    errno = 0
+    if kill(pid, 0) != 0 && errno == ESRCH {
+        return false
+    }
+
+    let process = Process()
+    let output = Pipe()
+    process.executableURL = URL(fileURLWithPath: "/bin/ps")
+    process.arguments = ["-o", "state=", "-p", String(pid)]
+    process.standardOutput = output
+    process.standardError = Pipe()
+    do {
+        try process.run()
+        process.waitUntilExit()
+    } catch {
+        // Fail closed: inability to inspect a still-addressable PID is treated as runnable.
+        return true
+    }
+    if process.terminationStatus != 0 {
+        return false
+    }
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    let state = String(data: data, encoding: .utf8)?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    if state.isEmpty { return false }
+    // kill(pid, 0) remains successful for a zombie until its reaper collects it.
+    // A zombie is already non-runnable and therefore satisfies process-tree cleanup.
+    return !state.hasPrefix("Z")
+}
+
+
 func ptyReadUntil(
     _ tools: LocalTools,
     sessionID: String,
@@ -1120,8 +1152,7 @@ precondition(ptyResize.structuredContent["rows"] as? Int == 40)
 
 _ = try ptyTools.call(name: "pty_stop", arguments: ["session_id": ptyOwnedSession])
 waitFor({
-    errno = 0
-    return kill(ptyChildPID, 0) != 0 && errno == ESRCH
+    !processIsRunnable(ptyChildPID)
 }, timeout: 5, label: "PTY descendant process-tree cleanup")
 
 let ptyCatStart = try ptyTools.call(
