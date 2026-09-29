@@ -1084,7 +1084,7 @@ let ptyOwnedStart = try ptyTools.call(
 )
 let ptyOwnedSession = ptyOwnedStart.structuredContent["session_id"] as! String
 precondition(ptyOwnedStart.structuredContent["actual_pty"] as? Bool == true)
-precondition(ptyOwnedStart.structuredContent["pty_backend"] as? String == "macos-posix-forkpty")
+precondition(ptyOwnedStart.structuredContent["pty_backend"] as? String == "macos-posix-openpty-spawn")
 
 let ptyNative = try ptyReadUntil(
     ptyTools,

@@ -160,19 +160,73 @@ private final class PosixPtyHost {
             ws_ypixel: 0
         )
 
-        let pid = forkpty(&masterFD, nil, nil, &size)
-        if pid == 0 {
-            if chdir(cwdCString) != 0 {
-                _exit(126)
-            }
-            _ = execve(executableCString, argvPointer, envPointer)
-            _exit(127)
+        var slaveFD: Int32 = -1
+        guard openpty(&masterFD, &slaveFD, nil, nil, &size) == 0 else {
+            throw MCPServerError.operationFailed(
+                "Could not allocate POSIX PTY: \(String(cString: strerror(errno)))"
+            )
         }
 
-        guard pid > 0 else {
-            if masterFD >= 0 { Darwin.close(masterFD) }
+        var fileActions: posix_spawn_file_actions_t?
+        var spawnAttributes: posix_spawnattr_t?
+        guard posix_spawn_file_actions_init(&fileActions) == 0 else {
+            Darwin.close(masterFD)
+            Darwin.close(slaveFD)
+            throw MCPServerError.operationFailed("Could not initialize PTY spawn file actions")
+        }
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+
+        guard posix_spawnattr_init(&spawnAttributes) == 0 else {
+            Darwin.close(masterFD)
+            Darwin.close(slaveFD)
+            throw MCPServerError.operationFailed("Could not initialize PTY spawn attributes")
+        }
+        defer { posix_spawnattr_destroy(&spawnAttributes) }
+
+        func requireSpawnAction(_ code: Int32, _ message: String) throws {
+            guard code == 0 else {
+                throw MCPServerError.operationFailed("\(message): \(String(cString: strerror(code)))")
+            }
+        }
+
+        do {
+            try requireSpawnAction(
+                posix_spawn_file_actions_addchdir(&fileActions, cwdCString),
+                "Could not configure PTY working directory"
+            )
+            try requireSpawnAction(posix_spawn_file_actions_adddup2(&fileActions, slaveFD, STDIN_FILENO), "Could not bind PTY stdin")
+            try requireSpawnAction(posix_spawn_file_actions_adddup2(&fileActions, slaveFD, STDOUT_FILENO), "Could not bind PTY stdout")
+            try requireSpawnAction(posix_spawn_file_actions_adddup2(&fileActions, slaveFD, STDERR_FILENO), "Could not bind PTY stderr")
+            try requireSpawnAction(posix_spawn_file_actions_addclose(&fileActions, masterFD), "Could not isolate PTY master")
+            if slaveFD > STDERR_FILENO {
+                try requireSpawnAction(posix_spawn_file_actions_addclose(&fileActions, slaveFD), "Could not close PTY slave after dup")
+            }
+
+            try requireSpawnAction(posix_spawnattr_setpgroup(&spawnAttributes, 0), "Could not configure PTY process group")
+            try requireSpawnAction(
+                posix_spawnattr_setflags(&spawnAttributes, Int16(POSIX_SPAWN_SETPGROUP)),
+                "Could not enable PTY process-group creation"
+            )
+        } catch {
+            Darwin.close(masterFD)
+            Darwin.close(slaveFD)
+            throw error
+        }
+
+        var pid: pid_t = 0
+        let spawnResult = posix_spawn(
+            &pid,
+            executableCString,
+            &fileActions,
+            &spawnAttributes,
+            argvPointer,
+            envPointer
+        )
+        Darwin.close(slaveFD)
+        guard spawnResult == 0, pid > 0 else {
+            Darwin.close(masterFD)
             throw MCPServerError.operationFailed(
-                "Could not launch POSIX PTY process: \(String(cString: strerror(errno)))"
+                "Could not launch POSIX PTY process: \(String(cString: strerror(spawnResult)))"
             )
         }
 
@@ -237,18 +291,22 @@ private final class PosixPtyHost {
         }
         switch signal {
         case "ctrl_c":
-            try write(Data([0x03]))
+            try signalProcessGroup(SIGINT, label: "Ctrl-C")
         case "terminate":
-            guard ownsProcessGroup() else {
-                throw MCPServerError.operationFailed("Refused PTY signal: process-group ownership is no longer proven")
-            }
-            if killpg(processGroupID, SIGTERM) != 0 && errno != ESRCH {
-                throw MCPServerError.operationFailed(
-                    "Could not signal POSIX PTY process group: \(String(cString: strerror(errno)))"
-                )
-            }
+            try signalProcessGroup(SIGTERM, label: "terminate")
         default:
             throw MCPServerError.invalidArguments("PTY signal must be ctrl_c or terminate")
+        }
+    }
+
+    private func signalProcessGroup(_ signalNumber: Int32, label: String) throws {
+        guard ownsProcessGroup() else {
+            throw MCPServerError.operationFailed("Refused PTY signal: process-group ownership is no longer proven")
+        }
+        if killpg(processGroupID, signalNumber) != 0 && errno != ESRCH {
+            throw MCPServerError.operationFailed(
+                "Could not send \(label) to POSIX PTY process group: \(String(cString: strerror(errno)))"
+            )
         }
     }
 
@@ -748,7 +806,7 @@ final class PersistentPtyService {
             "ring_limit_bytes": options.maxRingBytes,
             "spill_output": spillOutput,
             "actual_pty": true,
-            "pty_backend": "macos-posix-forkpty",
+            "pty_backend": "macos-posix-openpty-spawn",
             "grants_authority": false,
         ]
     }

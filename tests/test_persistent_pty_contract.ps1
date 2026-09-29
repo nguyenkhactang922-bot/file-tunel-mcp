@@ -37,10 +37,11 @@ foreach($marker in @(
 }
 
 foreach($marker in @(
-  "forkpty",
+  "openpty",
+  "posix_spawn",
   "TIOCSWINSZ",
   "killpg",
-  "macos-posix-forkpty",
+  "macos-posix-openpty-spawn",
   "ArtifactContentClasses.ptyOutput",
   "restart_resume_supported",
   "cursor_evicted",
@@ -74,6 +75,6 @@ foreach($marker in @(
 Write-Output "persistent-pty-contract: PASS"
 Write-Output "catalog: 1.11.0 / 41 tools"
 Write-Output "windows-backend: ConPTY"
-Write-Output "macos-backend: POSIX forkpty"
+Write-Output "macos-backend: POSIX openpty + posix_spawn"
 Write-Output "restart-resume: false"
 Write-Output "raw-pty-evidence-telemetry: absent"
