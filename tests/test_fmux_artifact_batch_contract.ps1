@@ -85,8 +85,8 @@ $macProjection = $macServer.Substring($macProjectionStart, $macProjectionEnd - $
 if($macProjection.Contains('"content"')) { throw "macOS projection must not copy inline file content" }
 if($macProjection.Contains('entry["content_ref"]') -or $macProjection.Contains('item["content_ref"]')) { throw "macOS projection must not log raw ContentRef tokens" }
 
-if(-not $graph.Contains("FMUX-014") -or -not $graph.Contains("State: ACTIVE / CLAIMED")) {
-  throw "FMUX-014 is not ACTIVE / CLAIMED in task graph"
+if(-not $graph.Contains("FMUX-014") -or (-not $graph.Contains("State: ACTIVE / CLAIMED") -and -not $graph.Contains("State: DONE / MAIN VERIFIED"))) {
+  throw "FMUX-014 lifecycle state is missing in task graph"
 }
 
 Write-Output "fmux-artifact-batch-contract: PASS"

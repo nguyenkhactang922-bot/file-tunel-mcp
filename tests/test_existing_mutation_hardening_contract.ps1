@@ -5,8 +5,8 @@ $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 $Catalog = Get-Content contracts/tool_catalog.v1.json -Raw | ConvertFrom-Json
-if ($Catalog.catalogVersion -ne "1.7.0") { throw "FMG-008 requires catalogVersion 1.7.0." }
-if ($Catalog.tools.Count -ne 25) { throw "Current catalog includes FMG-009 apply_edits; FMG-008 tool contracts must remain present." }
+if ($Catalog.catalogVersion -ne "1.8.0") { throw "FMG-008 requires catalogVersion 1.8.0." }
+if ($Catalog.tools.Count -ne 29) { throw "Current catalog includes FMG-009 apply_edits; FMG-008 tool contracts must remain present." }
 
 function Tool([string]$Name) {
     $items = @($Catalog.tools | Where-Object name -eq $Name)
@@ -65,4 +65,4 @@ Require-Marker "tests/test_swift_runtime.sh" @(
     "policy removal before commit"
 )
 
-Write-Host "existing-mutation-hardening-contract: ok (catalog=1.7.0 tools=25 expected-version + guard + policy + cancellation + dry-run parity)"
+Write-Host "existing-mutation-hardening-contract: ok (catalog=1.8.0 tools=29 expected-version + guard + policy + cancellation + dry-run parity)"
