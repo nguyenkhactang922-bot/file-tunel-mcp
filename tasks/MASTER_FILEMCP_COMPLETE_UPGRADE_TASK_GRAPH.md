@@ -265,7 +265,7 @@ Negative tests:
 
 ## FMG-018 - Repository Intelligence Core / Cache
 
-State: CLAIMED / ACTIVE
+State: WINDOWS CORE TARGETED VERIFIED / MACOS PARITY PENDING
 Depends: FMG-014, FMG-010, FMG-006
 
 Scope:
