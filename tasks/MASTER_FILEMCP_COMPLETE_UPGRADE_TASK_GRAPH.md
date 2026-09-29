@@ -238,7 +238,7 @@ Negative tests:
 
 ## FMG-017 - Model-Friendly Edit Adapters
 
-State: CLAIMED / ACTIVE
+State: LOCAL VERIFIED / MAIN SYNC + NATIVE CI PENDING
 Depends: FMG-013, FMG-009
 
 Scope:

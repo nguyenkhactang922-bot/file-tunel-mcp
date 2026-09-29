@@ -65,6 +65,13 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length > 0 && args[0] == "edit-adapters-only")
+            {
+                await TestEditAdaptersAsync(root);
+                Console.WriteLine($"windows-edit-adapters-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             TestObservabilityContracts();
             TestCanonicalToolCatalog();
             TestServerPolicy();
@@ -89,6 +96,7 @@ internal static class Program
             await TestAuthorizedPathSnapshotAsync(root);
             await TestExistingMutationHardeningAsync(root);
             await TestApplyEditsAsync(root);
+            await TestEditAdaptersAsync(root);
             await TestProjectContextAsync(root);
             await TestEvidenceAndFreshnessAsync(root);
             await TestArtifactContentStoreAsync(root);
@@ -122,13 +130,13 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.8.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.9.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 24, "catalog non-shell local tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 25, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 26, "catalog non-shell local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 27, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 2, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
@@ -2750,6 +2758,184 @@ internal static class Program
         Console.WriteLine("windows-apply-edits: ok");
     }
 
+    private static async Task TestEditAdaptersAsync(string root)
+    {
+        var workspace = Path.Combine(root, "edit-adapters");
+        Directory.CreateDirectory(workspace);
+        var tools = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
+
+        Assert(tools.HasTool("apply_search_replace") && tools.HasTool("apply_unified_diff"),
+            "FMG-017 edit adapters are policy-visible");
+
+        async Task<string> Version(string path)
+        {
+            var read = await tools.CallAsync("read_file", Obj(("relative_path", path)));
+            return read.StructuredContent["version"]!.GetValue<string>();
+        }
+
+        static JsonObject CanonicalArgs(string path, string version, JsonArray edits, bool dryRun = true) => new()
+        {
+            ["relative_path"] = path,
+            ["expected_version"] = version,
+            ["coordinate_system"] = "byte",
+            ["edits"] = edits,
+            ["dry_run"] = dryRun,
+            ["preserve_line_endings"] = true,
+            ["preserve_bom"] = true,
+        };
+
+        File.WriteAllText(Path.Combine(workspace, "search.txt"), "alpha\nbeta\ngamma\n", new UTF8Encoding(false));
+        var searchVersion = await Version("search.txt");
+        var searchDry = await tools.CallAsync("apply_search_replace", Obj(
+            ("relative_path", "search.txt"),
+            ("expected_version", searchVersion),
+            ("search", "beta"),
+            ("replacement", "BETA"),
+            ("dry_run", true)));
+        var canonicalSearch = await tools.CallAsync("apply_edits", CanonicalArgs(
+            "search.txt",
+            searchVersion,
+            new JsonArray(new JsonObject
+            {
+                ["start_byte"] = 6,
+                ["end_byte"] = 10,
+                ["replacement"] = "BETA",
+            })));
+        Assert(
+            searchDry.StructuredContent["preview"]!.GetValue<string>() ==
+            canonicalSearch.StructuredContent["preview"]!.GetValue<string>(),
+            "apply_search_replace preview exactly matches equivalent canonical apply_edits preview");
+        Assert(!searchDry.StructuredContent["committed"]!.GetValue<bool>() &&
+               File.ReadAllText(Path.Combine(workspace, "search.txt")) == "alpha\nbeta\ngamma\n",
+            "apply_search_replace dry_run never writes directly");
+
+        var searchCommit = await tools.CallAsync("apply_search_replace", Obj(
+            ("relative_path", "search.txt"),
+            ("expected_version", searchVersion),
+            ("search", "beta"),
+            ("replacement", "BETA")));
+        Assert(searchCommit.StructuredContent["committed"]!.GetValue<bool>() &&
+               File.ReadAllText(Path.Combine(workspace, "search.txt")) == "alpha\nBETA\ngamma\n",
+            "apply_search_replace commits only through canonical apply_edits");
+
+        File.WriteAllText(Path.Combine(workspace, "zero.txt"), "alpha\n", new UTF8Encoding(false));
+        var zeroVersion = await Version("zero.txt");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("apply_search_replace", Obj(
+                ("relative_path", "zero.txt"), ("expected_version", zeroVersion),
+                ("search", "missing"), ("replacement", "x"))),
+            "zero locations",
+            "apply_search_replace fails closed on zero match");
+
+        File.WriteAllText(Path.Combine(workspace, "multi.txt"), "same same\n", new UTF8Encoding(false));
+        var multiVersion = await Version("multi.txt");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("apply_search_replace", Obj(
+                ("relative_path", "multi.txt"), ("expected_version", multiVersion),
+                ("search", "same"), ("replacement", "x"))),
+            "ambiguous",
+            "apply_search_replace fails closed on multiple matches");
+
+        File.WriteAllText(Path.Combine(workspace, "stale-adapter.txt"), "version-a\n", new UTF8Encoding(false));
+        var staleVersion = await Version("stale-adapter.txt");
+        File.WriteAllText(Path.Combine(workspace, "stale-adapter.txt"), "version-b\n", new UTF8Encoding(false));
+        await AssertThrowsAsync(
+            () => tools.CallAsync("apply_search_replace", Obj(
+                ("relative_path", "stale-adapter.txt"), ("expected_version", staleVersion),
+                ("search", "version-a"), ("replacement", "changed"))),
+            "changed",
+            "apply_search_replace preserves expected_version and rejects stale source");
+        Assert(File.ReadAllText(Path.Combine(workspace, "stale-adapter.txt")) == "version-b\n",
+            "stale adapter failure preserves newer source");
+
+        File.WriteAllText(Path.Combine(workspace, "cancel-adapter.txt"), "alpha\n", new UTF8Encoding(false));
+        var cancelVersion = await Version("cancel-adapter.txt");
+        using (var cancelled = ToolExecutionContext.Create(null, cancellationProbe: () => true))
+        {
+            await AssertThrowsAsync(
+                () => tools.CallAsync("apply_search_replace", Obj(
+                    ("relative_path", "cancel-adapter.txt"), ("expected_version", cancelVersion),
+                    ("search", "alpha"), ("replacement", "ALPHA")), executionContext: cancelled),
+                "cancelled",
+                "apply_search_replace cancellation fails before compilation/write");
+        }
+        Assert(File.ReadAllText(Path.Combine(workspace, "cancel-adapter.txt")) == "alpha\n",
+            "cancelled adapter leaves source unchanged");
+
+        File.WriteAllText(Path.Combine(workspace, "diff.txt"), "one\ntwo\nthree\n", new UTF8Encoding(false));
+        var diffVersion = await Version("diff.txt");
+        var patch = "--- a/diff.txt\n+++ b/diff.txt\n@@ -1,3 +1,3 @@\n one\n-two\n+TWO\n three\n";
+        var diffDry = await tools.CallAsync("apply_unified_diff", Obj(
+            ("relative_path", "diff.txt"),
+            ("expected_version", diffVersion),
+            ("unified_diff", patch),
+            ("dry_run", true)));
+        var canonicalDiff = await tools.CallAsync("apply_edits", CanonicalArgs(
+            "diff.txt",
+            diffVersion,
+            new JsonArray(new JsonObject
+            {
+                ["start_byte"] = 0,
+                ["end_byte"] = Encoding.UTF8.GetByteCount("one\ntwo\nthree\n"),
+                ["replacement"] = "one\nTWO\nthree\n",
+            })));
+        Assert(
+            diffDry.StructuredContent["preview"]!.GetValue<string>() ==
+            canonicalDiff.StructuredContent["preview"]!.GetValue<string>(),
+            "apply_unified_diff preview exactly matches compiled canonical apply_edits preview");
+
+        var diffCommit = await tools.CallAsync("apply_unified_diff", Obj(
+            ("relative_path", "diff.txt"),
+            ("expected_version", diffVersion),
+            ("unified_diff", patch)));
+        Assert(diffCommit.StructuredContent["committed"]!.GetValue<bool>() &&
+               File.ReadAllText(Path.Combine(workspace, "diff.txt")) == "one\nTWO\nthree\n",
+            "apply_unified_diff commits through canonical apply_edits");
+
+        File.WriteAllText(Path.Combine(workspace, "bad-diff.txt"), "one\ntwo\nthree\n", new UTF8Encoding(false));
+        var badVersion = await Version("bad-diff.txt");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("apply_unified_diff", Obj(
+                ("relative_path", "bad-diff.txt"), ("expected_version", badVersion),
+                ("unified_diff", "--- a/bad-diff.txt\n+++ b/bad-diff.txt\nnot-a-hunk\n"))),
+            "malformed",
+            "apply_unified_diff rejects malformed unified diff");
+
+        var escapePatch = "--- a/../escape.txt\n+++ b/../escape.txt\n@@ -1,1 +1,1 @@\n-one\n+ONE\n";
+        await AssertThrowsAsync(
+            () => tools.CallAsync("apply_unified_diff", Obj(
+                ("relative_path", "bad-diff.txt"), ("expected_version", badVersion),
+                ("unified_diff", escapePatch))),
+            "escapes",
+            "apply_unified_diff rejects path header escape");
+
+        var overlapPatch =
+            "--- a/bad-diff.txt\n+++ b/bad-diff.txt\n" +
+            "@@ -1,2 +1,2 @@\n one\n-two\n+TWO\n" +
+            "@@ -2,2 +2,2 @@\n two\n-three\n+THREE\n";
+        await AssertThrowsAsync(
+            () => tools.CallAsync("apply_unified_diff", Obj(
+                ("relative_path", "bad-diff.txt"), ("expected_version", badVersion),
+                ("unified_diff", overlapPatch))),
+            "overlapping",
+            "apply_unified_diff rejects overlapping hunks");
+
+        var bomCrlfPath = Path.Combine(workspace, "bom-crlf.txt");
+        File.WriteAllBytes(bomCrlfPath, [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("alpha\r\nbeta\r\n")]);
+        var bomVersion = await Version("bom-crlf.txt");
+        await tools.CallAsync("apply_search_replace", Obj(
+            ("relative_path", "bom-crlf.txt"),
+            ("expected_version", bomVersion),
+            ("search", "beta"),
+            ("replacement", "B\nC")));
+        var bomBytes = File.ReadAllBytes(bomCrlfPath);
+        Assert(bomBytes.Take(3).SequenceEqual(new byte[] { 0xEF, 0xBB, 0xBF }) &&
+               Encoding.UTF8.GetString(bomBytes[3..]) == "alpha\r\nB\r\nC\r\n",
+            "edit adapters inherit apply_edits BOM and CRLF normalization semantics");
+
+        Console.WriteLine("windows-edit-adapters: ok");
+    }
+
     private static async Task TestProjectContextAsync(string root)
     {
         var workspace = Path.Combine(root, "project-context");
@@ -2889,8 +3075,8 @@ internal static class Program
         var workspace = Path.Combine(root, "files"); Directory.CreateDirectory(workspace);
         var safe = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
         var full = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", true);
-        Assert(safe.ToolDefinitions.Count == 23 && !safe.HasTool("run_command"), "safe tool count");
-        Assert(full.ToolDefinitions.Count == 25 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
+        Assert(safe.ToolDefinitions.Count == 25 && !safe.HasTool("run_command"), "safe tool count");
+        Assert(full.ToolDefinitions.Count == 27 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
 
         var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
         var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);
@@ -3232,7 +3418,11 @@ internal static class Program
         var correlatedList = await SendHttpAsync(correlatedPort, "POST", "/mcp", AuthHeaders(token), meteredListBody);
         var correlatedListJson = JsonNode.Parse(HttpBody(correlatedList))!.AsObject();
         var correlatedTools = correlatedListJson["result"]!["tools"]!.AsArray();
-        Assert(correlatedTools.Count == 27, "logical correlation facade includes connect, evidence and quarantine tools");
+        Assert(
+            correlatedTools.Count == 29 &&
+            correlatedTools.Any(tool => tool?["name"]?.GetValue<string>() == "apply_search_replace") &&
+            correlatedTools.Any(tool => tool?["name"]?.GetValue<string>() == "apply_unified_diff"),
+            "logical correlation facade includes connect, evidence, quarantine and edit-adapter tools");
         var connectDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "filemcp_observability_connect")!.AsObject();
         Assert(connectDefinition["annotations"]!["readOnlyHint"]!.GetValue<bool>(), "logical correlation connect tool is read-only metadata");
         var readDefinition = correlatedTools.Single(tool => tool!["name"]!.GetValue<string>() == "read_file")!.AsObject();

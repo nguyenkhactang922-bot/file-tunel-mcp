@@ -120,12 +120,12 @@ struct LocalToolCallOutput {
 final class LocalTools {
     private static let handlerToolNames: Set<String> = [
         "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "project_context", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
         "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "apply_edits", "project_context", "exec_process",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "exec_process",
     ]
     private let resolver: SafePathResolver
     private let gitUserName: String
@@ -134,6 +134,7 @@ final class LocalTools {
     private let policy: ServerPolicy
     private let execEnvironment: ExecProcessEnvironmentAuthority
     private let fileVersions: FileVersionService
+    private let editAdapters: EditAdapterService
     private let batchFiles: BatchFileService
     private let mutationGuard: AuthorizedPathSnapshotService
     private let quarantine: QuarantineService
@@ -145,7 +146,7 @@ final class LocalTools {
     private let commandSlots = DispatchSemaphore(value: 2)
     private let gitSlots = DispatchSemaphore(value: 3)
     private let serializedToolNames: Set<String> = [
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "run_command",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "run_command",
         "git_init", "git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push",
     ]
     private let skippedSearchDirectories: Set<String> = [
@@ -178,6 +179,7 @@ final class LocalTools {
         self.resolver = resolver
         let versionService = try FileVersionService(resolver: resolver)
         self.fileVersions = versionService
+        self.editAdapters = EditAdapterService(versions: versionService)
 
         let artifactLock = NSLock()
         var sharedArtifactStore = artifactStore
@@ -341,6 +343,29 @@ final class LocalTools {
                 coordinateSystem: requiredString(arguments, "coordinate_system"),
                 columnEncoding: string(arguments, "column_encoding", default: ""),
                 edits: try anyArray(arguments, "edits", maximum: 1024),
+                dryRun: bool(arguments, "dry_run", default: false),
+                preserveLineEndings: bool(arguments, "preserve_line_endings", default: true),
+                preserveBom: bool(arguments, "preserve_bom", default: true),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
+            ))
+        case "apply_search_replace":
+            return objectOutput(try applySearchReplace(
+                relativePath: requiredString(arguments, "relative_path"),
+                expectedVersion: requiredString(arguments, "expected_version"),
+                search: requiredString(arguments, "search"),
+                replacement: requiredString(arguments, "replacement"),
+                dryRun: bool(arguments, "dry_run", default: false),
+                preserveLineEndings: bool(arguments, "preserve_line_endings", default: true),
+                preserveBom: bool(arguments, "preserve_bom", default: true),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
+            ))
+        case "apply_unified_diff":
+            return objectOutput(try applyUnifiedDiff(
+                relativePath: requiredString(arguments, "relative_path"),
+                expectedVersion: requiredString(arguments, "expected_version"),
+                unifiedDiff: requiredString(arguments, "unified_diff"),
                 dryRun: bool(arguments, "dry_run", default: false),
                 preserveLineEndings: bool(arguments, "preserve_line_endings", default: true),
                 preserveBom: bool(arguments, "preserve_bom", default: true),
@@ -1004,6 +1029,68 @@ final class LocalTools {
         let startByte: Int
         let endByte: Int
         let replacement: Data
+    }
+
+    private func applySearchReplace(
+        relativePath: String,
+        expectedVersion: String,
+        search: String,
+        replacement: String,
+        dryRun: Bool,
+        preserveLineEndings: Bool,
+        preserveBom: Bool,
+        preparedPolicy: PolicySnapshot,
+        executionContext: ToolExecutionContext?
+    ) throws -> [String: Any] {
+        let compiled = try editAdapters.compileSearchReplace(
+            relativePath: relativePath,
+            expectedVersion: expectedVersion,
+            search: search,
+            replacement: replacement,
+            context: executionContext
+        )
+        return try applyEdits(
+            relativePath: relativePath,
+            expectedVersion: expectedVersion,
+            coordinateSystem: "byte",
+            columnEncoding: "",
+            edits: compiled.edits.map { $0 as Any },
+            dryRun: dryRun,
+            preserveLineEndings: preserveLineEndings,
+            preserveBom: preserveBom,
+            preparedPolicy: preparedPolicy,
+            executionContext: executionContext
+        )
+    }
+
+    private func applyUnifiedDiff(
+        relativePath: String,
+        expectedVersion: String,
+        unifiedDiff: String,
+        dryRun: Bool,
+        preserveLineEndings: Bool,
+        preserveBom: Bool,
+        preparedPolicy: PolicySnapshot,
+        executionContext: ToolExecutionContext?
+    ) throws -> [String: Any] {
+        let compiled = try editAdapters.compileUnifiedDiff(
+            relativePath: relativePath,
+            expectedVersion: expectedVersion,
+            unifiedDiff: unifiedDiff,
+            context: executionContext
+        )
+        return try applyEdits(
+            relativePath: relativePath,
+            expectedVersion: expectedVersion,
+            coordinateSystem: "byte",
+            columnEncoding: "",
+            edits: compiled.edits.map { $0 as Any },
+            dryRun: dryRun,
+            preserveLineEndings: preserveLineEndings,
+            preserveBom: preserveBom,
+            preparedPolicy: preparedPolicy,
+            executionContext: executionContext
+        )
     }
 
     private func applyEdits(
