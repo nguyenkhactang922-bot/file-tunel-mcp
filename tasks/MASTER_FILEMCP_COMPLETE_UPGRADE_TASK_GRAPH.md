@@ -298,7 +298,7 @@ Negative tests:
 
 ## FMG-019 - repo_map / symbol_search / related_files
 
-State: LOCAL VERIFIED / NATIVE CI PENDING
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING
 Depends: FMG-018
 
 Scope:

@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: commit the LOCAL VERIFIED FMG-019 candidate on `chatgpt/FMG-019-repository-intelligence-query-facade`, sync latest fork/main, rerun affected local gates only if sync changes the candidate, push exact synchronized head, require native Verify on macOS + Windows x64 + native Windows ARM64, then scoped review, PR/merge and merged-main verification; only after merged-main SUCCESS mark FMG-019 DONE / MAIN VERIFIED and claim FMG-020.
+AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the FMG-019 evidence-only closure head, require exact-head native Verify on macOS + Windows x64 + native Windows ARM64, then create/review/merge one PR, require merged-main Verify, mark FMG-019 DONE / MAIN VERIFIED and claim FMG-020.

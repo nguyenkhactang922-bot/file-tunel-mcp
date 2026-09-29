@@ -749,3 +749,12 @@ Catalog: 1.10.0 / 34 canonical tools / SHA-256 `a11c9512d6b182c13ad760709b99ff92
 Local proof: query contract + predecessor/source-state/project-context/catalog/parity and affected contracts PASS; Windows Release 0 warnings/errors; FMG-019 isolation 18 assertions PASS; full Windows regression 876 assertions PASS; diff check PASS. Cross-platform cursor codec was hardened against non-canonical Base64URL signature aliases discovered by full regression. macOS query implementation + native acceptance are wired; native Swift verification remains pending GitHub macOS Verify.
 Evidence: `docs/evidence/FMG-019_REPOSITORY_INTELLIGENCE_QUERY_FACADE_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit local-verified FMG-019 candidate, sync latest fork/main, rerun affected local gates only if sync changes the candidate, push exact synchronized head, require native Verify macOS + Windows x64 + native Windows ARM64, scoped review, PR/merge, merged-main Verify, then mark FMG-019 DONE / MAIN VERIFIED and claim FMG-020.
+
+## FMG-019 exact-head native verification / scoped review
+
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
+Candidate: `fbdb9d5eb36e1b0a90aab64234c2ff7f12c83753`.
+Native Verify run `36544068228`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Scoped review PASS: read-only/closed-world authority preserved; deterministic ranking/cursors; SourceStateRef freshness before return and post-publish; stale artifact cleanup; metadata-only ContentRef; canonical Base64URL cursor rejection cross-platform.
+Evidence: `docs/evidence/FMG-019_REPOSITORY_INTELLIGENCE_QUERY_FACADE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify all three lanes, then PR/merge -> merged-main Verify -> mark FMG-019 DONE / MAIN VERIFIED -> claim FMG-020.

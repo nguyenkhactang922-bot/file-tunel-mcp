@@ -78,3 +78,22 @@ Native Swift compile/runtime proof is pending GitHub macOS Verify because the lo
 7. PR/merge;
 8. merged-main Verify;
 9. mark FMG-019 DONE / MAIN VERIFIED and claim FMG-020.
+
+## Exact-head native verification / scoped review
+
+Candidate: `fbdb9d5eb36e1b0a90aab64234c2ff7f12c83753`.
+Native Verify: run `36544068228` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Scoped review PASS:
+- all three FMG-019 tools remain low-risk read-only `filesystem.read` tools with closed-world annotations;
+- none enters the serialized mutation lane or grants authority;
+- outputs preserve provider/version/completeness/parser profile and `grants_authority=false` / `raw_source_persisted=false`;
+- deterministic ranking/page order is explicit and authenticated cursors bind tool/options/workspace/SourceStateRef generation;
+- `allow_content_ref` is delivery preference only and does not change logical cursor identity;
+- SourceStateRef is rechecked immediately before return and again after ContentRef publish;
+- a newly published stale artifact is deleted before the stale-generation error is returned;
+- ContentRef uses existing authenticated `TOOL_OUTPUT` store/quota/TTL semantics and contains metadata only;
+- Windows full regression PASS 876 assertions; native macOS integration/build PASS on exact head;
+- cursor codec now rejects non-canonical Base64URL aliases cross-platform.
+
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
