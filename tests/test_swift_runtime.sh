@@ -2003,7 +2003,7 @@ precondition(fmg009StageText == "original")
 
 print("swift-apply-edits: ok")
 
-precondition(fmg009Tools.hasTool("apply_search_replace") && fmg009Tools.hasTool("apply_unified_diff"))
+precondition(fmg009Tools.hasTool(named: "apply_search_replace") && fmg009Tools.hasTool(named: "apply_unified_diff"))
 
 let fmg017SearchURL = fmg009Root.appendingPathComponent("adapter-search.txt")
 try Data("alpha\nbeta\ngamma\n".utf8).write(to: fmg017SearchURL)
