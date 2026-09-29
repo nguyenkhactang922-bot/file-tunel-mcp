@@ -30,14 +30,15 @@
 - Preserve native stacks: Windows WPF and macOS AppKit unless a future product-authority ADR explicitly changes that boundary.
 - Do not start FMUX-002 before FMUX-001 MAIN VERIFIED; follow the frozen FMUX dependency graph thereafter.
 
-## Single-project-root lock
+## Canonical PROJECT_ROOT lock
 
-- Canonical PROJECT_ROOT for FileMCP is **D:\Tools\FileMCP**.
-- Do not create Git worktrees, sibling FileMCP clones, temporary project roots, or directories such as `D:\Tools\FileMCP-*-worktree` for normal task execution.
-- Every coding chat must first verify `git rev-parse --show-toplevel` resolves to `D:/Tools/FileMCP`. If it does not, stop the coding action and return to the canonical root before reading/writing/building/committing.
-- Only one coding branch may be active in the canonical working tree at a time. Other chats may inspect/monitor state, but must not create alternate worktrees to work in parallel.
-- Branch changes happen in-place inside the canonical root after verifying a clean worktree and checking process/side-effect state. Preserve unfinished work with commits/remote branches; do not clone or worktree it into a sibling directory.
-- Historical branch refs may remain in Git for audit/recovery. They are not separate project roots and must not be materialized as sibling worktrees without explicit user authorization that supersedes this rule.
-- If a stale sibling FileMCP directory is ever discovered, audit it for unique unmerged changes first, salvage only compatible/stronger parts into the canonical branch, verify them, then delete the sibling directory.
-- Generated build/test/evidence artifacts must stay under the canonical repository's managed directories unless an external platform mandates another temporary location.
+- The only authorized local PROJECT_ROOT for FileMCP is `D:\Tools\FileMCP`.
+- Before any code/test/build/Git action, verify `git rev-parse --show-toplevel` resolves to `D:/Tools/FileMCP` (path-separator normalization is acceptable).
+- Do NOT create sibling clones, temporary repositories, Git worktrees, or directories such as `D:\Tools\FileMCP-*-worktree` unless the user explicitly supersedes this rule in that turn.
+- Do NOT use `git worktree add` as the normal task-isolation mechanism. Branch switching and task execution happen inside the canonical PROJECT_ROOT.
+- Only one coding branch may be active in the canonical working tree at a time. Other chats may inspect/monitor state, but must not switch the active branch or create parallel worktrees while another coding task is running.
+- Before switching branches, verify a clean worktree and inspect process/runtime/side-effect state. Preserve unfinished work with commits and remote branches, not sibling worktrees.
+- Historical branch refs may remain in Git for audit/recovery; inspect them with Git refs/diff/show from the canonical root instead of materializing sibling folders.
+- If a stale sibling FileMCP directory is ever discovered, audit for unique unmerged changes, salvage only compatible/stronger parts into the canonical branch, verify them, then remove the sibling directory.
+- Generated build/test/evidence artifacts must live under canonical repository-managed directories unless an external platform requires another temporary location.
 - `Repo + Git + evidence + runtime state` remain source of truth; chat-stream continuity is not authority.

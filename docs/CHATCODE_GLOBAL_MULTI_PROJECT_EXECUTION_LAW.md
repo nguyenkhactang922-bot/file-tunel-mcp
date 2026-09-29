@@ -41,9 +41,9 @@ No feature code before this complete current-scope gate is complete.
 
 ## Canonical PROJECT_ROOT lock
 
-- The only authorized local project root for FileMCP is `D:\\Tools\\FileMCP`.
+- The only authorized local project root for FileMCP is `D:\Tools\FileMCP`.
 - Before any code/test/build/Git action, verify `git rev-parse --show-toplevel` resolves to `D:/Tools/FileMCP` (path-separator normalization is acceptable).
-- Do NOT create sibling clones, temporary repositories, or Git worktrees such as `D:\\Tools\\FileMCP-*-worktree` unless the user explicitly authorizes a temporary secondary worktree in that same turn.
+- Do NOT create sibling clones, temporary repositories, or Git worktrees such as `D:\Tools\FileMCP-*-worktree` unless the user explicitly authorizes a temporary secondary worktree in that same turn.
 - Do NOT use `git worktree add` as the default task-isolation mechanism. Branch switching and task execution happen inside the canonical PROJECT_ROOT.
 - Existing historical branches/commits may remain as Git history inside the single repository; they must not be materialized as sibling project folders merely to inspect them. Inspect them with Git refs/diff/show from the canonical root.
 - If a stale sibling FileMCP directory is discovered, first audit for unique unmerged changes, salvage only the compatible/stronger parts into the canonical branch, verify them, and then remove the sibling directory.
