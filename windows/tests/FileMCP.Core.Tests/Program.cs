@@ -3266,6 +3266,7 @@ internal static class Program
         await GitCli(repo, ["init", "-b", "main"]);
         await GitCli(repo, ["config", "user.name", "FileMCP Test"]);
         await GitCli(repo, ["config", "user.email", "filemcp@example.invalid"]);
+        await GitCli(repo, ["config", "core.autocrlf", "false"]);
 
         Directory.CreateDirectory(Path.Combine(repo, "src"));
         Directory.CreateDirectory(Path.Combine(repo, "docs"));
@@ -3451,7 +3452,7 @@ internal static class Program
         File.WriteAllText(Path.Combine(repo, "README.txt"), "plain metadata only\n", new UTF8Encoding(false));
         for (var i = 0; i < 520; i++)
             File.WriteAllText(Path.Combine(repo, $"map-{i:D4}.txt"), $"metadata {i}\n", new UTF8Encoding(false));
-        await GitCli(repo, ["add", "."]);
+        await GitCli(repo, ["add", "."], timeoutSeconds: 60);
         await GitCli(repo, ["commit", "-m", "query fixture"]);
 
         var artifacts = new ArtifactContentStore(new ArtifactContentStoreOptions
@@ -5648,7 +5649,7 @@ internal static class Program
             _inner.Analyze(relativePath, utf8Content, maxSymbols, maxImports, cancellationToken, context);
     }
 
-    private static async Task GitCli(string repo, string[] args) { var all = new List<string> { "-C", repo }; all.AddRange(args); var result = await ProcessRunner.RunAsync("git.exe", all, timeoutSeconds: 20); if (result.ExitCode != 0) throw new Exception("git fixture failed: " + result.Stderr); }
+    private static async Task GitCli(string repo, string[] args, int timeoutSeconds = 20) { var all = new List<string> { "-C", repo }; all.AddRange(args); var result = await ProcessRunner.RunAsync("git.exe", all, timeoutSeconds: timeoutSeconds); if (result.ExitCode != 0) throw new Exception($"git fixture failed (timedOut={result.TimedOut}): " + result.Stderr); }
     private static JsonObject ExecArgs(
         string executable,
         IReadOnlyList<string> arguments,
