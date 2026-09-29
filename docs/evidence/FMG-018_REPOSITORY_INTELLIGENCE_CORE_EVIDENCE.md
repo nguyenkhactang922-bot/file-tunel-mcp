@@ -99,3 +99,8 @@ If no duplicate/newer work exists:
 6. PR/merge only exact green head;
 7. require merged-main Verify;
 8. mark FMG-018 DONE / MAIN VERIFIED and claim FMG-019.
+
+## FMG-018 native Verify attempt 1 remediation
+
+Run `36534587396` on `5ab626b38f3e04353d97f8744bd8c201590dce2d`: macOS failed only in Static verification because two `LexicalSymbolProvider` calls invoked static `requireContinue` through the instance context. Windows contract/integration continued green. Remediation is macOS compile-only: both calls now use `Self.requireContinue`; product repository-intelligence semantics are unchanged. Local affected-stage proof: Swift runtime/build shell syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push this two-line macOS compile fix and require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64.

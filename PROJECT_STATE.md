@@ -679,3 +679,8 @@ Local proof: project-state + repository-intelligence contract PASS; Windows isol
 Tool surface remains catalog 1.9.0 / 31 canonical tools; FMG-019 facade remains BLOCKED.
 Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
 NEXT_EXACT_ACTION: inspect latest `fork/main` and remote FMG-018 branch/PR before side effects; if unique, commit/sync exact candidate -> native Verify -> scoped review -> PR/merge -> merged-main Verify -> FMG-018 MAIN VERIFIED -> FMG-019.
+
+## FMG-018 native Verify attempt 1 remediation
+
+Run `36534587396` on `5ab626b38f3e04353d97f8744bd8c201590dce2d`: macOS failed only in Static verification because two `LexicalSymbolProvider` calls invoked static `requireContinue` through the instance context. Windows contract/integration continued green. Remediation is macOS compile-only: both calls now use `Self.requireContinue`; product repository-intelligence semantics are unchanged. Local affected-stage proof: Swift runtime/build shell syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push this two-line macOS compile fix and require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64.

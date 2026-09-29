@@ -134,7 +134,7 @@ final class LexicalSymbolProvider: RepositoryIntelligenceProvider {
         var aggregate: Int64 = 0
 
         for entry in context.files {
-            try requireContinue(context.executionContext, stage: "provider inventory")
+            try Self.requireContinue(context.executionContext, stage: "provider inventory")
             let language = Self.language(for: entry.relativePath)
             if language == "unknown" {
                 files.append(RepositoryIntelligenceFile(
@@ -182,7 +182,7 @@ final class LexicalSymbolProvider: RepositoryIntelligenceProvider {
             let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
                 .replacingOccurrences(of: "\r", with: "\n")
             for (offset, line) in normalized.components(separatedBy: "\n").enumerated() {
-                try requireContinue(context.executionContext, stage: "symbol extraction")
+                try Self.requireContinue(context.executionContext, stage: "symbol extraction")
                 Self.extract(
                     language: language,
                     path: entry.relativePath,
