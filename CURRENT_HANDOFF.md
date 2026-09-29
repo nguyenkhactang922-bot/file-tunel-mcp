@@ -3,7 +3,7 @@
 ## Current status
 
 Project: FileMCP
-Branch: `chatgpt/FMG-017-model-friendly-edit-adapters`
+Branch: `chatgpt/FMG-018-repository-intelligence-core`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: CLEAN.
 
@@ -719,3 +719,73 @@ Verify run `36518117949`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
 Scoped review PASS: adapters are compile-only, preserve expected_version, delegate every write to canonical apply_edits, and fail closed on ambiguity/malformed diff/overlap/path escape/stale source/cancellation.
 Evidence: `docs/evidence/FMG-017_MODEL_FRIENDLY_EDIT_ADAPTERS_EVIDENCE.md`.
 NEXT_EXACT_ACTION: commit/push the evidence-only closure head, require exact-head native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-017 DONE / MAIN VERIFIED -> claim FMG-018.
+
+## FMG-017 final closure / FMG-018 claim
+
+FMG-017: DONE / MAIN VERIFIED.
+- PR #36 head: `7b5b1b566adce24f0f61e75a1ba7310af3560544`.
+- Merge main: `4cc14b2cabe5ff23a8f8537e93a5a54c957f99a8`.
+- Final exact-head Verify: run `36518798422` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Merged-main Verify: run `36519464683` SUCCESS on all three lanes.
+
+FMG-018: CLAIMED / ACTIVE on `chatgpt/FMG-018-repository-intelligence-core`.
+NEXT_EXACT_ACTION: implement FMG-018 Repository Intelligence Core / Cache only: RepositoryIntelligenceProvider interface, built-in lexical heuristic provider, Git-tracked inventory + ignored-directory policy, lightweight language-aware symbols/imports, file/symbol relation ranking, rebuildable metadata-only cache, SourceStateRef generation/invalidation, bounded cancellation, corruption/stale recovery, and no authorization dependency on intelligence. Do not begin FMG-019 before FMG-018 MAIN VERIFIED.
+
+## FMG-017 final closure / FMG-018 claim
+
+FMG-017: DONE / MAIN VERIFIED.
+- Exact verified head: `7b5b1b566adce24f0f61e75a1ba7310af3560544`.
+- Exact-head Verify: run `36518798422` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #36 merged.
+- Merge main: `4cc14b2cabe5ff23a8f8537e93a5a54c957f99a8`.
+- Merged-main Verify: run `36519464683` SUCCESS.
+- Evidence: `docs/evidence/FMG-017_MODEL_FRIENDLY_EDIT_ADAPTERS_EVIDENCE.md`.
+
+FMG-018: CLAIMED / ACTIVE on `chatgpt/FMG-018-repository-intelligence-core`.
+NEXT_EXACT_ACTION: implement FMG-018 Repository Intelligence Core / Cache only: RepositoryIntelligenceProvider interface, built-in LexicalSymbolProvider, Git-tracked inventory plus ignored-directory policy, language-aware lightweight symbol/import extraction, relation/ranking model, rebuildable metadata cache, SourceStateRef generation/invalidation, no raw full-source persistence by default; preserve baseline tools and authorization independence. Add negative coverage for giant repo, binary/vendor/generated files, case/path differences, stale/corrupt cache, parser/profile mismatch and cancellation. Do not begin FMG-019 before FMG-018 MAIN VERIFIED.
+
+## FMG-018 Windows core checkpoint
+
+State: WINDOWS CORE TARGETED VERIFIED / MACOS PARITY PENDING.
+Windows implementation + adversarial isolation PASS: `windows-repo-intelligence-only-tests: ok (22 assertions)`.
+Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: port the same provider/source-state/cache contract to macOS using existing safe Git + SourceStateRef primitives; wire native Swift tests/build lists; then cross-platform contract -> affected local gates -> full Windows regression -> exact-head native Verify. FMG-019 remains BLOCKED until FMG-018 MAIN VERIFIED.
+
+## FMG-018 local verification checkpoint
+
+State: LOCAL VERIFIED / NATIVE CI PENDING.
+Local proof: repository-intelligence/source-state/project-context/catalog/parity/state contracts PASS; Windows Release 0 warnings/errors; FMG-018 isolation 22 assertions PASS; full Windows regression 856 assertions PASS; diff check PASS. macOS provider/service/cache parity + native tests are wired; native Swift typecheck/runtime remains pending GitHub macOS Verify.
+Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit local-verified candidate, sync latest fork/main, rerun affected gates if needed, push exact synchronized head, require native Verify macOS + Windows x64 + native Windows ARM64, scoped review, PR/merge, merged-main Verify, then mark FMG-018 DONE / MAIN VERIFIED and claim FMG-019.
+
+## FMG-018 native Verify attempt 1 remediation
+
+Run `36524611510` on `f5e9190`: Windows x64 + ARM64 SUCCESS; macOS static/catalog SUCCESS; macOS integration timed out only because the pre-listener fixture watchdog was 15s after FMG-018 added bounded Git/SourceStateRef adversarial scans. Remediation is test-only: readiness deadline 15s -> 45s. FMG-018 contract + diff check PASS; product semantics unchanged.
+NEXT_EXACT_ACTION: commit/push remediation and require exact-head native Verify all three lanes. FMG-019 remains BLOCKED.
+
+## FMG-018 exact-head native verification / scoped review - 2026-09-29
+
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
+
+Candidate: `f1517f84cb5d7f8ae1dce329d1673b97dda7c58f`.
+Native Verify: run `36525032038` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Attempt-1 remediation in `f1517f8` is test-harness only:
+- FMG-018 cache fixtures use a unique sibling temporary cache base, isolated from the resolver workspace;
+- pre-listener macOS fixture readiness watchdog increased from 15s to 45s for the added bounded Git/SourceStateRef adversarial scans;
+- no repository-intelligence product authority/catalog/runtime semantics changed.
+
+Scoped review PASS:
+- inventory is Git-tracked only (`git ls-files --cached -z --`) and bounded;
+- paths are normalized/resolved through existing workspace authority;
+- vendor/generated/binary/oversized inputs degrade or skip deterministically;
+- lexical provider emits provider id/version, parser-profile hash and `completeness=heuristic`;
+- cache is metadata-only; raw source is not persisted;
+- cache freshness binds SourceStateRef + provider/profile and stale/corrupt cache is deleted/rebuilt;
+- SourceStateRef is rechecked immediately before cache publish and in-flight source changes fail;
+- indexing is ToolBudget/cancellation bounded;
+- outputs explicitly report `grants_authority=false`;
+- baseline tool/catalog surface remains unchanged; FMG-019 query facade is still BLOCKED.
+
+Evidence: `docs/evidence/FMG-018_REPOSITORY_INTELLIGENCE_CORE_EVIDENCE.md`.
+NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify all three lanes, then PR/review/merge -> merged-main Verify -> FMG-018 DONE / MAIN VERIFIED -> claim FMG-019.

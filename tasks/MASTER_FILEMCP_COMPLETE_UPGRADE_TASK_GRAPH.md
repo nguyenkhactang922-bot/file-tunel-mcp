@@ -238,7 +238,7 @@ Negative tests:
 
 ## FMG-017 - Model-Friendly Edit Adapters
 
-State: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-013, FMG-009
 
 Scope:
@@ -265,7 +265,7 @@ Negative tests:
 
 ## FMG-018 - Repository Intelligence Core / Cache
 
-State: BLOCKED
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING
 Depends: FMG-014, FMG-010, FMG-006
 
 Scope:

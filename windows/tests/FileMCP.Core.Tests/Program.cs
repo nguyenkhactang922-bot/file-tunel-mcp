@@ -72,6 +72,13 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length > 0 && args[0] == "repo-intelligence-only")
+            {
+                await TestRepositoryIntelligenceAsync(root);
+                Console.WriteLine($"windows-repo-intelligence-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             TestObservabilityContracts();
             TestCanonicalToolCatalog();
             TestServerPolicy();
@@ -97,6 +104,7 @@ internal static class Program
             await TestExistingMutationHardeningAsync(root);
             await TestApplyEditsAsync(root);
             await TestEditAdaptersAsync(root);
+            await TestRepositoryIntelligenceAsync(root);
             await TestProjectContextAsync(root);
             await TestEvidenceAndFreshnessAsync(root);
             await TestArtifactContentStoreAsync(root);
@@ -2936,6 +2944,179 @@ internal static class Program
         Console.WriteLine("windows-edit-adapters: ok");
     }
 
+    private static async Task TestRepositoryIntelligenceAsync(string root)
+    {
+        var workspace = Path.Combine(root, "repo-intelligence-workspace");
+        var repo = Path.Combine(workspace, "repo");
+        var cacheRoot = Path.Combine(root, "repo-intelligence-cache");
+        Directory.CreateDirectory(repo);
+        await GitCli(repo, ["init", "-b", "main"]);
+        await GitCli(repo, ["config", "user.name", "FileMCP Test"]);
+        await GitCli(repo, ["config", "user.email", "filemcp@example.invalid"]);
+
+        Directory.CreateDirectory(Path.Combine(repo, "src"));
+        Directory.CreateDirectory(Path.Combine(repo, "docs"));
+        Directory.CreateDirectory(Path.Combine(repo, "vendor"));
+        File.WriteAllText(Path.Combine(repo, "src", "A.cs"),
+            "using B;\nnamespace Demo;\npublic class A { public string Value => \"RAW_SECRET_MARKER_FMG018\"; }\n",
+            new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(repo, "src", "B.cs"),
+            "namespace Demo;\npublic class B { public static void Run() { } }\n",
+            new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(repo, "src", "CaseFile.cs"),
+            "namespace Demo;\npublic class CaseFile { }\n",
+            new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(repo, "src", "ignored.generated.cs"),
+            "public class GeneratedShouldNotIndex { }\n",
+            new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(repo, "docs", "readme.txt"), "plain one\n", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(repo, "docs", "notes.txt"), "plain two\n", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(repo, "vendor", "Vendor.cs"), "public class VendorShouldNotIndex { }\n", new UTF8Encoding(false));
+        File.WriteAllBytes(Path.Combine(repo, "blob.bin"), [0x00, 0x01, 0x02, 0x03]);
+        File.WriteAllText(Path.Combine(repo, "untracked.cs"), "public class UntrackedShouldNotIndex { }\n", new UTF8Encoding(false));
+
+        await GitCli(repo, ["add", "src", "docs", "vendor", "blob.bin"]);
+        await GitCli(repo, ["commit", "-m", "fixture"]);
+
+        var tools = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
+        var options = new RepositoryIntelligenceOptions
+        {
+            CacheRootDirectory = cacheRoot,
+        };
+
+        // Baseline tools do not depend on intelligence/cache availability.
+        var baseline = await tools.CallAsync("read_file", Obj(("relative_path", "repo/src/A.cs")));
+        Assert(baseline.StructuredContent["result"]!.GetValue<string>().Contains("RAW_SECRET_MARKER_FMG018", StringComparison.Ordinal),
+            "baseline read_file remains independent from repository intelligence cache");
+
+        var first = await tools.CaptureRepositoryIntelligenceAsync("repo", options);
+        Assert(first["provider_id"]!.GetValue<string>() == LexicalSymbolProvider.Id &&
+               first["provider_version"]!.GetValue<string>() == LexicalSymbolProvider.Version &&
+               first["completeness"]!.GetValue<string>() == "heuristic",
+            "repository intelligence emits provider id/version/heuristic completeness");
+        Assert(first["parser_profile_hash"]!.GetValue<string>().StartsWith("sha256:", StringComparison.Ordinal) &&
+               first["source_state_id"]!.GetValue<string>().StartsWith("sha256:", StringComparison.Ordinal),
+            "repository intelligence binds parser profile and SourceStateRef identity");
+        Assert(first["grants_authority"]!.GetValue<bool>() == false &&
+               first["raw_source_persisted"]!.GetValue<bool>() == false,
+            "repository intelligence is metadata-only and grants no authority");
+        Assert(first["cache_status"]!.GetValue<string>() == "rebuilt" &&
+               first["truncated"]!.GetValue<bool>() == false,
+            "first repository intelligence capture builds complete cache");
+
+        var files = first["files"]!.AsArray().Select(node => node!.AsObject()).ToArray();
+        var paths = files.Select(file => file["path"]!.GetValue<string>()).ToArray();
+        Assert(paths.Contains("src/A.cs", StringComparer.Ordinal) &&
+               paths.Contains("src/B.cs", StringComparer.Ordinal) &&
+               paths.Contains("src/CaseFile.cs", StringComparer.Ordinal),
+            "tracked source files preserve canonical Git path casing");
+        Assert(paths.Contains("docs/readme.txt", StringComparer.Ordinal) &&
+               paths.Contains("docs/notes.txt", StringComparer.Ordinal),
+            "unsupported language files degrade to file-level metadata");
+        Assert(!paths.Contains("untracked.cs", StringComparer.Ordinal) &&
+               !paths.Contains("vendor/Vendor.cs", StringComparer.Ordinal) &&
+               !paths.Contains("src/ignored.generated.cs", StringComparer.Ordinal) &&
+               !paths.Contains("blob.bin", StringComparer.Ordinal),
+            "inventory is tracked-only and excludes vendor/generated/binary content");
+
+        var aFile = files.Single(file => file["path"]!.GetValue<string>() == "src/A.cs");
+        Assert(aFile["language"]!.GetValue<string>() == "csharp" &&
+               aFile["symbols"]!.AsArray().Any(symbol => symbol!["name"]!.GetValue<string>() == "A") &&
+               aFile["imports"]!.AsArray().Any(importItem => importItem!["target"]!.GetValue<string>() == "B"),
+            "lexical provider extracts language-aware symbols and imports");
+        var plain = files.Single(file => file["path"]!.GetValue<string>() == "docs/readme.txt");
+        Assert(plain["supported_language"]!.GetValue<bool>() == false &&
+               plain["symbols"]!.AsArray().Count == 0,
+            "unsupported language does not invent symbol support");
+
+        var relations = first["relations"]!.AsArray().Select(node => node!.AsObject()).ToArray();
+        Assert(relations.Any(relation =>
+                relation["source"]!.GetValue<string>() == "src/A.cs" &&
+                relation["target"]!.GetValue<string>() == "src/B.cs" &&
+                relation["score"]!.GetValue<double>() >= 0.5),
+            "relation model ranks import/name relationship");
+        Assert(relations.Any(relation =>
+                relation["source"]!.GetValue<string>() == "docs/readme.txt" &&
+                relation["target"]!.GetValue<string>() == "docs/notes.txt" &&
+                relation["kind"]!.GetValue<string>() == "file_level"),
+            "unsupported language degrades to concrete file-level relation");
+
+        var cacheFiles = Directory.GetFiles(cacheRoot, "*.json", SearchOption.AllDirectories);
+        Assert(cacheFiles.Length == 1, "repository intelligence writes one rebuildable metadata cache");
+        var cacheText = File.ReadAllText(cacheFiles[0], Encoding.UTF8);
+        Assert(!cacheText.Contains("RAW_SECRET_MARKER_FMG018", StringComparison.Ordinal),
+            "repository intelligence cache does not persist raw full-source content");
+
+        var hit = await tools.CaptureRepositoryIntelligenceAsync("repo", options);
+        Assert(hit["cache_status"]!.GetValue<string>() == "hit",
+            "unchanged SourceStateRef/provider profile reuses cache");
+
+        File.AppendAllText(Path.Combine(repo, "src", "B.cs"), "// changed\n", new UTF8Encoding(false));
+        var stale = await tools.CaptureRepositoryIntelligenceAsync("repo", options);
+        Assert(stale["cache_status"]!.GetValue<string>() == "rebuilt" &&
+               stale["cache_recovery"]!.GetValue<string>() == "stale_deleted",
+            "stale SourceStateRef invalidates and rebuilds cache");
+
+        File.WriteAllText(cacheFiles[0], "{ definitely not json", new UTF8Encoding(false));
+        var corrupt = await tools.CaptureRepositoryIntelligenceAsync("repo", options);
+        Assert(corrupt["cache_status"]!.GetValue<string>() == "rebuilt" &&
+               corrupt["cache_recovery"]!.GetValue<string>() == "corrupt_deleted",
+            "corrupted cache is deleted and rebuilt");
+
+        var profileMismatch = await tools.CaptureRepositoryIntelligenceAsync(
+            "repo",
+            options,
+            provider: new RepositoryProfileMismatchProvider());
+        Assert(profileMismatch["cache_recovery"]!.GetValue<string>() == "stale_deleted",
+            "parser/profile mismatch invalidates cache even when provider id/version are unchanged");
+
+        var tiny = new RepositoryIntelligenceOptions
+        {
+            CacheRootDirectory = Path.Combine(root, "repo-intelligence-cache-tiny"),
+            MaxTrackedFiles = 2,
+        };
+        var bounded = await tools.CaptureRepositoryIntelligenceAsync("repo", tiny);
+        Assert(bounded["truncated"]!.GetValue<bool>() &&
+               bounded["truncation_reason"]!.GetValue<string>() == "max_tracked_files" &&
+               bounded["visited_count"]!.GetValue<int>() == 2,
+            "giant repository indexing is deterministically bounded");
+
+        var cancelled = false;
+        var cancelOptions = new RepositoryIntelligenceOptions
+        {
+            CacheRootDirectory = Path.Combine(root, "repo-intelligence-cache-cancel"),
+            StageForTests = stage => { if (stage == "before_inventory") cancelled = true; },
+        };
+        using (var context = ToolExecutionContext.Create(null, cancellationProbe: () => cancelled))
+        {
+            var partial = await tools.CaptureRepositoryIntelligenceAsync("repo", cancelOptions, context);
+            Assert(partial["truncated"]!.GetValue<bool>() &&
+                   partial["truncation_reason"]!.GetValue<string>() == "cancelled",
+                "repository intelligence cooperatively cancels without granting authority");
+        }
+
+        var mutateOnce = false;
+        var changing = new RepositoryIntelligenceOptions
+        {
+            CacheRootDirectory = Path.Combine(root, "repo-intelligence-cache-changing"),
+            StageForTests = stage =>
+            {
+                if (stage != "before_source_state_recheck" || mutateOnce) return;
+                mutateOnce = true;
+                File.AppendAllText(Path.Combine(repo, "src", "CaseFile.cs"), "// race\n", new UTF8Encoding(false));
+            },
+        };
+        await AssertThrowsAsync(
+            () => tools.CaptureRepositoryIntelligenceAsync("repo", changing),
+            "Repository changed while intelligence index was being built",
+            "SourceStateRef is revalidated before cache publication");
+        Assert(!Directory.Exists(changing.CacheRootDirectory!) ||
+               Directory.GetFiles(changing.CacheRootDirectory!, "*.json", SearchOption.AllDirectories).Length == 0,
+            "stale in-flight intelligence generation is never published to cache");
+
+        Console.WriteLine("windows-repository-intelligence: ok");
+    }
+
     private static async Task TestProjectContextAsync(string root)
     {
         var workspace = Path.Combine(root, "project-context");
@@ -4916,6 +5097,24 @@ internal static class Program
         return predicate();
     }
     private static string ValueAfter(string[] args, string key) { var index = Array.IndexOf(args, key); return index >= 0 && index + 1 < args.Length ? args[index + 1] : throw new InvalidOperationException("missing " + key); }
+    private sealed class RepositoryProfileMismatchProvider : IRepositoryIntelligenceProvider
+    {
+        private readonly LexicalSymbolProvider _inner = new();
+        public string ProviderId => _inner.ProviderId;
+        public string ProviderVersion => _inner.ProviderVersion;
+        public string Completeness => _inner.Completeness;
+        public string ParserProfileHash => "sha256:profile-mismatch-test";
+        public bool Supports(string relativePath) => _inner.Supports(relativePath);
+        public RepositoryFileIntelligence Analyze(
+            string relativePath,
+            byte[] utf8Content,
+            int maxSymbols,
+            int maxImports,
+            CancellationToken cancellationToken,
+            ToolExecutionContext? context) =>
+            _inner.Analyze(relativePath, utf8Content, maxSymbols, maxImports, cancellationToken, context);
+    }
+
     private static async Task GitCli(string repo, string[] args) { var all = new List<string> { "-C", repo }; all.AddRange(args); var result = await ProcessRunner.RunAsync("git.exe", all, timeoutSeconds: 20); if (result.ExitCode != 0) throw new Exception("git fixture failed: " + result.Stderr); }
     private static JsonObject ExecArgs(
         string executable,

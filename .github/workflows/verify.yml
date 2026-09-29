@@ -43,6 +43,7 @@ jobs:
             macos/ArtifactContentStore.swift \
             macos/BatchFileService.swift \
             macos/EditAdapterService.swift \
+            macos/RepositoryIntelligence.swift \
             macos/QuarantineService.swift \
             macos/EvidenceSupport.swift \
             macos/ToolCatalog.swift \
@@ -147,6 +148,10 @@ jobs:
       - name: Verify model-friendly edit adapters contract
         shell: pwsh
         run: ./tests/test_edit_adapters_contract.ps1
+
+      - name: Verify repository intelligence core contract
+        shell: pwsh
+        run: ./tests/test_repository_intelligence_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh
@@ -270,6 +275,10 @@ jobs:
       - name: Verify model-friendly edit adapters contract
         shell: pwsh
         run: ./tests/test_edit_adapters_contract.ps1
+
+      - name: Verify repository intelligence core contract
+        shell: pwsh
+        run: ./tests/test_repository_intelligence_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh

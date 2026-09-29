@@ -64,6 +64,7 @@ chmod 755 "$APP/Contents/MacOS/tunnel-client"
     "$ROOT/macos/ArtifactContentStore.swift" \
     "$ROOT/macos/BatchFileService.swift" \
     "$ROOT/macos/EditAdapterService.swift" \
+    "$ROOT/macos/RepositoryIntelligence.swift" \
     "$ROOT/macos/QuarantineService.swift" \
     "$ROOT/macos/EvidenceSupport.swift" \
     "$ROOT/macos/ToolCatalog.swift" \
