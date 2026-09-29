@@ -1,0 +1,80 @@
+# FMG-019 Repository Intelligence Query Facade Evidence
+
+Status: LOCAL VERIFIED / NATIVE CI PENDING
+
+Branch: `chatgpt/FMG-019-repository-intelligence-query-facade`
+
+## Public surface
+
+Catalog version: `1.10.0`
+Canonical tools: 34
+Catalog SHA-256: `a11c9512d6b182c13ad760709b99ff9224a702cb477953409e831d7d4e21289d`
+
+New low-risk read-only tools:
+- `repo_map`
+- `symbol_search`
+- `related_files`
+
+All three are `local_tools`, `effect=read`, `filesystem.read`, closed-world, non-destructive, and explicitly return `grants_authority=false` plus `raw_source_persisted=false`.
+
+## Query semantics
+
+PASS locally:
+- `repo_map` returns deterministic bounded file metadata pages over the FMG-018 SourceStateRef-bound generation;
+- authenticated cursor binds tool/options/workspace/generation and resumes exact position;
+- changing `allow_content_ref` does not invalidate the same logical map cursor;
+- oversized full maps may spill only to authenticated `TOOL_OUTPUT` ContentRef;
+- spill artifact is metadata-only and excludes raw source;
+- artifact unavailability is reported explicitly without inventing a ContentRef;
+- stale generation is rechecked immediately before return and after artifact publish;
+- stale artifact is deleted if generation changes after publish;
+- `symbol_search` ranks exact -> prefix -> substring deterministically and reports ambiguity instead of choosing implicitly;
+- unsupported/no-symbol provider state is explicit;
+- `related_files` reports deterministic incoming/outgoing ranked relations and rejects traversal paths;
+- ToolBudget output bounds are enforced on large maps.
+
+## Cursor hardening discovered during full regression
+
+Full regression exposed a Base64URL canonicalization edge case: a 32-byte HMAC signature can have non-canonical final-character aliases that decode to identical bytes because of padding bits.
+
+Fixed cross-platform:
+- Windows `AuthenticatedCursorCodec` now rejects non-canonical payload encoding and non-canonical signature encoding before/at authentication;
+- macOS `AuthenticatedCursorCodec` has equivalent checks;
+- deterministic regression tests construct a non-canonical signature alias and require rejection.
+
+## Windows local verification
+
+PASS:
+- `tests/test_repository_intelligence_query_contract.ps1`;
+- repository-intelligence predecessor contract after FMG-019 compatibility update;
+- canonical catalog contract;
+- cross-platform tool-surface parity;
+- SourceStateRef/project-context/apply_edits/edit-adapter/batch/quarantine/mutation/exec/evidence contracts;
+- Release build: 0 warnings / 0 errors;
+- FMG-019 isolation: `windows-repo-query-only-tests: ok (18 assertions)`;
+- full Windows regression: `windows-core-tests: ok (876 assertions)`;
+- `git diff --check`.
+
+## macOS implementation / verification state
+
+Implemented and wired:
+- `macos/RepositoryIntelligenceQuery.swift`;
+- LocalTools dispatch + budget surface for all three query tools;
+- same authenticated cursor, SourceStateRef freshness and metadata-only ContentRef semantics;
+- app build list, static Verify list and both native Swift runtime compile lists include `RepositoryIntelligenceQuery.swift`;
+- native Swift acceptance covers pagination, cursor tamper/stale, ambiguity, no-symbol support, related traversal, stale-during-query, ContentRef metadata-only delivery, unavailable artifact and ToolBudget;
+- canonical Base64URL cursor alias regression coverage is present.
+
+Native Swift compile/runtime proof is pending GitHub macOS Verify because the local Windows host has no usable macOS Swift toolchain.
+
+## Remaining gate
+
+1. commit local-verified FMG-019 candidate;
+2. sync latest verified `fork/main`;
+3. rerun affected local gates only if sync changes the candidate;
+4. push exact synchronized head;
+5. require native Verify on macOS + Windows x64 + native Windows ARM64;
+6. scoped review;
+7. PR/merge;
+8. merged-main Verify;
+9. mark FMG-019 DONE / MAIN VERIFIED and claim FMG-020.

@@ -84,6 +84,10 @@ internal sealed class AuthenticatedCursorCodec
 
         if (payloadBytes.Length is <= 0 or > MaxPayloadBytes || signature.Length != 32)
             throw new FileMcpException("Malformed cursor");
+        if (!string.Equals(Base64Url(payloadBytes), parts[0], StringComparison.Ordinal))
+            throw new FileMcpException("Malformed cursor");
+        if (!string.Equals(Base64Url(signature), parts[1], StringComparison.Ordinal))
+            throw new FileMcpException("Cursor authentication failed");
 
         using var hmac = new HMACSHA256(_key);
         var expectedSignature = hmac.ComputeHash(payloadBytes);

@@ -44,6 +44,7 @@ jobs:
             macos/BatchFileService.swift \
             macos/EditAdapterService.swift \
             macos/RepositoryIntelligence.swift \
+            macos/RepositoryIntelligenceQuery.swift \
             macos/QuarantineService.swift \
             macos/EvidenceSupport.swift \
             macos/ToolCatalog.swift \
@@ -152,6 +153,10 @@ jobs:
       - name: Verify repository intelligence core contract
         shell: pwsh
         run: ./tests/test_repository_intelligence_contract.ps1
+
+      - name: Verify repository intelligence query facade contract
+        shell: pwsh
+        run: ./tests/test_repository_intelligence_query_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh
@@ -279,6 +284,10 @@ jobs:
       - name: Verify repository intelligence core contract
         shell: pwsh
         run: ./tests/test_repository_intelligence_contract.ps1
+
+      - name: Verify repository intelligence query facade contract
+        shell: pwsh
+        run: ./tests/test_repository_intelligence_query_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh

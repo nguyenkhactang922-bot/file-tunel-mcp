@@ -120,12 +120,12 @@ struct LocalToolCallOutput {
 final class LocalTools {
     private static let handlerToolNames: Set<String> = [
         "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
         "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "exec_process",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "exec_process",
     ]
     private let resolver: SafePathResolver
     private let gitUserName: String
@@ -136,6 +136,10 @@ final class LocalTools {
     private let fileVersions: FileVersionService
     private let editAdapters: EditAdapterService
     private let batchFiles: BatchFileService
+    let repositoryQueryCursors: AuthenticatedCursorCodec
+    let repositoryQueryArtifactFactory: () throws -> ArtifactContentStore
+    let repositoryQueryOptions: RepositoryIntelligenceQueryOptions
+    let repositoryQueryWorkspaceAuthorityID: String
     private let mutationGuard: AuthorizedPathSnapshotService
     private let quarantine: QuarantineService
     private let projectContext: ProjectContextService
@@ -174,7 +178,8 @@ final class LocalTools {
         skillRegistry: CodexSkillRegistry? = nil,
         artifactStore: ArtifactContentStore? = nil,
         quarantineOptions: QuarantineServiceOptions? = nil,
-        quarantineStageForTests: ((String) -> Void)? = nil
+        quarantineStageForTests: ((String) -> Void)? = nil,
+        repositoryQueryOptions: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions()
     ) throws {
         self.resolver = resolver
         let versionService = try FileVersionService(resolver: resolver)
@@ -193,6 +198,11 @@ final class LocalTools {
             sharedArtifactStore = created
             return created
         }
+        try repositoryQueryOptions.validate()
+        self.repositoryQueryOptions = repositoryQueryOptions
+        self.repositoryQueryArtifactFactory = artifactFactory
+        self.repositoryQueryWorkspaceAuthorityID = ArtifactContentStore.workspaceAuthorityID(resolver.root)
+        self.repositoryQueryCursors = try AuthenticatedCursorCodec()
         self.batchFiles = BatchFileService(
             resolver: resolver,
             versions: versionService,
@@ -378,6 +388,33 @@ final class LocalTools {
                 cursor: string(arguments, "cursor", default: ""),
                 maxLines: int(arguments, "max_lines", default: ProjectContextService.defaultMaxLines),
                 includeSkills: bool(arguments, "include_skills", default: true),
+                context: executionContext
+            ))
+        case "repo_map":
+            return objectOutput(try repoMap(
+                repoPath: try requiredString(arguments, "repo_path"),
+                cursor: string(arguments, "cursor", default: ""),
+                maxItems: int(arguments, "max_items", default: 100),
+                allowContentRef: bool(arguments, "allow_content_ref", default: false),
+                context: executionContext
+            ))
+        case "symbol_search":
+            return objectOutput(try symbolSearch(
+                repoPath: try requiredString(arguments, "repo_path"),
+                query: try requiredString(arguments, "query"),
+                kind: string(arguments, "kind", default: ""),
+                caseSensitive: bool(arguments, "case_sensitive", default: false),
+                cursor: string(arguments, "cursor", default: ""),
+                maxResults: int(arguments, "max_results", default: 50),
+                context: executionContext
+            ))
+        case "related_files":
+            return objectOutput(try relatedFiles(
+                repoPath: try requiredString(arguments, "repo_path"),
+                relativePath: try requiredString(arguments, "relative_path"),
+                minScore: double(arguments, "min_score", default: 0),
+                cursor: string(arguments, "cursor", default: ""),
+                maxResults: int(arguments, "max_results", default: 50),
                 context: executionContext
             ))
         case "exec_process":
@@ -2281,6 +2318,12 @@ final class LocalTools {
 
     private func int(_ arguments: [String: Any], _ key: String, default defaultValue: Int) -> Int {
         integerArgument(arguments, key) ?? defaultValue
+    }
+
+    private func double(_ arguments: [String: Any], _ key: String, default defaultValue: Double) -> Double {
+        guard let value = arguments[key] as? NSNumber,
+              CFGetTypeID(value) != CFBooleanGetTypeID() else { return defaultValue }
+        return value.doubleValue
     }
 
     private func stringOutput(_ value: String) -> LocalToolCallOutput {

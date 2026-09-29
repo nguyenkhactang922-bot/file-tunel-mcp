@@ -79,6 +79,13 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length > 0 && args[0] == "repo-query-only")
+            {
+                await TestRepositoryIntelligenceQueryAsync(root);
+                Console.WriteLine($"windows-repo-query-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             TestObservabilityContracts();
             TestCanonicalToolCatalog();
             TestServerPolicy();
@@ -105,6 +112,7 @@ internal static class Program
             await TestApplyEditsAsync(root);
             await TestEditAdaptersAsync(root);
             await TestRepositoryIntelligenceAsync(root);
+            await TestRepositoryIntelligenceQueryAsync(root);
             await TestProjectContextAsync(root);
             await TestEvidenceAndFreshnessAsync(root);
             await TestArtifactContentStoreAsync(root);
@@ -138,13 +146,13 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.9.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.10.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 26, "catalog non-shell local tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 27, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 29, "catalog non-shell local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 30, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 2, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
@@ -444,6 +452,18 @@ internal static class Program
         Assert(codec.Decode(cursor, "search_filenames", "opts", "root", 7, now) == "pos-42", "cursor roundtrip");
 
         ExpectCursorFailure(() => codec.Decode(cursor + "x", "search_filenames", "opts", "root", 7, now), "cursor", "tampered cursor rejected");
+        var cursorParts = cursor.Split('.', StringSplitOptions.None);
+        const string cursorAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        var signatureLastIndex = cursorAlphabet.IndexOf(cursorParts[1][^1]);
+        Assert(signatureLastIndex >= 0 && signatureLastIndex % 4 == 0,
+            "cursor signature uses canonical base64url tail");
+        var aliasSignature = cursorParts[1][..^1] + cursorAlphabet[signatureLastIndex + 1];
+        var aliasCursor = cursorParts[0] + "." + aliasSignature;
+        ExpectCursorFailure(
+            () => codec.Decode(aliasCursor, "search_filenames", "opts", "root", 7, now),
+            "authentication",
+            "non-canonical base64url cursor alias rejected");
+
         ExpectCursorFailure(() => codec.Decode(cursor, "search_content", "opts", "root", 7, now), "tool mismatch", "cursor tool binding");
         ExpectCursorFailure(() => codec.Decode(cursor, "search_filenames", "other", "root", 7, now), "options mismatch", "cursor options binding");
         ExpectCursorFailure(() => codec.Decode(cursor, "search_filenames", "opts", "other-root", 7, now), "root mismatch", "cursor root binding");
@@ -3117,6 +3137,226 @@ internal static class Program
         Console.WriteLine("windows-repository-intelligence: ok");
     }
 
+    private static async Task TestRepositoryIntelligenceQueryAsync(string root)
+    {
+        var workspace = Path.Combine(root, "repo-query-workspace");
+        var repo = Path.Combine(workspace, "repo");
+        var cacheRoot = Path.Combine(root, "repo-query-cache");
+        var artifactRoot = Path.Combine(root, "repo-query-artifacts");
+        Directory.CreateDirectory(repo);
+        await GitCli(repo, ["init", "-b", "main"]);
+        await GitCli(repo, ["config", "user.name", "FileMCP Test"]);
+        await GitCli(repo, ["config", "user.email", "filemcp@example.invalid"]);
+
+        Directory.CreateDirectory(Path.Combine(repo, "src"));
+        File.WriteAllText(Path.Combine(repo, "src", "Alpha.cs"),
+            "using Beta;\nnamespace Demo;\npublic class Shared { }\npublic class Alpha { public void Run() { } }\n",
+            new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(repo, "src", "Beta.cs"),
+            "namespace Demo;\npublic class Shared { }\npublic class Beta { public static void Go() { } }\n",
+            new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(repo, "README.txt"), "plain metadata only\n", new UTF8Encoding(false));
+        for (var i = 0; i < 520; i++)
+            File.WriteAllText(Path.Combine(repo, $"map-{i:D4}.txt"), $"metadata {i}\n", new UTF8Encoding(false));
+        await GitCli(repo, ["add", "."]);
+        await GitCli(repo, ["commit", "-m", "query fixture"]);
+
+        var artifacts = new ArtifactContentStore(new ArtifactContentStoreOptions
+        {
+            RootDirectory = artifactRoot,
+            WorkspaceRootForIsolation = workspace,
+        });
+        var queryOptions = new RepositoryIntelligenceQueryOptions
+        {
+            RepoMapSpillThresholdBytes = 1024,
+        };
+        var tools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(false),
+            artifactStore: artifacts,
+            quarantineOptions: null,
+            quarantineStageForTests: null,
+            repositoryQueryOptions: queryOptions);
+
+        Assert(tools.HasTool("repo_map") && tools.HasTool("symbol_search") && tools.HasTool("related_files"),
+            "FMG-019 query facade is policy-visible");
+
+        var map1 = await tools.CallAsync("repo_map", Obj(
+            ("repo_path", "repo"),
+            ("max_items", 3),
+            ("allow_content_ref", true)));
+        Assert(map1.StructuredContent["provider_id"]!.GetValue<string>() == LexicalSymbolProvider.Id &&
+               map1.StructuredContent["completeness"]!.GetValue<string>() == "heuristic" &&
+               map1.StructuredContent["grants_authority"]!.GetValue<bool>() == false &&
+               map1.StructuredContent["raw_source_persisted"]!.GetValue<bool>() == false,
+            "repo_map reports provider truth and no-authority metadata");
+        Assert(map1.StructuredContent["returned_count"]!.GetValue<int>() == 3 &&
+               map1.StructuredContent["partial"]!.GetValue<bool>() &&
+               !string.IsNullOrWhiteSpace(map1.StructuredContent["next_cursor"]!.GetValue<string>()),
+            "repo_map deterministically bounds first page and returns cursor");
+        Assert(map1.StructuredContent["artifact_state"]!.GetValue<string>() == "available" &&
+               !string.IsNullOrWhiteSpace(map1.StructuredContent["content_ref"]!.GetValue<string>()),
+            "large repo_map spills metadata to authenticated ContentRef");
+
+        var mapRef = map1.StructuredContent["content_ref"]!.GetValue<string>();
+        await using (var mapBytes = new MemoryStream())
+        {
+            await artifacts.CopyToAsync(
+                mapRef,
+                ArtifactContentStore.WorkspaceAuthorityId(workspace),
+                value => value == ArtifactContentClasses.ToolOutput,
+                mapBytes);
+            var mapArtifactText = Encoding.UTF8.GetString(mapBytes.ToArray());
+            Assert(mapArtifactText.Contains("\"kind\":\"repository_map\"", StringComparison.Ordinal) &&
+                   !mapArtifactText.Contains("public class Alpha", StringComparison.Ordinal),
+                "repo_map ContentRef contains metadata map only, never raw source");
+        }
+
+        var cursor = map1.StructuredContent["next_cursor"]!.GetValue<string>();
+        var map2 = await tools.CallAsync("repo_map", Obj(
+            ("repo_path", "repo"),
+            ("cursor", cursor),
+            ("max_items", 3),
+            ("allow_content_ref", false)));
+        Assert(map2.StructuredContent["start_index"]!.GetValue<int>() == 3,
+            "repo_map cursor resumes exact deterministic position");
+        var firstPaths = map1.StructuredContent["items"]!.AsArray().Select(x => x!["path"]!.GetValue<string>()).ToArray();
+        var secondPaths = map2.StructuredContent["items"]!.AsArray().Select(x => x!["path"]!.GetValue<string>()).ToArray();
+        Assert(!firstPaths.Intersect(secondPaths, StringComparer.Ordinal).Any(),
+            "repo_map cursor does not repeat prior page");
+
+        var tampered = cursor[..^1] + (cursor[^1] == 'A' ? "B" : "A");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("repo_map", Obj(
+                ("repo_path", "repo"), ("cursor", tampered), ("max_items", 3))),
+            "Cursor authentication failed",
+            "repo_map rejects tampered cursor");
+
+        var symbols = await tools.CallAsync("symbol_search", Obj(
+            ("repo_path", "repo"),
+            ("query", "Shared"),
+            ("max_results", 10)));
+        Assert(symbols.StructuredContent["symbol_support"]!.GetValue<bool>() &&
+               symbols.StructuredContent["ambiguous"]!.GetValue<bool>() &&
+               symbols.StructuredContent["exact_match_count"]!.GetValue<int>() == 2,
+            "symbol_search reports ambiguous exact symbols instead of choosing one");
+        Assert(symbols.StructuredContent["results"]!.AsArray().Count == 2,
+            "symbol_search returns all ambiguous exact matches deterministically");
+
+        var prefix = await tools.CallAsync("symbol_search", Obj(
+            ("repo_path", "repo"),
+            ("query", "Al"),
+            ("max_results", 10)));
+        var prefixResult = prefix.StructuredContent["results"]!.AsArray().First()!.AsObject();
+        Assert(prefixResult["name"]!.GetValue<string>() == "Alpha" &&
+               prefixResult["score"]!.GetValue<double>() == 0.75,
+            "symbol_search deterministic prefix ranking is explicit");
+
+        var related = await tools.CallAsync("related_files", Obj(
+            ("repo_path", "repo"),
+            ("relative_path", "src/Alpha.cs"),
+            ("max_results", 10)));
+        Assert(related.StructuredContent["results"]!.AsArray().Any(node =>
+            node!["path"]!.GetValue<string>() == "src/Beta.cs" &&
+            node["direction"]!.GetValue<string>() == "outgoing"),
+            "related_files exposes ranked outgoing relation from FMG-018 graph");
+
+        await AssertThrowsAsync(
+            () => tools.CallAsync("related_files", Obj(
+                ("repo_path", "repo"), ("relative_path", "../escape.cs"))),
+            "invalid path segment",
+            "related_files rejects traversal path");
+
+        var plainWorkspace = Path.Combine(root, "repo-query-plain-workspace");
+        var plainRepo = Path.Combine(plainWorkspace, "repo");
+        Directory.CreateDirectory(plainRepo);
+        await GitCli(plainRepo, ["init", "-b", "main"]);
+        await GitCli(plainRepo, ["config", "user.name", "FileMCP Test"]);
+        await GitCli(plainRepo, ["config", "user.email", "filemcp@example.invalid"]);
+        File.WriteAllText(Path.Combine(plainRepo, "a.txt"), "plain\n", new UTF8Encoding(false));
+        await GitCli(plainRepo, ["add", "."]);
+        await GitCli(plainRepo, ["commit", "-m", "plain"]);
+        var plainTools = new LocalTools(plainWorkspace, "FileMCP Test", "filemcp@example.invalid", false);
+        var noSymbols = await plainTools.CallAsync("symbol_search", Obj(
+            ("repo_path", "repo"), ("query", "anything")));
+        Assert(noSymbols.StructuredContent["symbol_support"]!.GetValue<bool>() == false &&
+               noSymbols.StructuredContent["results"]!.AsArray().Count == 0,
+            "symbol_search explicitly reports no symbol support");
+
+        var stalePage = await tools.CallAsync("repo_map", Obj(
+            ("repo_path", "repo"), ("max_items", 2)));
+        var staleCursor = stalePage.StructuredContent["next_cursor"]!.GetValue<string>();
+        File.AppendAllText(Path.Combine(repo, "src", "Alpha.cs"), "// query-stale\n", new UTF8Encoding(false));
+        await AssertThrowsAsync(
+            () => tools.CallAsync("repo_map", Obj(
+                ("repo_path", "repo"), ("cursor", staleCursor), ("max_items", 2))),
+            "Cursor generation is stale",
+            "cursor is SourceStateRef generation-bound");
+
+        var staleOnce = false;
+        var staleOptions = new RepositoryIntelligenceQueryOptions
+        {
+            StageForTests = stage =>
+            {
+                if (stage != "before_freshness_recheck" || staleOnce) return;
+                staleOnce = true;
+                File.AppendAllText(Path.Combine(repo, "src", "Beta.cs"), "// stale-during-query\n", new UTF8Encoding(false));
+            },
+        };
+        var staleTools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(false),
+            repositoryQueryOptions: staleOptions);
+        await AssertThrowsAsync(
+            () => staleTools.CallAsync("symbol_search", Obj(
+                ("repo_path", "repo"), ("query", "Beta"))),
+            "generation became stale",
+            "query rechecks SourceStateRef immediately before return");
+
+        var failArtifacts = new ArtifactContentStore(new ArtifactContentStoreOptions
+        {
+            RootDirectory = Path.Combine(root, "repo-query-artifact-failure"),
+            WorkspaceRootForIsolation = workspace,
+            FaultInjector = (stage, _) => stage == "before-publish" ? new IOException("injected artifact unavailable") : null,
+        });
+        var unavailableTools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(false),
+            artifactStore: failArtifacts,
+            repositoryQueryOptions: new RepositoryIntelligenceQueryOptions { RepoMapSpillThresholdBytes = 1024 });
+        var unavailable = await unavailableTools.CallAsync("repo_map", Obj(
+            ("repo_path", "repo"), ("max_items", 2), ("allow_content_ref", true)));
+        Assert(unavailable.StructuredContent["artifact_state"]!.GetValue<string>() == "unavailable" &&
+               unavailable.StructuredContent["content_ref"] is null,
+            "repo_map reports unavailable spill artifact explicitly without inventing ContentRef");
+
+        using (var tinyBudget = ToolExecutionContext.Create(new JsonObject
+        {
+            ["io.filemcp/budget"] = new JsonObject
+            {
+                ["maxFilesScanned"] = 10000,
+                ["maxBytesScanned"] = 50_000_000L,
+                ["maxOutputItems"] = 2,
+                ["maxVisitedEntries"] = 10000,
+            },
+        }))
+        {
+            var bounded = await tools.CallAsync("repo_map", Obj(
+                ("repo_path", "repo"), ("max_items", 50)), executionContext: tinyBudget);
+            Assert(bounded.StructuredContent["returned_count"]!.GetValue<int>() <= 2 &&
+                   bounded.StructuredContent["truncated"]!.GetValue<bool>(),
+                "repo_map respects ToolBudget output bound on very large graph");
+        }
+
+        Console.WriteLine("windows-repository-query: ok");
+    }
+
     private static async Task TestProjectContextAsync(string root)
     {
         var workspace = Path.Combine(root, "project-context");
@@ -3256,8 +3496,8 @@ internal static class Program
         var workspace = Path.Combine(root, "files"); Directory.CreateDirectory(workspace);
         var safe = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
         var full = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", true);
-        Assert(safe.ToolDefinitions.Count == 25 && !safe.HasTool("run_command"), "safe tool count");
-        Assert(full.ToolDefinitions.Count == 27 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
+        Assert(safe.ToolDefinitions.Count == 28 && !safe.HasTool("run_command"), "safe tool count");
+        Assert(full.ToolDefinitions.Count == 30 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
 
         var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
         var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);
@@ -3600,7 +3840,7 @@ internal static class Program
         var correlatedListJson = JsonNode.Parse(HttpBody(correlatedList))!.AsObject();
         var correlatedTools = correlatedListJson["result"]!["tools"]!.AsArray();
         Assert(
-            correlatedTools.Count == 29 &&
+            correlatedTools.Count == 32 &&
             correlatedTools.Any(tool => tool?["name"]?.GetValue<string>() == "apply_search_replace") &&
             correlatedTools.Any(tool => tool?["name"]?.GetValue<string>() == "apply_unified_diff"),
             "logical correlation facade includes connect, evidence, quarantine and edit-adapter tools");

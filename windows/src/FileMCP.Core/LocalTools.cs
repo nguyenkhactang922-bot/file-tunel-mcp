@@ -29,7 +29,7 @@ internal sealed partial class LocalTools
     private static readonly HashSet<string> HandlerToolNames = new(StringComparer.Ordinal)
     {
         "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     };
     private static readonly HashSet<string> SerializedToolNames = new(StringComparer.Ordinal)
@@ -39,7 +39,7 @@ internal sealed partial class LocalTools
     };
     private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "exec_process",
+        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "exec_process",
     };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -62,7 +62,8 @@ internal sealed partial class LocalTools
         CodexSkillRegistry? skillRegistry = null,
         ArtifactContentStore? artifactStore = null,
         QuarantineServiceOptions? quarantineOptions = null,
-        Action<string>? quarantineStageForTests = null)
+        Action<string>? quarantineStageForTests = null,
+        RepositoryIntelligenceQueryOptions? repositoryQueryOptions = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
@@ -76,6 +77,7 @@ internal sealed partial class LocalTools
                 }),
                 LazyThreadSafetyMode.ExecutionAndPublication);
         Func<ArtifactContentStore> artifactFactory = () => lazyArtifacts.Value;
+        ConfigureRepositoryIntelligenceQuery(artifactFactory, repositoryQueryOptions);
         _batchFiles = new BatchFileService(_resolver, _fileVersions, artifactFactory);
         _mutationGuard = new AuthorizedPathSnapshotService(_resolver);
         _quarantine = new QuarantineService(
@@ -231,6 +233,30 @@ internal sealed partial class LocalTools
                     GetInt(arguments, "max_lines", ProjectContextService.DefaultMaxLines),
                     GetBool(arguments, "include_skills", true),
                     executionContext)),
+                "repo_map" => ObjectOutput(await RepoMapAsync(
+                    GetRequiredString(arguments, "repo_path"),
+                    GetString(arguments, "cursor", ""),
+                    GetInt(arguments, "max_items", 100),
+                    GetBool(arguments, "allow_content_ref", false),
+                    executionContext,
+                    effectiveCancellation).ConfigureAwait(false)),
+                "symbol_search" => ObjectOutput(await SymbolSearchAsync(
+                    GetRequiredString(arguments, "repo_path"),
+                    GetRequiredString(arguments, "query"),
+                    GetString(arguments, "kind", ""),
+                    GetBool(arguments, "case_sensitive", false),
+                    GetString(arguments, "cursor", ""),
+                    GetInt(arguments, "max_results", 50),
+                    executionContext,
+                    effectiveCancellation).ConfigureAwait(false)),
+                "related_files" => ObjectOutput(await RelatedFilesAsync(
+                    GetRequiredString(arguments, "repo_path"),
+                    GetRequiredString(arguments, "relative_path"),
+                    GetDouble(arguments, "min_score", 0),
+                    GetString(arguments, "cursor", ""),
+                    GetInt(arguments, "max_results", 50),
+                    executionContext,
+                    effectiveCancellation).ConfigureAwait(false)),
                 "exec_process" => ObjectOutput(await ExecProcessAsync(
                     GetRequiredString(arguments, "executable"),
                     GetStringArray(arguments, "arguments"),

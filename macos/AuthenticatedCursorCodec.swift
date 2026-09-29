@@ -109,6 +109,12 @@ final class AuthenticatedCursorCodec {
             throw AuthenticatedCursorError.invalid("Malformed cursor")
         }
 
+        guard Self.base64URL(payloadData) == String(parts[0]) else {
+            throw AuthenticatedCursorError.invalid("Malformed cursor")
+        }
+        guard Self.base64URL(signature) == String(parts[1]) else {
+            throw AuthenticatedCursorError.invalid("Cursor authentication failed")
+        }
         guard HMAC<SHA256>.isValidAuthenticationCode(signature, authenticating: payloadData, using: key) else {
             throw AuthenticatedCursorError.invalid("Cursor authentication failed")
         }

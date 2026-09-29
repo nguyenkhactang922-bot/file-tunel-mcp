@@ -303,6 +303,18 @@ precondition(decodedCursorPosition == "pos-42")
 expectFailure("tamper", containing: "cursor") {
     _ = try codec.decode(cursor + "x", expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
 }
+let cursorParts = cursor.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+let cursorAlphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+precondition(cursorParts.count == 2)
+let signatureLast = cursorParts[1].last!
+let signatureLastIndex = cursorAlphabet.firstIndex(of: signatureLast)!
+precondition(signatureLastIndex % 4 == 0)
+var aliasSignatureChars = Array(cursorParts[1])
+aliasSignatureChars[aliasSignatureChars.count - 1] = cursorAlphabet[signatureLastIndex + 1]
+let aliasCursor = cursorParts[0] + "." + String(aliasSignatureChars)
+expectFailure("noncanonical cursor alias", containing: "authentication") {
+    _ = try codec.decode(aliasCursor, expectedTool: "search_filenames", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
+}
 expectFailure("tool binding", containing: "tool mismatch") {
     _ = try codec.decode(cursor, expectedTool: "search_content", expectedOptionsHash: "opts", expectedRootAuthorityID: "root", expectedGeneration: 7, now: now)
 }
@@ -1304,6 +1316,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/BatchFileService.swift \
     macos/EditAdapterService.swift \
     macos/RepositoryIntelligence.swift \
+    macos/RepositoryIntelligenceQuery.swift \
     macos/QuarantineService.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
@@ -2402,6 +2415,250 @@ let fmg018Published = (try? FileManager.default.contentsOfDirectory(at: fmg018Ch
 precondition(fmg018Published == 0)
 print("swift-repository-intelligence: ok")
 
+let fmg019Root = root.appendingPathComponent("repo-query")
+let fmg019Repo = fmg019Root.appendingPathComponent("repo")
+try FileManager.default.createDirectory(at: fmg019Repo, withIntermediateDirectories: true)
+try runGitFixture(fmg019Repo, ["init", "-b", "main"])
+try runGitFixture(fmg019Repo, ["config", "user.name", "FileMCP Test"])
+try runGitFixture(fmg019Repo, ["config", "user.email", "filemcp@example.invalid"])
+try FileManager.default.createDirectory(at: fmg019Repo.appendingPathComponent("src"), withIntermediateDirectories: true)
+try "using Beta;\nnamespace Demo;\npublic class Shared { }\npublic class Alpha { public void Run() { } }\n".write(
+    to: fmg019Repo.appendingPathComponent("src/Alpha.cs"), atomically: true, encoding: .utf8)
+try "namespace Demo;\npublic class Shared { }\npublic class Beta { public static void Go() { } }\n".write(
+    to: fmg019Repo.appendingPathComponent("src/Beta.cs"), atomically: true, encoding: .utf8)
+try "plain metadata only\n".write(to: fmg019Repo.appendingPathComponent("README.txt"), atomically: true, encoding: .utf8)
+for index in 0..<180 {
+    try "metadata \(index)\n".write(
+        to: fmg019Repo.appendingPathComponent(String(format: "map-%04d.txt", index)),
+        atomically: true,
+        encoding: .utf8
+    )
+}
+try runGitFixture(fmg019Repo, ["add", "."])
+try runGitFixture(fmg019Repo, ["commit", "-m", "query fixture"])
+
+let fmg019Resolver = try SafePathResolver(rootPath: fmg019Root.path)
+let fmg019ArtifactRoot = root.deletingLastPathComponent()
+    .appendingPathComponent("filemcp-repo-query-artifacts-\(UUID().uuidString)")
+var fmg019ArtifactOptions = ArtifactContentStoreOptions()
+fmg019ArtifactOptions.rootURL = fmg019ArtifactRoot
+fmg019ArtifactOptions.workspaceRootForIsolation = fmg019Root
+let fmg019Artifacts = try ArtifactContentStore(options: fmg019ArtifactOptions)
+var fmg019QueryOptions = RepositoryIntelligenceQueryOptions()
+fmg019QueryOptions.repoMapSpillThresholdBytes = 1024
+let fmg019Tools = try LocalTools(
+    resolver: fmg019Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    artifactStore: fmg019Artifacts,
+    repositoryQueryOptions: fmg019QueryOptions
+)
+precondition(fmg019Tools.hasTool(named: "repo_map"))
+precondition(fmg019Tools.hasTool(named: "symbol_search"))
+precondition(fmg019Tools.hasTool(named: "related_files"))
+
+let fmg019Map1 = try fmg019Tools.call(
+    name: "repo_map",
+    arguments: ["repo_path": "repo", "max_items": 3, "allow_content_ref": true]
+)
+let fmg019Map1Body = fmg019Map1.structuredContent
+precondition(fmg019Map1Body["provider_id"] as? String == LexicalSymbolProvider.id)
+precondition(fmg019Map1Body["completeness"] as? String == "heuristic")
+precondition(fmg019Map1Body["grants_authority"] as? Bool == false)
+precondition(fmg019Map1Body["raw_source_persisted"] as? Bool == false)
+precondition((fmg019Map1Body["returned_count"] as? NSNumber)?.intValue == 3)
+precondition(fmg019Map1Body["partial"] as? Bool == true)
+let fmg019Cursor = fmg019Map1Body["next_cursor"] as! String
+precondition(!fmg019Cursor.isEmpty)
+precondition(fmg019Map1Body["artifact_state"] as? String == "available")
+let fmg019MapRef = fmg019Map1Body["content_ref"] as! String
+precondition(!fmg019MapRef.isEmpty)
+
+let fmg019MapOutput = OutputStream.toMemory()
+try fmg019Artifacts.copy(
+    fmg019MapRef,
+    workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(fmg019Root),
+    contentClassAllowed: ArtifactContentClasses.isKnown,
+    to: fmg019MapOutput
+)
+let fmg019MapData = fmg019MapOutput.property(forKey: .dataWrittenToMemoryStreamKey) as! Data
+let fmg019MapObject = try JSONSerialization.jsonObject(with: fmg019MapData) as! [String: Any]
+precondition(fmg019MapObject["kind"] as? String == "repository_map")
+precondition(String(decoding: fmg019MapData, as: UTF8.self).contains("public class Alpha") == false)
+
+let fmg019Map2 = try fmg019Tools.call(
+    name: "repo_map",
+    arguments: ["repo_path": "repo", "cursor": fmg019Cursor, "max_items": 3, "allow_content_ref": false]
+)
+precondition((fmg019Map2.structuredContent["start_index"] as? NSNumber)?.intValue == 3)
+let fmg019FirstPaths = Set((fmg019Map1Body["items"] as! [[String: Any]]).compactMap { $0["path"] as? String })
+let fmg019SecondPaths = Set((fmg019Map2.structuredContent["items"] as! [[String: Any]]).compactMap { $0["path"] as? String })
+precondition(fmg019FirstPaths.isDisjoint(with: fmg019SecondPaths))
+
+var fmg019TamperedChars = Array(fmg019Cursor)
+precondition(!fmg019TamperedChars.isEmpty)
+fmg019TamperedChars[fmg019TamperedChars.count - 1] = fmg019TamperedChars.last == "A" ? "B" : "A"
+let fmg019Tampered = String(fmg019TamperedChars)
+do {
+    _ = try fmg019Tools.call(
+        name: "repo_map",
+        arguments: ["repo_path": "repo", "cursor": fmg019Tampered, "max_items": 3]
+    )
+    preconditionFailure("FMG-019 tampered cursor must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("authentication"))
+}
+
+let fmg019Symbols = try fmg019Tools.call(
+    name: "symbol_search",
+    arguments: ["repo_path": "repo", "query": "Shared", "max_results": 10]
+)
+precondition(fmg019Symbols.structuredContent["symbol_support"] as? Bool == true)
+precondition(fmg019Symbols.structuredContent["ambiguous"] as? Bool == true)
+precondition((fmg019Symbols.structuredContent["exact_match_count"] as? NSNumber)?.intValue == 2)
+precondition((fmg019Symbols.structuredContent["results"] as? [[String: Any]])?.count == 2)
+
+let fmg019Prefix = try fmg019Tools.call(
+    name: "symbol_search",
+    arguments: ["repo_path": "repo", "query": "Al", "max_results": 10]
+)
+let fmg019PrefixResult = (fmg019Prefix.structuredContent["results"] as! [[String: Any]])[0]
+precondition(fmg019PrefixResult["name"] as? String == "Alpha")
+precondition((fmg019PrefixResult["score"] as? NSNumber)?.doubleValue == 0.75)
+
+let fmg019Related = try fmg019Tools.call(
+    name: "related_files",
+    arguments: ["repo_path": "repo", "relative_path": "src/Alpha.cs", "max_results": 10]
+)
+let fmg019RelatedResults = fmg019Related.structuredContent["results"] as! [[String: Any]]
+precondition(fmg019RelatedResults.contains {
+    $0["path"] as? String == "src/Beta.cs" && $0["direction"] as? String == "outgoing"
+})
+do {
+    _ = try fmg019Tools.call(
+        name: "related_files",
+        arguments: ["repo_path": "repo", "relative_path": "../escape.cs"]
+    )
+    preconditionFailure("FMG-019 related_files traversal must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("invalid path segment"))
+}
+
+let fmg019PlainRoot = root.appendingPathComponent("repo-query-plain")
+let fmg019PlainRepo = fmg019PlainRoot.appendingPathComponent("repo")
+try FileManager.default.createDirectory(at: fmg019PlainRepo, withIntermediateDirectories: true)
+try runGitFixture(fmg019PlainRepo, ["init", "-b", "main"])
+try runGitFixture(fmg019PlainRepo, ["config", "user.name", "FileMCP Test"])
+try runGitFixture(fmg019PlainRepo, ["config", "user.email", "filemcp@example.invalid"])
+try "plain\n".write(to: fmg019PlainRepo.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+try runGitFixture(fmg019PlainRepo, ["add", "."])
+try runGitFixture(fmg019PlainRepo, ["commit", "-m", "plain"])
+let fmg019PlainTools = try LocalTools(
+    resolver: try SafePathResolver(rootPath: fmg019PlainRoot.path),
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    enableCommands: false
+)
+let fmg019NoSymbols = try fmg019PlainTools.call(
+    name: "symbol_search",
+    arguments: ["repo_path": "repo", "query": "anything"]
+)
+precondition(fmg019NoSymbols.structuredContent["symbol_support"] as? Bool == false)
+precondition((fmg019NoSymbols.structuredContent["results"] as? [[String: Any]])?.isEmpty == true)
+
+let fmg019StalePage = try fmg019Tools.call(
+    name: "repo_map",
+    arguments: ["repo_path": "repo", "max_items": 2]
+)
+let fmg019StaleCursor = fmg019StalePage.structuredContent["next_cursor"] as! String
+let fmg019AlphaURL = fmg019Repo.appendingPathComponent("src/Alpha.cs")
+let fmg019AlphaHandle = try FileHandle(forWritingTo: fmg019AlphaURL)
+try fmg019AlphaHandle.seekToEnd()
+try fmg019AlphaHandle.write(contentsOf: Data("// query-stale\n".utf8))
+try fmg019AlphaHandle.close()
+do {
+    _ = try fmg019Tools.call(
+        name: "repo_map",
+        arguments: ["repo_path": "repo", "cursor": fmg019StaleCursor, "max_items": 2]
+    )
+    preconditionFailure("FMG-019 stale cursor must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("generation is stale"))
+}
+
+var fmg019StaleOnce = false
+var fmg019StaleOptions = RepositoryIntelligenceQueryOptions()
+fmg019StaleOptions.stageForTests = { stage in
+    if stage == "before_freshness_recheck" && !fmg019StaleOnce {
+        fmg019StaleOnce = true
+        let betaURL = fmg019Repo.appendingPathComponent("src/Beta.cs")
+        let betaHandle = try! FileHandle(forWritingTo: betaURL)
+        try! betaHandle.seekToEnd()
+        try! betaHandle.write(contentsOf: Data("// stale-during-query\n".utf8))
+        try! betaHandle.close()
+    }
+}
+let fmg019StaleTools = try LocalTools(
+    resolver: fmg019Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    repositoryQueryOptions: fmg019StaleOptions
+)
+do {
+    _ = try fmg019StaleTools.call(
+        name: "symbol_search",
+        arguments: ["repo_path": "repo", "query": "Beta"]
+    )
+    preconditionFailure("FMG-019 stale in-flight query must fail")
+} catch {
+    precondition(error.localizedDescription.lowercased().contains("generation became stale"))
+}
+
+var fmg019FailArtifactOptions = ArtifactContentStoreOptions()
+fmg019FailArtifactOptions.rootURL = root.deletingLastPathComponent()
+    .appendingPathComponent("filemcp-repo-query-artifact-failure-\(UUID().uuidString)")
+fmg019FailArtifactOptions.workspaceRootForIsolation = fmg019Root
+fmg019FailArtifactOptions.faultInjector = { stage, _ in
+    stage == "before-publish" ? ArtifactContentStoreError.io("injected artifact unavailable") : nil
+}
+let fmg019FailArtifacts = try ArtifactContentStore(options: fmg019FailArtifactOptions)
+var fmg019FailQueryOptions = RepositoryIntelligenceQueryOptions()
+fmg019FailQueryOptions.repoMapSpillThresholdBytes = 1024
+let fmg019UnavailableTools = try LocalTools(
+    resolver: fmg019Resolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: try ServerPolicy.fromLegacy(enableCommands: false),
+    artifactStore: fmg019FailArtifacts,
+    repositoryQueryOptions: fmg019FailQueryOptions
+)
+let fmg019Unavailable = try fmg019UnavailableTools.call(
+    name: "repo_map",
+    arguments: ["repo_path": "repo", "max_items": 2, "allow_content_ref": true]
+)
+precondition(fmg019Unavailable.structuredContent["artifact_state"] as? String == "unavailable")
+precondition(fmg019Unavailable.structuredContent["content_ref"] is NSNull)
+
+let fmg019Budget = try ToolExecutionContext(meta: [
+    ToolExecutionContext.budgetMetadataKey: [
+        "maxFilesScanned": 10000,
+        "maxBytesScanned": NSNumber(value: 50_000_000),
+        "maxOutputItems": 2,
+        "maxVisitedEntries": 10000,
+    ],
+])
+let fmg019Bounded = try fmg019Tools.call(
+    name: "repo_map",
+    arguments: ["repo_path": "repo", "max_items": 50],
+    executionContext: fmg019Budget
+)
+precondition(((fmg019Bounded.structuredContent["returned_count"] as? NSNumber)?.intValue ?? 99) <= 2)
+precondition(fmg019Bounded.structuredContent["truncated"] as? Bool == true)
+
+print("swift-repository-query: ok")
+
 let fmg010Root = root.appendingPathComponent("project-context")
 let fmg010Deep = fmg010Root.appendingPathComponent("sub/deep")
 try FileManager.default.createDirectory(at: fmg010Deep, withIntermediateDirectories: true)
@@ -3111,6 +3368,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/BatchFileService.swift \
     macos/EditAdapterService.swift \
     macos/RepositoryIntelligence.swift \
+    macos/RepositoryIntelligenceQuery.swift \
     macos/QuarantineService.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
@@ -3145,7 +3403,7 @@ UNAVAILABLE_EVIDENCE_BASE_URL="http://127.0.0.1:18091/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.9.0"
+CATALOG_VERSION="1.10.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
