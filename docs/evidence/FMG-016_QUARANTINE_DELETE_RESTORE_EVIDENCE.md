@@ -103,3 +103,31 @@ NEXT_EXACT_ACTION: commit/push remediation and require a new exact-head native V
 Run `36461564984` on `f9b4b598bd449b437fe118d954732214090eedaf`: Windows x64 SUCCESS; Windows ARM64 SUCCESS; macOS product typecheck + runtime progressed through catalog/result/policy/budget/artifact/process/correlation/runtime checks and failed only because four quarantine test assertions performed throwing `Data(contentsOf:)` calls inside non-throwing `precondition` autoclosures.
 Remediation is test-only: each throwing file read is hoisted into a local value before `precondition`. Local proof: Swift shell syntax PASS; no `precondition(... try Data(contentsOf:))` remains; diff check PASS.
 NEXT_EXACT_ACTION: commit/push test-only remediation and require exact-head native Verify all three lanes.
+
+## Exact-head native verification / scoped review
+
+Candidate head: `8dd03ede244da123c41fd035d740b33b52526a11`.
+Verify run: `36461989589`.
+
+PASS:
+- macOS native Verify SUCCESS, including static verification, canonical catalog contract, integration tests and app build;
+- Windows x64 Verify SUCCESS, including quarantine restore contract, full integration, x64/ARM64 package builds and app smoke;
+- native Windows ARM64 Verify SUCCESS, including quarantine restore contract and ARM64 app smoke;
+- branch local head equals remote branch head;
+- branch is based on current verified main `7ced7b604d67acbb526e280e7e3653ba15d37d11` with no behind commits at review checkpoint.
+
+Scoped security/atomicity review: PASS.
+- artifact payload + manifest are created and verified before source delete;
+- commit-time policy authorization, Mutation Guard and expected-version/tree-version rechecks remain immediately before destructive commit;
+- failed pre-delete packaging/persistence cleans temporary recovery refs and preserves source;
+- single-file restore materializes to a temp file, verifies digest/size, rechecks target authority/version, then atomically publishes;
+- tree restore creates CHECKPOINT recovery material before destination mutation;
+- tree rollback verifies identity of the root created by the restore transaction before recursive cleanup;
+- rollback failure retains the recovery ContentRef and returns `partial_recovery_required`;
+- expired/quota/disk-full/path-swap/destination-race/stale-version cases are covered on the canonical contract/runtime path;
+- no FMG-017+ authority is introduced.
+
+Review note:
+- a durable `prepared` quarantine record may remain if source deletion succeeds but the post-delete metadata transition cannot persist. Recovery payload/manifest remain available and the operation does not falsely claim a successful terminal update. Restore accepts this recovery state.
+
+NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-head native Verify on macOS + Windows x64 + Windows ARM64, then PR/merge -> merged-main Verify -> mark FMG-016 DONE / MAIN VERIFIED -> claim FMG-017.

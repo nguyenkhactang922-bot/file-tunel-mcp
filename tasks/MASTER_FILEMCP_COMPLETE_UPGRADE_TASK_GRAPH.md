@@ -207,7 +207,7 @@ Negative tests:
 
 ## FMG-016 - Quarantine Delete / Restore
 
-State: CLAIMED / ACTIVE
+State: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING
 Depends: FMG-014, FMG-008, FMG-011
 
 Scope:

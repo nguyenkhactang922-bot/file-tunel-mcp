@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: implement FMG-016 Quarantine Delete / Restore only on `chatgpt/FMG-016-quarantine-restore`; add quarantine_delete/list/get/restore with expected-version + Mutation Guard, verified artifact-backed package/manifest, bounded TTL/quota, guarded atomic single-file restore, tree rollback transaction and explicit restored / rolled_back / partial_recovery_required states; cover stale source, path swap, expired ref, destination race, tree partial/rollback failure and quota/disk-full. Do not begin FMG-017 before FMG-016 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: commit/push the FMG-016 evidence-only closure head, require exact-head native Verify on macOS + Windows x64 + Windows ARM64, then PR/merge and merged-main verification; only after merged-main SUCCESS mark FMG-016 DONE / MAIN VERIFIED and claim FMG-017.
