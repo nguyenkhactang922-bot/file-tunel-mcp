@@ -111,3 +111,14 @@ The same product head already passed macOS native integration in push Verify run
 Remediation is test-harness only: extend the pre-listener readiness watchdog from 45s to 90s and document that this bound covers loaded CI startup for FMG-018 indexing + FMG-019 large-map/query fixtures. Product timeouts, query semantics, authority, catalog, SourceStateRef and ContentRef behavior are unchanged.
 
 NEXT_EXACT_ACTION: commit/push this test-only remediation, require exact-head Verify on macOS + Windows x64 + native Windows ARM64 (including PR checks), then merge PR #38 only on the exact remediated head and require merged-main Verify.
+
+## Final closure
+
+FMG-019 is DONE / MAIN VERIFIED.
+
+- Final branch head: `a6822a5b4b0a372fd4973b6963a314ccb5481469`.
+- PR #38 merge commit: `3623f96c1d6041f46bc6fcb7781f11a17ccb1d29`.
+- Merged-main Verify run `36550274743`: SUCCESS on macOS, Windows x64, and native Windows ARM64.
+- The last feature-branch Windows failure in run `36549734370` occurred before any FMG-019 query assertion: the 520-file test fixture exceeded its fixed 20-second `git add` helper timeout while emitting CRLF warnings. The merged-main run passed the same Windows integration suite, confirming no persisted product regression at the merge SHA.
+
+FMG-020 may now be claimed.

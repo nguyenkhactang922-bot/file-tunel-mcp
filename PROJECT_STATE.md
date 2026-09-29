@@ -1,7 +1,7 @@
 # PROJECT STATE
 
 Project: FileMCP
-Active branch: `chatgpt/FMG-019-repository-intelligence-query-facade`
+Active branch: `chatgpt/FMG-020-persistent-pty`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -763,3 +763,19 @@ NEXT_EXACT_ACTION: commit/push this evidence-only closure head, require exact-he
 
 PR #38 run `36545273004`: Windows x64 + native ARM64 SUCCESS; macOS failed only on the pre-listener fixture readiness watchdog after FMG-019 increased native startup work. Remediation is test-only: readiness watchdog 45s -> 90s; product semantics unchanged.
 NEXT_EXACT_ACTION: commit/push remediation, require exact-head three-lane Verify/PR checks, then merge PR #38 with expected head SHA and require merged-main Verify.
+
+## FMG-019 final closure / FMG-020 claim
+
+FMG-019: DONE / MAIN VERIFIED.
+- Final feature/remediation head: `a6822a5b4b0a372fd4973b6963a314ccb5481469`.
+- PR #38 merged at `3623f96c1d6041f46bc6fcb7781f11a17ccb1d29`.
+- Earlier exact-head native Verify `36544068228`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Closure push Verify `36544798050` on `0bfa1017...`: SUCCESS on all three lanes.
+- PR attempt `36545273004`: Windows x64 + ARM64 SUCCESS; macOS hit only the pre-listener 45s readiness watchdog; fixed test-only to 90s in `a6822a5...`.
+- Remediated push Verify `36549734370`: macOS + native ARM64 SUCCESS; Windows x64 hit a fixture-only 20s `git add` timeout while emitting CRLF warnings; no product/query assertion failed.
+- Merged-main Verify `36550274743`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Catalog remains `1.10.0` / 34 tools / SHA-256 `a11c9512d6b182c13ad760709b99ff9224a702cb477953409e831d7d4e21289d`.
+- Evidence: `docs/evidence/FMG-019_REPOSITORY_INTELLIGENCE_QUERY_FACADE_EVIDENCE.md`.
+
+FMG-020: CLAIMED / ACTIVE on `chatgpt/FMG-020-persistent-pty`.
+NEXT_EXACT_ACTION: audit existing process lifecycle, environment authority, artifact store, cursor/session identity, LocalTools/catalog and platform-specific primitives; freeze a persistent PTY contract for Windows ConPTY + macOS POSIX PTY, then implement the bounded session runtime without starting FMG-021.
