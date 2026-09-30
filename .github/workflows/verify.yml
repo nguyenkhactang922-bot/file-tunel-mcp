@@ -46,6 +46,7 @@ jobs:
             macos/RepositoryIntelligence.swift \
             macos/RepositoryIntelligenceQuery.swift \
             macos/QuarantineService.swift \
+            macos/PersistentPty.swift \
             macos/EvidenceSupport.swift \
             macos/ToolCatalog.swift \
             macos/ServerPolicy.swift \
@@ -129,6 +130,10 @@ jobs:
       - name: Verify structured exec_process contract
         shell: pwsh
         run: ./tests/test_exec_process_contract.ps1
+
+      - name: Verify persistent PTY contract
+        shell: pwsh
+        run: ./tests/test_persistent_pty_contract.ps1
 
       - name: Verify file version and source-state contract
         shell: pwsh
@@ -260,6 +265,10 @@ jobs:
       - name: Verify structured exec_process contract
         shell: pwsh
         run: ./tests/test_exec_process_contract.ps1
+
+      - name: Verify persistent PTY contract
+        shell: pwsh
+        run: ./tests/test_persistent_pty_contract.ps1
 
       - name: Verify file version and source-state contract
         shell: pwsh

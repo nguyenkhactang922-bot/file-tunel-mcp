@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.10.0",
+  "catalogVersion": "1.11.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -2541,6 +2541,568 @@
           "readOnlyHint": false,
           "destructiveHint": false,
           "openWorldHint": true
+        }
+      }
+    },
+    {
+      "name": "pty_start",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "execute",
+      "capabilities": [
+        "process.exec",
+        "network.open_world"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "pty_start",
+        "description": "Start a real native pseudo-terminal session. Windows uses ConPTY and macOS uses POSIX PTY semantics. cwd remains inside the shared root and environment authority is identical to exec_process.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "executable": {
+              "type": "string",
+              "minLength": 1
+            },
+            "arguments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "environment": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "maxProperties": 32
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 120
+            },
+            "rows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 30
+            },
+            "idle_ttl_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3600,
+              "default": 0
+            },
+            "max_lifetime_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 14400,
+              "default": 0
+            },
+            "spill_output": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "executable"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "pid": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string"
+            },
+            "columns": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "integer"
+            },
+            "idle_ttl_seconds": {
+              "type": "integer"
+            },
+            "max_lifetime_seconds": {
+              "type": "integer"
+            },
+            "ring_limit_bytes": {
+              "type": "integer"
+            },
+            "spill_output": {
+              "type": "boolean"
+            },
+            "actual_pty": {
+              "type": "boolean"
+            },
+            "pty_backend": {
+              "type": "string"
+            },
+            "grants_authority": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "session_id",
+            "pid",
+            "state",
+            "actual_pty",
+            "pty_backend",
+            "grants_authority"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": true
+        }
+      }
+    },
+    {
+      "name": "pty_read",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "read",
+      "capabilities": [
+        "process.exec"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "pty_read",
+        "description": "Read bounded bytes from a scoped PTY session using the session output cursor. PTY bytes remain memory-only by default; any spill refs are short-lived PTY_OUTPUT artifacts.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "cursor": {
+              "type": "string"
+            },
+            "max_bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 262144,
+              "default": 65536
+            }
+          },
+          "required": [
+            "session_id"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "state": {
+              "type": "string"
+            },
+            "start_cursor": {
+              "type": "string"
+            },
+            "next_cursor": {
+              "type": "string"
+            },
+            "earliest_cursor": {
+              "type": "string"
+            },
+            "end_cursor": {
+              "type": "string"
+            },
+            "cursor_evicted": {
+              "type": "boolean"
+            },
+            "data_base64": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "exit_code": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "spill_pending": {
+              "type": "boolean"
+            },
+            "spill_refs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "grants_authority": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "session_id",
+            "state",
+            "next_cursor",
+            "data_base64",
+            "grants_authority"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "pty_write",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "execute",
+      "capabilities": [
+        "process.exec"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "pty_write",
+        "description": "Write UTF-8 terminal input to an existing scoped PTY session. FileMCP does not persist stdin bytes.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "data": {
+              "type": "string",
+              "maxLength": 65536
+            }
+          },
+          "required": [
+            "session_id",
+            "data"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "written_bytes": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string"
+            },
+            "grants_authority": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "session_id",
+            "written_bytes",
+            "state",
+            "grants_authority"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": true
+        }
+      }
+    },
+    {
+      "name": "pty_resize",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "execute",
+      "capabilities": [
+        "process.exec"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "pty_resize",
+        "description": "Resize an existing native PTY session.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "rows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300
+            }
+          },
+          "required": [
+            "session_id",
+            "columns",
+            "rows"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "columns": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string"
+            },
+            "grants_authority": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "session_id",
+            "columns",
+            "rows",
+            "state",
+            "grants_authority"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "pty_signal",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "execute",
+      "capabilities": [
+        "process.exec"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "pty_signal",
+        "description": "Send a bounded terminal control signal to an existing PTY session. Supported signals are ctrl_c and terminate.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "signal": {
+              "type": "string",
+              "enum": [
+                "ctrl_c",
+                "terminate"
+              ]
+            }
+          },
+          "required": [
+            "session_id",
+            "signal"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "signal": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "grants_authority": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "session_id",
+            "signal",
+            "state",
+            "grants_authority"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "pty_stop",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "execute",
+      "capabilities": [
+        "process.exec"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "pty_stop",
+        "description": "Stop an owned PTY session and its process tree. Spill artifacts are deleted at session end.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "session_id"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "pid": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string"
+            },
+            "exit_code": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "restart_resume_supported": {
+              "type": "boolean"
+            },
+            "grants_authority": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "session_id",
+            "state",
+            "restart_resume_supported",
+            "grants_authority"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "pty_list",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "read",
+      "capabilities": [
+        "process.exec"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "pty_list",
+        "description": "List only PTY sessions owned by the current FileMCP workspace instance. A restart never reports dead sessions as resumed.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "sessions": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "count": {
+              "type": "integer"
+            },
+            "workspace_scoped": {
+              "type": "boolean"
+            },
+            "restart_resume_supported": {
+              "type": "boolean"
+            },
+            "grants_authority": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "sessions",
+            "count",
+            "workspace_scoped",
+            "restart_resume_supported",
+            "grants_authority"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
         }
       }
     },

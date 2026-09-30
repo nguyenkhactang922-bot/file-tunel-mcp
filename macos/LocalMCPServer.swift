@@ -120,12 +120,12 @@ struct LocalToolCallOutput {
 final class LocalTools {
     private static let handlerToolNames: Set<String> = [
         "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
         "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "exec_process",
+        "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "exec_process",
     ]
     private let resolver: SafePathResolver
     private let gitUserName: String
@@ -133,6 +133,7 @@ final class LocalTools {
     private let enableCommands: Bool
     private let policy: ServerPolicy
     private let execEnvironment: ExecProcessEnvironmentAuthority
+    private let pty: PersistentPtyService
     private let fileVersions: FileVersionService
     private let editAdapters: EditAdapterService
     private let batchFiles: BatchFileService
@@ -225,7 +226,13 @@ final class LocalTools {
         self.gitUserName = gitUserName
         self.gitUserEmail = gitUserEmail
         self.policy = policy
-        self.execEnvironment = try ExecProcessEnvironmentAuthority(patterns: execEnvironmentAllowList)
+        let activeExecEnvironment = try ExecProcessEnvironmentAuthority(patterns: execEnvironmentAllowList)
+        self.execEnvironment = activeExecEnvironment
+        self.pty = try PersistentPtyService(
+            resolver: resolver,
+            environmentAuthority: activeExecEnvironment,
+            artifactFactory: artifactFactory
+        )
         self.enableCommands = policy.legacyUnsafeGitCompatibility
         try CanonicalToolCatalog.shared.validateHandlerCoverage(handler: "local_tools", runtimeHandlerNames: Self.handlerToolNames)
     }
@@ -417,6 +424,47 @@ final class LocalTools {
                 maxResults: int(arguments, "max_results", default: 50),
                 context: executionContext
             ))
+        case "pty_start":
+            return objectOutput(try pty.start(
+                executable: requiredString(arguments, "executable"),
+                arguments: try stringArray(arguments, "arguments"),
+                cwd: string(arguments, "cwd", default: ""),
+                environmentOverrides: try stringDictionary(arguments, "environment"),
+                columns: int(arguments, "columns", default: 120),
+                rows: int(arguments, "rows", default: 30),
+                idleTTLSeconds: int(arguments, "idle_ttl_seconds", default: 0),
+                maxLifetimeSeconds: int(arguments, "max_lifetime_seconds", default: 0),
+                spillOutput: bool(arguments, "spill_output", default: false)
+            ))
+        case "pty_read":
+            return objectOutput(try pty.read(
+                sessionID: requiredString(arguments, "session_id"),
+                cursor: string(arguments, "cursor", default: ""),
+                maxBytes: int(arguments, "max_bytes", default: 65_536),
+                context: executionContext
+            ))
+        case "pty_write":
+            return objectOutput(try pty.write(
+                sessionID: requiredString(arguments, "session_id"),
+                data: requiredString(arguments, "data")
+            ))
+        case "pty_resize":
+            return objectOutput(try pty.resize(
+                sessionID: requiredString(arguments, "session_id"),
+                columns: requiredInt(arguments, "columns"),
+                rows: requiredInt(arguments, "rows")
+            ))
+        case "pty_signal":
+            return objectOutput(try pty.signal(
+                sessionID: requiredString(arguments, "session_id"),
+                signal: requiredString(arguments, "signal")
+            ))
+        case "pty_stop":
+            return objectOutput(try pty.stop(
+                sessionID: requiredString(arguments, "session_id")
+            ))
+        case "pty_list":
+            return objectOutput(pty.list())
         case "exec_process":
             return objectOutput(try execProcess(
                 executable: requiredString(arguments, "executable"),
@@ -463,6 +511,10 @@ final class LocalTools {
         default:
             throw MCPServerError.notFound("Unknown tool: \(name)")
         }
+    }
+
+    func stopAllPtySessions() {
+        pty.stopAll()
     }
 
     private func listFiles(
@@ -2610,6 +2662,7 @@ final class LocalMCPServer {
     }
 
     func stop() {
+        tools.stopAllPtySessions()
         listener?.cancel()
         listener = nil
         stateLock.lock()

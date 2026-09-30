@@ -16,6 +16,7 @@ internal sealed partial class LocalTools
     private readonly BatchFileService _batchFiles;
     private readonly AuthorizedPathSnapshotService _mutationGuard;
     private readonly QuarantineService _quarantine;
+    private readonly PersistentPtyService _pty;
     private readonly ProjectContextService _projectContext;
     private readonly Action<string>? _beforeMutationCommitForTests;
     private readonly Action<string>? _applyEditsStageForTests;
@@ -29,7 +30,7 @@ internal sealed partial class LocalTools
     private static readonly HashSet<string> HandlerToolNames = new(StringComparer.Ordinal)
     {
         "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     };
     private static readonly HashSet<string> SerializedToolNames = new(StringComparer.Ordinal)
@@ -39,7 +40,7 @@ internal sealed partial class LocalTools
     };
     private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "exec_process",
+        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "exec_process",
     };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -95,6 +96,7 @@ internal sealed partial class LocalTools
         _gitUserEmail = gitUserEmail;
         _policy = policy;
         _execEnvironment = new ExecProcessEnvironmentAuthority(execEnvironmentAllowList);
+        _pty = new PersistentPtyService(_resolver, _execEnvironment, artifactFactory);
         _enableCommands = _policy.LegacyUnsafeGitCompatibility;
         CanonicalToolCatalog.ValidateHandlerCoverage("local_tools", HandlerToolNames);
         if (!_enableCommands)
@@ -257,6 +259,39 @@ internal sealed partial class LocalTools
                     GetInt(arguments, "max_results", 50),
                     executionContext,
                     effectiveCancellation).ConfigureAwait(false)),
+                "pty_start" => ObjectOutput(await _pty.StartAsync(
+                    GetRequiredString(arguments, "executable"),
+                    GetStringArray(arguments, "arguments"),
+                    GetString(arguments, "cwd", ""),
+                    GetStringDictionary(arguments, "environment"),
+                    GetInt(arguments, "columns", 120),
+                    GetInt(arguments, "rows", 30),
+                    GetInt(arguments, "idle_ttl_seconds", 0),
+                    GetInt(arguments, "max_lifetime_seconds", 0),
+                    GetBool(arguments, "spill_output", false),
+                    effectiveCancellation).ConfigureAwait(false)),
+                "pty_read" => ObjectOutput(await _pty.ReadAsync(
+                    GetRequiredString(arguments, "session_id"),
+                    GetString(arguments, "cursor", ""),
+                    GetInt(arguments, "max_bytes", 65536),
+                    executionContext,
+                    effectiveCancellation).ConfigureAwait(false)),
+                "pty_write" => ObjectOutput(await _pty.WriteAsync(
+                    GetRequiredString(arguments, "session_id"),
+                    GetRequiredString(arguments, "data"),
+                    effectiveCancellation).ConfigureAwait(false)),
+                "pty_resize" => ObjectOutput(_pty.Resize(
+                    GetRequiredString(arguments, "session_id"),
+                    GetRequiredInt(arguments, "columns"),
+                    GetRequiredInt(arguments, "rows"))),
+                "pty_signal" => ObjectOutput(await _pty.SignalAsync(
+                    GetRequiredString(arguments, "session_id"),
+                    GetRequiredString(arguments, "signal"),
+                    effectiveCancellation).ConfigureAwait(false)),
+                "pty_stop" => ObjectOutput(await _pty.StopAsync(
+                    GetRequiredString(arguments, "session_id"),
+                    effectiveCancellation).ConfigureAwait(false)),
+                "pty_list" => ObjectOutput(_pty.List()),
                 "exec_process" => ObjectOutput(await ExecProcessAsync(
                     GetRequiredString(arguments, "executable"),
                     GetStringArray(arguments, "arguments"),
@@ -284,6 +319,11 @@ internal sealed partial class LocalTools
             if (serialize) _serializedSlot.Release();
             _toolSlots.Release();
         }
+    }
+
+    internal void StopAllPtySessions()
+    {
+        try { _pty.StopAllAsync().GetAwaiter().GetResult(); } catch { }
     }
 
     private (IReadOnlyList<string> Values, bool Truncated) ListFiles(string subpath, ToolExecutionContext? context)

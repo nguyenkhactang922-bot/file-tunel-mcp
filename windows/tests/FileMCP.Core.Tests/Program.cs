@@ -24,6 +24,26 @@ internal static class Program
             await Task.Delay(TimeSpan.FromSeconds(20));
             return 0;
         }
+        if (args.Length > 0 && args[0] == "pty-tree-parent-fixture")
+        {
+            if (args.Length < 2) return 94;
+            var self = Path.ChangeExtension(typeof(Program).Assembly.Location, ".exe");
+            var start = new ProcessStartInfo
+            {
+                FileName = self,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            start.ArgumentList.Add("exec-child-sleeper-fixture");
+            using var child = Process.Start(start);
+            if (child is null) return 95;
+            File.WriteAllText(args[1], child.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var hasConsoleInput = HasConsoleDevice("CONIN$", FileAccess.Read);
+            var hasConsoleOutput = HasConsoleDevice("CONOUT$", FileAccess.ReadWrite);
+            Console.WriteLine($"FMG020_TTY:{hasConsoleInput}:{hasConsoleOutput}:{Console.IsInputRedirected}:{Console.IsOutputRedirected}");
+            await Task.Delay(TimeSpan.FromSeconds(20));
+            return 0;
+        }
         if (args.Length > 0 && args[0] == "evidence-marker-fixture")
         {
             if (args.Length < 4) return 96;
@@ -86,6 +106,13 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length > 0 && args[0] == "pty-only")
+            {
+                await TestPersistentPtyAsync(root);
+                Console.WriteLine($"windows-pty-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             TestObservabilityContracts();
             TestCanonicalToolCatalog();
             TestServerPolicy();
@@ -106,6 +133,7 @@ internal static class Program
             await TestDesktopSingleInstanceCoordinatorAsync();
             await TestProcessRunnerAsync(root);
             await TestExecProcessAsync(root);
+            await TestPersistentPtyAsync(root);
             await TestFileVersionAndSourceStateAsync(root);
             await TestAuthorizedPathSnapshotAsync(root);
             await TestExistingMutationHardeningAsync(root);
@@ -146,13 +174,13 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.10.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.11.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 29, "catalog non-shell local tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 30, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 36, "catalog non-shell local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 37, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 2, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
@@ -2241,6 +2269,271 @@ internal static class Program
         Console.WriteLine("windows-exec-process: ok");
     }
 
+    private static async Task TestPersistentPtyAsync(string root)
+    {
+        var area = Path.Combine(root, "persistent-pty");
+        var workspace = Path.Combine(area, "workspace");
+        Directory.CreateDirectory(workspace);
+        var artifactsRoot = Path.Combine(area, "artifacts");
+        var artifactStore = new ArtifactContentStore(new ArtifactContentStoreOptions
+        {
+            RootDirectory = artifactsRoot,
+            WorkspaceRootForIsolation = workspace,
+            MaxItemBytes = 2 * 1024 * 1024,
+            MaxWorkspaceBytes = 8 * 1024 * 1024,
+            MaxGlobalBytes = 16 * 1024 * 1024,
+            DefaultTtl = TimeSpan.FromMinutes(15),
+            MaxTtl = TimeSpan.FromHours(1),
+        });
+
+        var policy = ServerPolicy.FromLegacy(enableCommands: true);
+        var tools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            policy,
+            artifactStore: artifactStore);
+
+        static JsonArray StringArray(IEnumerable<string> values)
+        {
+            var result = new JsonArray();
+            foreach (var value in values) result.Add(value);
+            return result;
+        }
+
+        static JsonObject StartArgs(
+            string executable,
+            IEnumerable<string> arguments,
+            string cwd = "",
+            int columns = 100,
+            int rows = 30,
+            int idleTtlSeconds = 0,
+            int maxLifetimeSeconds = 0,
+            bool spillOutput = false) =>
+            new()
+            {
+                ["executable"] = executable,
+                ["arguments"] = StringArray(arguments),
+                ["cwd"] = cwd,
+                ["columns"] = columns,
+                ["rows"] = rows,
+                ["idle_ttl_seconds"] = idleTtlSeconds,
+                ["max_lifetime_seconds"] = maxLifetimeSeconds,
+                ["spill_output"] = spillOutput,
+            };
+
+        async Task<(string Text, string Cursor, string State)> ReadUntilAsync(
+            string sessionId,
+            string cursor,
+            Func<string, bool> done,
+            TimeSpan timeout)
+        {
+            var text = new StringBuilder();
+            var state = "running";
+            var current = cursor;
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                var read = await tools.CallAsync("pty_read", Obj(
+                    ("session_id", sessionId),
+                    ("cursor", current),
+                    ("max_bytes", 64 * 1024)));
+                text.Append(read.StructuredContent["text"]!.GetValue<string>());
+                current = read.StructuredContent["next_cursor"]!.GetValue<string>();
+                state = read.StructuredContent["state"]!.GetValue<string>();
+                if (done(text.ToString()) || state != "running") break;
+                await Task.Delay(50);
+            }
+            return (text.ToString(), current, state);
+        }
+
+        var testHost = Path.ChangeExtension(typeof(Program).Assembly.Location, ".exe");
+        Assert(File.Exists(testHost), "PTY native fixture executable exists");
+        var childPidFile = Path.Combine(workspace, "pty-child.pid");
+
+        var ownedStart = await tools.CallAsync("pty_start", StartArgs(
+            testHost,
+            ["pty-tree-parent-fixture", childPidFile],
+            columns: 90,
+            rows: 24));
+        var ownedSession = ownedStart.StructuredContent["session_id"]!.GetValue<string>();
+        Assert(ownedStart.StructuredContent["actual_pty"]!.GetValue<bool>(), "pty_start reports actual PTY");
+        Assert(ownedStart.StructuredContent["pty_backend"]!.GetValue<string>() == "windows-conpty", "pty_start uses Windows ConPTY backend");
+
+        var native = await ReadUntilAsync(
+            ownedSession,
+            "",
+            value => value.Contains("FMG020_TTY:True:True:", StringComparison.OrdinalIgnoreCase),
+            TimeSpan.FromSeconds(8));
+        Assert(
+            native.Text.Contains("FMG020_TTY:True:True:", StringComparison.OrdinalIgnoreCase),
+            "ConPTY child has live CONIN$/CONOUT$ console devices even when managed standard streams use pipe transport");
+
+        var childPid = 0;
+        Assert(await WaitUntilAsync(
+            () =>
+            {
+                try { return File.Exists(childPidFile) && int.TryParse(File.ReadAllText(childPidFile).Trim(), out childPid); }
+                catch (IOException) { return false; }
+            },
+            TimeSpan.FromSeconds(5)), "PTY ownership fixture spawned descendant process");
+
+        var resizedOwned = await tools.CallAsync("pty_resize", Obj(
+            ("session_id", ownedSession),
+            ("columns", 120),
+            ("rows", 40)));
+        Assert(resizedOwned.StructuredContent["columns"]!.GetValue<int>() == 120 &&
+               resizedOwned.StructuredContent["rows"]!.GetValue<int>() == 40,
+            "pty_resize applies native ConPTY size");
+
+        await tools.CallAsync("pty_stop", Obj(("session_id", ownedSession)));
+        await Task.Delay(300);
+        var descendantAlive = false;
+        try { using var child = Process.GetProcessById(childPid); descendantAlive = !child.HasExited; } catch (ArgumentException) { }
+        Assert(!descendantAlive, "pty_stop kills owned descendant process tree through Job Object");
+
+        var cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
+        Assert(File.Exists(cmd), "PTY cmd fixture exists");
+        var interactiveStart = await tools.CallAsync("pty_start", StartArgs(cmd, ["/d", "/q"]));
+        var interactiveSession = interactiveStart.StructuredContent["session_id"]!.GetValue<string>();
+        await tools.CallAsync("pty_write", Obj(
+            ("session_id", interactiveSession),
+            ("data", "echo FMG020_WRITE_READ\\r\\n")));
+        var interactive = await ReadUntilAsync(
+            interactiveSession,
+            "",
+            value => value.Contains("FMG020_WRITE_READ", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(5));
+        Assert(interactive.Text.Contains("FMG020_WRITE_READ", StringComparison.Ordinal), "pty_write/read round trip through interactive terminal");
+
+        await tools.CallAsync("pty_signal", Obj(
+            ("session_id", interactiveSession),
+            ("signal", "ctrl_c")));
+        await tools.CallAsync("pty_write", Obj(
+            ("session_id", interactiveSession),
+            ("data", "echo FMG020_AFTER_CTRL_C\\r\\n")));
+        var afterSignal = await ReadUntilAsync(
+            interactiveSession,
+            interactive.Cursor,
+            value => value.Contains("FMG020_AFTER_CTRL_C", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(5));
+        Assert(afterSignal.Text.Contains("FMG020_AFTER_CTRL_C", StringComparison.Ordinal), "pty_signal ctrl_c preserves interactive shell control semantics");
+
+        await AssertThrowsAsync(
+            () => tools.CallAsync("pty_read", Obj(
+                ("session_id", interactiveSession + "tamper"),
+                ("cursor", ""))),
+            "Unknown",
+            "PTY session-id tamper rejected");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("pty_resize", Obj(
+                ("session_id", interactiveSession),
+                ("columns", 0),
+                ("rows", 20))),
+            "columns",
+            "PTY invalid resize rejected");
+
+        var listed = await tools.CallAsync("pty_list", new JsonObject());
+        Assert(listed.StructuredContent["workspace_scoped"]!.GetValue<bool>() &&
+               !listed.StructuredContent["restart_resume_supported"]!.GetValue<bool>(),
+            "PTY list is workspace scoped and explicitly non-resumable across restart");
+
+        var restartedTools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(enableCommands: true),
+            artifactStore: artifactStore);
+        var restartedList = await restartedTools.CallAsync("pty_list", new JsonObject());
+        Assert(restartedList.StructuredContent["count"]!.GetValue<int>() == 0, "new FileMCP PTY registry does not fake-resume prior sessions");
+        restartedTools.StopAllPtySessions();
+
+        policy.Update(LocalPolicyConfiguration.FromLegacy(enableCommands: false));
+        await AssertThrowsAsync(
+            () => tools.CallAsync("pty_write", Obj(
+                ("session_id", interactiveSession),
+                ("data", "echo SHOULD_NOT_RUN\\r\\n"))),
+            "policy",
+            "PTY action reauthorizes policy after session start");
+        tools.StopAllPtySessions();
+
+        var serviceOptions = new PersistentPtyOptions
+        {
+            MaxSessions = 4,
+            MaxRingBytes = 64 * 1024,
+            SpillChunkBytes = 16 * 1024,
+            DefaultIdleTtl = TimeSpan.FromSeconds(1),
+            MaxIdleTtl = TimeSpan.FromSeconds(10),
+            DefaultMaxLifetime = TimeSpan.FromSeconds(10),
+            MaxLifetime = TimeSpan.FromSeconds(20),
+            SpillTtl = TimeSpan.FromMinutes(5),
+        };
+        await using var service = new PersistentPtyService(
+            new SafePathResolver(workspace),
+            new ExecProcessEnvironmentAuthority(),
+            () => artifactStore,
+            serviceOptions);
+
+        var powerShell = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe");
+        var flood = await service.StartAsync(
+            powerShell,
+            ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "[Console]::Out.Write('Z' * 100000)"],
+            "",
+            new Dictionary<string, string>(),
+            100,
+            30,
+            10,
+            10,
+            spillOutput: true,
+            CancellationToken.None);
+        var floodId = flood["session_id"]!.GetValue<string>();
+        Assert(await WaitUntilAsync(
+            () =>
+            {
+                var sessions = service.List()["sessions"]!.AsArray();
+                var item = sessions.Select(node => node!.AsObject()).First(obj => obj["session_id"]!.GetValue<string>() == floodId);
+                return item["state"]!.GetValue<string>() != "running";
+            },
+            TimeSpan.FromSeconds(8)), "PTY output flood fixture exits");
+        var floodRead = await service.ReadAsync(floodId, "0", 64 * 1024, null, CancellationToken.None);
+        Assert(floodRead["cursor_evicted"]!.GetValue<bool>(), "PTY ring buffer evicts old output after bounded overflow");
+        Assert(floodRead["spill_refs"]!.AsArray().Count > 0, "PTY overflow spills to short-lived PTY_OUTPUT ContentRef when enabled");
+        var usageBeforeStop = await artifactStore.GetUsageAsync(ArtifactContentStore.WorkspaceAuthorityId(workspace));
+        Assert(usageBeforeStop.ReferenceCount > 0, "PTY spill is present only as Artifact Store content while session retained");
+        await service.StopAsync(floodId, CancellationToken.None);
+        var usageAfterStop = await artifactStore.GetUsageAsync(ArtifactContentStore.WorkspaceAuthorityId(workspace));
+        Assert(usageAfterStop.ReferenceCount == 0, "PTY spill artifacts are deleted at session end");
+
+        await AssertThrowsAsync(
+            () => service.ReadAsync(floodId, "999999999", 1024, null, CancellationToken.None),
+            "beyond current output",
+            "PTY future cursor rejected");
+
+        var idle = await service.StartAsync(
+            cmd, ["/d", "/q"], "", new Dictionary<string, string>(), 80, 24, 1, 10, false, CancellationToken.None);
+        var idleId = idle["session_id"]!.GetValue<string>();
+        await Task.Delay(1200);
+        await service.SweepNowForTestsAsync();
+        var idleMeta = service.List()["sessions"]!.AsArray().Select(node => node!.AsObject())
+            .First(obj => obj["session_id"]!.GetValue<string>() == idleId);
+        Assert(idleMeta["state"]!.GetValue<string>() == "idle_expired", "PTY idle TTL terminates inactive session");
+
+        var lifetime = await service.StartAsync(
+            cmd, ["/d", "/q"], "", new Dictionary<string, string>(), 80, 24, 10, 1, false, CancellationToken.None);
+        var lifetimeId = lifetime["session_id"]!.GetValue<string>();
+        await Task.Delay(1200);
+        await service.SweepNowForTestsAsync();
+        var lifetimeMeta = service.List()["sessions"]!.AsArray().Select(node => node!.AsObject())
+            .First(obj => obj["session_id"]!.GetValue<string>() == lifetimeId);
+        Assert(lifetimeMeta["state"]!.GetValue<string>() == "lifetime_expired", "PTY hard max lifetime terminates session");
+
+        Console.WriteLine("windows-persistent-pty: ok");
+    }
+
     private static async Task TestFileVersionAndSourceStateAsync(string root)
     {
         var workspace = Path.Combine(root, "fmg006");
@@ -2973,6 +3266,7 @@ internal static class Program
         await GitCli(repo, ["init", "-b", "main"]);
         await GitCli(repo, ["config", "user.name", "FileMCP Test"]);
         await GitCli(repo, ["config", "user.email", "filemcp@example.invalid"]);
+        await GitCli(repo, ["config", "core.autocrlf", "false"]);
 
         Directory.CreateDirectory(Path.Combine(repo, "src"));
         Directory.CreateDirectory(Path.Combine(repo, "docs"));
@@ -3158,7 +3452,7 @@ internal static class Program
         File.WriteAllText(Path.Combine(repo, "README.txt"), "plain metadata only\n", new UTF8Encoding(false));
         for (var i = 0; i < 520; i++)
             File.WriteAllText(Path.Combine(repo, $"map-{i:D4}.txt"), $"metadata {i}\n", new UTF8Encoding(false));
-        await GitCli(repo, ["add", "."]);
+        await GitCli(repo, ["add", "."], timeoutSeconds: 60);
         await GitCli(repo, ["commit", "-m", "query fixture"]);
 
         var artifacts = new ArtifactContentStore(new ArtifactContentStoreOptions
@@ -3497,7 +3791,7 @@ internal static class Program
         var safe = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
         var full = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", true);
         Assert(safe.ToolDefinitions.Count == 28 && !safe.HasTool("run_command"), "safe tool count");
-        Assert(full.ToolDefinitions.Count == 30 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
+        Assert(full.ToolDefinitions.Count == 37 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
 
         var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
         var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);
@@ -5355,7 +5649,7 @@ internal static class Program
             _inner.Analyze(relativePath, utf8Content, maxSymbols, maxImports, cancellationToken, context);
     }
 
-    private static async Task GitCli(string repo, string[] args) { var all = new List<string> { "-C", repo }; all.AddRange(args); var result = await ProcessRunner.RunAsync("git.exe", all, timeoutSeconds: 20); if (result.ExitCode != 0) throw new Exception("git fixture failed: " + result.Stderr); }
+    private static async Task GitCli(string repo, string[] args, int timeoutSeconds = 20) { var all = new List<string> { "-C", repo }; all.AddRange(args); var result = await ProcessRunner.RunAsync("git.exe", all, timeoutSeconds: timeoutSeconds); if (result.ExitCode != 0) throw new Exception($"git fixture failed (timedOut={result.TimedOut}): " + result.Stderr); }
     private static JsonObject ExecArgs(
         string executable,
         IReadOnlyList<string> arguments,
@@ -5394,6 +5688,24 @@ internal static class Program
         Assert(leftEnvelope["usage"]!.ToJsonString() == rightEnvelope["usage"]!.ToJsonString(), message + " envelope usage");
         Assert(leftEnvelope["warnings"]!.ToJsonString() == rightEnvelope["warnings"]!.ToJsonString(), message + " envelope warnings");
     }
+
+    private static bool HasConsoleDevice(string deviceName, FileAccess access)
+    {
+        try
+        {
+            using var handle = File.OpenHandle(deviceName, FileMode.Open, access, FileShare.ReadWrite);
+            return !handle.IsInvalid && GetConsoleMode(handle, out _);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetConsoleMode(
+        Microsoft.Win32.SafeHandles.SafeFileHandle consoleHandle,
+        out uint mode);
 
     private static void Assert(bool condition, string message) { _assertions++; if (!condition) throw new Exception("Assertion failed: " + message); }
     private static void AssertThrows(Action action, string contains, string message) { try { action(); } catch (Exception ex) when (ex.Message.Contains(contains, StringComparison.OrdinalIgnoreCase)) { Assert(true, message); return; } throw new Exception("Assertion failed: " + message); }

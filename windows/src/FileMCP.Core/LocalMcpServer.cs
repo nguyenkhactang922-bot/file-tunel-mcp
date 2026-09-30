@@ -122,6 +122,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
         IsReady = false;
         try { _cts?.Cancel(); } catch { }
         try { _listener?.Stop(); } catch { }
+        try { _tools.StopAllPtySessions(); } catch { }
         _listener = null;
     }
 

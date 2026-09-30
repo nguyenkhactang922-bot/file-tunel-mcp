@@ -19,3 +19,7 @@ Current final-product work is tracked in `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md
 | OBS-011 | PASS | OBS-010 | bounded realtime graph + measurable health |
 | OBS-012 | PASS | OBS-011 | privacy/concurrency/corruption/migration/security regression |
 | OBS-013 | PASS | OBS-012,V11-008 | live ChatGPT connector correlation proof |
+
+## Canonical PROJECT_ROOT historical note
+
+FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited and removed on 2026-09-29. Active continuation is tracked only in `CURRENT_HANDOFF.md` and `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`.

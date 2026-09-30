@@ -298,7 +298,7 @@ Negative tests:
 
 ## FMG-019 - repo_map / symbol_search / related_files
 
-State: PR VERIFY TEST-HARNESS REMEDIATION PENDING
+State: DONE / MAIN VERIFIED
 Depends: FMG-018
 
 Scope:
@@ -325,7 +325,7 @@ Negative tests:
 
 ## FMG-020 - Persistent PTY Session Runtime
 
-State: BLOCKED
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW CLEANUP ACTIVE
 Depends: FMG-014, FMG-005, FMG-003, FMG-004
 
 Scope:

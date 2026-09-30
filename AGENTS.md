@@ -29,3 +29,17 @@
 - FMUX consumes core/runtime truth; presentation code must never grant authority, bypass policy, invent evidence, or expose unavailable FMG capability.
 - Preserve native stacks: Windows WPF and macOS AppKit unless a future product-authority ADR explicitly changes that boundary.
 - Do not start FMUX-002 before FMUX-001 MAIN VERIFIED; follow the frozen FMUX dependency graph thereafter.
+
+## Canonical PROJECT_ROOT lock
+
+- The only authorized local PROJECT_ROOT for FileMCP is `D:\Tools\FileMCP`.
+- Persistent FileMCP-named repositories/directories outside the canonical root are forbidden, including `D:\FileMCP-*`; OSS/source audits must be captured as manifests/evidence inside the canonical repo rather than kept as sibling project roots.
+- Before any code/test/build/Git action, verify `git rev-parse --show-toplevel` resolves to `D:/Tools/FileMCP` (path-separator normalization is acceptable).
+- Do NOT create sibling clones, temporary repositories, Git worktrees, or directories such as `D:\Tools\FileMCP-*-worktree` unless the user explicitly supersedes this rule in that turn.
+- Do NOT use `git worktree add` as the normal task-isolation mechanism. Branch switching and task execution happen inside the canonical PROJECT_ROOT.
+- Only one coding branch may be active in the canonical working tree at a time. Other chats may inspect/monitor state, but must not switch the active branch or create parallel worktrees while another coding task is running.
+- Before switching branches, verify a clean worktree and inspect process/runtime/side-effect state. Preserve unfinished work with commits and remote branches, not sibling worktrees.
+- Historical branch refs may remain in Git for audit/recovery; inspect them with Git refs/diff/show from the canonical root instead of materializing sibling folders.
+- If a stale sibling FileMCP directory is ever discovered, audit for unique unmerged changes, salvage only compatible/stronger parts into the canonical branch, verify them, then remove the sibling directory.
+- Generated build/test/evidence artifacts must live under canonical repository-managed directories unless an external platform requires another temporary location.
+- `Repo + Git + evidence + runtime state` remain source of truth; chat-stream continuity is not authority.

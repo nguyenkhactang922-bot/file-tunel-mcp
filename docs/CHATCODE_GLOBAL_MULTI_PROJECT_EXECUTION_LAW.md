@@ -38,3 +38,14 @@ Before the first implementation task:
 This law does **not** claim that unknown future product ideas can be designed in advance. New requirements discovered later are handled by a new capture/review/ADR cycle. But known current-scope work must be designed and task-split before implementation begins.
 
 No feature code before this complete current-scope gate is complete.
+
+## Canonical PROJECT_ROOT lock
+
+- The only authorized local project root for FileMCP is `D:\Tools\FileMCP`.
+- Persistent FileMCP-named repositories/directories outside the canonical root are forbidden, including `D:\FileMCP-*`; OSS/source audits must be captured as manifests/evidence inside the canonical repo rather than kept as sibling project roots.
+- Before any code/test/build/Git action, verify `git rev-parse --show-toplevel` resolves to `D:/Tools/FileMCP` (path-separator normalization is acceptable).
+- Do NOT create sibling clones, temporary repositories, or Git worktrees such as `D:\Tools\FileMCP-*-worktree` unless the user explicitly authorizes a temporary secondary worktree in that same turn.
+- Do NOT use `git worktree add` as the default task-isolation mechanism. Branch switching and task execution happen inside the canonical PROJECT_ROOT.
+- Existing historical branches/commits may remain as Git history inside the single repository; they must not be materialized as sibling project folders merely to inspect them. Inspect them with Git refs/diff/show from the canonical root.
+- If a stale sibling FileMCP directory is discovered, first audit for unique unmerged changes, salvage only the compatible/stronger parts into the canonical branch, verify them, and then remove the sibling directory.
+- Generated build/test/evidence artifacts must live under the canonical repository's own managed directories unless an external platform mandates another temporary location.
