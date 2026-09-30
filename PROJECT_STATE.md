@@ -1021,3 +1021,15 @@ Exact-head `d6c9eb051943793db2a8d5814ec80a3b8a01b0fe`, Verify run `36668399919`:
 The failing region is therefore narrowed to the service-level bounded-ring / spill / artifact cleanup assertions. Diagnostic-only instrumentation now prints the actual `cursor_evicted`, spill-ref count, artifact reference count before stop, and artifact reference count after stop. Production PTY/runtime behavior remains unchanged.
 Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
 NEXT_EXACT_ACTION: commit/push this flood/spill diagnostic-only head, inspect macOS Integration values, then repair only the exact proven failing invariant.
+
+
+## FMG-020 macOS flood diagnostic syntax remediation - 2026-09-30
+
+Exact-head `673bfb5592ff91358da6635eb0be996b319fe5d9`, Verify run `36668772693`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS failed before PTY runtime diagnostics because two diagnostic-only Swift string interpolations escaped dictionary-key quotes inside interpolation, producing compile errors at generated main.swift lines 327/330.
+
+Remediation is diagnostic-only: bind `cursor_evicted` and spill-ref count to local Swift variables before interpolation, eliminating nested escaped literals. Production runtime is unchanged.
+Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push corrected diagnostic syntax, require fresh exact-head Verify, inspect the emitted `FMG020_FLOOD:*` values, then repair only the exact proven invariant.

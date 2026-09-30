@@ -1320,10 +1320,12 @@ let ptyFloodRead = try ptyService.read(
     maxBytes: 64 * 1024,
     context: nil
 )
-print("FMG020_FLOOD:cursor_evicted=\(String(describing: ptyFloodRead[\"cursor_evicted\"]))")
+let ptyFloodCursorEvictedDiagnostic = ptyFloodRead["cursor_evicted"]
+print("FMG020_FLOOD:cursor_evicted=\(String(describing: ptyFloodCursorEvictedDiagnostic))")
 fflush(stdout)
 precondition(ptyFloodRead["cursor_evicted"] as? Bool == true)
-print("FMG020_FLOOD:spill_refs=\((ptyFloodRead[\"spill_refs\"] as? [String])?.count ?? -1)")
+let ptyFloodSpillRefCountDiagnostic = (ptyFloodRead["spill_refs"] as? [String])?.count ?? -1
+print("FMG020_FLOOD:spill_refs=\(ptyFloodSpillRefCountDiagnostic)")
 fflush(stdout)
 precondition((ptyFloodRead["spill_refs"] as? [String])?.isEmpty == false)
 let ptyUsageBeforeStop = try ptyArtifactStore.usage(
