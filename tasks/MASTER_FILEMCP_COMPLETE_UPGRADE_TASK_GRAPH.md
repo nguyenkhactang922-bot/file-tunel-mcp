@@ -325,7 +325,7 @@ Negative tests:
 
 ## FMG-020 - Persistent PTY Session Runtime
 
-State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW CLEANUP ACTIVE
+State: DONE / MAIN VERIFIED
 Depends: FMG-014, FMG-005, FMG-003, FMG-004
 
 Scope:
@@ -361,7 +361,7 @@ Negative tests:
 
 ## FMG-021 - Workspace Checkpoint Capture
 
-State: BLOCKED
+State: ACTIVE
 Depends: FMG-014, FMG-006, FMG-011
 
 Scope:

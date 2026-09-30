@@ -18,7 +18,7 @@ $MacEnvelope = Get-Content "macos/ToolResultEnvelope.swift" -Raw
 $SwiftTests = Get-Content "tests/test_swift_runtime.sh" -Raw
 
 foreach ($Marker in @(
-    '"catalogVersion": "1.11.0"',
+    '"catalogVersion": "1.12.0"',
     '"name": "evidence_get"',
     '"pattern": "^ev_[0-9a-f]{32}$"'
 )) {
@@ -174,4 +174,4 @@ foreach ($Path in @(
     }
 }
 
-Write-Host "metadata-evidence-contract: ok (catalog=1.11.0 states=freshness/privacy/bounds cross-platform)"
+Write-Host "metadata-evidence-contract: ok (catalog=1.12.0 states=freshness/privacy/bounds cross-platform)"

@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMG-020-persistent-pty`
+Branch: `chatgpt/FMG-021-workspace-checkpoint`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: CLEAN.
+Expected worktree at handoff: ACTIVE FMG-021 changes pending verification.
 
 ## Completed technical program
 
@@ -1192,3 +1192,34 @@ Scoped review against `fork/main` confirmed FMG-020 production invariants remain
 
 Review cleanup removes only temporary `FMG020_CHECKPOINT:*` and `FMG020_FLOOD_*` debug prints/temporary variables from the macOS native acceptance test. It keeps the actual TTY marker, write/read round-trip, final `swift-persistent-pty: ok` marker and sanitized runtime failure diagnostic.
 NEXT_EXACT_ACTION: verify changed-scope contracts after review cleanup, commit/push the cleanup+state sync, require fresh exact-head Verify, then create/review/merge the FMG-020 PR if green.
+
+
+## FMG-020 MAIN VERIFIED -> FMG-021 CLAIMED - 2026-09-30
+
+FMG-020 Persistent PTY Session Runtime is DONE / MAIN VERIFIED.
+- PR #39 merged successfully as `4f99a60ba91abc0040364f70c9df86478fc4dab2`.
+- Merged-main Verify run `36675201004`: SUCCESS on macOS, Windows x64 and Windows ARM64, including native integration/build/smoke/package gates.
+- Canonical working tree is now on branch `chatgpt/FMG-021-workspace-checkpoint` created directly from merged main; no secondary worktree was created.
+
+FMG-021 Workspace Checkpoint Capture is CLAIMED / ACTIVE. Dependencies FMG-014 Artifact Store, FMG-006 SourceStateRef/versioning and FMG-011 metadata-only evidence are all DONE / MAIN VERIFIED.
+NEXT_EXACT_ACTION: deep-read the frozen checkpoint-capture requirements and existing cross-platform primitives for Artifact Store, SourceStateRef/Git source state, safe path/symlink handling, ignored/untracked enumeration, TTL/quota and metadata evidence; then implement the smallest cross-platform checkpoint capture service + tool surface + adversarial tests without starting FMG-022 restore.
+
+
+## FMG-021 Windows capture core checkpoint - 2026-09-30
+
+Windows Workspace Checkpoint Capture core is implemented and affected behavior test is PASS: `windows-checkpoint-only-tests: ok (20 assertions)`.
+Verified invariants: explicit capture only; staged index bytes and divergent worktree bytes are captured separately including binary content; staged/unstaged/untracked coverage; ignored files excluded by default and captured only by explicit opt-in; repository Git status is unchanged by capture; file/byte bounds fail closed; SourceStateRef revalidation aborts concurrent workspace changes and cleans partial CHECKPOINT ContentRefs; TTL expiry prunes record/artifacts; manifest corruption is rejected; lexical symlink/reparse entries are rejected before canonical resolution; delete cleans manifest and payload refs.
+Catalog candidate is now 1.12.0 / 45 tools with checkpoint_capture/list/get/delete. Windows Core + test assembly compile PASS with 0 warnings/errors.
+NEXT_EXACT_ACTION: port the same manifest/capture/list/get/delete contract to macOS using the existing Artifact Store + SourceStateRef/Git primitives, add cross-platform contract/native tests and Verify wiring, then run only affected gates before broader exact-head Verify.
+## FMG-021 cross-platform candidate ready for native Verify - 2026-09-30
+
+FMG-021 remains ACTIVE; FMG-022 remains BLOCKED.
+- Windows checkpoint-only behavior: PASS, `27 assertions`.
+- Canonical catalog: `1.12.0`, 45 tools; catalog/parity hash `fed4db13cf86a994564a42bef4ee80cfd0b4ef4a5ceee2c66c32f255cd9a3ea6`.
+- Project-state contract: PASS.
+- Swift/bash static checkpoint contract: PASS; native macOS behavior block is wired into `tests/test_swift_runtime.sh` and `WorkspaceCheckpoint.swift` is wired into static/build lanes.
+- Capture semantics now match the frozen architecture: ignored and generated payloads excluded by default; ignored/generated require explicit bounded opt-in; oversized single-file payloads are reported as excluded rather than failing the whole checkpoint; staged/worktree bytes remain separate; scoped SourceStateRef race guard includes opt-in ignored/generated paths; disk-full/concurrent-change failures clean partial Artifact Store refs; temporary staged-blob files on macOS are mode 0600.
+- `git diff --check`: PASS.
+- No native macOS runner evidence exists for this uncommitted candidate yet.
+
+NEXT_EXACT_ACTION: commit the FMG-021 candidate and state sync on `chatgpt/FMG-021-workspace-checkpoint`, push the exact head once, then require fresh Verify on macOS / Windows x64 / Windows ARM64. If a lane fails, repair only the proven failing stage; if all lanes pass, perform scoped review -> PR/merge -> merged-main Verify -> FMG-021 MAIN VERIFIED -> claim FMG-022.

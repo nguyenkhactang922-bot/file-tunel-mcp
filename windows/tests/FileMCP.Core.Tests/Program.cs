@@ -85,6 +85,13 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length > 0 && args[0] == "checkpoint-only")
+            {
+                await TestWorkspaceCheckpointAsync(root);
+                Console.WriteLine($"windows-checkpoint-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             if (args.Length > 0 && args[0] == "edit-adapters-only")
             {
                 await TestEditAdaptersAsync(root);
@@ -146,6 +153,7 @@ internal static class Program
             await TestArtifactContentStoreAsync(root);
             await TestBatchReadStatAsync(root);
             await TestQuarantineRestoreAsync(root);
+            await TestWorkspaceCheckpointAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -174,7 +182,7 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.11.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.12.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
@@ -5313,6 +5321,263 @@ internal static class Program
         Assert(terminalMeta?["storage_status"]?.GetValue<string>() == "unavailable" && terminalMeta?["verification_state"]?.GetValue<string>() == "unknown", "terminal persistence failure never returns passed");
 
         Console.WriteLine("windows-evidence-freshness: ok");
+    }
+
+
+    private static async Task TestWorkspaceCheckpointAsync(string root)
+    {
+        var area = Path.Combine(root, "fmg021");
+        var workspace = Path.Combine(area, "workspace");
+        var artifactsRoot = Path.Combine(area, "artifacts");
+        var checkpointsRoot = Path.Combine(area, "checkpoints");
+        Directory.CreateDirectory(workspace);
+        var clock = new DateTimeOffset(2026, 9, 30, 6, 0, 0, TimeSpan.Zero);
+        var artifactStore = new ArtifactContentStore(new ArtifactContentStoreOptions
+        {
+            RootDirectory = artifactsRoot,
+            WorkspaceRootForIsolation = workspace,
+            MaxItemBytes = 64 * 1024 * 1024,
+            MaxWorkspaceBytes = 128 * 1024 * 1024,
+            MaxGlobalBytes = 256 * 1024 * 1024,
+            DefaultTtl = TimeSpan.FromHours(24),
+            MaxTtl = TimeSpan.FromDays(7),
+            UtcNow = () => clock,
+        });
+        var mutateAfterPayloads = false;
+        var trackedPath = Path.Combine(workspace, "repo", "tracked.bin");
+        var checkpointOptions = new WorkspaceCheckpointOptions
+        {
+            MetadataRootDirectory = checkpointsRoot,
+            DefaultTtl = TimeSpan.FromHours(24),
+            MaxTtl = TimeSpan.FromDays(7),
+            MaxEntries = 100,
+            MaxTotalBytes = 8 * 1024 * 1024,
+            MaxSingleFileBytes = 4 * 1024 * 1024,
+            UtcNow = () => clock,
+            StageForTests = stage =>
+            {
+                if (stage == "after_payloads" && mutateAfterPayloads)
+                    File.WriteAllBytes(trackedPath, [0x44, 0x55, 0x66, 0x77]);
+            },
+        };
+        var policy = ServerPolicy.FromLegacy(enableCommands: true);
+        var tools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid", policy,
+            artifactStore: artifactStore,
+            checkpointOptions: checkpointOptions);
+
+        await tools.CallAsync("git_init", Obj(("repo_path", "repo")));
+        Directory.CreateDirectory(Path.Combine(workspace, "repo"));
+        File.WriteAllText(Path.Combine(workspace, "repo", ".gitignore"), "*.log\n", new UTF8Encoding(false));
+        File.WriteAllBytes(trackedPath, [0x01, 0x02, 0x03, 0x04]);
+        await tools.CallAsync("git_add", Obj(("repo_path", "repo"), ("paths", ".")));
+        await tools.CallAsync("git_commit", Obj(("repo_path", "repo"), ("message", "checkpoint baseline")));
+
+        var stagedBytes = new byte[] { 0x00, 0xFF, 0x80, 0x0A, 0x42 };
+        var worktreeBytes = new byte[] { 0x77, 0x66, 0x55, 0x44 };
+        File.WriteAllBytes(trackedPath, stagedBytes);
+        await tools.CallAsync("git_add", Obj(("repo_path", "repo"), ("paths", "tracked.bin")));
+        File.WriteAllBytes(trackedPath, worktreeBytes);
+        File.WriteAllText(Path.Combine(workspace, "repo", "untracked.txt"), "untracked\n", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(workspace, "repo", "ignored.log"), "ignored\n", new UTF8Encoding(false));
+        var generatedPath = Path.Combine(workspace, "repo", "build", "generated.txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(generatedPath)!);
+        File.WriteAllText(generatedPath, "generated\n", new UTF8Encoding(false));
+
+        var beforeStatus = (await tools.CallAsync("git_status", Obj(("repo_path", "repo"))))
+            .StructuredContent["result"]!.GetValue<string>();
+        var captured = (await tools.CallAsync("checkpoint_capture", Obj(
+            ("repo_path", "repo"),
+            ("include_untracked", true),
+            ("include_ignored", false),
+            ("ttl_seconds", 3600))))
+            .StructuredContent;
+        var checkpointRef = captured["checkpoint_ref"]!.GetValue<string>();
+        Assert(checkpointRef.StartsWith("cr1.", StringComparison.Ordinal), "checkpoint capture returns authenticated ContentRef");
+        Assert(captured["staged_count"]!.GetValue<int>() >= 1 &&
+               captured["unstaged_count"]!.GetValue<int>() >= 1 &&
+               captured["untracked_count"]!.GetValue<int>() >= 1 &&
+               captured["ignored_count"]!.GetValue<int>() == 0,
+            "checkpoint coverage distinguishes staged/unstaged/untracked and excludes ignored by default");
+
+        var afterStatus = (await tools.CallAsync("git_status", Obj(("repo_path", "repo"))))
+            .StructuredContent["result"]!.GetValue<string>();
+        Assert(beforeStatus == afterStatus, "checkpoint capture does not mutate repository status/index/worktree");
+
+        var got = (await tools.CallAsync("checkpoint_get", Obj(("checkpoint_ref", checkpointRef)))).StructuredContent;
+        var entries = got["entries"]!.AsArray().Select(node => node!.AsObject()).ToArray();
+        var tracked = entries.Single(item => item["relative_path"]!.GetValue<string>() == "tracked.bin");
+        Assert(tracked["staged"]!.GetValue<bool>() && tracked["unstaged"]!.GetValue<bool>(),
+            "checkpoint records simultaneous staged and unstaged state");
+        Assert(tracked["index_sha256"]!.GetValue<string>() == FileVersionService.Sha256Tagged(stagedBytes),
+            "checkpoint preserves staged index bytes byte-for-byte");
+        Assert(tracked["worktree_sha256"]!.GetValue<string>() == FileVersionService.Sha256Tagged(worktreeBytes),
+            "checkpoint preserves divergent worktree bytes byte-for-byte");
+        Assert(!entries.Any(item => item["relative_path"]!.GetValue<string>() == "ignored.log"),
+            "ignored path is absent without explicit opt-in");
+        var generatedEntry = entries.Single(item => item["relative_path"]!.GetValue<string>() == "build/generated.txt");
+        Assert(generatedEntry["generated"]!.GetValue<bool>() &&
+               generatedEntry["worktree_excluded_reason"]!.GetValue<string>() == "generated" &&
+               generatedEntry["worktree_sha256"] is null,
+            "generated directory payload is excluded by default and reported in metadata");
+        Assert(captured["excluded_count"]!.GetValue<int>() >= 1, "checkpoint reports excluded payload count");
+
+        var listed = (await tools.CallAsync("checkpoint_list", Obj(("max_items", 20)))).StructuredContent;
+        Assert(listed["count"]!.GetValue<int>() == 1, "checkpoint_list exposes metadata-only record");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", checkpointRef)));
+        var usage = await artifactStore.GetUsageAsync(ArtifactContentStore.WorkspaceAuthorityId(workspace));
+        Assert(usage.ReferenceCount == 0, "checkpoint_delete cleans manifest and payload ContentRefs");
+
+        var generatedCapture = (await tools.CallAsync("checkpoint_capture", Obj(
+            ("repo_path", "repo"), ("include_untracked", true), ("include_generated", true), ("ttl_seconds", 3600))))
+            .StructuredContent;
+        var generatedRef = generatedCapture["checkpoint_ref"]!.GetValue<string>();
+        var generatedGet = (await tools.CallAsync("checkpoint_get", Obj(("checkpoint_ref", generatedRef)))).StructuredContent;
+        var generatedEntries = generatedGet["entries"]!.AsArray().Select(node => node!.AsObject()).ToArray();
+        var generatedIncluded = generatedEntries.Single(item => item["relative_path"]!.GetValue<string>() == "build/generated.txt");
+        Assert(generatedIncluded["generated"]!.GetValue<bool>() &&
+               generatedIncluded["worktree_sha256"] is not null &&
+               generatedIncluded["worktree_excluded_reason"] is null,
+            "include_generated explicitly opts bounded generated content into the checkpoint");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", generatedRef)));
+
+        var oversizedPath = Path.Combine(workspace, "repo", "oversized.bin");
+        File.WriteAllBytes(oversizedPath, new byte[4 * 1024 * 1024 + 1]);
+        var oversizedCapture = (await tools.CallAsync("checkpoint_capture", Obj(
+            ("repo_path", "repo"), ("include_untracked", true), ("ttl_seconds", 3600))))
+            .StructuredContent;
+        var oversizedRef = oversizedCapture["checkpoint_ref"]!.GetValue<string>();
+        var oversizedGet = (await tools.CallAsync("checkpoint_get", Obj(("checkpoint_ref", oversizedRef)))).StructuredContent;
+        var oversizedEntries = oversizedGet["entries"]!.AsArray().Select(node => node!.AsObject()).ToArray();
+        var oversizedEntry = oversizedEntries.Single(item => item["relative_path"]!.GetValue<string>() == "oversized.bin");
+        Assert(oversizedEntry["worktree_excluded_reason"]!.GetValue<string>() == "oversized" &&
+               oversizedEntry["worktree_sha256"] is null &&
+               oversizedCapture["excluded_count"]!.GetValue<int>() >= 1,
+            "oversized file is excluded by default without failing the checkpoint");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", oversizedRef)));
+        File.Delete(oversizedPath);
+
+        var ignoredCapture = (await tools.CallAsync("checkpoint_capture", Obj(
+            ("repo_path", "repo"), ("include_untracked", true), ("include_ignored", true), ("ttl_seconds", 3600))))
+            .StructuredContent;
+        Assert(ignoredCapture["ignored_count"]!.GetValue<int>() >= 1, "ignored files require explicit opt-in");
+        var ignoredRef = ignoredCapture["checkpoint_ref"]!.GetValue<string>();
+        var ignoredGet = (await tools.CallAsync("checkpoint_get", Obj(("checkpoint_ref", ignoredRef)))).StructuredContent;
+        Assert(ignoredGet["entries"]!.AsArray().Any(node => node!.AsObject()["relative_path"]!.GetValue<string>() == "ignored.log"),
+            "explicit ignored opt-in captures ignored regular file");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", ignoredRef)));
+
+        File.WriteAllText(Path.Combine(workspace, "repo", "extra-a.txt"), "a", new UTF8Encoding(false));
+        File.WriteAllText(Path.Combine(workspace, "repo", "extra-b.txt"), "b", new UTF8Encoding(false));
+        await AssertThrowsAsync(
+            () => tools.CallAsync("checkpoint_capture", Obj(
+                ("repo_path", "repo"), ("max_files", 1), ("include_untracked", true))),
+            "max_files",
+            "giant/unbounded candidate set fails closed at max_files");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("checkpoint_capture", Obj(
+                ("repo_path", "repo"), ("max_total_bytes", 1), ("include_untracked", true))),
+            "max_total_bytes",
+            "checkpoint payload bytes are bounded");
+        File.Delete(Path.Combine(workspace, "repo", "extra-a.txt"));
+        File.Delete(Path.Combine(workspace, "repo", "extra-b.txt"));
+
+        mutateAfterPayloads = true;
+        await AssertThrowsAsync(
+            () => tools.CallAsync("checkpoint_capture", Obj(
+                ("repo_path", "repo"), ("include_untracked", true), ("ttl_seconds", 3600))),
+            "changed while checkpoint",
+            "concurrent workspace mutation aborts checkpoint before manifest publication");
+        mutateAfterPayloads = false;
+        usage = await artifactStore.GetUsageAsync(ArtifactContentStore.WorkspaceAuthorityId(workspace));
+        Assert(usage.ReferenceCount == 0, "failed concurrent capture cleans all partial Artifact Store references");
+
+        File.WriteAllBytes(trackedPath, worktreeBytes);
+
+        var diskFailStore = new ArtifactContentStore(new ArtifactContentStoreOptions
+        {
+            RootDirectory = Path.Combine(area, "artifacts-disk-full"),
+            WorkspaceRootForIsolation = workspace,
+            MaxItemBytes = 64 * 1024 * 1024,
+            MaxWorkspaceBytes = 128 * 1024 * 1024,
+            MaxGlobalBytes = 256 * 1024 * 1024,
+            DefaultTtl = TimeSpan.FromHours(24),
+            MaxTtl = TimeSpan.FromDays(7),
+            UtcNow = () => clock,
+            FaultInjector = (stage, _) => stage == "before-publish" ? new IOException("simulated disk full") : null,
+        });
+        var diskFailOptions = new WorkspaceCheckpointOptions
+        {
+            MetadataRootDirectory = Path.Combine(area, "checkpoints-disk-full"),
+            DefaultTtl = TimeSpan.FromHours(24),
+            MaxTtl = TimeSpan.FromDays(7),
+            MaxEntries = 100,
+            MaxTotalBytes = 8 * 1024 * 1024,
+            MaxSingleFileBytes = 4 * 1024 * 1024,
+            UtcNow = () => clock,
+        };
+        var diskFailTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid", policy,
+            artifactStore: diskFailStore,
+            checkpointOptions: diskFailOptions);
+        var diskBeforeStatus = (await diskFailTools.CallAsync("git_status", Obj(("repo_path", "repo"))))
+            .StructuredContent["result"]!.GetValue<string>();
+        await AssertThrowsAsync(
+            () => diskFailTools.CallAsync("checkpoint_capture", Obj(
+                ("repo_path", "repo"), ("include_untracked", true), ("ttl_seconds", 3600))),
+            "disk full",
+            "artifact disk-full aborts checkpoint safely");
+        var diskAfterStatus = (await diskFailTools.CallAsync("git_status", Obj(("repo_path", "repo"))))
+            .StructuredContent["result"]!.GetValue<string>();
+        Assert(diskBeforeStatus == diskAfterStatus, "disk-full checkpoint failure does not mutate repository state");
+        var diskUsage = await diskFailStore.GetUsageAsync(ArtifactContentStore.WorkspaceAuthorityId(workspace));
+        Assert(diskUsage.ReferenceCount == 0, "disk-full checkpoint failure leaves no Artifact Store refs");
+
+        var expiryCapture = (await tools.CallAsync("checkpoint_capture", Obj(
+            ("repo_path", "repo"), ("include_untracked", true), ("ttl_seconds", 60))))
+            .StructuredContent;
+        Assert(!string.IsNullOrWhiteSpace(expiryCapture["manifest_hash"]!.GetValue<string>()),
+            "checkpoint manifest exposes strong digest");
+        clock = clock.AddSeconds(61);
+        var afterExpiry = (await tools.CallAsync("checkpoint_list", Obj(("max_items", 20)))).StructuredContent;
+        Assert(afterExpiry["count"]!.GetValue<int>() == 0, "expired checkpoint metadata is pruned");
+        usage = await artifactStore.GetUsageAsync(ArtifactContentStore.WorkspaceAuthorityId(workspace));
+        Assert(usage.ReferenceCount == 0, "checkpoint expiry triggers safe Artifact Store cleanup");
+
+        clock = clock.AddSeconds(1);
+        var corruptCapture = (await tools.CallAsync("checkpoint_capture", Obj(
+            ("repo_path", "repo"), ("include_untracked", true), ("ttl_seconds", 3600))))
+            .StructuredContent;
+        var corruptRef = corruptCapture["checkpoint_ref"]!.GetValue<string>();
+        var descriptor = await artifactStore.ResolveAsync(
+            corruptRef,
+            ArtifactContentStore.WorkspaceAuthorityId(workspace),
+            value => value == ArtifactContentClasses.Checkpoint);
+        File.WriteAllBytes(artifactStore.BlobPathForTest(descriptor.BlobId), Encoding.UTF8.GetBytes("corrupt-checkpoint-manifest"));
+        await AssertThrowsAsync(
+            () => tools.CallAsync("checkpoint_get", Obj(("checkpoint_ref", corruptRef))),
+            "corrupt",
+            "checkpoint manifest corruption is rejected before metadata is served");
+
+        var symlinkPath = Path.Combine(workspace, "repo", "checkpoint-link.txt");
+        try
+        {
+            File.CreateSymbolicLink(symlinkPath, trackedPath);
+            await AssertThrowsAsync(
+                () => tools.CallAsync("checkpoint_capture", Obj(("repo_path", "repo"), ("include_untracked", true))),
+                "reparse",
+                "checkpoint rejects symlink/reparse entries");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Console.WriteLine("windows-workspace-checkpoint: symlink fixture unavailable; reparse behavior remains contract-covered");
+        }
+        catch (IOException ex) when (ex.Message.Contains("privilege", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("windows-workspace-checkpoint: symlink fixture unavailable; reparse behavior remains contract-covered");
+        }
+
+        Console.WriteLine("windows-workspace-checkpoint: ok");
     }
 
     private static void TestTunnelRestartPolicy()
