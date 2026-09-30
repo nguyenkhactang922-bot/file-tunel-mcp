@@ -1070,3 +1070,16 @@ Exact-head `acf23e406590ee40645698c8ac682d4794c0d127`, Verify run `36667522493`:
 Diagnostic-only remediation: add flushed `FMG020_CHECKPOINT:*` markers after invalid-resize, restart-no-resume, policy-revoke, flood/spill cleanup, future-cursor, idle-expiry and lifetime-expiry acceptance points. Production runtime is unchanged.
 Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
 NEXT_EXACT_ACTION: commit/push this diagnostic-only head, inspect only the macOS Integration checkpoint boundary, then fix the exact proven failing substage. Do not change Windows/runtime behavior without evidence.
+
+
+## FMG-020 macOS flood/spill diagnostic checkpoint - 2026-09-30
+
+Exact-head `d6c9eb051943793db2a8d5814ec80a3b8a01b0fe`, Verify run `36668399919`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS Static/typecheck/catalog: SUCCESS.
+- macOS Integration checkpoints PASS through `invalid-resize`, `restart-no-resume`, and `policy-revoke`, then SIGTRAP before `flood-spill-cleanup`.
+
+The failing region is therefore narrowed to the service-level bounded-ring / spill / artifact cleanup assertions. Diagnostic-only instrumentation now prints the actual `cursor_evicted`, spill-ref count, artifact reference count before stop, and artifact reference count after stop. Production PTY/runtime behavior remains unchanged.
+Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push this flood/spill diagnostic-only head, inspect macOS Integration values, then repair only the exact proven failing invariant.

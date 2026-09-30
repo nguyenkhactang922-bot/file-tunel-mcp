@@ -1320,16 +1320,24 @@ let ptyFloodRead = try ptyService.read(
     maxBytes: 64 * 1024,
     context: nil
 )
+print("FMG020_FLOOD:cursor_evicted=\(String(describing: ptyFloodRead[\"cursor_evicted\"]))")
+fflush(stdout)
 precondition(ptyFloodRead["cursor_evicted"] as? Bool == true)
+print("FMG020_FLOOD:spill_refs=\((ptyFloodRead[\"spill_refs\"] as? [String])?.count ?? -1)")
+fflush(stdout)
 precondition((ptyFloodRead["spill_refs"] as? [String])?.isEmpty == false)
 let ptyUsageBeforeStop = try ptyArtifactStore.usage(
     workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(root)
 )
+print("FMG020_FLOOD:usage_before=\(ptyUsageBeforeStop.referenceCount)")
+fflush(stdout)
 precondition(ptyUsageBeforeStop.referenceCount > 0)
 _ = try ptyService.stop(sessionID: ptyFloodSession)
 let ptyUsageAfterStop = try ptyArtifactStore.usage(
     workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(root)
 )
+print("FMG020_FLOOD:usage_after=\(ptyUsageAfterStop.referenceCount)")
+fflush(stdout)
 precondition(ptyUsageAfterStop.referenceCount == 0)
 print("FMG020_CHECKPOINT:flood-spill-cleanup")
 fflush(stdout)
