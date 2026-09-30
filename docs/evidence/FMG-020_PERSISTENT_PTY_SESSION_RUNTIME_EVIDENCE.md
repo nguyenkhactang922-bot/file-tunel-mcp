@@ -280,3 +280,17 @@ Exact-head `d31a4128f2c08fc68ba77795de595c916ca6fbba`, Verify run `36669725567`:
 This proves the Data-index remediation fixed the FMG-020 macOS PTY failure. Because `main` Verify was green before FMG-020, the next diagnostic changes only the first-runtime wait to resolve on `.running` or `.failed`, print only a secret-sanitized failure log, and assert `.running`. No production runtime behavior changes.
 Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
 NEXT_EXACT_ACTION: commit/push the fail-fast post-PTY runtime diagnostic, inspect the exact sanitized LocalMCPRuntime failure, then repair only the proven interference/regression before final FMG-020 review/merge.
+
+
+## FMG-020 post-PTY runtime profile fixture remediation - 2026-09-30
+
+Exact-head `8cd0d5e11672a009f77ffecd0e15a73fd22bef5b`, Verify run `36670371331`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS PTY acceptance: PASS through native TTY, owned descendant cleanup, invalid resize rejection, restart-no-resume, policy revoke, bounded-ring eviction, spill/delete, future cursor, idle expiry and lifetime expiry.
+- macOS Integration then failed outside FMG-020 PTY core because the runtime test profile was the literal `runtime-test-\\(UUID().uuidString)`, which violates the profile character contract.
+- Sanitized runtime evidence: `Profile must start with a letter or number and contain only letters, numbers, '.', '_' or '-'`.
+
+Remediation is test-only: restore real Swift interpolation in the existing runtime fixture as `runtime-test-\(UUID().uuidString)`. Production PTY and LocalMCPRuntime behavior are unchanged.
+Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; exact fixture assertion PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push this test-only profile fixture remediation, require fresh exact-head Verify macOS + Windows x64 + Windows ARM64; if all green, perform scoped FMG-020 review -> PR/merge -> merged-main Verify -> mark FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.

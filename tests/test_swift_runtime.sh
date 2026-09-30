@@ -1413,7 +1413,7 @@ fflush(stdout)
 ptyService.stopAll()
 print("swift-persistent-pty: ok")
 
-let profile = "runtime-test-\\(UUID().uuidString)"
+let profile = "runtime-test-\(UUID().uuidString)"
 let profileDirectory = root.appendingPathComponent("tunnel-profiles", isDirectory: true)
 let authCapture = root.appendingPathComponent("local-auth-headers.txt")
 setenv("MCP_TEST_ENV_CAPTURE", authCapture.path, 1)
