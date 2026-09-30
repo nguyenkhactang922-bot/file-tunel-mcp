@@ -1268,3 +1268,11 @@ NEXT_EXACT_ACTION: inspect latest `fork/main` and remote FMG-022 branch/PR befor
 ## Final local diff-hygiene checkpoint
 
 Before commit, scoped diff review found one literal NUL byte in `WorkspaceCheckpointGit.cs`, causing Git to classify the C# source as binary. The source byte was normalized to the canonical C# escape `\0` without changing runtime semantics. Post-fix proof: `git diff --check` PASS; Windows test-project build PASS 0 warnings/errors; targeted checkpoint restore PASS 29 assertions.
+
+## Native Verify attempt 1 remediation - 2026-09-30
+
+Run `36709124346` on `381b5eacf32942df54337c003239f84fc14c5728`: Windows ARM64 passed; macOS product static verification and catalog passed, then Swift integration compilation failed only because one FMG-022 test assertion executed throwing `String(contentsOf:)` inside non-throwing `precondition` autoclosure. Product restore code was not implicated.
+
+Remediation is test-only: the throwing file read is hoisted into `crDryTrackedText` before `precondition`. Local affected-stage proof: zero remaining `precondition(try String(contentsOf:))` occurrences, Swift shell syntax PASS, checkpoint-restore contract PASS, `git diff --check` PASS.
+
+NEXT_EXACT_ACTION: commit/push this test-only remediation and require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64.

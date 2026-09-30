@@ -4071,8 +4071,9 @@ precondition(
     (crDry["state"] as? String) == "planned" && crDry["rollback_checkpoint_ref"] is NSNull,
     "checkpoint restore dry-run must plan without rollback material"
 )
+let crDryTrackedText = try String(contentsOf: crSuccessRepo.appendingPathComponent("tracked.txt"), encoding: .utf8)
 precondition(
-    try String(contentsOf: crSuccessRepo.appendingPathComponent("tracked.txt"), encoding: .utf8) == "current-worktree\n",
+    crDryTrackedText == "current-worktree\n",
     "checkpoint restore dry-run mutated worktree"
 )
 let crAfterDryList = try crCall("checkpoint_list", ["max_items": 100])
