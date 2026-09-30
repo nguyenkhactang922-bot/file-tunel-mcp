@@ -185,3 +185,19 @@ Affected local proof:
 - `git diff --check`: PASS.
 
 NEXT_EXACT_ACTION: verify latest main/remote branch state, commit/push this test-only remediation, require exact-head native Verify on macOS / Windows x64 / Windows ARM64; if green, scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.
+
+
+## FMG-020 macOS invalid-resize assertion remediation - 2026-09-30
+
+Exact-head `65b0375d2c9574da0a291c2a8c037938d5e32353`, Verify run `36666308781`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS Static/typecheck/catalog: SUCCESS.
+- macOS Integration progressed beyond the ownership-proven descendant cleanup and failed at generated `main.swift:240`, the `ptyInvalidResizeRejected` assertion.
+
+Root cause is test-message specificity, not PTY authority: canonical schema validation rejects `columns: 0` before `PersistentPtyService.validateSize`, producing `Argument columns must be >= 1`; the test accepted only an error message containing `size`.
+
+Remediation is test-only: the native macOS acceptance now treats the invalid resize as correctly rejected when the localized error identifies either PTY `size` validation or the canonical `columns` bound. Production PTY/runtime behavior is unchanged.
+
+Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push this test-only invalid-resize assertion hardening and require a fresh exact-head native Verify on macOS / Windows x64 / Windows ARM64. If green, scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.

@@ -1231,7 +1231,8 @@ do {
         arguments: ["session_id": ptyCatSession, "columns": 0, "rows": 20]
     )
 } catch {
-    ptyInvalidResizeRejected = error.localizedDescription.lowercased().contains("size")
+    let message = error.localizedDescription.lowercased()
+    ptyInvalidResizeRejected = message.contains("size") || message.contains("columns")
 }
 precondition(ptyInvalidResizeRejected)
 
