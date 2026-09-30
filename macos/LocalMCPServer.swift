@@ -119,12 +119,12 @@ struct LocalToolCallOutput {
 
 final class LocalTools {
     private static let handlerToolNames: Set<String> = [
-        "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "git_init", "git_status", "git_log", "git_diff",
+        "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "checkpoint_list", "checkpoint_get", "search_content", "search_filenames",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "checkpoint_capture", "checkpoint_delete", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
-        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames",
+        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "checkpoint_capture", "checkpoint_list", "checkpoint_get", "checkpoint_delete", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "exec_process",
     ]
     private let resolver: SafePathResolver
@@ -143,6 +143,7 @@ final class LocalTools {
     let repositoryQueryWorkspaceAuthorityID: String
     private let mutationGuard: AuthorizedPathSnapshotService
     private let quarantine: QuarantineService
+    private var checkpoints: WorkspaceCheckpointService!
     private let projectContext: ProjectContextService
     private let beforeMutationCommitForTests: ((String) -> Void)?
     private let applyEditsStageForTests: ((String) -> Void)?
@@ -151,7 +152,7 @@ final class LocalTools {
     private let commandSlots = DispatchSemaphore(value: 2)
     private let gitSlots = DispatchSemaphore(value: 3)
     private let serializedToolNames: Set<String> = [
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "run_command",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "checkpoint_capture", "checkpoint_delete", "apply_edits", "apply_search_replace", "apply_unified_diff", "run_command",
         "git_init", "git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push",
     ]
     private let skippedSearchDirectories: Set<String> = [
@@ -180,7 +181,8 @@ final class LocalTools {
         artifactStore: ArtifactContentStore? = nil,
         quarantineOptions: QuarantineServiceOptions? = nil,
         quarantineStageForTests: ((String) -> Void)? = nil,
-        repositoryQueryOptions: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions()
+        repositoryQueryOptions: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions(),
+        checkpointOptions: WorkspaceCheckpointOptions = WorkspaceCheckpointOptions()
     ) throws {
         self.resolver = resolver
         let versionService = try FileVersionService(resolver: resolver)
@@ -234,6 +236,20 @@ final class LocalTools {
             artifactFactory: artifactFactory
         )
         self.enableCommands = policy.legacyUnsafeGitCompatibility
+        self.checkpoints = try WorkspaceCheckpointService(
+            resolver: resolver,
+            artifactFactory: artifactFactory,
+            policy: policy,
+            resolveRepo: { [unowned self] path in try self.gitRepo(path) },
+            runGit: { [unowned self] repo, arguments, limit, trim in
+                try self.runGit(repo: repo, arguments: arguments, outputLimitBytes: limit, trimOutput: trim)
+            },
+            readIndexBlob: { [unowned self] repo, path in try self.readGitIndexBlob(repo: repo, relativePath: path) },
+            captureSourceState: { [unowned self] path, relevant in
+                try self.captureSourceStateRef(repoPath: path, relevantPaths: relevant)
+            },
+            options: checkpointOptions
+        )
         try CanonicalToolCatalog.shared.validateHandlerCoverage(handler: "local_tools", runtimeHandlerNames: Self.handlerToolNames)
     }
 
@@ -307,6 +323,32 @@ final class LocalTools {
         case "quarantine_get":
             return objectOutput(try quarantine.get(
                 quarantineRef: requiredString(arguments, "quarantine_ref")
+            ))
+        case "checkpoint_capture":
+            return objectOutput(try checkpoints.capture(
+                repoPath: string(arguments, "repo_path", default: ""),
+                includeUntracked: bool(arguments, "include_untracked", default: true),
+                includeIgnored: bool(arguments, "include_ignored", default: false),
+                includeGenerated: bool(arguments, "include_generated", default: false),
+                ttlSeconds: int(arguments, "ttl_seconds", default: 0),
+                maxFiles: int(arguments, "max_files", default: 0),
+                maxTotalBytes: Int64(int(arguments, "max_total_bytes", default: 0)),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
+            ))
+        case "checkpoint_list":
+            return objectOutput(try checkpoints.list(
+                maxItems: int(arguments, "max_items", default: 100)
+            ))
+        case "checkpoint_get":
+            return objectOutput(try checkpoints.get(
+                checkpointRef: requiredString(arguments, "checkpoint_ref")
+            ))
+        case "checkpoint_delete":
+            return objectOutput(try checkpoints.delete(
+                checkpointRef: requiredString(arguments, "checkpoint_ref"),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
             ))
         case "quarantine_restore":
             return objectOutput(try quarantine.restore(
@@ -2052,6 +2094,96 @@ final class LocalTools {
             args += ["--no-verify", "--no-signed", "--no-recurse-submodules", "--receive-pack=git-receive-pack"]
         }
         return try runGit(repo: repo, arguments: args)
+    }
+
+    private func readGitIndexBlob(repo: URL, relativePath: String) throws -> Data? {
+        let listed = try runGit(
+            repo: repo,
+            arguments: ["ls-files", "-s", "--", relativePath],
+            outputLimitBytes: maxGitSafetyOutputBytes
+        )
+        var oid: String?
+        for line in listed.split(whereSeparator: { $0.isNewline }) {
+            guard let tab = line.firstIndex(of: "\t") else { continue }
+            let metadata = line[..<tab].split(separator: " ")
+            guard metadata.count >= 3, metadata[2] == "0" else { continue }
+            let candidate = String(metadata[1])
+            guard candidate.count >= 7, candidate.count <= 128, candidate.allSatisfy({ $0.isHexDigit }) else {
+                throw MCPServerError.operationFailed("Checkpoint could not validate staged Git blob identity")
+            }
+            oid = candidate
+            break
+        }
+        guard let oid else { return nil }
+        return try runGitBlob(repo: repo, oid: oid)
+    }
+
+    private func runGitBlob(repo: URL, oid: String) throws -> Data {
+        gitSlots.wait()
+        defer { gitSlots.signal() }
+
+        var environment = sanitizedGitEnvironment()
+        environment["GIT_TERMINAL_PROMPT"] = "0"
+        if !enableCommands {
+            environment["GIT_ASKPASS"] = "/usr/bin/false"
+            environment["SSH_ASKPASS"] = "/usr/bin/false"
+            environment["GIT_SSH_COMMAND"] = "/usr/bin/ssh -F /dev/null -o BatchMode=yes -o ProxyCommand=none -o ProxyJump=none"
+            environment["GIT_PAGER"] = "cat"
+        }
+
+        let nonce = UUID().uuidString
+        let stdoutURL = FileManager.default.temporaryDirectory.appendingPathComponent("filemcp-checkpoint-\(nonce).out")
+        let stderrURL = FileManager.default.temporaryDirectory.appendingPathComponent("filemcp-checkpoint-\(nonce).err")
+        guard FileManager.default.createFile(atPath: stdoutURL.path, contents: Data()),
+              FileManager.default.createFile(atPath: stderrURL.path, contents: Data()) else {
+            throw MCPServerError.operationFailed("Could not create checkpoint Git blob staging files")
+        }
+        chmod(stdoutURL.path, S_IRUSR | S_IWUSR)
+        chmod(stderrURL.path, S_IRUSR | S_IWUSR)
+        defer {
+            try? FileManager.default.removeItem(at: stdoutURL)
+            try? FileManager.default.removeItem(at: stderrURL)
+        }
+
+        let stdoutHandle = try FileHandle(forWritingTo: stdoutURL)
+        let stderrHandle = try FileHandle(forWritingTo: stderrURL)
+        defer {
+            try? stdoutHandle.close()
+            try? stderrHandle.close()
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["-C", repo.path, "--no-pager"] + safeGitConfigurationArguments() + ["cat-file", "blob", oid]
+        process.environment = environment
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = stdoutHandle
+        process.standardError = stderrHandle
+        try process.run()
+
+        let deadline = Date().addingTimeInterval(120)
+        while process.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+        if process.isRunning {
+            process.terminate()
+            process.waitUntilExit()
+            throw MCPServerError.operationFailed("git checkpoint blob read timed out after 120 seconds")
+        }
+        try stdoutHandle.synchronize()
+        try stderrHandle.synchronize()
+        guard process.terminationStatus == 0 else {
+            let error = (try? String(contentsOf: stderrURL, encoding: .utf8))?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw MCPServerError.operationFailed(error?.isEmpty == false ? error! : "git checkpoint blob read failed")
+        }
+
+        let attrs = try FileManager.default.attributesOfItem(atPath: stdoutURL.path)
+        let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
+        guard size <= 64 * 1024 * 1024 else {
+            throw MCPServerError.operationFailed("Checkpoint staged file exceeds hard safety read limit")
+        }
+        return try Data(contentsOf: stdoutURL)
     }
 
     private func runGit(

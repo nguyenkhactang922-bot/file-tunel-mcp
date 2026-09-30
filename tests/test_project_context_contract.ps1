@@ -5,8 +5,8 @@ $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 $Catalog = Get-Content contracts/tool_catalog.v1.json -Raw | ConvertFrom-Json
-if ($Catalog.catalogVersion -ne "1.11.0") { throw "FMG-010 requires catalogVersion 1.11.0." }
-if ($Catalog.tools.Count -ne 41) { throw "FMG-010 expects 41 canonical tools." }
+if ($Catalog.catalogVersion -ne "1.12.0") { throw "FMG-010 requires catalogVersion 1.12.0." }
+if ($Catalog.tools.Count -ne 45) { throw "FMG-010 expects 45 canonical tools." }
 $Tool = @($Catalog.tools | Where-Object name -eq "project_context")
 if ($Tool.Count -ne 1) { throw "Missing canonical project_context tool." }
 $Tool = $Tool[0]
@@ -80,4 +80,4 @@ foreach ($Text in @($WindowsContext, $MacContext)) {
     if ($Text -match 'instructions_included[^\r\n]*true') { throw "Project Context must never mark skill instructions as inlined." }
 }
 
-Write-Host "project-context-contract: ok (catalog=1.11.0 tools=41 provenance+digest+cursor+no-authority parity)"
+Write-Host "project-context-contract: ok (catalog=1.12.0 tools=45 provenance+digest+cursor+no-authority parity)"

@@ -1690,6 +1690,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/RepositoryIntelligenceQuery.swift \
     macos/QuarantineService.swift \
     macos/PersistentPty.swift \
+    macos/WorkspaceCheckpoint.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
     macos/LocalMCPRuntime.swift \
@@ -3673,6 +3674,272 @@ precondition(FileManager.default.fileExists(atPath: qMetadataFile.path), "metada
 
 print("swift-quarantine-restore: ok")
 
+
+// FMG-021 Workspace Checkpoint Capture.
+let cpArea = root.appendingPathComponent("workspace-checkpoint", isDirectory: true)
+let cpWorkspace = cpArea.appendingPathComponent("workspace", isDirectory: true)
+let cpRepo = cpWorkspace.appendingPathComponent("repo", isDirectory: true)
+try FileManager.default.createDirectory(at: cpRepo, withIntermediateDirectories: true)
+let cpResolver = try SafePathResolver(rootPath: cpWorkspace.path)
+var cpClock = Date(timeIntervalSince1970: 1_798_100_000)
+
+var cpArtifactOptions = ArtifactContentStoreOptions()
+cpArtifactOptions.rootURL = cpArea.appendingPathComponent("artifacts", isDirectory: true)
+cpArtifactOptions.workspaceRootForIsolation = cpWorkspace
+cpArtifactOptions.maxItemBytes = 64 * 1024 * 1024
+cpArtifactOptions.maxWorkspaceBytes = 128 * 1024 * 1024
+cpArtifactOptions.maxGlobalBytes = 256 * 1024 * 1024
+cpArtifactOptions.defaultTTL = 24 * 60 * 60
+cpArtifactOptions.maxTTL = 7 * 24 * 60 * 60
+cpArtifactOptions.now = { cpClock }
+let cpArtifacts = try ArtifactContentStore(options: cpArtifactOptions)
+
+let cpTracked = cpRepo.appendingPathComponent("tracked.bin")
+let cpIgnored = cpRepo.appendingPathComponent("ignored.log")
+var cpMutateAfterPayloads: URL?
+var cpOptions = WorkspaceCheckpointOptions()
+cpOptions.metadataRootDirectory = cpArea.appendingPathComponent("metadata", isDirectory: true)
+cpOptions.defaultTTL = 24 * 60 * 60
+cpOptions.maxTTL = 7 * 24 * 60 * 60
+cpOptions.maxEntries = 100
+cpOptions.maxTotalBytes = 8 * 1024 * 1024
+cpOptions.maxSingleFileBytes = 4 * 1024 * 1024
+cpOptions.now = { cpClock }
+cpOptions.stageForTests = { stage in
+    if stage == "after_payloads", let target = cpMutateAfterPayloads {
+        try! Data([0x44, 0x55, 0x66, 0x77]).write(to: target)
+    }
+}
+let cpTools = try LocalTools(
+    resolver: cpResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: ServerPolicy.fromLegacy(enableCommands: false),
+    artifactStore: cpArtifacts,
+    checkpointOptions: cpOptions
+)
+func cpCall(_ name: String, _ arguments: [String: Any] = [:]) throws -> [String: Any] {
+    try cpTools.call(name: name, arguments: arguments).structuredContent
+}
+func cpString(_ value: [String: Any], _ key: String) -> String {
+    guard let result = value[key] as? String else { preconditionFailure("missing checkpoint string \(key)") }
+    return result
+}
+func expectCpFailure(_ label: String, containing needle: String, _ body: () throws -> Void) {
+    do {
+        try body()
+        preconditionFailure("\(label) should fail")
+    } catch {
+        precondition(
+            error.localizedDescription.localizedCaseInsensitiveContains(needle),
+            "\(label) wrong error: \(error.localizedDescription)"
+        )
+    }
+}
+
+try runGitFixture(cpRepo, ["init"])
+try runGitFixture(cpRepo, ["config", "user.name", "FileMCP Test"])
+try runGitFixture(cpRepo, ["config", "user.email", "filemcp@example.invalid"])
+try "*.log\n".write(to: cpRepo.appendingPathComponent(".gitignore"), atomically: true, encoding: .utf8)
+try Data([0x01, 0x02, 0x03, 0x04]).write(to: cpTracked)
+try runGitFixture(cpRepo, ["add", "."])
+try runGitFixture(cpRepo, ["commit", "-m", "checkpoint baseline"])
+
+let cpStagedBytes = Data([0x00, 0xFF, 0x80, 0x0A, 0x42])
+let cpWorktreeBytes = Data([0x77, 0x66, 0x55, 0x44])
+try cpStagedBytes.write(to: cpTracked)
+try runGitFixture(cpRepo, ["add", "tracked.bin"])
+try cpWorktreeBytes.write(to: cpTracked)
+try "untracked\n".write(to: cpRepo.appendingPathComponent("untracked.txt"), atomically: true, encoding: .utf8)
+try "ignored\n".write(to: cpIgnored, atomically: true, encoding: .utf8)
+let cpGenerated = cpRepo.appendingPathComponent("build/generated.txt")
+try FileManager.default.createDirectory(at: cpGenerated.deletingLastPathComponent(), withIntermediateDirectories: true)
+try "generated\n".write(to: cpGenerated, atomically: true, encoding: .utf8)
+
+let cpBeforeStatus = cpString(try cpCall("git_status", ["repo_path": "repo"]), "result")
+let cpCaptured = try cpCall("checkpoint_capture", [
+    "repo_path": "repo",
+    "include_untracked": true,
+    "include_ignored": false,
+    "ttl_seconds": 3600,
+])
+let cpRef = cpString(cpCaptured, "checkpoint_ref")
+precondition(cpRef.hasPrefix("cr1."), "checkpoint capture must return authenticated ContentRef")
+precondition(
+    ((cpCaptured["staged_count"] as? NSNumber)?.intValue ?? 0) >= 1 &&
+    ((cpCaptured["unstaged_count"] as? NSNumber)?.intValue ?? 0) >= 1 &&
+    ((cpCaptured["untracked_count"] as? NSNumber)?.intValue ?? 0) >= 1 &&
+    ((cpCaptured["ignored_count"] as? NSNumber)?.intValue ?? -1) == 0,
+    "checkpoint coverage must distinguish staged/unstaged/untracked and exclude ignored by default"
+)
+let cpAfterStatus = cpString(try cpCall("git_status", ["repo_path": "repo"]), "result")
+precondition(cpBeforeStatus == cpAfterStatus, "checkpoint capture must not mutate repository state")
+
+let cpGot = try cpCall("checkpoint_get", ["checkpoint_ref": cpRef])
+guard let cpEntries = cpGot["entries"] as? [[String: Any]],
+      let cpTrackedEntry = cpEntries.first(where: { ($0["relative_path"] as? String) == "tracked.bin" }) else {
+    preconditionFailure("checkpoint_get did not expose tracked metadata")
+}
+precondition(
+    (cpTrackedEntry["staged"] as? Bool) == true &&
+    (cpTrackedEntry["unstaged"] as? Bool) == true,
+    "checkpoint must retain simultaneous staged and unstaged state"
+)
+precondition(
+    (cpTrackedEntry["index_sha256"] as? String) == FileVersionService.sha256Tagged(cpStagedBytes),
+    "checkpoint must preserve staged index bytes byte-for-byte"
+)
+precondition(
+    (cpTrackedEntry["worktree_sha256"] as? String) == FileVersionService.sha256Tagged(cpWorktreeBytes),
+    "checkpoint must preserve divergent worktree bytes byte-for-byte"
+)
+precondition(!cpEntries.contains(where: { ($0["relative_path"] as? String) == "ignored.log" }), "ignored file leaked without opt-in")
+guard let cpGeneratedDefault = cpEntries.first(where: { ($0["relative_path"] as? String) == "build/generated.txt" }) else {
+    preconditionFailure("generated path metadata missing")
+}
+precondition(
+    (cpGeneratedDefault["generated"] as? Bool) == true &&
+    (cpGeneratedDefault["worktree_excluded_reason"] as? String) == "generated" &&
+    cpGeneratedDefault["worktree_sha256"] is NSNull,
+    "generated directory payload must be excluded by default and reported"
+)
+precondition(((cpCaptured["excluded_count"] as? NSNumber)?.intValue ?? 0) >= 1, "checkpoint must report excluded payload count")
+let cpListedAfterCapture = try cpCall("checkpoint_list", ["max_items": 20])
+precondition(((cpListedAfterCapture["count"] as? NSNumber)?.intValue ?? 0) == 1, "checkpoint_list must expose metadata record")
+_ = try cpCall("checkpoint_delete", ["checkpoint_ref": cpRef])
+let cpUsageAfterDelete = try cpArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace))
+precondition(cpUsageAfterDelete.referenceCount == 0, "checkpoint_delete must clean manifest and payload refs")
+
+let cpGeneratedCapture = try cpCall("checkpoint_capture", [
+    "repo_path": "repo", "include_untracked": true, "include_generated": true, "ttl_seconds": 3600,
+])
+let cpGeneratedRef = cpString(cpGeneratedCapture, "checkpoint_ref")
+let cpGeneratedGet = try cpCall("checkpoint_get", ["checkpoint_ref": cpGeneratedRef])
+let cpGeneratedEntries = cpGeneratedGet["entries"] as? [[String: Any]] ?? []
+guard let cpGeneratedIncluded = cpGeneratedEntries.first(where: { ($0["relative_path"] as? String) == "build/generated.txt" }) else {
+    preconditionFailure("generated opt-in metadata missing")
+}
+precondition(
+    (cpGeneratedIncluded["generated"] as? Bool) == true &&
+    (cpGeneratedIncluded["worktree_sha256"] as? String) != nil &&
+    cpGeneratedIncluded["worktree_excluded_reason"] is NSNull,
+    "include_generated must opt bounded generated payload into checkpoint"
+)
+_ = try cpCall("checkpoint_delete", ["checkpoint_ref": cpGeneratedRef])
+
+let cpOversized = cpRepo.appendingPathComponent("oversized.bin")
+try Data(repeating: 0x5A, count: 4 * 1024 * 1024 + 1).write(to: cpOversized)
+let cpOversizedCapture = try cpCall("checkpoint_capture", [
+    "repo_path": "repo", "include_untracked": true, "ttl_seconds": 3600,
+])
+let cpOversizedRef = cpString(cpOversizedCapture, "checkpoint_ref")
+let cpOversizedGet = try cpCall("checkpoint_get", ["checkpoint_ref": cpOversizedRef])
+let cpOversizedEntries = cpOversizedGet["entries"] as? [[String: Any]] ?? []
+guard let cpOversizedEntry = cpOversizedEntries.first(where: { ($0["relative_path"] as? String) == "oversized.bin" }) else {
+    preconditionFailure("oversized path metadata missing")
+}
+precondition(
+    (cpOversizedEntry["worktree_excluded_reason"] as? String) == "oversized" &&
+    cpOversizedEntry["worktree_sha256"] is NSNull &&
+    ((cpOversizedCapture["excluded_count"] as? NSNumber)?.intValue ?? 0) >= 1,
+    "oversized file must be excluded by default without failing checkpoint"
+)
+_ = try cpCall("checkpoint_delete", ["checkpoint_ref": cpOversizedRef])
+try FileManager.default.removeItem(at: cpOversized)
+
+let cpIgnoredCapture = try cpCall("checkpoint_capture", [
+    "repo_path": "repo", "include_untracked": true, "include_ignored": true, "ttl_seconds": 3600,
+])
+precondition(((cpIgnoredCapture["ignored_count"] as? NSNumber)?.intValue ?? 0) >= 1, "ignored capture requires explicit opt-in")
+let cpIgnoredRef = cpString(cpIgnoredCapture, "checkpoint_ref")
+let cpIgnoredGet = try cpCall("checkpoint_get", ["checkpoint_ref": cpIgnoredRef])
+let cpIgnoredEntries = cpIgnoredGet["entries"] as? [[String: Any]] ?? []
+precondition(cpIgnoredEntries.contains(where: { ($0["relative_path"] as? String) == "ignored.log" }), "ignored opt-in must capture ignored regular file")
+_ = try cpCall("checkpoint_delete", ["checkpoint_ref": cpIgnoredRef])
+
+try "a".write(to: cpRepo.appendingPathComponent("extra-a.txt"), atomically: true, encoding: .utf8)
+try "b".write(to: cpRepo.appendingPathComponent("extra-b.txt"), atomically: true, encoding: .utf8)
+expectCpFailure("checkpoint max files", containing: "max_files") {
+    _ = try cpCall("checkpoint_capture", ["repo_path": "repo", "include_untracked": true, "max_files": 1])
+}
+try FileManager.default.removeItem(at: cpRepo.appendingPathComponent("extra-a.txt"))
+try FileManager.default.removeItem(at: cpRepo.appendingPathComponent("extra-b.txt"))
+
+cpMutateAfterPayloads = cpIgnored
+expectCpFailure("checkpoint concurrent ignored mutation", containing: "changed while checkpoint") {
+    _ = try cpCall("checkpoint_capture", [
+        "repo_path": "repo", "include_untracked": true, "include_ignored": true, "ttl_seconds": 3600,
+    ])
+}
+cpMutateAfterPayloads = nil
+let cpUsageAfterFailedCapture = try cpArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace))
+precondition(cpUsageAfterFailedCapture.referenceCount == 0, "failed checkpoint capture must clean partial refs")
+try cpWorktreeBytes.write(to: cpTracked)
+
+var cpDiskArtifactOptions = cpArtifactOptions
+cpDiskArtifactOptions.rootURL = cpArea.appendingPathComponent("artifacts-disk-full", isDirectory: true)
+cpDiskArtifactOptions.faultInjector = { stage, _ in
+    stage == "before-publish"
+        ? NSError(domain: "FileMCP.Test", code: 28, userInfo: [NSLocalizedDescriptionKey: "simulated disk full"])
+        : nil
+}
+let cpDiskArtifacts = try ArtifactContentStore(options: cpDiskArtifactOptions)
+var cpDiskOptions = cpOptions
+cpDiskOptions.metadataRootDirectory = cpArea.appendingPathComponent("metadata-disk-full", isDirectory: true)
+cpDiskOptions.stageForTests = nil
+let cpDiskTools = try LocalTools(
+    resolver: cpResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: ServerPolicy.fromLegacy(enableCommands: false),
+    artifactStore: cpDiskArtifacts,
+    checkpointOptions: cpDiskOptions
+)
+let cpDiskBeforeStatus = cpString(try cpDiskTools.call(name: "git_status", arguments: ["repo_path": "repo"]).structuredContent, "result")
+expectCpFailure("checkpoint disk full", containing: "disk full") {
+    _ = try cpDiskTools.call(name: "checkpoint_capture", arguments: [
+        "repo_path": "repo", "include_untracked": true, "ttl_seconds": 3600,
+    ])
+}
+let cpDiskAfterStatus = cpString(try cpDiskTools.call(name: "git_status", arguments: ["repo_path": "repo"]).structuredContent, "result")
+precondition(cpDiskBeforeStatus == cpDiskAfterStatus, "disk-full checkpoint failure must not mutate repository")
+let cpDiskUsageAfterFailure = try cpDiskArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace))
+precondition(
+    cpDiskUsageAfterFailure.referenceCount == 0,
+    "disk-full checkpoint failure must leave no Artifact Store refs"
+)
+
+let cpExpiry = try cpCall("checkpoint_capture", ["repo_path": "repo", "include_untracked": true, "ttl_seconds": 60])
+precondition(!cpString(cpExpiry, "manifest_hash").isEmpty, "checkpoint must expose strong manifest digest")
+cpClock = cpClock.addingTimeInterval(61)
+let cpExpiredList = try cpCall("checkpoint_list", ["max_items": 20])
+precondition(((cpExpiredList["count"] as? NSNumber)?.intValue ?? -1) == 0, "expired checkpoint metadata must be pruned")
+let cpUsageAfterExpiry = try cpArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace))
+precondition(cpUsageAfterExpiry.referenceCount == 0, "checkpoint expiry must clean Artifact Store refs")
+
+let cpLink = cpRepo.appendingPathComponent("checkpoint-link.txt")
+try FileManager.default.createSymbolicLink(at: cpLink, withDestinationURL: cpTracked)
+expectCpFailure("checkpoint symlink", containing: "symlink") {
+    _ = try cpCall("checkpoint_capture", ["repo_path": "repo", "include_untracked": true])
+}
+try FileManager.default.removeItem(at: cpLink)
+
+cpClock = cpClock.addingTimeInterval(1)
+let cpCorruptCapture = try cpCall("checkpoint_capture", ["repo_path": "repo", "include_untracked": true, "ttl_seconds": 3600])
+let cpCorruptRef = cpString(cpCorruptCapture, "checkpoint_ref")
+let cpDescriptor = try cpArtifacts.resolve(
+    cpCorruptRef,
+    workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace),
+    contentClassAllowed: { $0 == ArtifactContentClasses.checkpoint }
+)
+try Data("corrupt-checkpoint-manifest".utf8).write(to: cpArtifacts.blobURLForTest(cpDescriptor.blobID))
+expectCpFailure("checkpoint corruption", containing: "corrupt") {
+    _ = try cpCall("checkpoint_get", ["checkpoint_ref": cpCorruptRef])
+}
+
+print("swift-workspace-checkpoint: ok")
+
+
 let fmg011ServerStoreURL = root.appendingPathComponent("server-evidence.json")
 let server = try LocalMCPServer(
     port: 18088,
@@ -3743,6 +4010,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/RepositoryIntelligenceQuery.swift \
     macos/QuarantineService.swift \
     macos/PersistentPty.swift \
+    macos/WorkspaceCheckpoint.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
 mkdir -p "$TMP_DIR/git-template"
@@ -3778,7 +4046,7 @@ UNAVAILABLE_EVIDENCE_BASE_URL="http://127.0.0.1:18091/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.11.0"
+CATALOG_VERSION="1.12.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'

@@ -5,8 +5,8 @@ function Require-Contains([string]$Text, [string]$Needle, [string]$Message) {
 }
 
 $Catalog = Get-Content "contracts/tool_catalog.v1.json" -Raw | ConvertFrom-Json
-if ($Catalog.catalogVersion -ne "1.11.0") { throw "FMG-019 requires catalogVersion 1.11.0." }
-if ($Catalog.tools.Count -ne 41) { throw "FMG-019 requires exactly 41 canonical tools; got $($Catalog.tools.Count)." }
+if ($Catalog.catalogVersion -ne "1.12.0") { throw "FMG-019 requires catalogVersion 1.12.0." }
+if ($Catalog.tools.Count -ne 45) { throw "FMG-019 requires exactly 45 canonical tools; got $($Catalog.tools.Count)." }
 
 foreach ($Name in @("repo_map", "symbol_search", "related_files")) {
     $Tool = @($Catalog.tools | Where-Object name -eq $Name)
@@ -107,4 +107,4 @@ foreach ($Path in @("build_macos_app.sh", ".github/workflows/verify.yml", "tests
     Require-Contains $Text "RepositoryIntelligenceQuery.swift" "$Path does not compile RepositoryIntelligenceQuery.swift"
 }
 
-Write-Host "repository-intelligence-query-contract: ok (catalog=1.11.0 tools=41 read-only query facade)"
+Write-Host "repository-intelligence-query-contract: ok (catalog=1.12.0 tools=45 read-only query facade)"

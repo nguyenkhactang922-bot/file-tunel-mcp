@@ -5,8 +5,8 @@ function Require-Contains([string]$Text, [string]$Needle, [string]$Message) {
 }
 
 $Catalog = Get-Content "contracts/tool_catalog.v1.json" -Raw | ConvertFrom-Json
-if ($Catalog.catalogVersion -ne "1.11.0") { throw "FMG-015 requires catalog version 1.11.0" }
-if ($Catalog.tools.Count -ne 41) { throw "FMG-015 requires exactly 41 canonical tools; got $($Catalog.tools.Count)" }
+if ($Catalog.catalogVersion -ne "1.12.0") { throw "FMG-015 requires catalog version 1.12.0" }
+if ($Catalog.tools.Count -ne 45) { throw "FMG-015 requires exactly 45 canonical tools; got $($Catalog.tools.Count)" }
 
 foreach ($Name in @("batch_stat", "batch_read")) {
     $Tool = @($Catalog.tools | Where-Object name -eq $Name)
@@ -99,4 +99,4 @@ foreach ($Path in @("build_macos_app.sh", ".github/workflows/verify.yml")) {
     Require-Contains $Text "macos/ArtifactContentStore.swift" "$Path does not compile ArtifactContentStore.swift"
 }
 
-Write-Host "batch-read-stat-contract: ok (catalog=1.11.0 tools=41)"
+Write-Host "batch-read-stat-contract: ok (catalog=1.12.0 tools=45)"

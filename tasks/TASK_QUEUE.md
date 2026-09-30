@@ -23,3 +23,9 @@ Current final-product work is tracked in `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md
 ## Canonical PROJECT_ROOT historical note
 
 FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited and removed on 2026-09-29. Active continuation is tracked only in `CURRENT_HANDOFF.md` and `tasks/FINAL_PRODUCT_AUDIT_FIX_QUEUE.md`.
+
+## Current complete-upgrade pointer
+
+- FMG-020: DONE / MAIN VERIFIED at 4f99a60ba91abc0040364f70c9df86478fc4dab2 (Verify 36675201004 SUCCESS).
+- FMG-021: ACTIVE on chatgpt/FMG-021-workspace-checkpoint.
+- NEXT_EXACT_ACTION: FMG-021 exact-head 3aa0f59 Verify 36695888973: ARM64 full PASS; x64 failed later in unchanged Job Object assignment with Access denied; macOS static PASS but Integration test compile failed on try-inside-precondition. Swift harness is locally remediated with contract guard PASS. Commit/push test-only fix and require fresh exact-head Verify; do not weaken ProcessRunner unless x64 reproduces. FMG-022 remains blocked.

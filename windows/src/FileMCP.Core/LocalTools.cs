@@ -16,6 +16,7 @@ internal sealed partial class LocalTools
     private readonly BatchFileService _batchFiles;
     private readonly AuthorizedPathSnapshotService _mutationGuard;
     private readonly QuarantineService _quarantine;
+    private readonly WorkspaceCheckpointService _checkpoints;
     private readonly PersistentPtyService _pty;
     private readonly ProjectContextService _projectContext;
     private readonly Action<string>? _beforeMutationCommitForTests;
@@ -29,18 +30,18 @@ internal sealed partial class LocalTools
     private readonly SemaphoreSlim _gitSlots = new(3, 3);
     private static readonly HashSet<string> HandlerToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "git_init", "git_status", "git_log", "git_diff",
+        "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "checkpoint_list", "checkpoint_get", "search_content", "search_filenames",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "checkpoint_capture", "checkpoint_delete", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     };
     private static readonly HashSet<string> SerializedToolNames = new(StringComparer.Ordinal)
     {
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "apply_edits", "apply_search_replace", "apply_unified_diff", "run_command",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "checkpoint_capture", "checkpoint_delete", "apply_edits", "apply_search_replace", "apply_unified_diff", "run_command",
         "git_init", "git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push",
     };
     private static readonly HashSet<string> BudgetedToolNames = new(StringComparer.Ordinal)
     {
-        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "exec_process",
+        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "checkpoint_capture", "checkpoint_list", "checkpoint_get", "checkpoint_delete", "search_content", "search_filenames", "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "exec_process",
     };
     private static readonly HashSet<string> SkippedSearchDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -64,7 +65,8 @@ internal sealed partial class LocalTools
         ArtifactContentStore? artifactStore = null,
         QuarantineServiceOptions? quarantineOptions = null,
         Action<string>? quarantineStageForTests = null,
-        RepositoryIntelligenceQueryOptions? repositoryQueryOptions = null)
+        RepositoryIntelligenceQueryOptions? repositoryQueryOptions = null,
+        WorkspaceCheckpointOptions? checkpointOptions = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
@@ -89,6 +91,15 @@ internal sealed partial class LocalTools
             policy,
             quarantineOptions,
             quarantineStageForTests);
+        _checkpoints = new WorkspaceCheckpointService(
+            _resolver,
+            artifactFactory,
+            policy,
+            (path, ct) => GitRepoAsync(path, ct),
+            (repo, args, limit, trim, ct) => RunGitAsync(repo, args, limit, trim, ct),
+            ReadGitIndexBlobAsync,
+            CaptureSourceStateRefAsync,
+            checkpointOptions);
         _projectContext = new ProjectContextService(_resolver, policy, skillRegistry);
         _beforeMutationCommitForTests = beforeMutationCommitForTests;
         _applyEditsStageForTests = applyEditsStageForTests;
@@ -162,6 +173,21 @@ internal sealed partial class LocalTools
                 "quarantine_get" => ObjectOutput(await _quarantine.GetAsync(
                     GetRequiredString(arguments, "quarantine_ref"),
                     effectiveCancellation).ConfigureAwait(false)),
+                "checkpoint_capture" => ObjectOutput(await _checkpoints.CaptureAsync(
+                    GetString(arguments, "repo_path", ""),
+                    GetBool(arguments, "include_untracked", true),
+                    GetBool(arguments, "include_ignored", false),
+                    GetBool(arguments, "include_generated", false),
+                    GetInt(arguments, "ttl_seconds", 0),
+                    GetInt(arguments, "max_files", 0),
+                    GetInt(arguments, "max_total_bytes", 0),
+                    preparedPolicy, executionContext, effectiveCancellation).ConfigureAwait(false)),
+                "checkpoint_list" => ObjectOutput(await _checkpoints.ListAsync(
+                    GetInt(arguments, "max_items", 100), effectiveCancellation).ConfigureAwait(false)),
+                "checkpoint_get" => ObjectOutput(await _checkpoints.GetAsync(
+                    GetRequiredString(arguments, "checkpoint_ref"), effectiveCancellation).ConfigureAwait(false)),
+                "checkpoint_delete" => ObjectOutput(await _checkpoints.DeleteAsync(
+                    GetRequiredString(arguments, "checkpoint_ref"), preparedPolicy, executionContext, effectiveCancellation).ConfigureAwait(false)),
                 "quarantine_restore" => ObjectOutput(await _quarantine.RestoreAsync(
                     GetRequiredString(arguments, "quarantine_ref"),
                     GetString(arguments, "target_relative_path", ""),

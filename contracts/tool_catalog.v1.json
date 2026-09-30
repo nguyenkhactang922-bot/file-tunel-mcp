@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.11.0",
+  "catalogVersion": "1.12.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -2226,6 +2226,555 @@
         "annotations": {
           "readOnlyHint": true,
           "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "checkpoint_capture",
+      "handler": "local_tools",
+      "risk": "medium",
+      "effect": "write",
+      "capabilities": [
+        "filesystem.read",
+        "workspace.checkpoint"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "checkpoint_capture",
+        "description": "Explicitly capture staged, unstaged and selected untracked workspace state into authenticated CHECKPOINT Artifact Store content without modifying the repository. Staged index bytes and worktree bytes are preserved separately; ignored/generated/oversized payloads are excluded by default; SourceStateRef is revalidated before manifest publication.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "repo_path": {
+              "type": "string"
+            },
+            "include_untracked": {
+              "type": "boolean",
+              "default": true
+            },
+            "include_ignored": {
+              "type": "boolean",
+              "default": false
+            },
+            "ttl_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 604800,
+              "default": 0
+            },
+            "max_files": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5000,
+              "default": 0
+            },
+            "max_total_bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50000000,
+              "default": 0
+            },
+            "include_generated": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "checkpoint_ref": {
+              "type": "string"
+            },
+            "manifest_hash": {
+              "type": "string"
+            },
+            "repository_relative_path": {
+              "type": "string"
+            },
+            "head_oid": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_state_id": {
+              "type": "string"
+            },
+            "created_epoch_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "expires_epoch_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "expired": {
+              "type": "boolean"
+            },
+            "entry_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "staged_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unstaged_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "untracked_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ignored_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "workspace_authority_id": {
+              "type": "string"
+            },
+            "excluded_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "checkpoint_ref",
+            "manifest_hash",
+            "repository_relative_path",
+            "head_oid",
+            "source_state_id",
+            "created_epoch_ms",
+            "expires_epoch_ms",
+            "expired",
+            "entry_count",
+            "total_bytes",
+            "staged_count",
+            "unstaged_count",
+            "untracked_count",
+            "ignored_count",
+            "workspace_authority_id",
+            "excluded_count"
+          ],
+          "additionalProperties": true
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "checkpoint_list",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "metadata",
+      "capabilities": [
+        "workspace.checkpoint"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "checkpoint_list",
+        "description": "List metadata-only workspace checkpoint records, including exclusion counts. Captured file bytes and internal ContentRefs are not returned.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "max_items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "checkpoint_ref": {
+                    "type": "string"
+                  },
+                  "manifest_hash": {
+                    "type": "string"
+                  },
+                  "repository_relative_path": {
+                    "type": "string"
+                  },
+                  "head_oid": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source_state_id": {
+                    "type": "string"
+                  },
+                  "created_epoch_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "expires_epoch_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "expired": {
+                    "type": "boolean"
+                  },
+                  "entry_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "total_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "staged_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "unstaged_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "untracked_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "ignored_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "workspace_authority_id": {
+                    "type": "string"
+                  },
+                  "excluded_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "checkpoint_ref",
+                  "manifest_hash",
+                  "repository_relative_path",
+                  "head_oid",
+                  "source_state_id",
+                  "created_epoch_ms",
+                  "expires_epoch_ms",
+                  "expired",
+                  "entry_count",
+                  "total_bytes",
+                  "staged_count",
+                  "unstaged_count",
+                  "untracked_count",
+                  "ignored_count",
+                  "workspace_authority_id",
+                  "excluded_count"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "workspace_authority_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "items",
+            "count",
+            "workspace_authority_id"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "checkpoint_get",
+      "handler": "local_tools",
+      "risk": "low",
+      "effect": "metadata",
+      "capabilities": [
+        "workspace.checkpoint"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "checkpoint_get",
+        "description": "Get verified metadata for one authenticated workspace checkpoint, including staged/unstaged/untracked status and generated/oversized exclusion reasons, but never captured file payload bytes or internal ContentRefs.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "checkpoint_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "checkpoint_ref"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "checkpoint_ref": {
+              "type": "string"
+            },
+            "manifest_hash": {
+              "type": "string"
+            },
+            "repository_relative_path": {
+              "type": "string"
+            },
+            "head_oid": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_state_id": {
+              "type": "string"
+            },
+            "created_epoch_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "expires_epoch_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "expired": {
+              "type": "boolean"
+            },
+            "entry_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "staged_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unstaged_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "untracked_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ignored_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "workspace_authority_id": {
+              "type": "string"
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "relative_path": {
+                    "type": "string"
+                  },
+                  "staged": {
+                    "type": "boolean"
+                  },
+                  "unstaged": {
+                    "type": "boolean"
+                  },
+                  "untracked": {
+                    "type": "boolean"
+                  },
+                  "ignored": {
+                    "type": "boolean"
+                  },
+                  "generated": {
+                    "type": "boolean"
+                  },
+                  "worktree_exists": {
+                    "type": "boolean"
+                  },
+                  "index_size_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "worktree_size_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "index_sha256": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "worktree_sha256": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "index_excluded_reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "generated",
+                      "oversized",
+                      null
+                    ]
+                  },
+                  "worktree_excluded_reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "generated",
+                      "oversized",
+                      null
+                    ]
+                  }
+                },
+                "required": [
+                  "relative_path",
+                  "staged",
+                  "unstaged",
+                  "untracked",
+                  "ignored",
+                  "generated",
+                  "worktree_exists",
+                  "index_size_bytes",
+                  "worktree_size_bytes",
+                  "index_sha256",
+                  "worktree_sha256",
+                  "index_excluded_reason",
+                  "worktree_excluded_reason"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "include_untracked": {
+              "type": "boolean"
+            },
+            "include_ignored": {
+              "type": "boolean"
+            },
+            "index_fingerprint": {
+              "type": "string"
+            },
+            "excluded_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "include_generated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "checkpoint_ref",
+            "manifest_hash",
+            "repository_relative_path",
+            "head_oid",
+            "source_state_id",
+            "created_epoch_ms",
+            "expires_epoch_ms",
+            "expired",
+            "entry_count",
+            "total_bytes",
+            "staged_count",
+            "unstaged_count",
+            "untracked_count",
+            "ignored_count",
+            "workspace_authority_id",
+            "entries",
+            "include_untracked",
+            "include_ignored",
+            "index_fingerprint",
+            "excluded_count",
+            "include_generated"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "checkpoint_delete",
+      "handler": "local_tools",
+      "risk": "medium",
+      "effect": "delete",
+      "capabilities": [
+        "workspace.checkpoint"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "checkpoint_delete",
+        "description": "Delete one workspace checkpoint and its authenticated CHECKPOINT Artifact Store references without mutating repository content or history.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "checkpoint_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "checkpoint_ref"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "checkpoint_ref": {
+              "type": "string"
+            },
+            "deleted": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "checkpoint_ref",
+            "deleted"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
           "openWorldHint": false
         }
       }
