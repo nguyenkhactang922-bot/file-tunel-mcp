@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `chatgpt/FMG-021-workspace-checkpoint`
+Active branch: `chatgpt/FMG-022-checkpoint-restore`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1185,3 +1185,13 @@ Exact-head `3aa0f5977beef12435871fc337332cb4a1c25630`, Verify run `36695888973`:
 - Local evidence after remediation: workspace-checkpoint contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
 
 NEXT_EXACT_ACTION: commit/push this test-harness-only remediation, require a fresh exact-head Verify. Do not modify ProcessRunner/Job Object semantics unless the x64 failure reproduces on the new exact head or independent evidence proves a product defect. FMG-022 remains BLOCKED until FMG-021 MAIN VERIFIED.
+
+## FMG-021 MAIN VERIFIED -> FMG-022 CLAIMED - 2026-09-30
+
+FMG-021 Workspace Checkpoint Capture is DONE / MAIN VERIFIED.
+- PR #40 merged to main as `12874be49a3bc8eaacdeb0dfb2aea33eb9ac087e`.
+- Exact-head `1bfc56a75a433603faff087025b1fa38766054d1`: push Verify `36696693545` SUCCESS and PR Verify `36697495870` SUCCESS.
+- Merged-main Verify run `36698092398`: SUCCESS on macOS, Windows x64 and Windows ARM64.
+- FMG-022 Checkpoint Restore Transaction is CLAIMED / ACTIVE on branch `chatgpt/FMG-022-checkpoint-restore`.
+- Dependencies FMG-021, FMG-008, FMG-009, FMG-016 are all DONE / MAIN VERIFIED.
+NEXT_EXACT_ACTION: deep-read the existing WorkspaceCheckpointService/manifest format plus Mutation Guard, apply_edits/versioned mutation, quarantine restore transaction and SourceStateRef/Git primitives; implement restore plan + divergence guard + mandatory rollback checkpoint + staged/unstaged/untracked/index restore + verification/rollback terminal states. Do not begin FMG-023 before FMG-022 MAIN VERIFIED.

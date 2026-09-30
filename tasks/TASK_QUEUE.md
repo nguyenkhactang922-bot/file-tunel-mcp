@@ -27,5 +27,6 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 ## Current complete-upgrade pointer
 
 - FMG-020: DONE / MAIN VERIFIED at 4f99a60ba91abc0040364f70c9df86478fc4dab2 (Verify 36675201004 SUCCESS).
-- FMG-021: ACTIVE on chatgpt/FMG-021-workspace-checkpoint.
-- NEXT_EXACT_ACTION: FMG-021 exact-head 3aa0f59 Verify 36695888973: ARM64 full PASS; x64 failed later in unchanged Job Object assignment with Access denied; macOS static PASS but Integration test compile failed on try-inside-precondition. Swift harness is locally remediated with contract guard PASS. Commit/push test-only fix and require fresh exact-head Verify; do not weaken ProcessRunner unless x64 reproduces. FMG-022 remains blocked.
+- FMG-021: DONE / MAIN VERIFIED at `12874be49a3bc8eaacdeb0dfb2aea33eb9ac087e` (merged-main Verify `36698092398` SUCCESS).
+- FMG-022: ACTIVE on `chatgpt/FMG-022-checkpoint-restore`.
+- NEXT_EXACT_ACTION: deep-read checkpoint manifest/capture + Mutation Guard/apply_edits/quarantine/SourceStateRef primitives, then implement transactional checkpoint restore with divergence guard, mandatory rollback checkpoint, index restoration, post-restore verification and rollback/partial_recovery_required handling. FMG-023 remains blocked until FMG-022 MAIN VERIFIED.
