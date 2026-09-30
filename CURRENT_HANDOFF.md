@@ -1257,3 +1257,14 @@ FMG-021 Workspace Checkpoint Capture is DONE / MAIN VERIFIED.
 - FMG-022 Checkpoint Restore Transaction is CLAIMED / ACTIVE on branch `chatgpt/FMG-022-checkpoint-restore`.
 - Dependencies FMG-021, FMG-008, FMG-009, FMG-016 are all DONE / MAIN VERIFIED.
 NEXT_EXACT_ACTION: deep-read the existing WorkspaceCheckpointService/manifest format plus Mutation Guard, apply_edits/versioned mutation, quarantine restore transaction and SourceStateRef/Git primitives; implement restore plan + divergence guard + mandatory rollback checkpoint + staged/unstaged/untracked/index restore + verification/rollback terminal states. Do not begin FMG-023 before FMG-022 MAIN VERIFIED.
+
+## FMG-022 local verification checkpoint - 2026-09-30
+
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-022-checkpoint-restore`.
+Local proof: state + checkpoint-restore contract PASS; catalog 1.13.0 / 46 tools + parity PASS; targeted Windows restore 29 assertions PASS; Windows Release 0 warnings/errors; full Windows runtime 955 assertions PASS; macOS runtime/build shell syntax PASS.
+Evidence: `docs/evidence/FMG-022_CHECKPOINT_RESTORE_TRANSACTION_EVIDENCE.md`.
+NEXT_EXACT_ACTION: inspect latest `fork/main` and remote FMG-022 branch/PR before commit/push; sync only if needed, then exact-head native Verify -> scoped review -> PR/merge -> merged-main Verify -> FMG-022 MAIN VERIFIED -> claim FMG-023.
+
+## Final local diff-hygiene checkpoint
+
+Before commit, scoped diff review found one literal NUL byte in `WorkspaceCheckpointGit.cs`, causing Git to classify the C# source as binary. The source byte was normalized to the canonical C# escape `\0` without changing runtime semantics. Post-fix proof: `git diff --check` PASS; Windows test-project build PASS 0 warnings/errors; targeted checkpoint restore PASS 29 assertions.

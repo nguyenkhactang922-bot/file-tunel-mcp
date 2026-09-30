@@ -120,11 +120,11 @@ struct LocalToolCallOutput {
 final class LocalTools {
     private static let handlerToolNames: Set<String> = [
         "list_files", "read_file", "read_file_range", "batch_stat", "batch_read", "quarantine_list", "quarantine_get", "checkpoint_list", "checkpoint_get", "search_content", "search_filenames",
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "checkpoint_capture", "checkpoint_delete", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "git_init", "git_status", "git_log", "git_diff",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "checkpoint_capture", "checkpoint_restore", "checkpoint_delete", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "git_init", "git_status", "git_log", "git_diff",
         "git_add", "git_commit", "git_push", "exec_process", "run_command",
     ]
     private static let budgetedToolNames: Set<String> = [
-        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "checkpoint_capture", "checkpoint_list", "checkpoint_get", "checkpoint_delete", "search_content", "search_filenames",
+        "list_files", "batch_stat", "batch_read", "quarantine_delete", "quarantine_list", "quarantine_get", "quarantine_restore", "checkpoint_capture", "checkpoint_restore", "checkpoint_list", "checkpoint_get", "checkpoint_delete", "search_content", "search_filenames",
         "write_file", "delete_file", "delete_directory", "apply_edits", "apply_search_replace", "apply_unified_diff", "project_context", "repo_map", "symbol_search", "related_files", "pty_start", "pty_read", "pty_write", "pty_resize", "pty_signal", "pty_stop", "pty_list", "exec_process",
     ]
     private let resolver: SafePathResolver
@@ -152,7 +152,7 @@ final class LocalTools {
     private let commandSlots = DispatchSemaphore(value: 2)
     private let gitSlots = DispatchSemaphore(value: 3)
     private let serializedToolNames: Set<String> = [
-        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "checkpoint_capture", "checkpoint_delete", "apply_edits", "apply_search_replace", "apply_unified_diff", "run_command",
+        "write_file", "delete_file", "delete_directory", "quarantine_delete", "quarantine_restore", "checkpoint_capture", "checkpoint_restore", "checkpoint_delete", "apply_edits", "apply_search_replace", "apply_unified_diff", "run_command",
         "git_init", "git_status", "git_log", "git_diff", "git_add", "git_commit", "git_push",
     ]
     private let skippedSearchDirectories: Set<String> = [
@@ -240,11 +240,13 @@ final class LocalTools {
             resolver: resolver,
             artifactFactory: artifactFactory,
             policy: policy,
+            mutationGuard: guardService,
             resolveRepo: { [unowned self] path in try self.gitRepo(path) },
             runGit: { [unowned self] repo, arguments, limit, trim in
                 try self.runGit(repo: repo, arguments: arguments, outputLimitBytes: limit, trimOutput: trim)
             },
             readIndexBlob: { [unowned self] repo, path in try self.readGitIndexBlob(repo: repo, relativePath: path) },
+            readGitObjectBlob: { [unowned self] repo, objectSpec in try self.readGitObjectBlob(repo: repo, objectSpec: objectSpec) },
             captureSourceState: { [unowned self] path, relevant in
                 try self.captureSourceStateRef(repoPath: path, relevantPaths: relevant)
             },
@@ -343,6 +345,14 @@ final class LocalTools {
         case "checkpoint_get":
             return objectOutput(try checkpoints.get(
                 checkpointRef: requiredString(arguments, "checkpoint_ref")
+            ))
+        case "checkpoint_restore":
+            return objectOutput(try checkpoints.restore(
+                checkpointRef: requiredString(arguments, "checkpoint_ref"),
+                historyMode: string(arguments, "history_mode", default: "preserve"),
+                dryRun: bool(arguments, "dry_run", default: false),
+                preparedPolicy: preparedPolicy,
+                executionContext: executionContext
             ))
         case "checkpoint_delete":
             return objectOutput(try checkpoints.delete(
@@ -2116,6 +2126,15 @@ final class LocalTools {
         }
         guard let oid else { return nil }
         return try runGitBlob(repo: repo, oid: oid)
+    }
+
+    private func readGitObjectBlob(repo: URL, objectSpec: String) throws -> Data {
+        guard !objectSpec.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              objectSpec.utf8.count <= 8192,
+              !objectSpec.contains("\0") else {
+            throw MCPServerError.invalidArguments("Checkpoint Git object spec is invalid")
+        }
+        return try runGitBlob(repo: repo, oid: objectSpec)
     }
 
     private func runGitBlob(repo: URL, oid: String) throws -> Data {

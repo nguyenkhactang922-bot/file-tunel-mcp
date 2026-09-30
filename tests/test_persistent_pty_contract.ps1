@@ -12,8 +12,8 @@ $swiftRuntime = Get-Content -Raw (Join-Path $Root "tests/test_swift_runtime.sh")
 $macBuild = Get-Content -Raw (Join-Path $Root "build_macos_app.sh")
 $verify = Get-Content -Raw (Join-Path $Root ".github/workflows/verify.yml")
 
-if($catalog.catalogVersion -ne "1.12.0"){ throw "FMG-020 requires catalog 1.12.0" }
-if($catalog.tools.Count -ne 45){ throw "FMG-020 requires 45 canonical tools, got $($catalog.tools.Count)" }
+if($catalog.catalogVersion -ne "1.13.0"){ throw "FMG-020 requires catalog 1.13.0" }
+if($catalog.tools.Count -ne 46){ throw "FMG-020 requires 46 canonical tools, got $($catalog.tools.Count)" }
 
 $ptyTools = @("pty_start","pty_read","pty_write","pty_resize","pty_signal","pty_stop","pty_list")
 foreach($name in $ptyTools){
@@ -74,7 +74,7 @@ foreach($marker in @(
 }
 
 Write-Output "persistent-pty-contract: PASS"
-Write-Output "catalog: 1.12.0 / 45 tools"
+Write-Output "catalog: 1.13.0 / 46 tools"
 Write-Output "windows-backend: ConPTY"
 Write-Output "macos-backend: POSIX openpty + posix_spawn"
 Write-Output "restart-resume: false"

@@ -15,18 +15,22 @@ internal sealed class WorkspaceCheckpointOptions
     public long MaxSingleFileBytes { get; init; } = 32L * 1024 * 1024;
     public Func<DateTimeOffset> UtcNow { get; init; } = () => DateTimeOffset.UtcNow;
     internal Action<string>? StageForTests { get; init; }
+    internal Action<string>? RestoreStageForTests { get; init; }
 }
 
-internal sealed class WorkspaceCheckpointService
+internal sealed partial class WorkspaceCheckpointService
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
+    private const int MinimumSchemaVersion = 1;
     private readonly SafePathResolver _resolver;
     private readonly Func<ArtifactContentStore> _artifactFactory;
     private readonly ServerPolicy _policy;
+    private readonly AuthorizedPathSnapshotService _mutationGuard;
     private readonly WorkspaceCheckpointOptions _options;
     private readonly Func<string, CancellationToken, Task<string>> _resolveRepo;
     private readonly Func<string, IReadOnlyList<string>, int, bool, CancellationToken, Task<string>> _runGit;
     private readonly Func<string, string, CancellationToken, Task<byte[]?>> _readIndexBlob;
+    private readonly Func<string, string, CancellationToken, Task<byte[]>> _readGitObjectBlob;
     private readonly Func<string, IReadOnlyList<string>?, CancellationToken, Task<JsonObject>> _captureSourceState;
     private readonly string _workspaceAuthorityId;
     private readonly string _metadataRoot;
@@ -44,18 +48,22 @@ internal sealed class WorkspaceCheckpointService
         SafePathResolver resolver,
         Func<ArtifactContentStore> artifactFactory,
         ServerPolicy policy,
+        AuthorizedPathSnapshotService mutationGuard,
         Func<string, CancellationToken, Task<string>> resolveRepo,
         Func<string, IReadOnlyList<string>, int, bool, CancellationToken, Task<string>> runGit,
         Func<string, string, CancellationToken, Task<byte[]?>> readIndexBlob,
+        Func<string, string, CancellationToken, Task<byte[]>> readGitObjectBlob,
         Func<string, IReadOnlyList<string>?, CancellationToken, Task<JsonObject>> captureSourceState,
         WorkspaceCheckpointOptions? options = null)
     {
         _resolver = resolver;
         _artifactFactory = artifactFactory;
         _policy = policy;
+        _mutationGuard = mutationGuard;
         _resolveRepo = resolveRepo;
         _runGit = runGit;
         _readIndexBlob = readIndexBlob;
+        _readGitObjectBlob = readGitObjectBlob;
         _captureSourceState = captureSourceState;
         _options = options ?? new WorkspaceCheckpointOptions();
         ValidateOptions(_options);
@@ -165,9 +173,11 @@ internal sealed class WorkspaceCheckpointService
                 string? indexRef = null;
                 string? indexHash = null;
                 long indexBytes = 0;
+                string? indexMode = null;
                 string? indexExcludedReason = null;
                 if (stagedSet.Contains(path))
                 {
+                    indexMode = await ReadIndexModeAsync(repo, path, cancellationToken).ConfigureAwait(false);
                     if (generated && !includeGenerated)
                     {
                         indexExcludedReason = "generated";
@@ -239,6 +249,7 @@ internal sealed class WorkspaceCheckpointService
                     IndexContentRef = indexRef,
                     IndexSha256 = indexHash,
                     IndexSizeBytes = indexBytes,
+                    IndexMode = indexMode,
                     IndexExcludedReason = indexExcludedReason,
                     WorktreeContentRef = worktreeRef,
                     WorktreeSha256 = worktreeHash,
@@ -534,6 +545,7 @@ internal sealed class WorkspaceCheckpointService
                     ["worktree_exists"] = entry.WorktreeExists,
                     ["index_size_bytes"] = entry.IndexSizeBytes,
                     ["worktree_size_bytes"] = entry.WorktreeSizeBytes,
+                    ["index_mode"] = entry.IndexMode,
                     ["index_sha256"] = entry.IndexSha256,
                     ["worktree_sha256"] = entry.WorktreeSha256,
                     ["index_excluded_reason"] = entry.IndexExcludedReason,
@@ -547,6 +559,28 @@ internal sealed class WorkspaceCheckpointService
             result["index_fingerprint"] = manifest.IndexFingerprint;
         }
         return result;
+    }
+
+    private async Task<string?> ReadIndexModeAsync(string repo, string path, CancellationToken cancellationToken)
+    {
+        var listed = await _runGit(
+            repo,
+            ["ls-files", "-s", "--", path],
+            FileMcpConstants.MaxGitSafetyOutputBytes,
+            true,
+            cancellationToken).ConfigureAwait(false);
+        foreach (var line in listed.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var tab = line.IndexOf('	');
+            if (tab <= 0) continue;
+            var metadata = line[..tab].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (metadata.Length < 3 || metadata[2] != "0") continue;
+            var mode = metadata[0];
+            if (mode is not ("100644" or "100755" or "120000"))
+                throw new FileMcpException($"Checkpoint does not support Git index mode {mode} for {path}");
+            return mode;
+        }
+        return null;
     }
 
     private void EnforcePayloadBounds(string path, long bytes, ref long totalBytes, long maximum)
@@ -639,7 +673,7 @@ internal sealed class WorkspaceCheckpointService
 
     private static void ValidateManifest(CheckpointManifest manifest)
     {
-        if (manifest.SchemaVersion != SchemaVersion || string.IsNullOrWhiteSpace(manifest.WorkspaceAuthorityId) ||
+        if (manifest.SchemaVersion < MinimumSchemaVersion || manifest.SchemaVersion > SchemaVersion || string.IsNullOrWhiteSpace(manifest.WorkspaceAuthorityId) ||
             string.IsNullOrWhiteSpace(manifest.SourceStateId) || string.IsNullOrWhiteSpace(manifest.IndexFingerprint) ||
             manifest.CreatedEpochMs <= 0 || manifest.ExpiresEpochMs <= manifest.CreatedEpochMs ||
             manifest.Entries is null || manifest.TotalBytes < 0)
@@ -699,6 +733,7 @@ internal sealed class WorkspaceCheckpointService
         public string? IndexContentRef { get; set; }
         public string? IndexSha256 { get; set; }
         public long IndexSizeBytes { get; set; }
+        public string? IndexMode { get; set; }
         public string? IndexExcludedReason { get; set; }
         public string? WorktreeContentRef { get; set; }
         public string? WorktreeSha256 { get; set; }

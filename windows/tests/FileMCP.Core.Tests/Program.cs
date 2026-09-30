@@ -101,6 +101,13 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length > 0 && args[0] == "checkpoint-restore-only")
+            {
+                await TestWorkspaceCheckpointRestoreAsync(root);
+                Console.WriteLine($"windows-checkpoint-restore-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             if (args.Length > 0 && args[0] == "edit-adapters-only")
             {
                 await TestEditAdaptersAsync(root);
@@ -163,6 +170,7 @@ internal static class Program
             await TestBatchReadStatAsync(root);
             await TestQuarantineRestoreAsync(root);
             await TestWorkspaceCheckpointAsync(root);
+            await TestWorkspaceCheckpointRestoreAsync(root);
             TestTunnelRestartPolicy();
             await TestFilesystemAndToolsAsync(root);
             await TestGitSafetyAsync(root);
@@ -191,13 +199,13 @@ internal static class Program
 
     private static void TestCanonicalToolCatalog()
     {
-        Assert(CanonicalToolCatalog.CatalogVersion == "1.12.0", "canonical catalog version");
+        Assert(CanonicalToolCatalog.CatalogVersion == "1.13.0", "canonical catalog version");
         Assert(CanonicalToolCatalog.CatalogHash.Length == 64 && CanonicalToolCatalog.CatalogHash.All(Uri.IsHexDigit), "canonical catalog hash shape");
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 40, "catalog non-shell local tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 41, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 41, "catalog non-shell local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 42, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 2, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
@@ -3807,8 +3815,8 @@ internal static class Program
         var workspace = Path.Combine(root, "files"); Directory.CreateDirectory(workspace);
         var safe = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
         var full = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", true);
-        Assert(safe.ToolDefinitions.Count == 32 && !safe.HasTool("run_command"), "safe tool count");
-        Assert(full.ToolDefinitions.Count == 41 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
+        Assert(safe.ToolDefinitions.Count == 33 && !safe.HasTool("run_command"), "safe tool count");
+        Assert(full.ToolDefinitions.Count == 42 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
 
         var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
         var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);
@@ -4151,7 +4159,7 @@ internal static class Program
         var correlatedListJson = JsonNode.Parse(HttpBody(correlatedList))!.AsObject();
         var correlatedTools = correlatedListJson["result"]!["tools"]!.AsArray();
         Assert(
-            correlatedTools.Count == 36 &&
+            correlatedTools.Count == 37 &&
             correlatedTools.Any(tool => tool?["name"]?.GetValue<string>() == "apply_search_replace") &&
             correlatedTools.Any(tool => tool?["name"]?.GetValue<string>() == "apply_unified_diff"),
             "logical correlation facade includes connect, evidence, quarantine and edit-adapter tools");
@@ -5587,6 +5595,367 @@ internal static class Program
         }
 
         Console.WriteLine("windows-workspace-checkpoint: ok");
+    }
+
+    private static async Task TestWorkspaceCheckpointRestoreAsync(string root)
+    {
+        var area = Path.Combine(root, "fmg022");
+        var workspace = Path.Combine(area, "workspace");
+        var artifactsRoot = Path.Combine(area, "artifacts");
+        var checkpointsRoot = Path.Combine(area, "checkpoints");
+        Directory.CreateDirectory(workspace);
+
+        var clock = new DateTimeOffset(2026, 9, 30, 9, 0, 0, TimeSpan.Zero);
+        var artifactStore = new ArtifactContentStore(new ArtifactContentStoreOptions
+        {
+            RootDirectory = artifactsRoot,
+            WorkspaceRootForIsolation = workspace,
+            MaxItemBytes = 64 * 1024 * 1024,
+            MaxWorkspaceBytes = 256 * 1024 * 1024,
+            MaxGlobalBytes = 512 * 1024 * 1024,
+            DefaultTtl = TimeSpan.FromHours(24),
+            MaxTtl = TimeSpan.FromDays(7),
+            UtcNow = () => clock,
+        });
+
+        Action<string>? restoreHook = null;
+        var checkpointOptions = new WorkspaceCheckpointOptions
+        {
+            MetadataRootDirectory = checkpointsRoot,
+            DefaultTtl = TimeSpan.FromHours(24),
+            MaxTtl = TimeSpan.FromDays(7),
+            MaxEntries = 1000,
+            MaxTotalBytes = 32 * 1024 * 1024,
+            MaxSingleFileBytes = 8 * 1024 * 1024,
+            UtcNow = () => clock,
+            RestoreStageForTests = stage => restoreHook?.Invoke(stage),
+        };
+        var policy = ServerPolicy.FromLegacy(enableCommands: true);
+        LocalTools tools = new(
+            workspace, "FileMCP Test", "filemcp@example.invalid", policy,
+            artifactStore: artifactStore,
+            checkpointOptions: checkpointOptions);
+
+        void WriteText(string repoName, string relativePath, string value)
+        {
+            var full = Path.Combine(workspace, repoName, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+            File.WriteAllText(full, value, new UTF8Encoding(false));
+        }
+
+        async Task InitRepoAsync(string repoName, params (string Path, string Content)[] files)
+        {
+            Directory.CreateDirectory(Path.Combine(workspace, repoName));
+            await tools.CallAsync("git_init", Obj(("repo_path", repoName)));
+            foreach (var (path, content) in files) WriteText(repoName, path, content);
+            await tools.CallAsync("git_add", Obj(("repo_path", repoName), ("paths", ".")));
+            await tools.CallAsync("git_commit", Obj(("repo_path", repoName), ("message", "baseline")));
+        }
+
+        async Task<string> StatusAsync(string repoName) =>
+            (await tools.CallAsync("git_status", Obj(("repo_path", repoName))))
+                .StructuredContent["result"]!.GetValue<string>();
+
+        async Task<JsonObject> CaptureAsync(
+            string repoName,
+            bool includeUntracked = true,
+            bool includeIgnored = false,
+            bool includeGenerated = false) =>
+            (await tools.CallAsync("checkpoint_capture", Obj(
+                ("repo_path", repoName),
+                ("include_untracked", includeUntracked),
+                ("include_ignored", includeIgnored),
+                ("include_generated", includeGenerated),
+                ("ttl_seconds", 3600))))
+            .StructuredContent;
+
+        // Happy path: staged/index bytes, divergent worktree bytes and untracked content are restored.
+        // Ignored/generated content excluded by the manifest policy must remain untouched.
+        const string successRepo = "restore-success";
+        await InitRepoAsync(successRepo,
+            (".gitignore", "*.log\n"),
+            ("tracked.txt", "base\n"));
+        WriteText(successRepo, "tracked.txt", "target-index\n");
+        await tools.CallAsync("git_add", Obj(("repo_path", successRepo), ("paths", "tracked.txt")));
+        WriteText(successRepo, "tracked.txt", "target-worktree\n");
+        WriteText(successRepo, "target-untracked.txt", "target-untracked\n");
+        WriteText(successRepo, "ignored.log", "ignored-target\n");
+        WriteText(successRepo, "build/generated.txt", "generated-target\n");
+        var successTargetStatus = await StatusAsync(successRepo);
+        var successCapture = await CaptureAsync(successRepo);
+        var successRef = successCapture["checkpoint_ref"]!.GetValue<string>();
+        var successGet = (await tools.CallAsync("checkpoint_get", Obj(("checkpoint_ref", successRef)))).StructuredContent;
+        var successTracked = successGet["entries"]!.AsArray()
+            .Select(node => node!.AsObject())
+            .Single(item => item["relative_path"]!.GetValue<string>() == "tracked.txt");
+        Assert(successTracked["index_mode"]!.GetValue<string>() == "100644",
+            "checkpoint schema v2 records Git index mode for staged restore");
+
+        WriteText(successRepo, "tracked.txt", "current-index\n");
+        await tools.CallAsync("git_add", Obj(("repo_path", successRepo), ("paths", "tracked.txt")));
+        WriteText(successRepo, "tracked.txt", "current-worktree\n");
+        WriteText(successRepo, "target-untracked.txt", "current-untracked\n");
+        WriteText(successRepo, "extra-untracked.txt", "extra\n");
+        WriteText(successRepo, "ignored.log", "ignored-current\n");
+        WriteText(successRepo, "build/generated.txt", "generated-current\n");
+
+        var beforeDryCount = (await tools.CallAsync("checkpoint_list", Obj(("max_items", 100))))
+            .StructuredContent["count"]!.GetValue<int>();
+        var dry = (await tools.CallAsync("checkpoint_restore", Obj(
+            ("checkpoint_ref", successRef),
+            ("dry_run", true)))).StructuredContent;
+        Assert(dry["state"]!.GetValue<string>() == "planned" &&
+               dry["rollback_checkpoint_ref"] is null,
+            "checkpoint restore dry-run plans without rollback material");
+        Assert(File.ReadAllText(Path.Combine(workspace, successRepo, "tracked.txt")) == "current-worktree\n" &&
+               File.Exists(Path.Combine(workspace, successRepo, "extra-untracked.txt")),
+            "checkpoint restore dry-run does not mutate worktree");
+        var afterDryCount = (await tools.CallAsync("checkpoint_list", Obj(("max_items", 100))))
+            .StructuredContent["count"]!.GetValue<int>();
+        Assert(beforeDryCount == afterDryCount, "checkpoint restore dry-run does not create rollback checkpoint");
+
+        var successRestore = (await tools.CallAsync("checkpoint_restore", Obj(("checkpoint_ref", successRef))))
+            .StructuredContent;
+        Assert(successRestore["state"]!.GetValue<string>() == "restored" &&
+               successRestore["rollback_checkpoint_ref"] is null,
+            "checkpoint restore reaches verified restored terminal state and cleans rollback material");
+        Assert(File.ReadAllText(Path.Combine(workspace, successRepo, "tracked.txt")) == "target-worktree\n",
+            "checkpoint restore restores divergent worktree bytes");
+        Assert(File.ReadAllText(Path.Combine(workspace, successRepo, "target-untracked.txt")) == "target-untracked\n" &&
+               !File.Exists(Path.Combine(workspace, successRepo, "extra-untracked.txt")),
+            "checkpoint restore restores target untracked content and removes later untracked content");
+        Assert(File.ReadAllText(Path.Combine(workspace, successRepo, "ignored.log")) == "ignored-current\n" &&
+               File.ReadAllText(Path.Combine(workspace, successRepo, "build", "generated.txt")) == "generated-current\n",
+            "ignored/generated files excluded by checkpoint manifest remain untouched");
+        Assert(await StatusAsync(successRepo) == successTargetStatus,
+            "checkpoint restore reproduces staged/unstaged/untracked Git status exactly");
+        var afterSuccessCount = (await tools.CallAsync("checkpoint_list", Obj(("max_items", 100))))
+            .StructuredContent["count"]!.GetValue<int>();
+        Assert(afterSuccessCount == beforeDryCount, "successful restore deletes mandatory rollback checkpoint after verification");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", successRef)));
+
+        // Failure after mutation must roll back staged/index/worktree/untracked state.
+        const string rollbackRepo = "restore-rollback";
+        await InitRepoAsync(rollbackRepo, ("tracked.txt", "base\n"));
+        var rollbackTarget = await CaptureAsync(rollbackRepo);
+        var rollbackTargetRef = rollbackTarget["checkpoint_ref"]!.GetValue<string>();
+        WriteText(rollbackRepo, "tracked.txt", "before-index\n");
+        await tools.CallAsync("git_add", Obj(("repo_path", rollbackRepo), ("paths", "tracked.txt")));
+        WriteText(rollbackRepo, "tracked.txt", "before-worktree\n");
+        WriteText(rollbackRepo, "before-untracked.txt", "before-untracked\n");
+        var rollbackBeforeStatus = await StatusAsync(rollbackRepo);
+        restoreHook = stage =>
+        {
+            if (stage == "before_restore_verify")
+                throw new IOException("simulated restore verification failure");
+        };
+        var rolledBack = (await tools.CallAsync("checkpoint_restore", Obj(("checkpoint_ref", rollbackTargetRef))))
+            .StructuredContent;
+        restoreHook = null;
+        Assert(rolledBack["state"]!.GetValue<string>() == "rolled_back" &&
+               rolledBack["rollback_checkpoint_ref"] is null,
+            "restore failure triggers verified rollback and removes rollback checkpoint");
+        Assert(await StatusAsync(rollbackRepo) == rollbackBeforeStatus &&
+               File.ReadAllText(Path.Combine(workspace, rollbackRepo, "tracked.txt")) == "before-worktree\n" &&
+               File.ReadAllText(Path.Combine(workspace, rollbackRepo, "before-untracked.txt")) == "before-untracked\n",
+            "rollback restores pre-restore staged/worktree/untracked state");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", rollbackTargetRef)));
+
+        // Race after validation is detected before restore mutation and rollback material is cleaned.
+        const string raceRepo = "restore-race";
+        await InitRepoAsync(raceRepo, ("tracked.txt", "base\n"));
+        var raceTarget = await CaptureAsync(raceRepo);
+        var raceRef = raceTarget["checkpoint_ref"]!.GetValue<string>();
+        WriteText(raceRepo, "tracked.txt", "current\n");
+        restoreHook = stage =>
+        {
+            if (stage == "after_restore_plan")
+                WriteText(raceRepo, "tracked.txt", "raced\n");
+        };
+        await AssertThrowsAsync(
+            () => tools.CallAsync("checkpoint_restore", Obj(("checkpoint_ref", raceRef))),
+            "changed after checkpoint restore plan validation",
+            "concurrent change after validation aborts restore before mutation");
+        restoreHook = null;
+        Assert(File.ReadAllText(Path.Combine(workspace, raceRepo, "tracked.txt")) == "raced\n",
+            "race detector does not overwrite the concurrent writer");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", raceRef)));
+
+        // Locked file fails before mutation.
+        const string lockRepo = "restore-lock";
+        await InitRepoAsync(lockRepo, ("tracked.txt", "base\n"));
+        var lockTarget = await CaptureAsync(lockRepo);
+        var lockRef = lockTarget["checkpoint_ref"]!.GetValue<string>();
+        WriteText(lockRepo, "tracked.txt", "locked-current\n");
+        var lockPath = Path.Combine(workspace, lockRepo, "tracked.txt");
+        var lockFailed = false;
+        using (var locked = new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            try
+            {
+                await tools.CallAsync("checkpoint_restore", Obj(("checkpoint_ref", lockRef)));
+            }
+            catch (IOException)
+            {
+                lockFailed = true;
+            }
+        }
+        Assert(lockFailed && File.ReadAllText(lockPath) == "locked-current\n",
+            "locked file aborts checkpoint restore before mutation");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", lockRef)));
+
+        // Missing authenticated manifest fails closed before mutation.
+        const string missingRepo = "restore-missing-artifact";
+        await InitRepoAsync(missingRepo, ("tracked.txt", "base\n"));
+        var missingTarget = await CaptureAsync(missingRepo);
+        var missingRef = missingTarget["checkpoint_ref"]!.GetValue<string>();
+        var missingDeleted = await artifactStore.DeleteAsync(
+            missingRef,
+            ArtifactContentStore.WorkspaceAuthorityId(workspace),
+            value => value == ArtifactContentClasses.Checkpoint);
+        Assert(missingDeleted, "test fixture removes checkpoint manifest ContentRef");
+        var missingFailed = false;
+        try
+        {
+            await tools.CallAsync("checkpoint_restore", Obj(("checkpoint_ref", missingRef)));
+        }
+        catch (FileMcpException)
+        {
+            missingFailed = true;
+        }
+        Assert(missingFailed && File.ReadAllText(Path.Combine(workspace, missingRepo, "tracked.txt")) == "base\n",
+            "missing checkpoint artifact fails closed before repository mutation");
+
+        // Diverged HEAD is refused by default; explicit history move requires stronger local policy.
+        // When enabled, clean paths changed only by history are included in the restore plan.
+        const string moveRepo = "restore-history-move";
+        await InitRepoAsync(moveRepo,
+            ("tracked.txt", "base\n"),
+            ("clean-history.txt", "base-clean\n"));
+        WriteText(moveRepo, "tracked.txt", "target-index\n");
+        await tools.CallAsync("git_add", Obj(("repo_path", moveRepo), ("paths", "tracked.txt")));
+        WriteText(moveRepo, "tracked.txt", "target-worktree\n");
+        WriteText(moveRepo, "target-untracked.txt", "target-untracked\n");
+        var moveTargetStatus = await StatusAsync(moveRepo);
+        var moveTarget = await CaptureAsync(moveRepo);
+        var moveRef = moveTarget["checkpoint_ref"]!.GetValue<string>();
+        var moveTargetHead = moveTarget["head_oid"]!.GetValue<string>();
+
+        WriteText(moveRepo, "tracked.txt", "later\n");
+        WriteText(moveRepo, "clean-history.txt", "later-clean\n");
+        WriteText(moveRepo, "target-untracked.txt", "later-now-tracked\n");
+        await tools.CallAsync("git_add", Obj(("repo_path", moveRepo), ("paths", ".")));
+        await tools.CallAsync("git_commit", Obj(("repo_path", moveRepo), ("message", "later commit")));
+
+        await AssertThrowsAsync(
+            () => tools.CallAsync("checkpoint_restore", Obj(("checkpoint_ref", moveRef))),
+            "HEAD diverged",
+            "later/diverged commit is refused by default");
+        await AssertThrowsAsync(
+            () => tools.CallAsync("checkpoint_restore", Obj(
+                ("checkpoint_ref", moveRef),
+                ("history_mode", "move"))),
+            "explicit custom high-risk local policy",
+            "history move is denied without explicit stronger local policy");
+
+        var movePolicy = new ServerPolicy(new LocalPolicyConfiguration
+        {
+            Profile = FileMcpPolicyProfiles.Custom,
+            CustomMaxRisk = "high",
+            CustomAllowedEffects = ["read", "write", "delete", "metadata"],
+            CustomAllowNetworkOpenWorld = false,
+            CustomAllowShell = false,
+        });
+        Assert(movePolicy.AllowsExplicitHistoryMove, "custom high-risk write+delete policy enables explicit history move gate");
+        var moveTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid", movePolicy,
+            artifactStore: artifactStore,
+            checkpointOptions: checkpointOptions);
+        var moved = (await moveTools.CallAsync("checkpoint_restore", Obj(
+            ("checkpoint_ref", moveRef),
+            ("history_mode", "move")))).StructuredContent;
+        Assert(moved["state"]!.GetValue<string>() == "restored" &&
+               moved["target_head_oid"]!.GetValue<string>() == moveTargetHead,
+            "explicit history move reaches target checkpoint HEAD and verifies restore");
+        Assert(File.ReadAllText(Path.Combine(workspace, moveRepo, "clean-history.txt")) == "base-clean\n",
+            "history move restores clean path changed only between commits");
+        Assert(File.ReadAllText(Path.Combine(workspace, moveRepo, "tracked.txt")) == "target-worktree\n" &&
+               File.ReadAllText(Path.Combine(workspace, moveRepo, "target-untracked.txt")) == "target-untracked\n",
+            "history move restores checkpoint worktree and untracked payloads");
+        Assert(await StatusAsync(moveRepo) == moveTargetStatus,
+            "history move restores target staged/unstaged/untracked status");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", moveRef)));
+
+        // Crash after first publish retains journal + rollback checkpoint; a fresh service instance recovers it.
+        const string crashRepo = "restore-crash";
+        await InitRepoAsync(crashRepo, ("tracked.txt", "base\n"));
+        var crashTarget = await CaptureAsync(crashRepo);
+        var crashRef = crashTarget["checkpoint_ref"]!.GetValue<string>();
+        WriteText(crashRepo, "tracked.txt", "crash-index\n");
+        await tools.CallAsync("git_add", Obj(("repo_path", crashRepo), ("paths", "tracked.txt")));
+        WriteText(crashRepo, "tracked.txt", "crash-worktree\n");
+        WriteText(crashRepo, "crash-untracked.txt", "crash-untracked\n");
+        var crashBeforeStatus = await StatusAsync(crashRepo);
+        var crashInjected = false;
+        restoreHook = stage =>
+        {
+            if (!crashInjected && stage.StartsWith("after_restore_publish:", StringComparison.Ordinal))
+            {
+                crashInjected = true;
+                throw new WorkspaceCheckpointCrashForTestsException();
+            }
+        };
+        await AssertThrowsAsync(
+            () => tools.CallAsync("checkpoint_restore", Obj(("checkpoint_ref", crashRef))),
+            "simulated checkpoint restore crash",
+            "simulated process crash leaves durable recovery transaction");
+        restoreHook = null;
+
+        var recoveredTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid", policy,
+            artifactStore: artifactStore,
+            checkpointOptions: checkpointOptions);
+        var recovered = (await recoveredTools.CallAsync("checkpoint_restore", Obj(("checkpoint_ref", crashRef))))
+            .StructuredContent;
+        Assert(recovered["state"]!.GetValue<string>() == "rolled_back" &&
+               recovered["recovered_incomplete"]!.GetValue<bool>(),
+            "fresh service instance detects interrupted restore journal and rolls back");
+        tools = recoveredTools;
+        Assert(await StatusAsync(crashRepo) == crashBeforeStatus &&
+               File.ReadAllText(Path.Combine(workspace, crashRepo, "tracked.txt")) == "crash-worktree\n" &&
+               File.ReadAllText(Path.Combine(workspace, crashRepo, "crash-untracked.txt")) == "crash-untracked\n",
+            "crash recovery restores pre-restore workspace/index state");
+        await tools.CallAsync("checkpoint_delete", Obj(("checkpoint_ref", crashRef)));
+
+        // Rollback failure must never claim PASS and must retain recovery material.
+        const string partialRepo = "restore-partial";
+        await InitRepoAsync(partialRepo, ("tracked.txt", "base\n"));
+        var partialTarget = await CaptureAsync(partialRepo);
+        var partialRef = partialTarget["checkpoint_ref"]!.GetValue<string>();
+        WriteText(partialRepo, "tracked.txt", "partial-index\n");
+        await tools.CallAsync("git_add", Obj(("repo_path", partialRepo), ("paths", "tracked.txt")));
+        WriteText(partialRepo, "tracked.txt", "partial-worktree\n");
+        restoreHook = stage =>
+        {
+            if (stage == "before_restore_verify")
+                throw new IOException("simulated restore verification failure");
+            if (stage == "during_restore_rollback")
+                throw new IOException("simulated rollback failure");
+        };
+        var partial = (await tools.CallAsync("checkpoint_restore", Obj(("checkpoint_ref", partialRef))))
+            .StructuredContent;
+        restoreHook = null;
+        var recoveryRef = partial["rollback_checkpoint_ref"]!.GetValue<string>();
+        Assert(partial["state"]!.GetValue<string>() == "partial_recovery_required" &&
+               !string.IsNullOrWhiteSpace(recoveryRef) &&
+               partial["rollback_error"]!.GetValue<string>().Contains("simulated rollback failure", StringComparison.Ordinal),
+            "rollback failure returns partial_recovery_required with retained recovery material");
+        var retained = (await tools.CallAsync("checkpoint_list", Obj(("max_items", 1000))))
+            .StructuredContent["items"]!.AsArray()
+            .Any(node => node!.AsObject()["checkpoint_ref"]!.GetValue<string>() == recoveryRef);
+        Assert(retained, "partial recovery retains rollback checkpoint instead of deleting recovery material");
+
+        Console.WriteLine("windows-workspace-checkpoint-restore: ok");
     }
 
     private static void TestTunnelRestartPolicy()

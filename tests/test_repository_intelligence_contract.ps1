@@ -73,8 +73,8 @@ foreach ($Path in @("build_macos_app.sh", ".github/workflows/verify.yml", "tests
     Require-Contains $Text "RepositoryIntelligence.swift" "$Path does not compile RepositoryIntelligence.swift"
 }
 
-if ($Catalog.catalogVersion -ne "1.12.0" -or $Catalog.tools.Count -ne 45) {
-    throw "FMG-018 core invariants must remain compatible with the current 1.12.0 / 41-tool public catalog."
+if ($Catalog.catalogVersion -ne "1.13.0" -or $Catalog.tools.Count -ne 46) {
+    throw "FMG-018 core invariants must remain compatible with the current 1.13.0 / 41-tool public catalog."
 }
 
 Require-Contains $MacTools "func captureRepositoryIntelligence(" "macOS LocalTools internal FMG-018 bridge missing."

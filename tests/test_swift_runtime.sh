@@ -3940,6 +3940,384 @@ expectCpFailure("checkpoint corruption", containing: "corrupt") {
 print("swift-workspace-checkpoint: ok")
 
 
+
+
+// FMG-022 Checkpoint Restore Transaction.
+let crArea = root.appendingPathComponent("workspace-checkpoint-restore", isDirectory: true)
+let crWorkspace = crArea.appendingPathComponent("workspace", isDirectory: true)
+try FileManager.default.createDirectory(at: crWorkspace, withIntermediateDirectories: true)
+let crResolver = try SafePathResolver(rootPath: crWorkspace.path)
+var crClock = Date(timeIntervalSince1970: 1_798_200_000)
+
+var crArtifactOptions = ArtifactContentStoreOptions()
+crArtifactOptions.rootURL = crArea.appendingPathComponent("artifacts", isDirectory: true)
+crArtifactOptions.workspaceRootForIsolation = crWorkspace
+crArtifactOptions.maxItemBytes = 64 * 1024 * 1024
+crArtifactOptions.maxWorkspaceBytes = 256 * 1024 * 1024
+crArtifactOptions.maxGlobalBytes = 512 * 1024 * 1024
+crArtifactOptions.defaultTTL = 24 * 60 * 60
+crArtifactOptions.maxTTL = 7 * 24 * 60 * 60
+crArtifactOptions.now = { crClock }
+let crArtifacts = try ArtifactContentStore(options: crArtifactOptions)
+
+var crRestoreHook: ((String) throws -> Void)?
+var crOptions = WorkspaceCheckpointOptions()
+crOptions.metadataRootDirectory = crArea.appendingPathComponent("metadata", isDirectory: true)
+crOptions.defaultTTL = 24 * 60 * 60
+crOptions.maxTTL = 7 * 24 * 60 * 60
+crOptions.maxEntries = 1000
+crOptions.maxTotalBytes = 32 * 1024 * 1024
+crOptions.maxSingleFileBytes = 8 * 1024 * 1024
+crOptions.now = { crClock }
+crOptions.restoreStageForTests = { stage in try crRestoreHook?(stage) }
+
+let crLegacyPolicy = try ServerPolicy.fromLegacy(enableCommands: true)
+var crTools = try LocalTools(
+    resolver: crResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: crLegacyPolicy,
+    artifactStore: crArtifacts,
+    checkpointOptions: crOptions
+)
+func crCall(_ name: String, _ arguments: [String: Any] = [:]) throws -> [String: Any] {
+    try crTools.call(name: name, arguments: arguments).structuredContent
+}
+func crString(_ value: [String: Any], _ key: String) -> String {
+    guard let result = value[key] as? String else { preconditionFailure("missing restore string \(key)") }
+    return result
+}
+func crWrite(_ repoName: String, _ relativePath: String, _ value: String) throws {
+    let url = crWorkspace.appendingPathComponent(repoName, isDirectory: true).appendingPathComponent(relativePath)
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try value.write(to: url, atomically: false, encoding: .utf8)
+}
+func crInitRepo(_ repoName: String, _ files: [(String, String)]) throws {
+    let repo = crWorkspace.appendingPathComponent(repoName, isDirectory: true)
+    try FileManager.default.createDirectory(at: repo, withIntermediateDirectories: true)
+    try runGitFixture(repo, ["init"])
+    try runGitFixture(repo, ["config", "user.name", "FileMCP Test"])
+    try runGitFixture(repo, ["config", "user.email", "filemcp@example.invalid"])
+    for (path, content) in files { try crWrite(repoName, path, content) }
+    try runGitFixture(repo, ["add", "."])
+    try runGitFixture(repo, ["commit", "-m", "baseline"])
+}
+func crStatus(_ repoName: String) throws -> String {
+    crString(try crCall("git_status", ["repo_path": repoName]), "result")
+}
+func crCapture(
+    _ repoName: String,
+    includeIgnored: Bool = false,
+    includeGenerated: Bool = false
+) throws -> [String: Any] {
+    try crCall("checkpoint_capture", [
+        "repo_path": repoName,
+        "include_untracked": true,
+        "include_ignored": includeIgnored,
+        "include_generated": includeGenerated,
+        "ttl_seconds": 3600,
+    ])
+}
+func expectCrFailure(_ label: String, containing needle: String, _ body: () throws -> Void) {
+    do {
+        try body()
+        preconditionFailure("\(label) should fail")
+    } catch {
+        precondition(
+            error.localizedDescription.localizedCaseInsensitiveContains(needle),
+            "\(label) wrong error: \(error.localizedDescription)"
+        )
+    }
+}
+
+// Exact staged/index + divergent worktree + untracked restore; excluded ignored/generated stay untouched.
+let crSuccessName = "restore-success"
+let crSuccessRepo = crWorkspace.appendingPathComponent(crSuccessName, isDirectory: true)
+try crInitRepo(crSuccessName, [
+    (".gitignore", "*.log\n"),
+    ("tracked.txt", "base\n"),
+])
+try crWrite(crSuccessName, "tracked.txt", "target-index\n")
+try runGitFixture(crSuccessRepo, ["add", "tracked.txt"])
+try crWrite(crSuccessName, "tracked.txt", "target-worktree\n")
+try crWrite(crSuccessName, "target-untracked.txt", "target-untracked\n")
+try crWrite(crSuccessName, "ignored.log", "ignored-target\n")
+try crWrite(crSuccessName, "build/generated.txt", "generated-target\n")
+let crSuccessTargetStatus = try crStatus(crSuccessName)
+let crSuccessCapture = try crCapture(crSuccessName)
+let crSuccessRef = crString(crSuccessCapture, "checkpoint_ref")
+let crSuccessGet = try crCall("checkpoint_get", ["checkpoint_ref": crSuccessRef])
+guard let crSuccessEntries = crSuccessGet["entries"] as? [[String: Any]],
+      let crSuccessTracked = crSuccessEntries.first(where: { ($0["relative_path"] as? String) == "tracked.txt" }) else {
+    preconditionFailure("restore checkpoint metadata missing tracked entry")
+}
+precondition(
+    (crSuccessTracked["index_mode"] as? String) == "100644",
+    "schema-v2 checkpoint must retain index_mode for exact staged restore"
+)
+
+try crWrite(crSuccessName, "tracked.txt", "current-index\n")
+try runGitFixture(crSuccessRepo, ["add", "tracked.txt"])
+try crWrite(crSuccessName, "tracked.txt", "current-worktree\n")
+try crWrite(crSuccessName, "target-untracked.txt", "current-untracked\n")
+try crWrite(crSuccessName, "extra-untracked.txt", "extra\n")
+try crWrite(crSuccessName, "ignored.log", "ignored-current\n")
+try crWrite(crSuccessName, "build/generated.txt", "generated-current\n")
+
+let crBeforeDryList = try crCall("checkpoint_list", ["max_items": 100])
+let crBeforeDryCount = (crBeforeDryList["count"] as? NSNumber)?.intValue ?? -1
+let crDry = try crCall("checkpoint_restore", ["checkpoint_ref": crSuccessRef, "dry_run": true])
+precondition(
+    (crDry["state"] as? String) == "planned" && crDry["rollback_checkpoint_ref"] is NSNull,
+    "checkpoint restore dry-run must plan without rollback material"
+)
+precondition(
+    try String(contentsOf: crSuccessRepo.appendingPathComponent("tracked.txt"), encoding: .utf8) == "current-worktree\n",
+    "checkpoint restore dry-run mutated worktree"
+)
+let crAfterDryList = try crCall("checkpoint_list", ["max_items": 100])
+let crAfterDryCount = (crAfterDryList["count"] as? NSNumber)?.intValue ?? -1
+precondition(crBeforeDryCount == crAfterDryCount, "checkpoint restore dry-run created rollback material")
+
+let crRestored = try crCall("checkpoint_restore", ["checkpoint_ref": crSuccessRef])
+precondition(
+    (crRestored["state"] as? String) == "restored" && crRestored["rollback_checkpoint_ref"] is NSNull,
+    "checkpoint restore must verify before deleting rollback material"
+)
+let crRestoredTracked = try String(contentsOf: crSuccessRepo.appendingPathComponent("tracked.txt"), encoding: .utf8)
+let crRestoredUntracked = try String(contentsOf: crSuccessRepo.appendingPathComponent("target-untracked.txt"), encoding: .utf8)
+let crIgnoredCurrent = try String(contentsOf: crSuccessRepo.appendingPathComponent("ignored.log"), encoding: .utf8)
+let crGeneratedCurrent = try String(contentsOf: crSuccessRepo.appendingPathComponent("build/generated.txt"), encoding: .utf8)
+precondition(crRestoredTracked == "target-worktree\n", "checkpoint restore worktree bytes mismatch")
+precondition(
+    crRestoredUntracked == "target-untracked\n"
+        && !FileManager.default.fileExists(atPath: crSuccessRepo.appendingPathComponent("extra-untracked.txt").path),
+    "checkpoint restore untracked state mismatch"
+)
+precondition(
+    crIgnoredCurrent == "ignored-current\n" && crGeneratedCurrent == "generated-current\n",
+    "checkpoint restore mutated ignored/generated paths excluded by manifest policy"
+)
+let crSuccessAfterStatus = try crStatus(crSuccessName)
+precondition(crSuccessAfterStatus == crSuccessTargetStatus, "checkpoint restore Git status does not match target")
+_ = try crCall("checkpoint_delete", ["checkpoint_ref": crSuccessRef])
+
+// checkpoint restore rollback: injected verification failure must restore pre-restore staged/worktree/untracked state.
+let crRollbackName = "restore-rollback"
+let crRollbackRepo = crWorkspace.appendingPathComponent(crRollbackName, isDirectory: true)
+try crInitRepo(crRollbackName, [("tracked.txt", "base\n")])
+let crRollbackTarget = try crCapture(crRollbackName)
+let crRollbackRef = crString(crRollbackTarget, "checkpoint_ref")
+try crWrite(crRollbackName, "tracked.txt", "before-index\n")
+try runGitFixture(crRollbackRepo, ["add", "tracked.txt"])
+try crWrite(crRollbackName, "tracked.txt", "before-worktree\n")
+try crWrite(crRollbackName, "before-untracked.txt", "before-untracked\n")
+let crRollbackBeforeStatus = try crStatus(crRollbackName)
+crRestoreHook = { stage in
+    if stage == "before_restore_verify" {
+        throw NSError(
+            domain: "FileMCP.Test",
+            code: 22,
+            userInfo: [NSLocalizedDescriptionKey: "simulated restore verification failure"]
+        )
+    }
+}
+let crRolledBack = try crCall("checkpoint_restore", ["checkpoint_ref": crRollbackRef])
+crRestoreHook = nil
+precondition(
+    (crRolledBack["state"] as? String) == "rolled_back" && crRolledBack["rollback_checkpoint_ref"] is NSNull,
+    "checkpoint restore rollback did not reach verified rolled_back state"
+)
+let crRollbackAfterStatus = try crStatus(crRollbackName)
+let crRollbackWorktree = try String(contentsOf: crRollbackRepo.appendingPathComponent("tracked.txt"), encoding: .utf8)
+let crRollbackUntracked = try String(contentsOf: crRollbackRepo.appendingPathComponent("before-untracked.txt"), encoding: .utf8)
+precondition(
+    crRollbackAfterStatus == crRollbackBeforeStatus
+        && crRollbackWorktree == "before-worktree\n"
+        && crRollbackUntracked == "before-untracked\n",
+    "checkpoint restore rollback did not restore pre-restore workspace/index state"
+)
+_ = try crCall("checkpoint_delete", ["checkpoint_ref": crRollbackRef])
+
+// Race after validation must abort before mutation and preserve the concurrent writer.
+let crRaceName = "restore-race"
+let crRaceRepo = crWorkspace.appendingPathComponent(crRaceName, isDirectory: true)
+try crInitRepo(crRaceName, [("tracked.txt", "base\n")])
+let crRaceTarget = try crCapture(crRaceName)
+let crRaceRef = crString(crRaceTarget, "checkpoint_ref")
+try crWrite(crRaceName, "tracked.txt", "current\n")
+crRestoreHook = { stage in
+    if stage == "after_restore_plan" {
+        try crWrite(crRaceName, "tracked.txt", "raced\n")
+    }
+}
+expectCrFailure("checkpoint restore race", containing: "changed after checkpoint restore plan validation") {
+    _ = try crCall("checkpoint_restore", ["checkpoint_ref": crRaceRef])
+}
+crRestoreHook = nil
+let crRaceValue = try String(contentsOf: crRaceRepo.appendingPathComponent("tracked.txt"), encoding: .utf8)
+precondition(crRaceValue == "raced\n", "checkpoint restore race overwrote concurrent writer")
+_ = try crCall("checkpoint_delete", ["checkpoint_ref": crRaceRef])
+
+// Later/diverged history is refused by default; explicit move requires stronger local policy.
+let crMoveName = "restore-history-move"
+let crMoveRepo = crWorkspace.appendingPathComponent(crMoveName, isDirectory: true)
+try crInitRepo(crMoveName, [
+    ("tracked.txt", "base\n"),
+    ("clean-history.txt", "base-clean\n"),
+])
+try crWrite(crMoveName, "tracked.txt", "target-index\n")
+try runGitFixture(crMoveRepo, ["add", "tracked.txt"])
+try crWrite(crMoveName, "tracked.txt", "target-worktree\n")
+try crWrite(crMoveName, "target-untracked.txt", "target-untracked\n")
+let crMoveTargetStatus = try crStatus(crMoveName)
+let crMoveTarget = try crCapture(crMoveName)
+let crMoveRef = crString(crMoveTarget, "checkpoint_ref")
+let crMoveHead = crString(crMoveTarget, "head_oid")
+try crWrite(crMoveName, "tracked.txt", "later\n")
+try crWrite(crMoveName, "clean-history.txt", "later-clean\n")
+try crWrite(crMoveName, "target-untracked.txt", "later-now-tracked\n")
+try runGitFixture(crMoveRepo, ["add", "."])
+try runGitFixture(crMoveRepo, ["commit", "-m", "later commit"])
+expectCrFailure("history divergence default", containing: "HEAD diverged") {
+    _ = try crCall("checkpoint_restore", ["checkpoint_ref": crMoveRef])
+}
+expectCrFailure("history move policy", containing: "explicit custom high-risk local policy") {
+    _ = try crCall("checkpoint_restore", ["checkpoint_ref": crMoveRef, "history_mode": "move"])
+}
+
+var crMoveConfiguration = LocalPolicyConfiguration()
+crMoveConfiguration.profile = FileMCPPolicyProfiles.custom
+crMoveConfiguration.customMaxRisk = "high"
+crMoveConfiguration.customAllowedEffects = ["read", "write", "delete", "metadata"]
+let crMovePolicy = try ServerPolicy(configuration: crMoveConfiguration)
+precondition(crMovePolicy.allowsExplicitHistoryMove, "history move policy gate did not activate")
+crTools = try LocalTools(
+    resolver: crResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: crMovePolicy,
+    artifactStore: crArtifacts,
+    checkpointOptions: crOptions
+)
+let crMoved = try crCall("checkpoint_restore", ["checkpoint_ref": crMoveRef, "history_mode": "move"])
+precondition(
+    (crMoved["state"] as? String) == "restored" && (crMoved["target_head_oid"] as? String) == crMoveHead,
+    "history move restore did not reach checkpoint HEAD"
+)
+let crMoveClean = try String(contentsOf: crMoveRepo.appendingPathComponent("clean-history.txt"), encoding: .utf8)
+let crMoveTracked = try String(contentsOf: crMoveRepo.appendingPathComponent("tracked.txt"), encoding: .utf8)
+let crMoveUntracked = try String(contentsOf: crMoveRepo.appendingPathComponent("target-untracked.txt"), encoding: .utf8)
+precondition(
+    crMoveClean == "base-clean\n" && crMoveTracked == "target-worktree\n" && crMoveUntracked == "target-untracked\n",
+    "history move restore did not restore clean-history + worktree + untracked target state"
+)
+let crMoveAfterStatus = try crStatus(crMoveName)
+precondition(crMoveAfterStatus == crMoveTargetStatus, "history move restore Git status mismatch")
+_ = try crCall("checkpoint_delete", ["checkpoint_ref": crMoveRef])
+
+// Return to normal policy for crash/rollback-failure tests.
+crTools = try LocalTools(
+    resolver: crResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: crLegacyPolicy,
+    artifactStore: crArtifacts,
+    checkpointOptions: crOptions
+)
+
+// checkpoint restore crash recovery: durable journal + rollback checkpoint survive simulated process death.
+let crCrashName = "restore-crash"
+let crCrashRepo = crWorkspace.appendingPathComponent(crCrashName, isDirectory: true)
+try crInitRepo(crCrashName, [("tracked.txt", "base\n")])
+let crCrashTarget = try crCapture(crCrashName)
+let crCrashRef = crString(crCrashTarget, "checkpoint_ref")
+try crWrite(crCrashName, "tracked.txt", "crash-index\n")
+try runGitFixture(crCrashRepo, ["add", "tracked.txt"])
+try crWrite(crCrashName, "tracked.txt", "crash-worktree\n")
+try crWrite(crCrashName, "crash-untracked.txt", "crash-untracked\n")
+let crCrashBeforeStatus = try crStatus(crCrashName)
+var crCrashInjected = false
+crRestoreHook = { stage in
+    if !crCrashInjected && stage.hasPrefix("after_restore_publish:") {
+        crCrashInjected = true
+        throw WorkspaceCheckpointCrashForTestsError()
+    }
+}
+expectCrFailure("checkpoint restore crash recovery injection", containing: "simulated checkpoint restore crash") {
+    _ = try crCall("checkpoint_restore", ["checkpoint_ref": crCrashRef])
+}
+crRestoreHook = nil
+crTools = try LocalTools(
+    resolver: crResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: crLegacyPolicy,
+    artifactStore: crArtifacts,
+    checkpointOptions: crOptions
+)
+let crRecovered = try crCall("checkpoint_restore", ["checkpoint_ref": crCrashRef])
+precondition(
+    (crRecovered["state"] as? String) == "rolled_back"
+        && (crRecovered["recovered_incomplete"] as? Bool) == true,
+    "checkpoint restore crash recovery did not rollback interrupted journal"
+)
+let crCrashAfterStatus = try crStatus(crCrashName)
+let crCrashTracked = try String(contentsOf: crCrashRepo.appendingPathComponent("tracked.txt"), encoding: .utf8)
+let crCrashUntracked = try String(contentsOf: crCrashRepo.appendingPathComponent("crash-untracked.txt"), encoding: .utf8)
+precondition(
+    crCrashAfterStatus == crCrashBeforeStatus
+        && crCrashTracked == "crash-worktree\n"
+        && crCrashUntracked == "crash-untracked\n",
+    "checkpoint restore crash recovery did not restore pre-crash state"
+)
+_ = try crCall("checkpoint_delete", ["checkpoint_ref": crCrashRef])
+
+// Rollback failure cannot yield PASS; partial recovery retains rollback checkpoint.
+let crPartialName = "restore-partial"
+let crPartialRepo = crWorkspace.appendingPathComponent(crPartialName, isDirectory: true)
+try crInitRepo(crPartialName, [("tracked.txt", "base\n")])
+let crPartialTarget = try crCapture(crPartialName)
+let crPartialRef = crString(crPartialTarget, "checkpoint_ref")
+try crWrite(crPartialName, "tracked.txt", "partial-index\n")
+try runGitFixture(crPartialRepo, ["add", "tracked.txt"])
+try crWrite(crPartialName, "tracked.txt", "partial-worktree\n")
+crRestoreHook = { stage in
+    if stage == "before_restore_verify" {
+        throw NSError(
+            domain: "FileMCP.Test",
+            code: 23,
+            userInfo: [NSLocalizedDescriptionKey: "simulated restore verification failure"]
+        )
+    }
+    if stage == "during_restore_rollback" {
+        throw NSError(
+            domain: "FileMCP.Test",
+            code: 24,
+            userInfo: [NSLocalizedDescriptionKey: "simulated rollback failure"]
+        )
+    }
+}
+let crPartial = try crCall("checkpoint_restore", ["checkpoint_ref": crPartialRef])
+crRestoreHook = nil
+guard let crRecoveryRef = crPartial["rollback_checkpoint_ref"] as? String else {
+    preconditionFailure("partial recovery did not retain rollback checkpoint ref")
+}
+precondition(
+    (crPartial["state"] as? String) == "partial_recovery_required"
+        && ((crPartial["rollback_error"] as? String)?.contains("simulated rollback failure") ?? false),
+    "rollback failure incorrectly claimed PASS"
+)
+let crPartialList = try crCall("checkpoint_list", ["max_items": 1000])
+let crPartialItems = crPartialList["items"] as? [[String: Any]] ?? []
+precondition(
+    crPartialItems.contains(where: { ($0["checkpoint_ref"] as? String) == crRecoveryRef }),
+    "partial recovery retains rollback checkpoint"
+)
+
+print("swift-workspace-checkpoint-restore: ok")
+
+
 let fmg011ServerStoreURL = root.appendingPathComponent("server-evidence.json")
 let server = try LocalMCPServer(
     port: 18088,
@@ -4046,7 +4424,7 @@ UNAVAILABLE_EVIDENCE_BASE_URL="http://127.0.0.1:18091/mcp"
 SERVER_ROOT="${TMPDIR%/}/filemcp-server-test"
 LOCAL_AUTH_TOKEN="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 CATALOG_HASH="$(python3 -c 'import hashlib, pathlib; t=pathlib.Path("contracts/tool_catalog.v1.json").read_text(encoding="utf-8-sig").replace("\r\n","\n").replace("\r","\n"); print(hashlib.sha256(t.encode("utf-8")).hexdigest())')"
-CATALOG_VERSION="1.12.0"
+CATALOG_VERSION="1.13.0"
 INSTRUCTION_VERSION="1.0.0"
 
 python3 - <<'PY'
