@@ -1235,8 +1235,6 @@ do {
     ptyInvalidResizeRejected = message.contains("size") || message.contains("columns")
 }
 precondition(ptyInvalidResizeRejected)
-print("FMG020_CHECKPOINT:invalid-resize")
-fflush(stdout)
 
 let ptyList = try ptyTools.call(name: "pty_list", arguments: [:])
 precondition(ptyList.structuredContent["workspace_scoped"] as? Bool == true)
@@ -1250,8 +1248,6 @@ let restartedPtyTools = try LocalTools(
 )
 let restartedPtyList = try restartedPtyTools.call(name: "pty_list", arguments: [:])
 precondition(restartedPtyList.structuredContent["count"] as? Int == 0)
-print("FMG020_CHECKPOINT:restart-no-resume")
-fflush(stdout)
 restartedPtyTools.stopAllPtySessions()
 
 let policyPtyStart = try ptyTools.call(
@@ -1270,8 +1266,6 @@ do {
     ptyPolicyRevoked = error.localizedDescription.lowercased().contains("policy")
 }
 precondition(ptyPolicyRevoked)
-print("FMG020_CHECKPOINT:policy-revoke")
-fflush(stdout)
 ptyTools.stopAllPtySessions()
 
 // Service-level bounded ring, spill, cursor and TTL proof.
@@ -1291,8 +1285,6 @@ ptyOptions.maxIdleTTL = 10
 ptyOptions.defaultMaxLifetime = 10
 ptyOptions.maxLifetime = 20
 ptyOptions.spillTTL = 5 * 60
-print("FMG020_FLOOD_STAGE:before-service-init")
-fflush(stdout)
 let ptyService = try PersistentPtyService(
     resolver: ptyResolver,
     environmentAuthority: try ExecProcessEnvironmentAuthority(),
@@ -1300,11 +1292,7 @@ let ptyService = try PersistentPtyService(
     options: ptyOptions
 )
 
-print("FMG020_FLOOD_STAGE:before-command")
-fflush(stdout)
 let ptyFloodCommand = "i=0; while [ $i -lt 5000 ]; do printf '0123456789abcdef0123456789abcdef\\\\n'; i=$((i+1)); done"
-print("FMG020_FLOOD_STAGE:before-start")
-fflush(stdout)
 let ptyFlood = try ptyService.start(
     executable: "/bin/sh",
     arguments: ["-c", ptyFloodCommand],
@@ -1317,48 +1305,26 @@ let ptyFlood = try ptyService.start(
     spillOutput: true
 )
 let ptyFloodSession = ptyFlood["session_id"] as! String
-print("FMG020_FLOOD_STAGE:after-start")
-fflush(stdout)
-print("FMG020_FLOOD_STAGE:before-wait")
-fflush(stdout)
 waitFor({
     ptyState(ptyService, sessionID: ptyFloodSession) != "running"
 }, timeout: 8, label: "PTY output flood exit")
-print("FMG020_FLOOD_STAGE:after-wait")
-fflush(stdout)
-print("FMG020_FLOOD_STAGE:before-read")
-fflush(stdout)
 let ptyFloodRead = try ptyService.read(
     sessionID: ptyFloodSession,
     cursor: "0",
     maxBytes: 64 * 1024,
     context: nil
 )
-print("FMG020_FLOOD_STAGE:after-read")
-fflush(stdout)
-let ptyFloodCursorEvictedDiagnostic = ptyFloodRead["cursor_evicted"]
-print("FMG020_FLOOD:cursor_evicted=\(String(describing: ptyFloodCursorEvictedDiagnostic))")
-fflush(stdout)
 precondition(ptyFloodRead["cursor_evicted"] as? Bool == true)
-let ptyFloodSpillRefCountDiagnostic = (ptyFloodRead["spill_refs"] as? [String])?.count ?? -1
-print("FMG020_FLOOD:spill_refs=\(ptyFloodSpillRefCountDiagnostic)")
-fflush(stdout)
 precondition((ptyFloodRead["spill_refs"] as? [String])?.isEmpty == false)
 let ptyUsageBeforeStop = try ptyArtifactStore.usage(
     workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(root)
 )
-print("FMG020_FLOOD:usage_before=\(ptyUsageBeforeStop.referenceCount)")
-fflush(stdout)
 precondition(ptyUsageBeforeStop.referenceCount > 0)
 _ = try ptyService.stop(sessionID: ptyFloodSession)
 let ptyUsageAfterStop = try ptyArtifactStore.usage(
     workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(root)
 )
-print("FMG020_FLOOD:usage_after=\(ptyUsageAfterStop.referenceCount)")
-fflush(stdout)
 precondition(ptyUsageAfterStop.referenceCount == 0)
-print("FMG020_CHECKPOINT:flood-spill-cleanup")
-fflush(stdout)
 
 var ptyFutureCursorRejected = false
 do {
@@ -1372,8 +1338,6 @@ do {
     ptyFutureCursorRejected = error.localizedDescription.lowercased().contains("beyond current output")
 }
 precondition(ptyFutureCursorRejected)
-print("FMG020_CHECKPOINT:future-cursor")
-fflush(stdout)
 
 let ptyIdle = try ptyService.start(
     executable: "/bin/cat",
@@ -1390,8 +1354,6 @@ let ptyIdleSession = ptyIdle["session_id"] as! String
 Thread.sleep(forTimeInterval: 1.2)
 ptyService.sweepNowForTests()
 precondition(ptyState(ptyService, sessionID: ptyIdleSession) == "idle_expired")
-print("FMG020_CHECKPOINT:idle-expiry")
-fflush(stdout)
 
 let ptyLifetime = try ptyService.start(
     executable: "/bin/cat",
@@ -1408,8 +1370,6 @@ let ptyLifetimeSession = ptyLifetime["session_id"] as! String
 Thread.sleep(forTimeInterval: 1.2)
 ptyService.sweepNowForTests()
 precondition(ptyState(ptyService, sessionID: ptyLifetimeSession) == "lifetime_expired")
-print("FMG020_CHECKPOINT:lifetime-expiry")
-fflush(stdout)
 ptyService.stopAll()
 print("swift-persistent-pty: ok")
 

@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: from canonical PROJECT_ROOT `D:\Tools\FileMCP` only, verify and commit/push the current FMG-020 macOS SDK-26 deprecation remediation that dynamically resolves legacy spawn-chdir on macOS 12..25 and uses the standard API on macOS 26+, require fresh exact-head native Verify, fix only any newly proven failing lane/stage, then scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021. Do not create another worktree and do not begin FMG-021 before FMG-020 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: from canonical PROJECT_ROOT `D:\Tools\FileMCP` only, verify/commit/push the FMG-020 scoped-review cleanup that removes temporary macOS PTY debug checkpoints while preserving acceptance markers, require fresh exact-head native Verify, then create/review/merge the FMG-020 PR, verify merged main, mark FMG-020 DONE / MAIN VERIFIED and claim FMG-021. Do not create another worktree and do not begin FMG-021 before FMG-020 MAIN VERIFIED.

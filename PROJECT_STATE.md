@@ -1117,3 +1117,16 @@ Remediation keeps the already-proven `openpty + posix_spawn` topology and cwd fi
 
 Current worktree is remediation-only; no CI run exists for this uncommitted dlsym candidate yet.
 NEXT_EXACT_ACTION: verify changed-scope local contracts, commit/push the dlsym compatibility remediation, require a fresh exact-head native Verify; do not rerun or modify already-green Windows behavior except as the branch workflow naturally verifies the pushed head.
+
+
+## FMG-020 exact-head native PASS + scoped-review cleanup - 2026-09-30
+
+Exact-head `be848d23d9a01cb446a501e0cde8775a1a6dba61`, Verify run `36673260254`, attempt 2: SUCCESS.
+- macOS: Static/typecheck/catalog PASS; Integration PASS; Build app PASS; bundled legal resources PASS.
+- Windows ARM64: full job PASS including native build/smoke/package.
+- Windows x64 initial attempt failed only on a transient exclusive file lock while reading `runtime-dynamic-health.health-url`; the failure was unrelated to the macOS-only code change. The exact failed Windows x64 job was rerun without code changes and then passed integration, x64/arm64 package builds, app smoke, resources and upload.
+
+Scoped review against `fork/main` confirmed FMG-020 production invariants remain intact: ConPTY + kill-on-close Job Object on Windows; POSIX openpty + posix_spawn + proven process-group signaling on macOS; workspace-scoped sessions; restart-no-resume; bounded ring/cursor/TTL/spill; PTY bytes absent from evidence/telemetry; macOS 12..25 legacy cwd spawn action resolved fail-closed via dlsym and macOS 26+ uses the standard API.
+
+Review cleanup removes only temporary `FMG020_CHECKPOINT:*` and `FMG020_FLOOD_*` debug prints/temporary variables from the macOS native acceptance test. It keeps the actual TTY marker, write/read round-trip, final `swift-persistent-pty: ok` marker and sanitized runtime failure diagnostic.
+NEXT_EXACT_ACTION: verify changed-scope contracts after review cleanup, commit/push the cleanup+state sync, require fresh exact-head Verify, then create/review/merge the FMG-020 PR if green.
