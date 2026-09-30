@@ -4396,16 +4396,23 @@ mkdir -p "$TMP_DIR/git-template"
 printf 'outside-template-marker\n' > "$TMP_DIR/git-template/copied-from-template"
 GIT_TEMPLATE_DIR="$TMP_DIR/git-template" "$TMP_DIR/server-test" &
 SERVER_PID=$!
-python3 - <<'PY'
+SERVER_PID="$SERVER_PID" python3 - <<'PY'
+import os
 import socket
 import time
 
 ports = (18088, 18089, 18090, 18091)
-# Native pre-listener fixtures include FMG-018 indexing and FMG-019 large-map/query coverage.
-# Keep this watchdog above loaded CI startup time; it does not alter product timeouts.
-deadline = time.monotonic() + 90.0
+server_pid = int(os.environ["SERVER_PID"])
+# Native pre-listener fixtures now include repository intelligence/query, PTY,
+# workspace checkpoint capture and transactional checkpoint restore adversarial coverage.
+# The watchdog protects only test-harness startup; it does not alter product timeouts.
+deadline = time.monotonic() + 240.0
 pending = set(ports)
 while pending and time.monotonic() < deadline:
+    try:
+        os.kill(server_pid, 0)
+    except ProcessLookupError:
+        raise SystemExit(f"macOS server fixture process exited before listeners became ready; pending ports: {sorted(pending)}")
     for port in tuple(pending):
         try:
             with socket.create_connection(("127.0.0.1", port), timeout=0.2):
@@ -4415,7 +4422,7 @@ while pending and time.monotonic() < deadline:
     if pending:
         time.sleep(0.05)
 if pending:
-    raise SystemExit(f"macOS server fixtures did not become ready on ports: {sorted(pending)}")
+    raise SystemExit(f"macOS server fixtures did not become ready within 240s on ports: {sorted(pending)}")
 print("macos-server-fixture-ready: ok")
 PY
 

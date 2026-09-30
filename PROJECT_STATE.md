@@ -1214,3 +1214,19 @@ Run `36709124346` on `381b5eacf32942df54337c003239f84fc14c5728`: Windows ARM64 p
 Remediation is test-only: the throwing file read is hoisted into `crDryTrackedText` before `precondition`. Local affected-stage proof: zero remaining `precondition(try String(contentsOf:))` occurrences, Swift shell syntax PASS, checkpoint-restore contract PASS, `git diff --check` PASS.
 
 NEXT_EXACT_ACTION: commit/push this test-only remediation and require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64.
+
+## FMG-022 native Verify attempt 2 remediation - 2026-10-01
+
+Run `36709652846` on exact head `4ddd8ab8afaab916f089e9cafd132927cc596613`: Windows x64 SUCCESS; Windows ARM64 SUCCESS; macOS static/catalog PASS, then Swift runtime reached FMG-022 restore fixtures but the server-test process did not open the four HTTP listeners within the existing 90-second pre-listener watchdog.
+
+Root cause is test-harness startup budget, not checkpoint-restore product semantics: the server-test executable intentionally runs repository-intelligence/query, PTY, checkpoint-capture and transactional checkpoint-restore native fixtures before constructing/listening on the HTTP servers. FMG-021/022 materially increased legitimate pre-listener fixture time beyond the stale 90-second watchdog.
+
+Remediation is test-harness only:
+- pass SERVER_PID into the readiness probe;
+- extend only the pre-listener fixture watchdog from 90s to 240s;
+- fail fast if the server-test process exits before listeners become ready;
+- keep all FileMCP product timeouts unchanged.
+
+Affected-stage local proof: project-state contract PASS; checkpoint-restore contract PASS (catalog 1.13.0 / 46 tools / transactional parity); Swift shell syntax PASS; `git diff --check` PASS.
+
+NEXT_EXACT_ACTION: commit/push this test-only watchdog remediation, require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64, then scoped review -> PR/merge -> merged-main Verify -> FMG-022 DONE / MAIN VERIFIED -> claim FMG-023.
