@@ -239,3 +239,16 @@ Exact-head `673bfb5592ff91358da6635eb0be996b319fe5d9`, Verify run `36668772693`:
 Remediation is diagnostic-only: bind `cursor_evicted` and spill-ref count to local Swift variables before interpolation, eliminating nested escaped literals. Production runtime is unchanged.
 Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
 NEXT_EXACT_ACTION: commit/push corrected diagnostic syntax, require fresh exact-head Verify, inspect the emitted `FMG020_FLOOD:*` values, then repair only the exact proven invariant.
+
+
+## FMG-020 macOS flood-stage boundary diagnostic - 2026-09-30
+
+Exact-head `bc6a970b5c0ed4623f439fa537bb1ac71790dc77`, Verify run `36669074011`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS Static/typecheck/catalog: SUCCESS.
+- macOS Integration passes checkpoints through `policy-revoke`, but none of the post-read `FMG020_FLOOD:*` values are emitted before SIGTRAP.
+
+The failure is therefore earlier than the four flood/spill assertions. Diagnostic-only instrumentation now brackets service initialization, flood-command creation, PTY start, wait-for-exit and read so the next native run identifies the exact boundary. Production runtime remains unchanged.
+Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push this boundary diagnostic, inspect only macOS Integration stage markers, then fix the proven failing operation without changing already-green Windows behavior.

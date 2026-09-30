@@ -1291,6 +1291,8 @@ ptyOptions.maxIdleTTL = 10
 ptyOptions.defaultMaxLifetime = 10
 ptyOptions.maxLifetime = 20
 ptyOptions.spillTTL = 5 * 60
+print("FMG020_FLOOD_STAGE:before-service-init")
+fflush(stdout)
 let ptyService = try PersistentPtyService(
     resolver: ptyResolver,
     environmentAuthority: try ExecProcessEnvironmentAuthority(),
@@ -1298,7 +1300,11 @@ let ptyService = try PersistentPtyService(
     options: ptyOptions
 )
 
+print("FMG020_FLOOD_STAGE:before-command")
+fflush(stdout)
 let ptyFloodCommand = "i=0; while [ $i -lt 5000 ]; do printf '0123456789abcdef0123456789abcdef\\\\n'; i=$((i+1)); done"
+print("FMG020_FLOOD_STAGE:before-start")
+fflush(stdout)
 let ptyFlood = try ptyService.start(
     executable: "/bin/sh",
     arguments: ["-c", ptyFloodCommand],
@@ -1311,15 +1317,25 @@ let ptyFlood = try ptyService.start(
     spillOutput: true
 )
 let ptyFloodSession = ptyFlood["session_id"] as! String
+print("FMG020_FLOOD_STAGE:after-start")
+fflush(stdout)
+print("FMG020_FLOOD_STAGE:before-wait")
+fflush(stdout)
 waitFor({
     ptyState(ptyService, sessionID: ptyFloodSession) != "running"
 }, timeout: 8, label: "PTY output flood exit")
+print("FMG020_FLOOD_STAGE:after-wait")
+fflush(stdout)
+print("FMG020_FLOOD_STAGE:before-read")
+fflush(stdout)
 let ptyFloodRead = try ptyService.read(
     sessionID: ptyFloodSession,
     cursor: "0",
     maxBytes: 64 * 1024,
     context: nil
 )
+print("FMG020_FLOOD_STAGE:after-read")
+fflush(stdout)
 let ptyFloodCursorEvictedDiagnostic = ptyFloodRead["cursor_evicted"]
 print("FMG020_FLOOD:cursor_evicted=\(String(describing: ptyFloodCursorEvictedDiagnostic))")
 fflush(stdout)
