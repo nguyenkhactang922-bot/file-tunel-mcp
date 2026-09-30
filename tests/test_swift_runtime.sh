@@ -1235,6 +1235,8 @@ do {
     ptyInvalidResizeRejected = message.contains("size") || message.contains("columns")
 }
 precondition(ptyInvalidResizeRejected)
+print("FMG020_CHECKPOINT:invalid-resize")
+fflush(stdout)
 
 let ptyList = try ptyTools.call(name: "pty_list", arguments: [:])
 precondition(ptyList.structuredContent["workspace_scoped"] as? Bool == true)
@@ -1248,6 +1250,8 @@ let restartedPtyTools = try LocalTools(
 )
 let restartedPtyList = try restartedPtyTools.call(name: "pty_list", arguments: [:])
 precondition(restartedPtyList.structuredContent["count"] as? Int == 0)
+print("FMG020_CHECKPOINT:restart-no-resume")
+fflush(stdout)
 restartedPtyTools.stopAllPtySessions()
 
 let policyPtyStart = try ptyTools.call(
@@ -1266,6 +1270,8 @@ do {
     ptyPolicyRevoked = error.localizedDescription.lowercased().contains("policy")
 }
 precondition(ptyPolicyRevoked)
+print("FMG020_CHECKPOINT:policy-revoke")
+fflush(stdout)
 ptyTools.stopAllPtySessions()
 
 // Service-level bounded ring, spill, cursor and TTL proof.
@@ -1325,6 +1331,8 @@ let ptyUsageAfterStop = try ptyArtifactStore.usage(
     workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(root)
 )
 precondition(ptyUsageAfterStop.referenceCount == 0)
+print("FMG020_CHECKPOINT:flood-spill-cleanup")
+fflush(stdout)
 
 var ptyFutureCursorRejected = false
 do {
@@ -1338,6 +1346,8 @@ do {
     ptyFutureCursorRejected = error.localizedDescription.lowercased().contains("beyond current output")
 }
 precondition(ptyFutureCursorRejected)
+print("FMG020_CHECKPOINT:future-cursor")
+fflush(stdout)
 
 let ptyIdle = try ptyService.start(
     executable: "/bin/cat",
@@ -1354,6 +1364,8 @@ let ptyIdleSession = ptyIdle["session_id"] as! String
 Thread.sleep(forTimeInterval: 1.2)
 ptyService.sweepNowForTests()
 precondition(ptyState(ptyService, sessionID: ptyIdleSession) == "idle_expired")
+print("FMG020_CHECKPOINT:idle-expiry")
+fflush(stdout)
 
 let ptyLifetime = try ptyService.start(
     executable: "/bin/cat",
@@ -1370,6 +1382,8 @@ let ptyLifetimeSession = ptyLifetime["session_id"] as! String
 Thread.sleep(forTimeInterval: 1.2)
 ptyService.sweepNowForTests()
 precondition(ptyState(ptyService, sessionID: ptyLifetimeSession) == "lifetime_expired")
+print("FMG020_CHECKPOINT:lifetime-expiry")
+fflush(stdout)
 ptyService.stopAll()
 print("swift-persistent-pty: ok")
 

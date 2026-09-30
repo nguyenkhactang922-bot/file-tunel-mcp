@@ -995,3 +995,16 @@ Remediation is test-only: the native macOS acceptance now treats the invalid res
 
 Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
 NEXT_EXACT_ACTION: commit/push this test-only invalid-resize assertion hardening and require a fresh exact-head native Verify on macOS / Windows x64 / Windows ARM64. If green, scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.
+
+
+## FMG-020 macOS post-resize diagnostic checkpoint - 2026-09-30
+
+Exact-head `acf23e406590ee40645698c8ac682d4794c0d127`, Verify run `36667522493`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS Static/typecheck/catalog: SUCCESS.
+- macOS Integration moved beyond the invalid-resize assertion but terminated with SIGTRAP before the final PTY success marker; the job log did not emit a Swift source line for the new trap.
+
+Diagnostic-only remediation: add flushed `FMG020_CHECKPOINT:*` markers after invalid-resize, restart-no-resume, policy-revoke, flood/spill cleanup, future-cursor, idle-expiry and lifetime-expiry acceptance points. Production runtime is unchanged.
+Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push this diagnostic-only head, inspect only the macOS Integration checkpoint boundary, then fix the exact proven failing substage. Do not change Windows/runtime behavior without evidence.
