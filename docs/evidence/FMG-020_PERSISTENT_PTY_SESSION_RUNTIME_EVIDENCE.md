@@ -309,3 +309,17 @@ Remediation is limited to PTY launch compatibility: keep the existing `posix_spa
 
 Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS for runtime/build scripts; `git diff --check` PASS. Native macOS compile/build remains the authoritative proof for SDK availability.
 NEXT_EXACT_ACTION: commit/push this deployment-target compatibility remediation, require fresh exact-head Verify macOS + Windows x64 + Windows ARM64; if all green, scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.
+
+
+## FMG-020 macOS SDK-26 deprecation remediation - 2026-09-30
+
+Exact-head `72c2adcf0abd0d0a52028be5885a0c5c39578201`, Verify run `36672151953`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS failed only at Static verification before Integration/Build.
+- Compiler evidence: direct `posix_spawn_file_actions_addchdir_np` is deprecated on the macOS 26 SDK and `-warnings-as-errors` rejects it; the availability-obsoleted helper was also considered unavailable at the fallback call site.
+
+Remediation keeps the already-proven `openpty + posix_spawn` topology and cwd file-action semantics while removing compile-time reference to the deprecated symbol. macOS 26+ uses `posix_spawn_file_actions_addchdir`; macOS 12..25 resolves the legacy `posix_spawn_file_actions_addchdir_np` symbol dynamically with `dlopen`/`dlsym`, fail-closed if the compatibility symbol is unavailable. PTY ownership, process-group signaling, workspace containment, environment authority, ring/cursor/spill, TTL, restart-no-resume and evidence/privacy semantics are unchanged.
+
+Current worktree is remediation-only; no CI run exists for this uncommitted dlsym candidate yet.
+NEXT_EXACT_ACTION: verify changed-scope local contracts, commit/push the dlsym compatibility remediation, require a fresh exact-head native Verify; do not rerun or modify already-green Windows behavior except as the branch workflow naturally verifies the pushed head.

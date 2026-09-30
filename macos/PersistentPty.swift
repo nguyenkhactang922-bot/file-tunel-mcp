@@ -66,12 +66,24 @@ private final class PosixPtyHost {
         }
     }
 
-    @available(macOS, introduced: 10.15, obsoleted: 26.0)
+    private typealias LegacySpawnChdirFunction = @convention(c) (
+        UnsafeMutablePointer<posix_spawn_file_actions_t?>,
+        UnsafePointer<CChar>
+    ) -> Int32
+
     private static func addLegacySpawnChdir(
         _ actions: UnsafeMutablePointer<posix_spawn_file_actions_t?>,
         _ path: UnsafePointer<CChar>
-    ) -> Int32 {
-        posix_spawn_file_actions_addchdir_np(actions, path)
+    ) throws -> Int32 {
+        guard let handle = dlopen(nil, RTLD_LAZY) else {
+            throw MCPServerError.operationFailed("Could not open process image for PTY cwd compatibility")
+        }
+        defer { dlclose(handle) }
+        guard let symbol = dlsym(handle, "posix_spawn_file_actions_addchdir_np") else {
+            throw MCPServerError.operationFailed("PTY cwd compatibility symbol is unavailable")
+        }
+        let function = unsafeBitCast(symbol, to: LegacySpawnChdirFunction.self)
+        return function(actions, path)
     }
 
     static func start(
@@ -202,7 +214,7 @@ private final class PosixPtyHost {
             if #available(macOS 26.0, *) {
                 chdirResult = posix_spawn_file_actions_addchdir(&fileActions, cwdCString)
             } else {
-                chdirResult = Self.addLegacySpawnChdir(&fileActions, cwdCString)
+                chdirResult = try Self.addLegacySpawnChdir(&fileActions, cwdCString)
             }
             try requireSpawnAction(
                 chdirResult,

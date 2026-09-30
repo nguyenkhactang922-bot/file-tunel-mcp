@@ -325,7 +325,7 @@ Negative tests:
 
 ## FMG-020 - Persistent PTY Session Runtime
 
-State: LOCAL CROSS-PLATFORM VERIFIED / NATIVE CI PENDING
+State: NATIVE CI REMEDIATION ACTIVE
 Depends: FMG-014, FMG-005, FMG-003, FMG-004
 
 Scope:
