@@ -66,6 +66,14 @@ private final class PosixPtyHost {
         }
     }
 
+    @available(macOS, introduced: 10.15, obsoleted: 26.0)
+    private static func addLegacySpawnChdir(
+        _ actions: UnsafeMutablePointer<posix_spawn_file_actions_t?>,
+        _ path: UnsafePointer<CChar>
+    ) -> Int32 {
+        posix_spawn_file_actions_addchdir_np(actions, path)
+    }
+
     static func start(
         executable: String,
         arguments: [String],
@@ -190,8 +198,14 @@ private final class PosixPtyHost {
         }
 
         do {
+            let chdirResult: Int32
+            if #available(macOS 26.0, *) {
+                chdirResult = posix_spawn_file_actions_addchdir(&fileActions, cwdCString)
+            } else {
+                chdirResult = Self.addLegacySpawnChdir(&fileActions, cwdCString)
+            }
             try requireSpawnAction(
-                posix_spawn_file_actions_addchdir(&fileActions, cwdCString),
+                chdirResult,
                 "Could not configure PTY working directory"
             )
             try requireSpawnAction(posix_spawn_file_actions_adddup2(&fileActions, slaveFD, STDIN_FILENO), "Could not bind PTY stdin")

@@ -294,3 +294,18 @@ Exact-head `8cd0d5e11672a009f77ffecd0e15a73fd22bef5b`, Verify run `36670371331`:
 Remediation is test-only: restore real Swift interpolation in the existing runtime fixture as `runtime-test-\(UUID().uuidString)`. Production PTY and LocalMCPRuntime behavior are unchanged.
 Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; exact fixture assertion PASS; `git diff --check` PASS.
 NEXT_EXACT_ACTION: commit/push this test-only profile fixture remediation, require fresh exact-head Verify macOS + Windows x64 + Windows ARM64; if all green, perform scoped FMG-020 review -> PR/merge -> merged-main Verify -> mark FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.
+
+
+## FMG-020 macOS deployment-target spawn-chdir remediation - 2026-09-30
+
+Exact-head `bfed45e959e111e986cf40b2821e3068b150bb77`, Verify run `36670793927`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS Static/typecheck/catalog: SUCCESS.
+- macOS Integration: SUCCESS, including the full FMG-020 native PTY acceptance and pre-existing runtime integration.
+- macOS Build app: FAIL only because `posix_spawn_file_actions_addchdir` is unavailable for the app deployment target `macOS 12.0` and is SDK-available only on macOS 26+.
+
+Remediation is limited to PTY launch compatibility: keep the existing `posix_spawn` topology and use the standard `posix_spawn_file_actions_addchdir` on macOS 26+, with `posix_spawn_file_actions_addchdir_np` isolated behind an availability-bounded helper for macOS 12..25. PTY ownership, process-group, cwd containment, environment, ring/cursor/spill, policy and cleanup semantics are unchanged.
+
+Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS for runtime/build scripts; `git diff --check` PASS. Native macOS compile/build remains the authoritative proof for SDK availability.
+NEXT_EXACT_ACTION: commit/push this deployment-target compatibility remediation, require fresh exact-head Verify macOS + Windows x64 + Windows ARM64; if all green, scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.
