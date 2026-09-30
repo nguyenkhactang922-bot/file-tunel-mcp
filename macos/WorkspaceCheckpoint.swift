@@ -287,7 +287,7 @@ final class WorkspaceCheckpointService {
             return recordMetadata(record, manifest: manifest)
         } catch {
             for contentRef in createdRefs.reversed() {
-                try? artifactFactory().delete(
+                _ = try? artifactFactory().delete(
                     contentRef,
                     workspaceAuthorityID: workspaceAuthorityID,
                     contentClassAllowed: { $0 == ArtifactContentClasses.checkpoint }

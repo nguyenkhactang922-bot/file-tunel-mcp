@@ -64,6 +64,15 @@ internal static class Program
         Directory.CreateDirectory(root);
         try
         {
+            if (args.Length > 0 && args[0] == "tool-surface-only")
+            {
+                TestCanonicalToolCatalog();
+                await TestFilesystemAndToolsAsync(root);
+                await TestHttpAndMcpAsync(root);
+                Console.WriteLine($"windows-tool-surface-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             if (args.Length > 0 && args[0] == "artifact-store-only")
             {
                 await TestArtifactContentStoreAsync(root);
@@ -187,8 +196,8 @@ internal static class Program
         Assert(CanonicalToolCatalog.InstructionVersion == "1.0.0", "canonical instruction version");
         Assert(CanonicalToolCatalog.InstructionHash.Length == 64 && CanonicalToolCatalog.InstructionHash.All(Uri.IsHexDigit), "canonical instruction hash shape");
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 36, "catalog non-shell local tool count");
-        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 37, "catalog full local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: false).Count == 40, "catalog non-shell local tool count");
+        Assert(CanonicalToolCatalog.ToolDefinitions("local_tools", commandsEnabled: true).Count == 41, "catalog full local tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("skills").Count == 2, "catalog skill tool count");
         Assert(CanonicalToolCatalog.ToolDefinitions("server").Count == 2, "catalog server tool count");
         CanonicalToolCatalog.ValidateHandlerCoverage("skills", new[] { "list_codex_skills", "load_codex_skill" });
@@ -3798,8 +3807,8 @@ internal static class Program
         var workspace = Path.Combine(root, "files"); Directory.CreateDirectory(workspace);
         var safe = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", false);
         var full = new LocalTools(workspace, "FileMCP Test", "filemcp@example.invalid", true);
-        Assert(safe.ToolDefinitions.Count == 28 && !safe.HasTool("run_command"), "safe tool count");
-        Assert(full.ToolDefinitions.Count == 37 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
+        Assert(safe.ToolDefinitions.Count == 32 && !safe.HasTool("run_command"), "safe tool count");
+        Assert(full.ToolDefinitions.Count == 41 && full.HasTool("exec_process") && full.HasTool("run_command"), "full tool count");
 
         var volumeRoot = Path.GetPathRoot(workspace) ?? throw new Exception("Workspace volume root unavailable");
         var volumeSafe = new LocalTools(volumeRoot, "FileMCP Test", "filemcp@example.invalid", false);
@@ -4142,7 +4151,7 @@ internal static class Program
         var correlatedListJson = JsonNode.Parse(HttpBody(correlatedList))!.AsObject();
         var correlatedTools = correlatedListJson["result"]!["tools"]!.AsArray();
         Assert(
-            correlatedTools.Count == 32 &&
+            correlatedTools.Count == 36 &&
             correlatedTools.Any(tool => tool?["name"]?.GetValue<string>() == "apply_search_replace") &&
             correlatedTools.Any(tool => tool?["name"]?.GetValue<string>() == "apply_unified_diff"),
             "logical correlation facade includes connect, evidence, quarantine and edit-adapter tools");

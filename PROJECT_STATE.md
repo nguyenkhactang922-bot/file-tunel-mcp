@@ -1161,3 +1161,16 @@ FMG-021 remains ACTIVE; FMG-022 remains BLOCKED.
 - No native macOS runner evidence exists for this uncommitted candidate yet.
 
 NEXT_EXACT_ACTION: commit the FMG-021 candidate and state sync on `chatgpt/FMG-021-workspace-checkpoint`, push the exact head once, then require fresh Verify on macOS / Windows x64 / Windows ARM64. If a lane fails, repair only the proven failing stage; if all lanes pass, perform scoped review -> PR/merge -> merged-main Verify -> FMG-021 MAIN VERIFIED -> claim FMG-022.
+## FMG-021 exact-head Verify scoped remediation ready - 2026-09-30
+
+Exact-head candidate `252d77b11ea5d177e66fb9d806bed9820ded4241`, Verify run `36691938173`:
+- Windows ARM64 job `109810925781`: PASS; unchanged.
+- Windows x64 job `109810925432`: failed only in Windows integration due stale local-tool surface counts after adding 4 checkpoint tools.
+- macOS job `109810925888`: failed only in Static verification because unused `try?` delete result is rejected by `-warnings-as-errors`; Integration/Build were skipped.
+- Scoped macOS fix: explicit `_ = try? artifactFactory().delete(...)`; local static/bash remediation check PASS.
+- Scoped Windows fix: catalog local counts 40/41, restricted/full LocalTools counts 32/41, correlated MCP facade count 36.
+- Added `tool-surface-only` targeted regression selector so future catalog-surface changes can be verified without rerunning the full Windows suite.
+- Windows affected-scope proof: build PASS 0 warnings/errors; `windows-tool-surface-only-tests: ok (127 assertions)`.
+- `git diff --check`: PASS.
+
+NEXT_EXACT_ACTION: commit the scoped remediation + state sync, push branch once, require fresh exact-head Verify on macOS / Windows x64 / Windows ARM64. Do not rerun the already-passed old ARM64 job. If fresh exact-head all-green, scoped review -> PR/merge -> merged-main Verify -> FMG-021 MAIN VERIFIED -> claim FMG-022.

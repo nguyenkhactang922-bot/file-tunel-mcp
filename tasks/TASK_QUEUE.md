@@ -28,4 +28,4 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 
 - FMG-020: DONE / MAIN VERIFIED at 4f99a60ba91abc0040364f70c9df86478fc4dab2 (Verify 36675201004 SUCCESS).
 - FMG-021: ACTIVE on chatgpt/FMG-021-workspace-checkpoint.
-- NEXT_EXACT_ACTION: FMG-021 cross-platform candidate has local affected gates PASS (Windows checkpoint-only 27 assertions; catalog/parity/state/Swift-static PASS). Commit/push exact head, require native Verify on macOS / Windows x64 / Windows ARM64, repair only a proven failing lane, then scoped review/PR/merge/merged-main Verify. FMG-022 remains blocked until FMG-021 MAIN VERIFIED.
+- NEXT_EXACT_ACTION: FMG-021 exact-head 252d77b Verify 36691938173 failed only Windows x64 stale tool-surface counts + macOS static unused try? result; ARM64 PASS. Scoped remediation local proof PASS: macOS static check and Windows tool-surface-only 127 assertions. Commit/push remediation once, then fresh exact-head Verify; FMG-022 remains blocked until FMG-021 MAIN VERIFIED.
