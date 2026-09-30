@@ -588,9 +588,19 @@ final class PersistentPtyService {
             }
             let evicted = requestedOffset < baseOffset
             let effective = max(requestedOffset, baseOffset)
-            let index = Int(effective - baseOffset)
-            let count = min(maxBytes, ring.count - index)
-            let bytes = count > 0 ? Data(ring[index..<(index + count)]) : Data()
+            let relativeIndex = Int(effective - baseOffset)
+            guard relativeIndex >= 0, relativeIndex <= ring.count else {
+                throw MCPServerError.operationFailed("PTY ring cursor state is inconsistent")
+            }
+            let count = min(maxBytes, ring.count - relativeIndex)
+            let bytes: Data
+            if count > 0 {
+                let start = ring.index(ring.startIndex, offsetBy: relativeIndex)
+                let end = ring.index(start, offsetBy: count)
+                bytes = Data(ring[start..<end])
+            } else {
+                bytes = Data()
+            }
             let next = effective + Int64(count)
             let exit: Any = exitCode.map { Int($0) } ?? NSNull()
             return [

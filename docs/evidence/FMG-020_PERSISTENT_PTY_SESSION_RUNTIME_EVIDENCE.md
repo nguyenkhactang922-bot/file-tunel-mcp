@@ -252,3 +252,17 @@ Exact-head `bc6a970b5c0ed4623f439fa537bb1ac71790dc77`, Verify run `36669074011`:
 The failure is therefore earlier than the four flood/spill assertions. Diagnostic-only instrumentation now brackets service initialization, flood-command creation, PTY start, wait-for-exit and read so the next native run identifies the exact boundary. Production runtime remains unchanged.
 Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
 NEXT_EXACT_ACTION: commit/push this boundary diagnostic, inspect only macOS Integration stage markers, then fix the proven failing operation without changing already-green Windows behavior.
+
+
+## FMG-020 macOS ring-index remediation - 2026-09-30
+
+Exact-head `14931eabf1d4e107dfef1f6593e7acb70ae9f250`, Verify run `36669390759`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS Static/typecheck/catalog: SUCCESS.
+- macOS Integration emitted `before-service-init`, `before-command`, `before-start`, `after-start`, `before-wait`, `after-wait`, `before-read`, then SIGTRAP before `after-read`.
+
+Root cause is the macOS bounded-ring read slice. After `Data.removeFirst(overflow)`, the collection's valid `startIndex` must not be assumed to be zero. The old code calculated a relative cursor index correctly but sliced `ring[index..<index+count]`, which can trap after eviction. Remediation converts the relative offset through `ring.index(ring.startIndex, offsetBy:)`, validates the relative range, and slices only with valid Data indices. The PTY contract now pins `ring.startIndex` usage to prevent regression.
+
+Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push the ring-index remediation with retained diagnostics, require a fresh exact-head native Verify, then inspect flood/spill values and continue only if a remaining invariant fails.

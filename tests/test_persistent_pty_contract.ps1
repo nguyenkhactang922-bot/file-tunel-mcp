@@ -47,7 +47,8 @@ foreach($marker in @(
   "cursor_evicted",
   "idle_expired",
   "lifetime_expired",
-  "process-group ownership is no longer proven"
+  "process-group ownership is no longer proven",
+  "ring.startIndex"
 )){
   if(-not $macPty.Contains($marker)){ throw "macOS PTY implementation missing marker: $marker" }
 }
