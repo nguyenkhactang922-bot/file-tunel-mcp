@@ -1442,7 +1442,18 @@ let secondConfig = LocalMCPConfiguration(
 )
 
 first.start(firstConfig)
-waitFor({ first.state == .running }, timeout: 5, label: "first runtime")
+waitFor({ first.state == .running || isFailed(first.state) }, timeout: 5, label: "first runtime resolution")
+if isFailed(first.state) {
+    logLock.lock()
+    let failedRuntimeLog = capturedRuntimeLog
+    logLock.unlock()
+    let sanitizedFailureLog = failedRuntimeLog
+        .replacingOccurrences(of: "test-key", with: "[REDACTED]")
+        .replacingOccurrences(of: "[0-9a-f]{64}", with: "[REDACTED]", options: .regularExpression)
+    print("FMG020_POSTPTY_RUNTIME_FAILURE:\(sanitizedFailureLog)")
+    fflush(stdout)
+}
+precondition(first.state == .running, "first runtime must reach running")
 let authLines = try String(contentsOf: authCapture, encoding: .utf8)
     .split(whereSeparator: { $0.isNewline })
     .map(String.init)

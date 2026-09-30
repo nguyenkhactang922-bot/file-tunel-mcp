@@ -266,3 +266,17 @@ Root cause is the macOS bounded-ring read slice. After `Data.removeFirst(overflo
 
 Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
 NEXT_EXACT_ACTION: commit/push the ring-index remediation with retained diagnostics, require a fresh exact-head native Verify, then inspect flood/spill values and continue only if a remaining invariant fails.
+
+
+## FMG-020 native PTY core PASS; post-PTY runtime diagnostic - 2026-09-30
+
+Exact-head `d31a4128f2c08fc68ba77795de595c916ca6fbba`, Verify run `36669725567`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS PTY acceptance: PASS through read, eviction, spill and cleanup.
+- Native values: `cursor_evicted=true`, `spill_refs=7`, artifact references `7 -> 0`, future-cursor rejection PASS, idle-expiry PASS, lifetime-expiry PASS.
+- The run then failed outside the PTY acceptance block at the pre-existing LocalMCPRuntime test with `timed out waiting for first runtime`.
+
+This proves the Data-index remediation fixed the FMG-020 macOS PTY failure. Because `main` Verify was green before FMG-020, the next diagnostic changes only the first-runtime wait to resolve on `.running` or `.failed`, print only a secret-sanitized failure log, and assert `.running`. No production runtime behavior changes.
+Affected local proof: persistent-PTY contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push the fail-fast post-PTY runtime diagnostic, inspect the exact sanitized LocalMCPRuntime failure, then repair only the proven interference/regression before final FMG-020 review/merge.
