@@ -3804,9 +3804,11 @@ precondition(
     "generated directory payload must be excluded by default and reported"
 )
 precondition(((cpCaptured["excluded_count"] as? NSNumber)?.intValue ?? 0) >= 1, "checkpoint must report excluded payload count")
-precondition(((try cpCall("checkpoint_list", ["max_items": 20]))["count"] as? NSNumber)?.intValue == 1, "checkpoint_list must expose metadata record")
+let cpListedAfterCapture = try cpCall("checkpoint_list", ["max_items": 20])
+precondition(((cpListedAfterCapture["count"] as? NSNumber)?.intValue ?? 0) == 1, "checkpoint_list must expose metadata record")
 _ = try cpCall("checkpoint_delete", ["checkpoint_ref": cpRef])
-precondition(try cpArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace)).referenceCount == 0, "checkpoint_delete must clean manifest and payload refs")
+let cpUsageAfterDelete = try cpArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace))
+precondition(cpUsageAfterDelete.referenceCount == 0, "checkpoint_delete must clean manifest and payload refs")
 
 let cpGeneratedCapture = try cpCall("checkpoint_capture", [
     "repo_path": "repo", "include_untracked": true, "include_generated": true, "ttl_seconds": 3600,
@@ -3870,7 +3872,8 @@ expectCpFailure("checkpoint concurrent ignored mutation", containing: "changed w
     ])
 }
 cpMutateAfterPayloads = nil
-precondition(try cpArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace)).referenceCount == 0, "failed checkpoint capture must clean partial refs")
+let cpUsageAfterFailedCapture = try cpArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace))
+precondition(cpUsageAfterFailedCapture.referenceCount == 0, "failed checkpoint capture must clean partial refs")
 try cpWorktreeBytes.write(to: cpTracked)
 
 var cpDiskArtifactOptions = cpArtifactOptions
@@ -3900,16 +3903,19 @@ expectCpFailure("checkpoint disk full", containing: "disk full") {
 }
 let cpDiskAfterStatus = cpString(try cpDiskTools.call(name: "git_status", arguments: ["repo_path": "repo"]).structuredContent, "result")
 precondition(cpDiskBeforeStatus == cpDiskAfterStatus, "disk-full checkpoint failure must not mutate repository")
+let cpDiskUsageAfterFailure = try cpDiskArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace))
 precondition(
-    try cpDiskArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace)).referenceCount == 0,
+    cpDiskUsageAfterFailure.referenceCount == 0,
     "disk-full checkpoint failure must leave no Artifact Store refs"
 )
 
 let cpExpiry = try cpCall("checkpoint_capture", ["repo_path": "repo", "include_untracked": true, "ttl_seconds": 60])
 precondition(!cpString(cpExpiry, "manifest_hash").isEmpty, "checkpoint must expose strong manifest digest")
 cpClock = cpClock.addingTimeInterval(61)
-precondition(((try cpCall("checkpoint_list", ["max_items": 20]))["count"] as? NSNumber)?.intValue == 0, "expired checkpoint metadata must be pruned")
-precondition(try cpArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace)).referenceCount == 0, "checkpoint expiry must clean Artifact Store refs")
+let cpExpiredList = try cpCall("checkpoint_list", ["max_items": 20])
+precondition(((cpExpiredList["count"] as? NSNumber)?.intValue ?? -1) == 0, "expired checkpoint metadata must be pruned")
+let cpUsageAfterExpiry = try cpArtifacts.usage(workspaceAuthorityID: ArtifactContentStore.workspaceAuthorityID(cpWorkspace))
+precondition(cpUsageAfterExpiry.referenceCount == 0, "checkpoint expiry must clean Artifact Store refs")
 
 let cpLink = cpRepo.appendingPathComponent("checkpoint-link.txt")
 try FileManager.default.createSymbolicLink(at: cpLink, withDestinationURL: cpTracked)

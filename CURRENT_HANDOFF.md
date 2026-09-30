@@ -1236,3 +1236,14 @@ Exact-head candidate `252d77b11ea5d177e66fb9d806bed9820ded4241`, Verify run `366
 - `git diff --check`: PASS.
 
 NEXT_EXACT_ACTION: commit the scoped remediation + state sync, push branch once, require fresh exact-head Verify on macOS / Windows x64 / Windows ARM64. Do not rerun the already-passed old ARM64 job. If fresh exact-head all-green, scoped review -> PR/merge -> merged-main Verify -> FMG-021 MAIN VERIFIED -> claim FMG-022.
+## FMG-021 Verify 36695888973 results + Swift harness remediation - 2026-09-30
+
+Exact-head `3aa0f5977beef12435871fc337332cb4a1c25630`, Verify run `36695888973`:
+- Windows ARM64 job `109823629747`: SUCCESS / full job PASS.
+- Windows x64 job `109823629843`: FMG-021 contracts and prior static gates PASS; integration later failed in pre-existing ProcessRunner/Repository Intelligence path because Windows Job Object assignment returned `Access is denied`. This code path is unchanged by FMG-021 and the same exact-head ARM64 lane passed, so no security weakening is justified from this single x64 runner failure.
+- macOS job `109823629945`: Static verification PASS; canonical catalog PASS; Integration failed while compiling the FMG-021 Swift acceptance block because throwing calls were embedded in non-throwing `precondition` autoclosures.
+- Swift harness remediation hoists all throwing checkpoint calls/usage queries to `let` bindings before `precondition`.
+- `tests/test_workspace_checkpoint_contract.ps1` now rejects FMG-021 `try`-inside-`precondition` regressions.
+- Local evidence after remediation: workspace-checkpoint contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
+
+NEXT_EXACT_ACTION: commit/push this test-harness-only remediation, require a fresh exact-head Verify. Do not modify ProcessRunner/Job Object semantics unless the x64 failure reproduces on the new exact head or independent evidence proves a product defect. FMG-022 remains BLOCKED until FMG-021 MAIN VERIFIED.

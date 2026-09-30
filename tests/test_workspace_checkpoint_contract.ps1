@@ -100,6 +100,9 @@ if ($WindowsRuntime.IndexOf("windows-checkpoint-only-tests: ok", [StringComparis
 if ($SwiftRuntime.IndexOf("swift-workspace-checkpoint: ok", [StringComparison]::Ordinal) -lt 0) {
     throw "macOS FMG-021 behavioral acceptance marker missing."
 }
+if ([regex]::IsMatch($SwiftRuntime, 'precondition\(\s*(?:\(\()?try\s+cp', [System.Text.RegularExpressions.RegexOptions]::Singleline)) {
+    throw "FMG-021 Swift acceptance must hoist throwing calls out of precondition autoclosures."
+}
 foreach ($Needle in @("include_generated", "oversized file", "disk-full checkpoint", "ignored files require explicit opt-in")) {
     if ($WindowsRuntime.IndexOf($Needle, [StringComparison]::OrdinalIgnoreCase) -lt 0) {
         throw "Windows FMG-021 negative/opt-in test missing: $Needle"
