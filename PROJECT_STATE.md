@@ -962,3 +962,20 @@ Affected local proof:
 - `git diff --check`: PASS.
 
 NEXT_EXACT_ACTION: verify latest main/remote branch state, commit/push this test-only remediation, require exact-head native Verify on macOS / Windows x64 / Windows ARM64; if green, scoped review -> PR/merge -> merged-main Verify -> FMG-020 DONE / MAIN VERIFIED -> claim FMG-021.
+
+## FMG-020 macOS proven-process-group cleanup fixture - 2026-09-30
+
+Exact-head `52fcf1694714a755a1ebc619cd45f6aaac80884a`, Verify run `36604291025`:
+- Windows x64: SUCCESS.
+- Windows ARM64: SUCCESS.
+- macOS: FAIL only at descendant process-tree cleanup even after zombie-aware inspection, proving the descendant remained runnable.
+
+The prior fixture spawned `/bin/sleep` via Foundation `Process`, which does not provide an explicit contract that the descendant remains in FileMCP's owned PTY process group. Because FMG-020 must never kill arbitrary PIDs without ownership proof, the fixture is now stronger and more precise:
+- a dedicated child fixture explicitly joins the PTY parent's process group with `setpgid`;
+- the parent waits until the child is running in that group before publishing its PID;
+- the acceptance test verifies `child PGID == PTY owned PGID` before calling `pty_stop`;
+- cleanup still requires the child to become non-runnable (PID absent or zombie only).
+
+This is test-only ownership hardening; production PTY/process-group code is unchanged.
+Affected local proof: persistent-PTY contract PASS; Swift runtime shell syntax PASS; `git diff --check` PASS.
+NEXT_EXACT_ACTION: commit/push this ownership-proven fixture and require a fresh exact-head native Verify. If macOS still fails the same cleanup assertion, fix only production process-group cleanup; otherwise proceed to scoped review -> PR/merge -> merged-main Verify -> FMG-020 MAIN VERIFIED -> FMG-021.

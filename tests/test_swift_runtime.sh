@@ -997,12 +997,31 @@ cat >"$TMP_DIR/main.swift" <<'SWIFT'
 import Foundation
 import Darwin
 
+if CommandLine.arguments.count >= 3 && CommandLine.arguments[1] == "pty-tree-child-fixture" {
+    guard let requestedGroup = Int32(CommandLine.arguments[2]),
+          setpgid(0, pid_t(requestedGroup)) == 0 else {
+        exit(96)
+    }
+    Thread.sleep(forTimeInterval: 20)
+    exit(0)
+}
+
 if CommandLine.arguments.count >= 3 && CommandLine.arguments[1] == "pty-tree-parent-fixture" {
     let pidFile = CommandLine.arguments[2]
+    let ownedGroup = getpgrp()
     let child = Process()
-    child.executableURL = URL(fileURLWithPath: "/bin/sleep")
-    child.arguments = ["20"]
+    child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
+    child.arguments = ["pty-tree-child-fixture", String(ownedGroup)]
     try child.run()
+
+    let deadline = Date().addingTimeInterval(2)
+    while Date() < deadline && child.isRunning && getpgid(child.processIdentifier) != ownedGroup {
+        Thread.sleep(forTimeInterval: 0.02)
+    }
+    guard child.isRunning, getpgid(child.processIdentifier) == ownedGroup else {
+        exit(97)
+    }
+
     try String(child.processIdentifier).write(toFile: pidFile, atomically: true, encoding: .utf8)
     print("FMG020_TTY:\(isatty(STDIN_FILENO)):\(isatty(STDOUT_FILENO))")
     fflush(stdout)
@@ -1141,6 +1160,11 @@ let ptyChildPID = pid_t(
         try String(contentsOf: ptyChildPIDFile, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     )!
+)
+let ptyOwnedPID = pid_t(ptyOwnedStart.structuredContent["pid"] as! Int)
+precondition(
+    getpgid(ptyChildPID) == ptyOwnedPID,
+    "PTY descendant must remain in the proven owned process group before cleanup"
 )
 
 let ptyResize = try ptyTools.call(
