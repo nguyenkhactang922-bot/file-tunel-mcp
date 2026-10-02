@@ -30,5 +30,7 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - FMG-021: DONE / MAIN VERIFIED at `12874be49a3bc8eaacdeb0dfb2aea33eb9ac087e` (merged-main Verify `36698092398` SUCCESS).
 - FMG-022: DONE / MAIN VERIFIED. PR #41 merged as `f3e4254c5a32d48d95b28372d0eff56880aeb5f5`; merged-main Verify `36986797605` SUCCESS.
 - Drive-root project_context hotfix: MAIN VERIFIED. PR #42 merged as `9b6162fd9c79e755922f2865efef6b1eefc6402e`; merged-main Verify `36991621549` SUCCESS.
-- FMG-023: CLAIMED / ACTIVE on `chatgpt/FMG-023-execution-backend`.
-- NEXT_EXACT_ACTION: implement the frozen process+PTY Execution Backend Interface using HostExecutionBackend over existing ProcessRunner/PersistentPty; preserve file/Git host-native behavior and add explicit backend identity/capabilities, lifecycle/health/cleanup and evidence identity.
+- FMG-023: LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-023-execution-backend`.
+- Local proof: Windows full runtime 975 assertions PASS; targeted execution-backend 19 assertions PASS; Release build 0 warnings/errors; catalog/parity + exec/PTY/evidence/backend contracts PASS.
+- Evidence: `docs/evidence/FMG-023_EXECUTION_BACKEND_INTERFACE_EVIDENCE.md`.
+- NEXT_EXACT_ACTION: commit/push exact FMG-023 candidate, require native Verify macOS + Windows x64 + Windows ARM64, then exact-head review -> PR/merge -> merged-main Verify -> claim FMG-024.

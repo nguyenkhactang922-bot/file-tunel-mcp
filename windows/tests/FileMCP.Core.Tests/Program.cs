@@ -136,6 +136,13 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length > 0 && args[0] == "execution-backend-only")
+            {
+                await TestExecutionBackendAsync(root);
+                Console.WriteLine($"windows-execution-backend-only-tests: ok ({_assertions} assertions)");
+                return 0;
+            }
+
             TestObservabilityContracts();
             TestCanonicalToolCatalog();
             TestServerPolicy();
@@ -156,6 +163,7 @@ internal static class Program
             await TestDesktopSingleInstanceCoordinatorAsync();
             await TestProcessRunnerAsync(root);
             await TestExecProcessAsync(root);
+            await TestExecutionBackendAsync(root);
             await TestPersistentPtyAsync(root);
             await TestFileVersionAndSourceStateAsync(root);
             await TestAuthorizedPathSnapshotAsync(root);
@@ -2292,6 +2300,179 @@ internal static class Program
         Assert(!childAlive, "exec_process cancellation cleans descendant process tree");
 
         Console.WriteLine("windows-exec-process: ok");
+    }
+
+    private static async Task TestExecutionBackendAsync(string root)
+    {
+        var workspace = Path.Combine(root, "execution-backend");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "host-native.txt"), "host");
+
+        var descriptor = new ExecutionBackendDescriptor(
+            "test-backend",
+            "9.1.0",
+            [
+                ExecutionBackendCapabilities.Process,
+                ExecutionBackendCapabilities.WorkspaceMapping,
+                ExecutionBackendCapabilities.EnvironmentMediation,
+                ExecutionBackendCapabilities.Cleanup,
+            ],
+            "host-contained",
+            "mediated",
+            "none",
+            "test-isolated");
+        ExecutionBackendContracts.ValidateDescriptor(descriptor with
+        {
+            Id = "future-container-contract",
+            WorkspaceMode = "container-mounted",
+            EnvironmentMode = "mediated",
+            NetworkMode = "none",
+            ResourceMode = "container-capped",
+        });
+        Assert(true, "FMG-023 backend descriptor remains extensible for FMG-024 isolated workspace/network/resource modes");
+
+        var fake = new TestExecutionBackend(
+            descriptor,
+            new ExecutionBackendHealth(true, "ready"),
+            new ProcessResult(0, "fake-ok", "", false, false, false, false, 0, 0));
+        var tools = new LocalTools(
+            workspace,
+            "FileMCP Test",
+            "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(enableCommands: true),
+            executionBackend: fake);
+
+        var result = await tools.CallAsync("exec_process", ExecArgs("fake-executable", ["literal-arg"], cwd: ""));
+        Assert(fake.ProcessCalls == 1, "FMG-023 routes exec_process through selected execution backend");
+        Assert(fake.LastProcessRequest is not null && fake.LastProcessRequest.Arguments.SequenceEqual(["literal-arg"]),
+            "FMG-023 maps structured process request without shell rewriting");
+        Assert(result.StructuredContent["stdout"]!.GetValue<string>() == "fake-ok",
+            "FMG-023 normalizes backend process result");
+        Assert(result.StructuredContent["backend_id"]!.GetValue<string>() == "test-backend" &&
+               result.StructuredContent["backend_version"]!.GetValue<string>() == "9.1.0",
+            "FMG-023 exposes server-owned backend identity/version");
+        var caps = result.StructuredContent["backend_capabilities"]!.AsArray().Select(node => node!.GetValue<string>()).ToArray();
+        Assert(caps.Contains(ExecutionBackendCapabilities.Process, StringComparer.Ordinal) &&
+               result.StructuredContent["backend_network_mode"]!.GetValue<string>() == "none",
+            "FMG-023 exposes explicit backend capabilities and network mode");
+
+        _ = await tools.CallAsync("list_files", Obj(("subpath", "")));
+        Assert(fake.ProcessCalls == 1 && fake.PtyCalls == 0,
+            "FMG-023 keeps filesystem tools host-native outside execution backend");
+
+        var evidenceStore = new EvidenceStore(Path.Combine(workspace, "backend-evidence.sqlite3"));
+        var evidence = new EvidenceCoordinator(
+            evidenceStore,
+            tools,
+            ServerPolicy.FromLegacy(enableCommands: true),
+            EvidenceStore.WorkspaceFingerprint(workspace),
+            _ => { });
+        var evidenceRun = await evidence.BeginAsync(
+            new EvidenceRequestSpec("tool.success", null, [], false),
+            "op_" + new string('a', 32),
+            "exec_process");
+        Assert(evidenceRun is not null && evidenceRun.BackendId == "test-backend",
+            "FMG-023 freezes backend identity at evidence begin");
+        var evidenceMetadata = await evidence.CompleteAsync(
+            evidenceRun,
+            isError: false,
+            result.StructuredContent,
+            executionContext: null);
+        Assert(evidenceMetadata?["backend_id"]?.GetValue<string>() == "test-backend",
+            "FMG-023 returns backend identity in evidence metadata");
+        var evidenceStatus = await evidence.StatusAsync(evidenceRun!.EvidenceId, null, [], CancellationToken.None);
+        Assert(evidenceStatus["backend_id"]!.GetValue<string>() == "test-backend",
+            "FMG-023 persists server-owned backend identity in durable evidence");
+
+        var unavailable = new TestExecutionBackend(
+            descriptor,
+            new ExecutionBackendHealth(false, "unavailable", "fixture"),
+            new ProcessResult(0, "", "", false, false, false, false, 0, 0));
+        var unavailableTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(enableCommands: true), executionBackend: unavailable);
+        await AssertThrowsAsync(
+            () => unavailableTools.CallAsync("exec_process", ExecArgs("fake-executable", [])),
+            "unavailable",
+            "FMG-023 rejects unavailable backend before process dispatch");
+        Assert(unavailable.ProcessCalls == 0, "FMG-023 unavailable backend has no process side effect");
+
+        var ptyOnlyDescriptor = descriptor with
+        {
+            Id = "pty-only-test",
+            Capabilities = [ExecutionBackendCapabilities.Pty, ExecutionBackendCapabilities.Cleanup],
+        };
+        var ptyOnly = new TestExecutionBackend(
+            ptyOnlyDescriptor,
+            new ExecutionBackendHealth(true, "ready"),
+            new ProcessResult(0, "", "", false, false, false, false, 0, 0));
+        var capabilityTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(enableCommands: true), executionBackend: ptyOnly);
+        await AssertThrowsAsync(
+            () => capabilityTools.CallAsync("exec_process", ExecArgs("fake-executable", [])),
+            "required capability",
+            "FMG-023 rejects backend capability mismatch before process dispatch");
+        Assert(ptyOnly.ProcessCalls == 0, "FMG-023 capability mismatch has no process side effect");
+
+        var degraded = new TestExecutionBackend(
+            descriptor with { Id = "degraded-test" },
+            new ExecutionBackendHealth(false, "degraded", "lifecycle fixture"),
+            new ProcessResult(0, "", "", false, false, false, false, 0, 0));
+        var degradedTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(enableCommands: true), executionBackend: degraded);
+        await AssertThrowsAsync(
+            () => degradedTools.CallAsync("exec_process", ExecArgs("fake-executable", [])),
+            "unavailable",
+            "FMG-023 lifecycle degradation fails closed");
+
+        var malformedResult = new TestExecutionBackend(
+            descriptor with { Id = "malformed-result-test" },
+            new ExecutionBackendHealth(true, "ready"),
+            new ProcessResult(0, "bad", "", false, false, false, false, -1, 0));
+        var malformedTools = new LocalTools(
+            workspace, "FileMCP Test", "filemcp@example.invalid",
+            ServerPolicy.FromLegacy(enableCommands: true), executionBackend: malformedResult);
+        await AssertThrowsAsync(
+            () => malformedTools.CallAsync("exec_process", ExecArgs("fake-executable", [])),
+            "omitted-byte",
+            "FMG-023 rejects backend result normalization mismatch");
+
+        AssertThrows(
+            () => _ = new LocalTools(
+                workspace,
+                "FileMCP Test",
+                "filemcp@example.invalid",
+                ServerPolicy.FromLegacy(enableCommands: true),
+                executionBackend: new TestExecutionBackend(
+                    descriptor with { Id = "spoof/invalid" },
+                    new ExecutionBackendHealth(true, "ready"),
+                    new ProcessResult(0, "", "", false, false, false, false, 0, 0))),
+            "identity",
+            "FMG-023 rejects malformed backend identity at construction");
+
+        var spoofArgs = ExecArgs("fake-executable", []);
+        spoofArgs["backend_id"] = "attacker-controlled";
+        await AssertThrowsAsync(
+            () => tools.CallAsync("exec_process", spoofArgs),
+            "Unexpected argument",
+            "FMG-023 rejects model-supplied backend identity spoof input");
+
+        var hostEnvironment = new ExecProcessEnvironmentAuthority([]);
+        var host = new HostExecutionBackend(
+            new SafePathResolver(workspace),
+            hostEnvironment,
+            () => new ArtifactContentStore(new ArtifactContentStoreOptions { WorkspaceRootForIsolation = workspace }));
+        Assert(host.Descriptor.Id == HostExecutionBackend.BackendId &&
+               host.Descriptor.Capabilities.Contains(ExecutionBackendCapabilities.Process, StringComparer.Ordinal) &&
+               host.Descriptor.Capabilities.Contains(ExecutionBackendCapabilities.Pty, StringComparer.Ordinal) &&
+               host.Health.Available,
+            "FMG-023 HostExecutionBackend remains the healthy default with explicit process+PTY capabilities");
+        await host.StopAllAsync();
+        await host.DisposeAsync();
+
+        Console.WriteLine("windows-execution-backend: ok");
     }
 
     private static async Task TestPersistentPtyAsync(string root)
@@ -6287,6 +6468,94 @@ internal static class Program
         return predicate();
     }
     private static string ValueAfter(string[] args, string key) { var index = Array.IndexOf(args, key); return index >= 0 && index + 1 < args.Length ? args[index + 1] : throw new InvalidOperationException("missing " + key); }
+    private sealed class TestExecutionBackend : IExecutionBackend
+    {
+        public TestExecutionBackend(
+            ExecutionBackendDescriptor descriptor,
+            ExecutionBackendHealth health,
+            ProcessResult processResult)
+        {
+            Descriptor = descriptor;
+            Health = health;
+            ProcessResult = processResult;
+        }
+
+        public ExecutionBackendDescriptor Descriptor { get; }
+        public ExecutionBackendHealth Health { get; set; }
+        public ProcessResult ProcessResult { get; set; }
+        public int ProcessCalls { get; private set; }
+        public int PtyCalls { get; private set; }
+        public ExecutionProcessRequest? LastProcessRequest { get; private set; }
+
+        public Task<ProcessResult> RunProcessAsync(ExecutionProcessRequest request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ProcessCalls++;
+            LastProcessRequest = request;
+            return Task.FromResult(ProcessResult);
+        }
+
+        public Task<JsonObject> StartPtyAsync(
+            string executable,
+            IReadOnlyList<string> arguments,
+            string cwd,
+            IReadOnlyDictionary<string, string> environmentOverrides,
+            int columns,
+            int rows,
+            int idleTtlSeconds,
+            int maxLifetimeSeconds,
+            bool spillOutput,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PtyCalls++;
+            return Task.FromResult(new JsonObject { ["state"] = "running", ["session_id"] = "pty_test" });
+        }
+
+        public Task<JsonObject> ReadPtyAsync(string sessionId, string cursor, int maxBytes, ToolExecutionContext? context, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PtyCalls++;
+            return Task.FromResult(new JsonObject { ["state"] = "running", ["session_id"] = sessionId, ["text"] = "" });
+        }
+
+        public Task<JsonObject> WritePtyAsync(string sessionId, string data, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PtyCalls++;
+            return Task.FromResult(new JsonObject { ["state"] = "running", ["session_id"] = sessionId, ["written_bytes"] = data.Length });
+        }
+
+        public JsonObject ResizePty(string sessionId, int columns, int rows)
+        {
+            PtyCalls++;
+            return new JsonObject { ["state"] = "running", ["session_id"] = sessionId, ["columns"] = columns, ["rows"] = rows };
+        }
+
+        public Task<JsonObject> SignalPtyAsync(string sessionId, string signal, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PtyCalls++;
+            return Task.FromResult(new JsonObject { ["state"] = "running", ["session_id"] = sessionId, ["signal"] = signal });
+        }
+
+        public Task<JsonObject> StopPtyAsync(string sessionId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PtyCalls++;
+            return Task.FromResult(new JsonObject { ["state"] = "stopped", ["session_id"] = sessionId });
+        }
+
+        public JsonObject ListPty()
+        {
+            PtyCalls++;
+            return new JsonObject { ["sessions"] = new JsonArray(), ["count"] = 0 };
+        }
+
+        public Task StopAllAsync() => Task.CompletedTask;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     private sealed class RepositoryProfileMismatchProvider : IRepositoryIntelligenceProvider
     {
         private readonly LexicalSymbolProvider _inner = new();

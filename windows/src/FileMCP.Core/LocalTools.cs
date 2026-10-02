@@ -10,14 +10,14 @@ internal sealed partial class LocalTools
     private readonly string _gitUserName;
     private readonly string _gitUserEmail;
     private readonly ServerPolicy _policy;
-    private readonly ExecProcessEnvironmentAuthority _execEnvironment;
+    private readonly IExecutionBackend _executionBackend;
     private readonly FileVersionService _fileVersions;
     private readonly EditAdapterService _editAdapters;
     private readonly BatchFileService _batchFiles;
     private readonly AuthorizedPathSnapshotService _mutationGuard;
     private readonly QuarantineService _quarantine;
     private readonly WorkspaceCheckpointService _checkpoints;
-    private readonly PersistentPtyService _pty;
+
     private readonly ProjectContextService _projectContext;
     private readonly Action<string>? _beforeMutationCommitForTests;
     private readonly Action<string>? _applyEditsStageForTests;
@@ -66,7 +66,8 @@ internal sealed partial class LocalTools
         QuarantineServiceOptions? quarantineOptions = null,
         Action<string>? quarantineStageForTests = null,
         RepositoryIntelligenceQueryOptions? repositoryQueryOptions = null,
-        WorkspaceCheckpointOptions? checkpointOptions = null)
+        WorkspaceCheckpointOptions? checkpointOptions = null,
+        IExecutionBackend? executionBackend = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
@@ -108,8 +109,10 @@ internal sealed partial class LocalTools
         _gitUserName = gitUserName;
         _gitUserEmail = gitUserEmail;
         _policy = policy;
-        _execEnvironment = new ExecProcessEnvironmentAuthority(execEnvironmentAllowList);
-        _pty = new PersistentPtyService(_resolver, _execEnvironment, artifactFactory);
+        var environmentAuthority = new ExecProcessEnvironmentAuthority(execEnvironmentAllowList);
+        _executionBackend = executionBackend ?? new HostExecutionBackend(_resolver, environmentAuthority, artifactFactory);
+        ExecutionBackendContracts.ValidateDescriptor(_executionBackend.Descriptor);
+        ExecutionBackendContracts.ValidateHealth(_executionBackend.Health);
         _enableCommands = _policy.LegacyUnsafeGitCompatibility;
         CanonicalToolCatalog.ValidateHandlerCoverage("local_tools", HandlerToolNames);
         if (!_enableCommands)
@@ -292,7 +295,7 @@ internal sealed partial class LocalTools
                     GetInt(arguments, "max_results", 50),
                     executionContext,
                     effectiveCancellation).ConfigureAwait(false)),
-                "pty_start" => ObjectOutput(await _pty.StartAsync(
+                "pty_start" => ObjectOutput(await PtyStartAsync(
                     GetRequiredString(arguments, "executable"),
                     GetStringArray(arguments, "arguments"),
                     GetString(arguments, "cwd", ""),
@@ -303,28 +306,28 @@ internal sealed partial class LocalTools
                     GetInt(arguments, "max_lifetime_seconds", 0),
                     GetBool(arguments, "spill_output", false),
                     effectiveCancellation).ConfigureAwait(false)),
-                "pty_read" => ObjectOutput(await _pty.ReadAsync(
+                "pty_read" => ObjectOutput(await PtyReadAsync(
                     GetRequiredString(arguments, "session_id"),
                     GetString(arguments, "cursor", ""),
                     GetInt(arguments, "max_bytes", 65536),
                     executionContext,
                     effectiveCancellation).ConfigureAwait(false)),
-                "pty_write" => ObjectOutput(await _pty.WriteAsync(
+                "pty_write" => ObjectOutput(await PtyWriteAsync(
                     GetRequiredString(arguments, "session_id"),
                     GetRequiredString(arguments, "data"),
                     effectiveCancellation).ConfigureAwait(false)),
-                "pty_resize" => ObjectOutput(_pty.Resize(
+                "pty_resize" => ObjectOutput(PtyResize(
                     GetRequiredString(arguments, "session_id"),
                     GetRequiredInt(arguments, "columns"),
                     GetRequiredInt(arguments, "rows"))),
-                "pty_signal" => ObjectOutput(await _pty.SignalAsync(
+                "pty_signal" => ObjectOutput(await PtySignalAsync(
                     GetRequiredString(arguments, "session_id"),
                     GetRequiredString(arguments, "signal"),
                     effectiveCancellation).ConfigureAwait(false)),
-                "pty_stop" => ObjectOutput(await _pty.StopAsync(
+                "pty_stop" => ObjectOutput(await PtyStopAsync(
                     GetRequiredString(arguments, "session_id"),
                     effectiveCancellation).ConfigureAwait(false)),
-                "pty_list" => ObjectOutput(_pty.List()),
+                "pty_list" => ObjectOutput(PtyList()),
                 "exec_process" => ObjectOutput(await ExecProcessAsync(
                     GetRequiredString(arguments, "executable"),
                     GetStringArray(arguments, "arguments"),
@@ -356,7 +359,96 @@ internal sealed partial class LocalTools
 
     internal void StopAllPtySessions()
     {
-        try { _pty.StopAllAsync().GetAwaiter().GetResult(); } catch { }
+        try { _executionBackend.StopAllAsync().GetAwaiter().GetResult(); } catch { }
+    }
+
+    internal string EvidenceBackendId(string toolName)
+    {
+        if (!IsExecutionBackendTool(toolName)) return HostExecutionBackend.BackendId;
+        var descriptor = _executionBackend.Descriptor;
+        ExecutionBackendContracts.ValidateDescriptor(descriptor);
+        return descriptor.Id;
+    }
+
+    private static bool IsExecutionBackendTool(string toolName) =>
+        toolName == "exec_process" || toolName.StartsWith("pty_", StringComparison.Ordinal);
+
+    private ExecutionBackendDescriptor RequireExecutionBackend(string capability)
+    {
+        var descriptor = _executionBackend.Descriptor;
+        ExecutionBackendContracts.ValidateDescriptor(descriptor);
+        ExecutionBackendContracts.RequireCapability(descriptor, capability);
+        var health = _executionBackend.Health;
+        ExecutionBackendContracts.ValidateHealth(health);
+        if (!health.Available)
+            throw new FileMcpException($"Execution backend unavailable: {descriptor.Id} ({health.State})");
+        return descriptor;
+    }
+
+    private async Task<JsonObject> PtyStartAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        string cwd,
+        IReadOnlyDictionary<string, string> environmentOverrides,
+        int columns,
+        int rows,
+        int idleTtlSeconds,
+        int maxLifetimeSeconds,
+        bool spillOutput,
+        CancellationToken cancellationToken)
+    {
+        var descriptor = RequireExecutionBackend(ExecutionBackendCapabilities.Pty);
+        var result = await _executionBackend.StartPtyAsync(
+            executable, arguments, cwd, environmentOverrides, columns, rows,
+            idleTtlSeconds, maxLifetimeSeconds, spillOutput, cancellationToken).ConfigureAwait(false);
+        return ExecutionBackendContracts.AttachMetadata(result, descriptor);
+    }
+
+    private async Task<JsonObject> PtyReadAsync(
+        string sessionId,
+        string cursor,
+        int maxBytes,
+        ToolExecutionContext? context,
+        CancellationToken cancellationToken)
+    {
+        var descriptor = RequireExecutionBackend(ExecutionBackendCapabilities.Pty);
+        var result = await _executionBackend.ReadPtyAsync(
+            sessionId, cursor, maxBytes, context, cancellationToken).ConfigureAwait(false);
+        return ExecutionBackendContracts.AttachMetadata(result, descriptor);
+    }
+
+    private async Task<JsonObject> PtyWriteAsync(string sessionId, string data, CancellationToken cancellationToken)
+    {
+        var descriptor = RequireExecutionBackend(ExecutionBackendCapabilities.Pty);
+        var result = await _executionBackend.WritePtyAsync(sessionId, data, cancellationToken).ConfigureAwait(false);
+        return ExecutionBackendContracts.AttachMetadata(result, descriptor);
+    }
+
+    private JsonObject PtyResize(string sessionId, int columns, int rows)
+    {
+        var descriptor = RequireExecutionBackend(ExecutionBackendCapabilities.Pty);
+        return ExecutionBackendContracts.AttachMetadata(
+            _executionBackend.ResizePty(sessionId, columns, rows), descriptor);
+    }
+
+    private async Task<JsonObject> PtySignalAsync(string sessionId, string signal, CancellationToken cancellationToken)
+    {
+        var descriptor = RequireExecutionBackend(ExecutionBackendCapabilities.Pty);
+        var result = await _executionBackend.SignalPtyAsync(sessionId, signal, cancellationToken).ConfigureAwait(false);
+        return ExecutionBackendContracts.AttachMetadata(result, descriptor);
+    }
+
+    private async Task<JsonObject> PtyStopAsync(string sessionId, CancellationToken cancellationToken)
+    {
+        var descriptor = RequireExecutionBackend(ExecutionBackendCapabilities.Pty);
+        var result = await _executionBackend.StopPtyAsync(sessionId, cancellationToken).ConfigureAwait(false);
+        return ExecutionBackendContracts.AttachMetadata(result, descriptor);
+    }
+
+    private JsonObject PtyList()
+    {
+        var descriptor = RequireExecutionBackend(ExecutionBackendCapabilities.Pty);
+        return ExecutionBackendContracts.AttachMetadata(_executionBackend.ListPty(), descriptor);
     }
 
     private (IReadOnlyList<string> Values, bool Truncated) ListFiles(string subpath, ToolExecutionContext? context)
@@ -1223,9 +1315,7 @@ internal sealed partial class LocalTools
         if (timeoutSeconds is < 1 or > ProcessRunner.MaxCommandTimeoutSeconds) throw new FileMcpException($"timeout_seconds must be 1..{ProcessRunner.MaxCommandTimeoutSeconds}");
         if (outputLimitBytes is < 1 or > FileMcpConstants.MaxToolProcessOutputBytes) throw new FileMcpException($"output_limit_bytes must be 1..{FileMcpConstants.MaxToolProcessOutputBytes}");
 
-        var workdir = _resolver.Resolve(cwd);
-        if (!Directory.Exists(workdir)) throw new FileMcpException($"No such working directory: {(string.IsNullOrEmpty(cwd) ? "." : cwd)}");
-        var environment = _execEnvironment.Build(environmentOverrides);
+        var descriptor = RequireExecutionBackend(ExecutionBackendCapabilities.Process);
 
         await _commandSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -1233,16 +1323,18 @@ internal sealed partial class LocalTools
             // Re-authorize immediately before the side effect so a prepared request cannot execute
             // after local policy generation/hash changes.
             _policy.Authorize("exec_process", preparedPolicy);
-            var result = await ProcessRunner.RunAsync(
-                executable,
-                arguments,
-                workdir,
-                environment,
-                timeoutSeconds,
-                outputLimitBytes,
+            var result = await _executionBackend.RunProcessAsync(
+                new ExecutionProcessRequest(
+                    executable,
+                    arguments,
+                    cwd,
+                    environmentOverrides,
+                    timeoutSeconds,
+                    outputLimitBytes),
                 cancellationToken).ConfigureAwait(false);
+            ExecutionBackendContracts.ValidateProcessResult(result);
             var terminalState = result.Cancelled ? "cancelled" : result.TimedOut ? "timed_out" : "exited";
-            return new JsonObject
+            return ExecutionBackendContracts.AttachMetadata(new JsonObject
             {
                 ["terminal_state"] = terminalState,
                 ["exit_code"] = result.ExitCode,
@@ -1254,7 +1346,7 @@ internal sealed partial class LocalTools
                 ["stderr_truncated"] = result.StderrTruncated,
                 ["stdout_omitted_bytes"] = result.StdoutOmittedBytes,
                 ["stderr_omitted_bytes"] = result.StderrOmittedBytes,
-            };
+            }, descriptor);
         }
         finally { _commandSlots.Release(); }
     }

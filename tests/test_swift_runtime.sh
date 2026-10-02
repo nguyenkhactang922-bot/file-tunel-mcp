@@ -1690,6 +1690,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/RepositoryIntelligenceQuery.swift \
     macos/QuarantineService.swift \
     macos/PersistentPty.swift \
+    macos/ExecutionBackend.swift \
     macos/WorkspaceCheckpoint.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
@@ -4318,6 +4319,315 @@ precondition(
 
 print("swift-workspace-checkpoint-restore: ok")
 
+final class TestExecutionBackend: ExecutionBackend {
+    let descriptor: ExecutionBackendDescriptor
+    var health: ExecutionBackendHealth
+    var processResult: ProcessResult
+    private(set) var processCalls = 0
+    private(set) var ptyCalls = 0
+    private(set) var lastProcessRequest: ExecutionProcessRequest?
+
+    init(descriptor: ExecutionBackendDescriptor, health: ExecutionBackendHealth, processResult: ProcessResult) {
+        self.descriptor = descriptor
+        self.health = health
+        self.processResult = processResult
+    }
+
+    func runProcess(_ request: ExecutionProcessRequest, shouldCancel: (() -> Bool)?) throws -> ProcessResult {
+        if shouldCancel?() == true {
+            throw MCPServerError.operationFailed("test backend cancelled")
+        }
+        processCalls += 1
+        lastProcessRequest = request
+        return processResult
+    }
+
+    func startPty(
+        executable: String,
+        arguments: [String],
+        cwd: String,
+        environmentOverrides: [String: String],
+        columns: Int,
+        rows: Int,
+        idleTTLSeconds: Int,
+        maxLifetimeSeconds: Int,
+        spillOutput: Bool
+    ) throws -> [String: Any] {
+        ptyCalls += 1
+        return ["state": "running", "session_id": "pty_test"]
+    }
+
+    func readPty(sessionID: String, cursor: String, maxBytes: Int, context: ToolExecutionContext?) throws -> [String: Any] {
+        ptyCalls += 1
+        return ["state": "running", "session_id": sessionID, "text": ""]
+    }
+
+    func writePty(sessionID: String, data: String) throws -> [String: Any] {
+        ptyCalls += 1
+        return ["state": "running", "session_id": sessionID, "written_bytes": data.utf8.count]
+    }
+
+    func resizePty(sessionID: String, columns: Int, rows: Int) throws -> [String: Any] {
+        ptyCalls += 1
+        return ["state": "running", "session_id": sessionID, "columns": columns, "rows": rows]
+    }
+
+    func signalPty(sessionID: String, signal: String) throws -> [String: Any] {
+        ptyCalls += 1
+        return ["state": "running", "session_id": sessionID, "signal": signal]
+    }
+
+    func stopPty(sessionID: String) throws -> [String: Any] {
+        ptyCalls += 1
+        return ["state": "stopped", "session_id": sessionID]
+    }
+
+    func listPty() throws -> [String: Any] {
+        ptyCalls += 1
+        return ["sessions": [[String: Any]](), "count": 0]
+    }
+
+    func stopAll() {}
+}
+
+func backendDescriptor(_ id: String, _ capabilities: [String]) -> ExecutionBackendDescriptor {
+    ExecutionBackendDescriptor(
+        id: id,
+        version: "9.1.0",
+        capabilities: capabilities,
+        workspaceMode: "host-contained",
+        environmentMode: "mediated",
+        networkMode: "none",
+        resourceMode: "test-isolated"
+    )
+}
+
+func expectBackendFailure(_ label: String, containing expected: String, _ body: () throws -> Void) {
+    do {
+        try body()
+        preconditionFailure("\(label) unexpectedly succeeded")
+    } catch {
+        precondition(
+            error.localizedDescription.localizedCaseInsensitiveContains(expected),
+            "\(label) failed with unexpected error: \(error)"
+        )
+    }
+}
+
+let ebResolver = try SafePathResolver(rootPath: root.path)
+let ebPolicy = try ServerPolicy.fromLegacy(enableCommands: true)
+let ebDescriptor = backendDescriptor(
+    "test-backend",
+    [
+        ExecutionBackendCapabilities.process,
+        ExecutionBackendCapabilities.workspaceMapping,
+        ExecutionBackendCapabilities.environmentMediation,
+        ExecutionBackendCapabilities.cleanup,
+    ]
+)
+try ExecutionBackendContracts.validate(
+    ExecutionBackendDescriptor(
+        id: "future-container-contract",
+        version: "1.0.0",
+        capabilities: [
+            ExecutionBackendCapabilities.process,
+            ExecutionBackendCapabilities.workspaceMapping,
+            ExecutionBackendCapabilities.environmentMediation,
+            ExecutionBackendCapabilities.cleanup,
+        ],
+        workspaceMode: "container-mounted",
+        environmentMode: "mediated",
+        networkMode: "none",
+        resourceMode: "container-capped"
+    )
+)
+
+let ebFake = TestExecutionBackend(
+    descriptor: ebDescriptor,
+    health: ExecutionBackendHealth(available: true, state: "ready", detail: nil),
+    processResult: ProcessResult(
+        exitCode: 0,
+        stdout: "fake-ok",
+        stderr: "",
+        timedOut: false,
+        cancelled: false,
+        stdoutTruncated: false,
+        stderrTruncated: false,
+        stdoutOmittedBytes: 0,
+        stderrOmittedBytes: 0
+    )
+)
+let ebTools = try LocalTools(
+    resolver: ebResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: ebPolicy,
+    executionBackend: ebFake
+)
+let ebOutput = try ebTools.call(
+    name: "exec_process",
+    arguments: [
+        "executable": "fake-executable",
+        "arguments": ["literal-arg"],
+    ]
+)
+precondition(ebFake.processCalls == 1, "FMG-023 must route exec_process through selected backend")
+precondition(ebFake.lastProcessRequest?.arguments == ["literal-arg"], "FMG-023 must preserve structured argv")
+precondition(
+    (ebOutput.structuredContent["backend_id"] as? String) == "test-backend"
+        && (ebOutput.structuredContent["backend_version"] as? String) == "9.1.0",
+    "FMG-023 backend identity/version metadata mismatch"
+)
+precondition(
+    (ebOutput.structuredContent["backend_capabilities"] as? [String])?.contains(ExecutionBackendCapabilities.process) == true
+        && (ebOutput.structuredContent["backend_network_mode"] as? String) == "none",
+    "FMG-023 backend capability metadata mismatch"
+)
+
+_ = try ebTools.call(name: "list_files", arguments: ["subpath": ""])
+precondition(ebFake.processCalls == 1 && ebFake.ptyCalls == 0, "filesystem tools must remain host-native outside execution backend")
+
+let ebEvidenceStore = EvidenceStore(fileURL: root.appendingPathComponent("backend-evidence.json"))
+let ebEvidence = EvidenceCoordinator(
+    store: ebEvidenceStore,
+    tools: ebTools,
+    policy: ebPolicy,
+    workspaceFingerprint: EvidenceStore.workspaceFingerprint(root.path),
+    log: { _ in }
+)
+let ebEvidenceRun = ebEvidence.begin(
+    request: EvidenceRequestSpec(criterionID: "tool.success", repoPath: nil, relevantPaths: [], required: false),
+    operationID: "op_" + String(repeating: "a", count: 32),
+    toolName: "exec_process"
+)
+precondition(ebEvidenceRun?.backendID == "test-backend", "FMG-023 must freeze backend identity at evidence begin")
+let ebEvidenceMeta = ebEvidence.complete(
+    run: ebEvidenceRun,
+    isError: false,
+    structuredContent: ebOutput.structuredContent,
+    context: nil
+)
+precondition((ebEvidenceMeta?["backend_id"] as? String) == "test-backend", "FMG-023 evidence metadata backend mismatch")
+if let evidenceID = ebEvidenceRun?.evidenceID {
+    let status = try ebEvidence.status(evidenceID: evidenceID, repoPath: nil, relevantPaths: [])
+    precondition((status["backend_id"] as? String) == "test-backend", "FMG-023 durable evidence backend mismatch")
+} else {
+    preconditionFailure("FMG-023 evidence run missing")
+}
+
+let ebUnavailable = TestExecutionBackend(
+    descriptor: ebDescriptor,
+    health: ExecutionBackendHealth(available: false, state: "unavailable", detail: "fixture"),
+    processResult: ebFake.processResult
+)
+let ebUnavailableTools = try LocalTools(
+    resolver: ebResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: ebPolicy,
+    executionBackend: ebUnavailable
+)
+expectBackendFailure("FMG-023 unavailable backend", containing: "unavailable") {
+    _ = try ebUnavailableTools.call(name: "exec_process", arguments: ["executable": "fake-executable", "arguments": []])
+}
+precondition(ebUnavailable.processCalls == 0, "unavailable backend must have no process side effect")
+
+let ebPtyOnly = TestExecutionBackend(
+    descriptor: backendDescriptor("pty-only-test", [ExecutionBackendCapabilities.pty, ExecutionBackendCapabilities.cleanup]),
+    health: ExecutionBackendHealth(available: true, state: "ready", detail: nil),
+    processResult: ebFake.processResult
+)
+let ebPtyOnlyTools = try LocalTools(
+    resolver: ebResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: ebPolicy,
+    executionBackend: ebPtyOnly
+)
+expectBackendFailure("FMG-023 capability mismatch", containing: "required capability") {
+    _ = try ebPtyOnlyTools.call(name: "exec_process", arguments: ["executable": "fake-executable", "arguments": []])
+}
+precondition(ebPtyOnly.processCalls == 0, "capability mismatch must have no process side effect")
+
+let ebDegraded = TestExecutionBackend(
+    descriptor: backendDescriptor("degraded-test", ebDescriptor.capabilities),
+    health: ExecutionBackendHealth(available: false, state: "degraded", detail: "lifecycle fixture"),
+    processResult: ebFake.processResult
+)
+let ebDegradedTools = try LocalTools(
+    resolver: ebResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: ebPolicy,
+    executionBackend: ebDegraded
+)
+expectBackendFailure("FMG-023 lifecycle failure", containing: "unavailable") {
+    _ = try ebDegradedTools.call(name: "exec_process", arguments: ["executable": "fake-executable", "arguments": []])
+}
+
+let ebMalformedResult = TestExecutionBackend(
+    descriptor: backendDescriptor("malformed-result-test", ebDescriptor.capabilities),
+    health: ExecutionBackendHealth(available: true, state: "ready", detail: nil),
+    processResult: ProcessResult(
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        timedOut: false,
+        cancelled: false,
+        stdoutTruncated: false,
+        stderrTruncated: false,
+        stdoutOmittedBytes: -1,
+        stderrOmittedBytes: 0
+    )
+)
+let ebMalformedTools = try LocalTools(
+    resolver: ebResolver,
+    gitUserName: "FileMCP Test",
+    gitUserEmail: "filemcp@example.invalid",
+    policy: ebPolicy,
+    executionBackend: ebMalformedResult
+)
+expectBackendFailure("FMG-023 result normalization", containing: "omitted-byte") {
+    _ = try ebMalformedTools.call(name: "exec_process", arguments: ["executable": "fake-executable", "arguments": []])
+}
+
+expectBackendFailure("FMG-023 backend identity spoof descriptor", containing: "identity") {
+    _ = try LocalTools(
+        resolver: ebResolver,
+        gitUserName: "FileMCP Test",
+        gitUserEmail: "filemcp@example.invalid",
+        policy: ebPolicy,
+        executionBackend: TestExecutionBackend(
+            descriptor: backendDescriptor("spoof/invalid", ebDescriptor.capabilities),
+            health: ExecutionBackendHealth(available: true, state: "ready", detail: nil),
+            processResult: ebFake.processResult
+        )
+    )
+}
+
+expectBackendFailure("FMG-023 model backend identity spoof input", containing: "Unexpected argument") {
+    _ = try ebTools.call(
+        name: "exec_process",
+        arguments: ["executable": "fake-executable", "arguments": [], "backend_id": "attacker-controlled"]
+    )
+}
+
+let ebHost = try HostExecutionBackend(
+    resolver: ebResolver,
+    environmentAuthority: ExecProcessEnvironmentAuthority(patterns: []),
+    artifactFactory: { crArtifacts }
+)
+precondition(
+    ebHost.descriptor.id == HostExecutionBackend.backendID
+        && ebHost.descriptor.capabilities.contains(ExecutionBackendCapabilities.process)
+        && ebHost.descriptor.capabilities.contains(ExecutionBackendCapabilities.pty)
+        && ebHost.health.available,
+    "FMG-023 HostExecutionBackend must remain healthy default with process+PTY capability"
+)
+ebHost.stopAll()
+
+print("swift-execution-backend: ok")
+
 
 let fmg011ServerStoreURL = root.appendingPathComponent("server-evidence.json")
 let server = try LocalMCPServer(
@@ -4389,6 +4699,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/RepositoryIntelligenceQuery.swift \
     macos/QuarantineService.swift \
     macos/PersistentPty.swift \
+    macos/ExecutionBackend.swift \
     macos/WorkspaceCheckpoint.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"
