@@ -1292,3 +1292,21 @@ Remediation is test-harness only:
 Affected-stage local proof: project-state contract PASS; checkpoint-restore contract PASS (catalog 1.13.0 / 46 tools / transactional parity); Swift shell syntax PASS; `git diff --check` PASS.
 
 NEXT_EXACT_ACTION: commit/push this test-only watchdog remediation, require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64, then scoped review -> PR/merge -> merged-main Verify -> FMG-022 DONE / MAIN VERIFIED -> claim FMG-023.
+
+## FMG-022 + drive-root hotfix closure / FMG-023 claim - 2026-10-02
+
+FMG-022 Checkpoint Restore Transaction is DONE / MAIN VERIFIED.
+- PR #41 merged as `f3e4254c5a32d48d95b28372d0eff56880aeb5f5`.
+- Exact-head push Verify `36750333286`: SUCCESS.
+- Merged-main Verify `36986797605`: SUCCESS on macOS / Windows x64 / Windows ARM64.
+
+Drive-root `project_context` hotfix is MAIN VERIFIED.
+- PR #42 exact head `aa681c99bddd145bcbba9a0b62d6d566eef9691c`.
+- Push Verify `36988088942`: SUCCESS.
+- PR Verify `36991043837`: SUCCESS.
+- Merge main `9b6162fd9c79e755922f2865efef6b1eefc6402e`.
+- Merged-main Verify `36991621549`: SUCCESS.
+- Live D:\ FileMCP runtime PID 16240 remains active from the already-swapped verified binary.
+
+FMG-023 Execution Backend Interface is CLAIMED / ACTIVE on `chatgpt/FMG-023-execution-backend`, based directly on merged main `9b6162fd9c79e755922f2865efef6b1eefc6402e`.
+NEXT_EXACT_ACTION: implement only the frozen process+PTY backend abstraction: IExecutionBackend + HostExecutionBackend, backend identity/version/capabilities, workspace mapping, environment mediation hooks, health/lifecycle/cleanup and evidence backend identity. File/Git tools remain host-native. FMG-024 remains blocked until FMG-023 MAIN VERIFIED.

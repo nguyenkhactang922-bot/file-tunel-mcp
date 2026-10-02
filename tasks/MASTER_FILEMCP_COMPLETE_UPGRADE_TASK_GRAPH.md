@@ -390,7 +390,7 @@ Negative tests:
 
 ## FMG-022 - Checkpoint Restore Transaction
 
-State: ACTIVE
+State: DONE / MAIN VERIFIED
 Depends: FMG-021, FMG-008, FMG-009, FMG-016
 
 Scope:
@@ -423,7 +423,7 @@ Negative tests:
 
 ## FMG-023 - Execution Backend Interface
 
-State: BLOCKED
+State: ACTIVE
 Depends: FMG-013, FMG-005, FMG-011
 
 Scope:
