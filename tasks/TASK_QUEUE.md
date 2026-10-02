@@ -30,7 +30,7 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - FMG-021: DONE / MAIN VERIFIED at `12874be49a3bc8eaacdeb0dfb2aea33eb9ac087e` (merged-main Verify `36698092398` SUCCESS).
 - FMG-022: DONE / MAIN VERIFIED. PR #41 merged as `f3e4254c5a32d48d95b28372d0eff56880aeb5f5`; merged-main Verify `36986797605` SUCCESS.
 - Drive-root project_context hotfix: MAIN VERIFIED. PR #42 merged as `9b6162fd9c79e755922f2865efef6b1eefc6402e`; merged-main Verify `36991621549` SUCCESS.
-- FMG-023: LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-023-execution-backend`.
-- Local proof: Windows full runtime 975 assertions PASS; targeted execution-backend 19 assertions PASS; Release build 0 warnings/errors; catalog/parity + exec/PTY/evidence/backend contracts PASS.
+- FMG-023: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING on `chatgpt/FMG-023-execution-backend`.
+- Candidate `fe05746759592d3ef3354e92b4969b9f246fdb41`; Verify `36996922253` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 - Evidence: `docs/evidence/FMG-023_EXECUTION_BACKEND_INTERFACE_EVIDENCE.md`.
-- NEXT_EXACT_ACTION: commit/push exact FMG-023 candidate, require native Verify macOS + Windows x64 + Windows ARM64, then exact-head review -> PR/merge -> merged-main Verify -> claim FMG-024.
+- NEXT_EXACT_ACTION: commit/push evidence-state closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-023 MAIN VERIFIED -> claim FMG-024.

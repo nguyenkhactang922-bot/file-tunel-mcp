@@ -68,3 +68,24 @@ Before FMG-023 can be DONE / MAIN VERIFIED:
 3. perform exact-head scoped review;
 4. PR/merge;
 5. require merged-main native Verify SUCCESS.
+
+
+## Exact-head native verification and scoped review
+
+Candidate: fe05746759592d3ef3354e92b4969b9f246fdb41
+GitHub Verify run: 36996922253
+Result: SUCCESS on macOS, Windows x64 and native Windows ARM64.
+
+Notable native proof:
+- macOS warnings-as-errors typecheck: PASS;
+- macOS full integration tests: PASS;
+- macOS app build/resources: PASS;
+- Windows x64 full integration/build/smoke/resources: PASS;
+- native Windows ARM64 contract/build/smoke/resources: PASS;
+- execution-backend interface contract: PASS on both Windows lanes;
+- canonical catalog remained 1.13.0 / 46 tools.
+
+Exact-head scoped review: PASS.
+No P0/P1 finding remains in FMG-023 scope. The backend abstraction is process+PTY only, HostExecutionBackend remains default, file/Git authority remains host-native, backend selection/identity is server-owned, and the generic descriptor-mode repair leaves FMG-024 isolated backend implementation possible without weakening current host defaults.
+
+NEXT_EXACT_ACTION: commit this evidence/state-only closure, push, require Verify on the evidence-only head, then PR/merge and merged-main Verify.
