@@ -1385,3 +1385,11 @@ Verify run `37042165795` on `8fe0217e941e6b3c78e4f7ec487ad03e1733d745`: Windows 
 
 Remediation is macOS wiring-only: reorder those two named arguments to match the initializer declaration. Preserve all Windows PASS checkpoints.
 NEXT_EXACT_ACTION: commit/push this macOS-only remediation and require fresh native Verify; repair only any newly failed stage.
+
+
+## FMG-024 native Verify attempt 2 remediation - 2026-10-03
+
+Verify run `37042897103` on `a5e55248857f2c9e65bb222acbf8a1c8202b4d13`: Windows x64 SUCCESS including full integration/build/smoke/resources; native Windows ARM64 SUCCESS. macOS failed only at warnings-as-errors static typecheck because `LocalMCPConfiguration` was missing its struct-closing brace after the initializer. No Docker runtime/contract failure occurred.
+
+Remediation is macOS syntax-only: restore the missing struct-closing brace. Preserve all Windows PASS checkpoints and do not rerun local Windows stages.
+NEXT_EXACT_ACTION: commit/push this macOS syntax-only remediation and require fresh native Verify; repair only any newly failed stage.

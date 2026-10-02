@@ -44,6 +44,7 @@ struct LocalMCPConfiguration {
         self.execEnvironmentAllowList = execEnvironmentAllowList
         self.dockerExecutionBackend = dockerExecutionBackend
     }
+}
 
 enum LocalMCPRuntimeState: Equatable {
     case stopped
