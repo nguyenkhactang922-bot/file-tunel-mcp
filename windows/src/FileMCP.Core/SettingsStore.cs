@@ -100,6 +100,24 @@ public sealed class SettingsStore
         settings.CustomPolicyAllowShell = normalizedPolicy.CustomAllowShell;
         settings.EnableCommands = normalizedPolicy.Profile == FileMcpPolicyProfiles.LegacyCommandCompatible;
         settings.ExecEnvironmentAllowList = ExecProcessEnvironmentAuthority.NormalizePatterns(settings.ExecEnvironmentAllowList);
+        settings.ExecutionBackendMode = string.Equals(settings.ExecutionBackendMode?.Trim(), "docker", StringComparison.OrdinalIgnoreCase)
+            ? "docker"
+            : "host";
+        settings.DockerImage = settings.DockerImage?.Trim() ?? "";
+        settings.DockerAllowedImages = (settings.DockerAllowedImages ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        if (settings.DockerCpuLimit is < 0.1 or > 32) settings.DockerCpuLimit = 2.0;
+        if (settings.DockerMemoryMb is < 128 or > 65_536) settings.DockerMemoryMb = 2048;
+        if (settings.DockerPidsLimit is < 16 or > 4096) settings.DockerPidsLimit = 128;
+        if (string.IsNullOrWhiteSpace(settings.DockerUser)) settings.DockerUser = "1000:1000";
+        else settings.DockerUser = settings.DockerUser.Trim();
+        if (settings.DockerStartupTimeoutSeconds is < 1 or > ProcessRunner.MaxCommandTimeoutSeconds) settings.DockerStartupTimeoutSeconds = 30;
+        if (settings.DockerIdleTtlSeconds is < 60 or > 86_400) settings.DockerIdleTtlSeconds = 900;
+        if (settings.DockerMaxLifetimeSeconds < settings.DockerIdleTtlSeconds || settings.DockerMaxLifetimeSeconds > 604_800) settings.DockerMaxLifetimeSeconds = 7200;
 
         var existing = settings.Workspaces
             .Where(item => !string.IsNullOrWhiteSpace(item.Key))

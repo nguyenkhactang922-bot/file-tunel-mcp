@@ -25,9 +25,17 @@ final class ExecProcessEnvironmentAuthority {
     ]
 
     let patterns: [String]
+    private let blockedNames: Set<String>
+    private let blockedOverrideNames: Set<String>
 
-    init(patterns: [String] = []) throws {
+    init(
+        patterns: [String] = [],
+        blockedNames: [String] = [],
+        blockedOverrideNames: [String] = []
+    ) throws {
         self.patterns = try Self.normalizePatterns(patterns)
+        self.blockedNames = try Self.normalizeBlockedNames(blockedNames)
+        self.blockedOverrideNames = try Self.normalizeBlockedNames(blockedOverrideNames)
     }
 
     static func normalizePatterns(_ patterns: [String]) throws -> [String] {
@@ -45,6 +53,18 @@ final class ExecProcessEnvironmentAuthority {
     }
 
     func build(overrides: [String: String] = [:], host: [String: String] = ProcessInfo.processInfo.environment) throws -> [String: String] {
+        try buildCore(overrides: overrides, host: host, includeMinimalBaseline: true)
+    }
+
+    func buildIsolated(overrides: [String: String] = [:], host: [String: String] = ProcessInfo.processInfo.environment) throws -> [String: String] {
+        try buildCore(overrides: overrides, host: host, includeMinimalBaseline: false)
+    }
+
+    private func buildCore(
+        overrides: [String: String],
+        host: [String: String],
+        includeMinimalBaseline: Bool
+    ) throws -> [String: String] {
         var result: [String: String] = [:]
         var environmentChars = 0
 
@@ -64,10 +84,13 @@ final class ExecProcessEnvironmentAuthority {
             environmentChars = nextChars
         }
 
-        for name in Self.minimalBaselineNames {
-            if let value = host[name], !value.isEmpty { try setBounded(name, value) }
+        if includeMinimalBaseline {
+            for name in Self.minimalBaselineNames where !blockedNames.contains(name.uppercased()) {
+                if let value = host[name], !value.isEmpty { try setBounded(name, value) }
+            }
         }
         for (name, value) in host {
+            if blockedNames.contains(name.uppercased()) { continue }
             guard let matching = matchingPattern(name) else { continue }
             if Self.isSecretLike(name), Self.containsWildcard(matching) { continue }
             try setBounded(name, value)
@@ -79,6 +102,9 @@ final class ExecProcessEnvironmentAuthority {
         var totalChars = 0
         for (name, value) in overrides {
             try Self.validateName(name)
+            if blockedNames.contains(name.uppercased()) || blockedOverrideNames.contains(name.uppercased()) {
+                throw ExecProcessEnvironmentAuthorityError.invalid("Environment override is reserved by the selected execution backend: \(name)")
+            }
             guard !value.utf8.contains(0) else { throw ExecProcessEnvironmentAuthorityError.invalid("Environment override \(name) contains a NUL byte") }
             guard value.count <= Self.maxValueChars else { throw ExecProcessEnvironmentAuthorityError.invalid("Environment override \(name) exceeds \(Self.maxValueChars) characters") }
             totalChars += name.count + value.count
@@ -98,6 +124,17 @@ final class ExecProcessEnvironmentAuthority {
     static func isSecretLike(_ name: String) -> Bool {
         let upper = name.uppercased()
         return secretMarkers.contains { upper.contains($0) }
+    }
+
+    private static func normalizeBlockedNames(_ names: [String]) throws -> Set<String> {
+        var result = Set<String>()
+        for raw in names {
+            let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if name.isEmpty { continue }
+            try validateName(name)
+            result.insert(name.uppercased())
+        }
+        return result
     }
 
     private func matchingPattern(_ name: String) -> String? {

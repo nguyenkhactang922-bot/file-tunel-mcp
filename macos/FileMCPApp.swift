@@ -32,6 +32,17 @@ private enum ConfigKey {
     static let customPolicyAllowNetworkOpenWorld = "customPolicyAllowNetworkOpenWorld"
     static let customPolicyAllowShell = "customPolicyAllowShell"
     static let execEnvironmentAllowList = "execEnvironmentAllowList"
+    static let executionBackendMode = "executionBackendMode"
+    static let dockerImage = "dockerImage"
+    static let dockerAllowedImages = "dockerAllowedImages"
+    static let dockerNetworkEnabled = "dockerNetworkEnabled"
+    static let dockerCpuLimit = "dockerCpuLimit"
+    static let dockerMemoryMB = "dockerMemoryMB"
+    static let dockerPidsLimit = "dockerPidsLimit"
+    static let dockerUser = "dockerUser"
+    static let dockerStartupTimeoutSeconds = "dockerStartupTimeoutSeconds"
+    static let dockerIdleTTLSeconds = "dockerIdleTTLSeconds"
+    static let dockerMaxLifetimeSeconds = "dockerMaxLifetimeSeconds"
 }
 
 private final class LoadingButton: NSButton {
@@ -1169,6 +1180,39 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             .filter { !$0.isEmpty }
     }
 
+    private func dockerExecutionBackendConfiguration() -> DockerExecutionBackendConfiguration? {
+        let defaults = UserDefaults.standard
+        let mode = defaults.string(forKey: ConfigKey.executionBackendMode)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? "host"
+        guard mode == "docker" else { return nil }
+
+        func intValue(_ key: String, fallback: Int) -> Int {
+            defaults.object(forKey: key) == nil ? fallback : defaults.integer(forKey: key)
+        }
+        func doubleValue(_ key: String, fallback: Double) -> Double {
+            defaults.object(forKey: key) == nil ? fallback : defaults.double(forKey: key)
+        }
+
+        let memoryMB = intValue(ConfigKey.dockerMemoryMB, fallback: 2048)
+        let memoryBytes: Int64 = (128...65_536).contains(memoryMB)
+            ? Int64(memoryMB) * 1024 * 1024
+            : -1
+        return DockerExecutionBackendConfiguration(
+            enabled: true,
+            image: defaults.string(forKey: ConfigKey.dockerImage) ?? "",
+            allowedImages: defaults.stringArray(forKey: ConfigKey.dockerAllowedImages) ?? [],
+            networkEnabled: defaults.bool(forKey: ConfigKey.dockerNetworkEnabled),
+            cpuLimit: doubleValue(ConfigKey.dockerCpuLimit, fallback: 2.0),
+            memoryBytes: memoryBytes,
+            pidsLimit: intValue(ConfigKey.dockerPidsLimit, fallback: 128),
+            user: defaults.string(forKey: ConfigKey.dockerUser) ?? "1000:1000",
+            startupTimeoutSeconds: intValue(ConfigKey.dockerStartupTimeoutSeconds, fallback: 30),
+            idleTTLSeconds: intValue(ConfigKey.dockerIdleTTLSeconds, fallback: 900),
+            maxLifetimeSeconds: intValue(ConfigKey.dockerMaxLifetimeSeconds, fallback: 7200)
+        )
+    }
+
     private func localPolicyConfiguration() -> LocalPolicyConfiguration {
         let defaults = UserDefaults.standard
         let profile = policyProfilePopup.selectedItem?.representedObject as? String ?? FileMCPPolicyProfiles.restricted
@@ -1710,7 +1754,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
                 gitUserEmail: gitUserEmailField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                 enableCommands: policyConfiguration.profile == FileMCPPolicyProfiles.legacyCommandCompatible,
                 policyConfiguration: policyConfiguration,
-                execEnvironmentAllowList: execEnvironmentAllowList()
+                execEnvironmentAllowList: execEnvironmentAllowList(),
+                dockerExecutionBackend: dockerExecutionBackendConfiguration()
             ))
         } catch { showError(error.localizedDescription) }
     }

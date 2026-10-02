@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace FileMCP.Core;
 
@@ -12,6 +13,7 @@ internal sealed record EvidenceBegin(
     string CriterionId,
     long StartedEpochMs,
     string BackendId,
+    string BackendMetadataJson,
     long PolicyGeneration,
     string PolicyHash,
     string CatalogHash,
@@ -45,6 +47,7 @@ internal sealed record EvidenceRecord(
     string OperationState,
     string VerificationState,
     string BackendId,
+    string BackendMetadataJson,
     string? SourceStateJson,
     string? SourceStateId,
     string? ProjectContextDigest,
@@ -59,11 +62,12 @@ internal sealed record EvidenceRecord(
 
 internal sealed class EvidenceStore
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
     public static readonly TimeSpan DefaultRetention = TimeSpan.FromDays(30);
     public const int DefaultMaxRecords = 10_000;
     public const long DefaultMaxStoreBytes = 32L * 1024 * 1024;
     public const int MaxSourceStateJsonBytes = 256 * 1024;
+    public const int MaxBackendMetadataJsonBytes = 16 * 1024;
 
     private readonly string _databasePath;
     private readonly TimeSpan _retention;
@@ -157,13 +161,13 @@ internal sealed class EvidenceStore
             command.CommandText = """
                 INSERT INTO evidence_records(
                     evidence_id,operation_id,workspace_fingerprint,tool_name,criterion_id,
-                    started_epoch_ms,ended_epoch_ms,operation_state,verification_state,backend_id,
+                    started_epoch_ms,ended_epoch_ms,operation_state,verification_state,backend_id,backend_metadata_json,
                     source_state_json,source_state_id,project_context_digest,
                     policy_generation,policy_hash,catalog_hash,catalog_version,
                     exit_code,timed_out,cancelled,truncated)
                 VALUES(
                     $evidence,$operation,$workspace,$tool,$criterion,
-                    $started,NULL,'running','not-run',$backend,
+                    $started,NULL,'running','not-run',$backend,$backendMetadata,
                     NULL,NULL,NULL,
                     $policyGeneration,$policyHash,$catalogHash,$catalogVersion,
                     NULL,0,0,0);
@@ -175,6 +179,7 @@ internal sealed class EvidenceStore
             command.Parameters.AddWithValue("$criterion", begin.CriterionId);
             command.Parameters.AddWithValue("$started", begin.StartedEpochMs);
             command.Parameters.AddWithValue("$backend", begin.BackendId);
+            command.Parameters.AddWithValue("$backendMetadata", begin.BackendMetadataJson);
             command.Parameters.AddWithValue("$policyGeneration", begin.PolicyGeneration);
             command.Parameters.AddWithValue("$policyHash", begin.PolicyHash);
             command.Parameters.AddWithValue("$catalogHash", begin.CatalogHash);
@@ -254,7 +259,7 @@ internal sealed class EvidenceStore
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT evidence_id,operation_id,workspace_fingerprint,tool_name,criterion_id,
-                   started_epoch_ms,ended_epoch_ms,operation_state,verification_state,backend_id,
+                   started_epoch_ms,ended_epoch_ms,operation_state,verification_state,backend_id,backend_metadata_json,
                    source_state_json,source_state_id,project_context_digest,
                    policy_generation,policy_hash,catalog_hash,catalog_version,
                    exit_code,timed_out,cancelled,truncated
@@ -265,10 +270,10 @@ internal sealed class EvidenceStore
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return null;
         return new EvidenceRecord(
             reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
-            reader.GetInt64(5), reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.GetString(7), reader.GetString(8), reader.GetString(9),
-            reader.IsDBNull(10) ? null : reader.GetString(10), reader.IsDBNull(11) ? null : reader.GetString(11), reader.IsDBNull(12) ? null : reader.GetString(12),
-            reader.GetInt64(13), reader.GetString(14), reader.GetString(15), reader.GetString(16),
-            reader.IsDBNull(17) ? null : reader.GetInt32(17), reader.GetInt64(18) != 0, reader.GetInt64(19) != 0, reader.GetInt64(20) != 0);
+            reader.GetInt64(5), reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.GetString(7), reader.GetString(8), reader.GetString(9), reader.GetString(10),
+            reader.IsDBNull(11) ? null : reader.GetString(11), reader.IsDBNull(12) ? null : reader.GetString(12), reader.IsDBNull(13) ? null : reader.GetString(13),
+            reader.GetInt64(14), reader.GetString(15), reader.GetString(16), reader.GetString(17),
+            reader.IsDBNull(18) ? null : reader.GetInt32(18), reader.GetInt64(19) != 0, reader.GetInt64(20) != 0, reader.GetInt64(21) != 0);
     }
 
     internal async Task<int> CountAsync(CancellationToken cancellationToken = default)
@@ -380,6 +385,7 @@ internal sealed class EvidenceStore
                 operation_state TEXT NOT NULL,
                 verification_state TEXT NOT NULL,
                 backend_id TEXT NOT NULL,
+                backend_metadata_json TEXT NOT NULL DEFAULT '{}',
                 source_state_json TEXT,
                 source_state_id TEXT,
                 project_context_digest TEXT,
@@ -406,6 +412,14 @@ internal sealed class EvidenceStore
             insert.Parameters.AddWithValue("$version", SchemaVersion.ToString());
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
+        else if (string.Equals(existing, "1", StringComparison.Ordinal))
+        {
+            await ExecuteAsync(connection, "ALTER TABLE evidence_records ADD COLUMN backend_metadata_json TEXT NOT NULL DEFAULT '{}';", cancellationToken).ConfigureAwait(false);
+            await using var migrate = connection.CreateCommand();
+            migrate.CommandText = "UPDATE evidence_meta SET value=$version WHERE key='schema_version';";
+            migrate.Parameters.AddWithValue("$version", SchemaVersion.ToString());
+            await migrate.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
         else if (!string.Equals(existing, SchemaVersion.ToString(), StringComparison.Ordinal))
         {
             throw new FileMcpException($"Unsupported evidence database schema version: {existing}");
@@ -430,6 +444,7 @@ internal sealed class EvidenceStore
         RequireBounded(begin.ToolName, 128, nameof(begin.ToolName));
         RequireBounded(begin.CriterionId, 128, nameof(begin.CriterionId));
         RequireBounded(begin.BackendId, 64, nameof(begin.BackendId));
+        ValidateBackendMetadataJson(begin.BackendMetadataJson);
         RequireBounded(begin.PolicyHash, 128, nameof(begin.PolicyHash));
         RequireBounded(begin.CatalogHash, 128, nameof(begin.CatalogHash));
         RequireBounded(begin.CatalogVersion, 64, nameof(begin.CatalogVersion));
@@ -447,6 +462,22 @@ internal sealed class EvidenceStore
         RequireBounded(completion.PolicyHash, 128, nameof(completion.PolicyHash));
         RequireBounded(completion.CatalogHash, 128, nameof(completion.CatalogHash));
         RequireBounded(completion.CatalogVersion, 64, nameof(completion.CatalogVersion));
+    }
+
+    private static void ValidateBackendMetadataJson(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || Encoding.UTF8.GetByteCount(value) > MaxBackendMetadataJsonBytes)
+            throw new FileMcpException("Invalid evidence backend metadata");
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                throw new FileMcpException("Evidence backend metadata must be a JSON object");
+        }
+        catch (JsonException)
+        {
+            throw new FileMcpException("Evidence backend metadata must be valid JSON");
+        }
     }
 
     private static void RequireBounded(string value, int maxLength, string field)

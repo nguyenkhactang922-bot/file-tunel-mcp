@@ -56,7 +56,7 @@ foreach($marker in @(
   "_executionBackend.RunProcessAsync",
   "RequireExecutionBackend(ExecutionBackendCapabilities.Process)",
   "ExecutionBackendContracts.AttachMetadata",
-  "EvidenceBackendId",
+  "EvidenceBackendIdentity",
   "_executionBackend.StopAllAsync"
 )){
   if(-not $winTools.Contains($marker)){ throw "Windows LocalTools routing missing marker: $marker" }
@@ -69,7 +69,7 @@ foreach($marker in @(
   "executionBackend.runProcess",
   "requireExecutionBackend(ExecutionBackendCapabilities.process)",
   "ExecutionBackendContracts.attachMetadata",
-  "evidenceBackendID",
+  "evidenceBackendIdentity",
   "executionBackend.stopAll"
 )){
   if(-not $macTools.Contains($marker)){ throw "macOS LocalTools routing missing marker: $marker" }
@@ -79,14 +79,16 @@ if($macTools.Contains("pty.start(")){
 }
 
 foreach($marker in @(
-  "var backendId = _tools.EvidenceBackendId(toolName)",
+  "var backendIdentity = _tools.EvidenceBackendIdentity(toolName)",
+  "var backendId = backendIdentity.BackendId",
   "backendId,",
   '["backend_id"] = run.BackendId'
 )){
   if(-not $winEvidence.Contains($marker)){ throw "Windows evidence backend binding missing marker: $marker" }
 }
 foreach($marker in @(
-  "let backendID = tools.evidenceBackendID(toolName: toolName)",
+  "let backendIdentity = try tools.evidenceBackendIdentity(toolName: toolName)",
+  "let backendID = backendIdentity.backendID",
   "backendID: backendID",
   '"backend_id": run.backendID'
 )){

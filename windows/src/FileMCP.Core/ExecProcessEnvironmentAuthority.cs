@@ -28,10 +28,17 @@ internal sealed class ExecProcessEnvironmentAuthority
     ];
 
     private readonly IReadOnlyList<string> _patterns;
+    private readonly HashSet<string> _blockedNames;
+    private readonly HashSet<string> _blockedOverrideNames;
 
-    public ExecProcessEnvironmentAuthority(IEnumerable<string>? patterns = null)
+    public ExecProcessEnvironmentAuthority(
+        IEnumerable<string>? patterns = null,
+        IEnumerable<string>? blockedNames = null,
+        IEnumerable<string>? blockedOverrideNames = null)
     {
         _patterns = NormalizePatterns(patterns);
+        _blockedNames = NormalizeBlockedNames(blockedNames);
+        _blockedOverrideNames = NormalizeBlockedNames(blockedOverrideNames);
     }
 
     public IReadOnlyList<string> Patterns => _patterns;
@@ -54,16 +61,28 @@ internal sealed class ExecProcessEnvironmentAuthority
     {
         var host = Environment.GetEnvironmentVariables().Cast<DictionaryEntry>()
             .ToDictionary(item => (string)item.Key, item => (string?)item.Value ?? "", StringComparer.OrdinalIgnoreCase);
-        return BuildCore(host, requestOverrides);
+        return BuildCore(host, requestOverrides, includeMinimalBaseline: true);
+    }
+
+    public Dictionary<string, string> BuildIsolated(IReadOnlyDictionary<string, string>? requestOverrides = null)
+    {
+        var host = Environment.GetEnvironmentVariables().Cast<DictionaryEntry>()
+            .ToDictionary(item => (string)item.Key, item => (string?)item.Value ?? "", StringComparer.OrdinalIgnoreCase);
+        return BuildCore(host, requestOverrides, includeMinimalBaseline: false);
     }
 
     internal Dictionary<string, string> BuildForTest(
         IReadOnlyDictionary<string, string> host,
-        IReadOnlyDictionary<string, string>? requestOverrides = null) => BuildCore(host, requestOverrides);
+        IReadOnlyDictionary<string, string>? requestOverrides = null) => BuildCore(host, requestOverrides, includeMinimalBaseline: true);
+
+    internal Dictionary<string, string> BuildIsolatedForTest(
+        IReadOnlyDictionary<string, string> host,
+        IReadOnlyDictionary<string, string>? requestOverrides = null) => BuildCore(host, requestOverrides, includeMinimalBaseline: false);
 
     private Dictionary<string, string> BuildCore(
         IReadOnlyDictionary<string, string> host,
-        IReadOnlyDictionary<string, string>? requestOverrides)
+        IReadOnlyDictionary<string, string>? requestOverrides,
+        bool includeMinimalBaseline)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var environmentChars = 0;
@@ -83,11 +102,15 @@ internal sealed class ExecProcessEnvironmentAuthority
             environmentChars = nextChars;
         }
 
-        foreach (var name in MinimalBaselineNames)
-            if (host.TryGetValue(name, out var value) && value.Length > 0) SetBounded(name, value);
+        if (includeMinimalBaseline)
+        {
+            foreach (var name in MinimalBaselineNames)
+                if (!IsBlocked(name) && host.TryGetValue(name, out var value) && value.Length > 0) SetBounded(name, value);
+        }
 
         foreach (var pair in host)
         {
+            if (IsBlocked(pair.Key)) continue;
             var matching = MatchingPattern(pair.Key);
             if (matching is null) continue;
             if (IsSecretLike(pair.Key) && ContainsWildcard(matching)) continue;
@@ -100,6 +123,8 @@ internal sealed class ExecProcessEnvironmentAuthority
         foreach (var pair in requestOverrides)
         {
             ValidateName(pair.Key);
+            if (IsBlocked(pair.Key) || _blockedOverrideNames.Contains(pair.Key))
+                throw new FileMcpException($"Environment override is reserved by the selected execution backend: {pair.Key}");
             if (pair.Value.Contains('\0')) throw new FileMcpException($"Environment override {pair.Key} contains a NUL byte");
             if (pair.Value.Length > MaxValueChars) throw new FileMcpException($"Environment override {pair.Key} exceeds {MaxValueChars} characters");
             totalChars = checked(totalChars + pair.Key.Length + pair.Value.Length);
@@ -118,6 +143,21 @@ internal sealed class ExecProcessEnvironmentAuthority
     {
         var upper = name.ToUpperInvariant();
         return SecretMarkers.Any(marker => upper.Contains(marker, StringComparison.Ordinal));
+    }
+
+    private bool IsBlocked(string name) => _blockedNames.Contains(name);
+
+    private static HashSet<string> NormalizeBlockedNames(IEnumerable<string>? blockedNames)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var raw in blockedNames ?? [])
+        {
+            var name = (raw ?? "").Trim();
+            if (name.Length == 0) continue;
+            ValidateName(name);
+            result.Add(name);
+        }
+        return result;
     }
 
     private string? MatchingPattern(string name) => _patterns.FirstOrDefault(pattern => GlobMatches(pattern, name));

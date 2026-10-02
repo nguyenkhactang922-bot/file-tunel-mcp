@@ -7,6 +7,11 @@ enum ExecutionBackendCapabilities {
     static let environmentMediation = "environment_mediation"
     static let hostNetwork = "host_network"
     static let cleanup = "cleanup"
+    static let isolation = "isolation"
+    static let networkNone = "network_none"
+    static let networkEnabled = "network_enabled"
+    static let digestPinnedImage = "digest_pinned_image"
+    static let resourceLimits = "resource_limits"
 }
 
 struct ExecutionBackendDescriptor {
@@ -25,6 +30,11 @@ struct ExecutionBackendHealth {
     let detail: String?
 }
 
+struct ExecutionBackendEvidenceIdentity {
+    let backendID: String
+    let metadata: [String: String]
+}
+
 struct ExecutionProcessRequest {
     let executable: String
     let arguments: [String]
@@ -37,6 +47,7 @@ struct ExecutionProcessRequest {
 protocol ExecutionBackend: AnyObject {
     var descriptor: ExecutionBackendDescriptor { get }
     var health: ExecutionBackendHealth { get }
+    var evidenceIdentity: ExecutionBackendEvidenceIdentity { get }
 
     func runProcess(_ request: ExecutionProcessRequest, shouldCancel: (() -> Bool)?) throws -> ProcessResult
 
@@ -104,6 +115,25 @@ enum ExecutionBackendContracts {
         }
     }
 
+    static func validate(_ identity: ExecutionBackendEvidenceIdentity) throws {
+        guard identity.backendID.range(of: identifierPattern, options: .regularExpression) != nil else {
+            throw MCPServerError.operationFailed("Execution backend evidence identity is invalid")
+        }
+        guard identity.metadata.count <= 32 else {
+            throw MCPServerError.operationFailed("Execution backend evidence metadata is too large")
+        }
+        for (key, value) in identity.metadata {
+            guard key.range(of: identifierPattern, options: .regularExpression) != nil else {
+                throw MCPServerError.operationFailed("Execution backend evidence metadata key is invalid")
+            }
+            guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  value.count <= 1024,
+                  !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
+                throw MCPServerError.operationFailed("Execution backend evidence metadata value is invalid")
+            }
+        }
+    }
+
     static func requireCapability(_ descriptor: ExecutionBackendDescriptor, _ capability: String) throws {
         try validate(descriptor)
         guard descriptor.capabilities.contains(capability) else {
@@ -159,6 +189,15 @@ final class HostExecutionBackend: ExecutionBackend {
         resourceMode: "host-process"
     )
 
+    private static let hostEvidenceIdentity = ExecutionBackendEvidenceIdentity(
+        backendID: backendID,
+        metadata: [
+            "workspace_mode": "host-contained",
+            "network_policy": "host",
+            "resource_policy": "host-process",
+        ]
+    )
+
     private let resolver: SafePathResolver
     private let environmentAuthority: ExecProcessEnvironmentAuthority
     private let pty: PersistentPtyService
@@ -171,6 +210,7 @@ final class HostExecutionBackend: ExecutionBackend {
         artifactFactory: @escaping () throws -> ArtifactContentStore
     ) throws {
         try ExecutionBackendContracts.validate(Self.hostDescriptor)
+        try ExecutionBackendContracts.validate(Self.hostEvidenceIdentity)
         self.resolver = resolver
         self.environmentAuthority = environmentAuthority
         self.pty = try PersistentPtyService(
@@ -181,6 +221,7 @@ final class HostExecutionBackend: ExecutionBackend {
     }
 
     var descriptor: ExecutionBackendDescriptor { Self.hostDescriptor }
+    var evidenceIdentity: ExecutionBackendEvidenceIdentity { Self.hostEvidenceIdentity }
 
     var health: ExecutionBackendHealth {
         lock.lock()

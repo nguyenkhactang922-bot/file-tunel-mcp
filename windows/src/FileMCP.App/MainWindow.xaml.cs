@@ -994,8 +994,29 @@ public partial class MainWindow : Window
                 CustomAllowNetworkOpenWorld = _settings.CustomPolicyAllowNetworkOpenWorld,
                 CustomAllowShell = _settings.CustomPolicyAllowShell,
             },
-            _settings.ExecEnvironmentAllowList);
+            _settings.ExecEnvironmentAllowList,
+            BuildDockerExecutionBackendConfiguration());
 
+    private DockerExecutionBackendConfiguration? BuildDockerExecutionBackendConfiguration()
+    {
+        if (!string.Equals(_settings.ExecutionBackendMode, "docker", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return new DockerExecutionBackendConfiguration
+        {
+            Enabled = true,
+            Image = _settings.DockerImage,
+            AllowedImages = _settings.DockerAllowedImages.ToList(),
+            NetworkEnabled = _settings.DockerNetworkEnabled,
+            CpuLimit = _settings.DockerCpuLimit,
+            MemoryBytes = checked((long)_settings.DockerMemoryMb * 1024 * 1024),
+            PidsLimit = _settings.DockerPidsLimit,
+            User = _settings.DockerUser,
+            StartupTimeoutSeconds = _settings.DockerStartupTimeoutSeconds,
+            IdleTtlSeconds = _settings.DockerIdleTtlSeconds,
+            MaxLifetimeSeconds = _settings.DockerMaxLifetimeSeconds,
+        };
+    }
     private static List<string> ParseEnvironmentAllowList(string value) => value
         .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Where(item => item.Length > 0)

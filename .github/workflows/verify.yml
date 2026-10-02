@@ -48,6 +48,7 @@ jobs:
             macos/QuarantineService.swift \
             macos/PersistentPty.swift \
             macos/ExecutionBackend.swift \
+            macos/DockerExecutionBackend.swift \
             macos/WorkspaceCheckpoint.swift \
             macos/EvidenceSupport.swift \
             macos/ToolCatalog.swift \
@@ -140,6 +141,10 @@ jobs:
       - name: Verify execution backend interface contract
         shell: pwsh
         run: ./tests/test_execution_backend_contract.ps1
+      - name: Verify optional Docker isolated backend contract
+        shell: pwsh
+        run: ./tests/test_docker_backend_contract.ps1
+
 
       - name: Verify file version and source-state contract
         shell: pwsh
@@ -287,6 +292,10 @@ jobs:
       - name: Verify execution backend interface contract
         shell: pwsh
         run: ./tests/test_execution_backend_contract.ps1
+      - name: Verify optional Docker isolated backend contract
+        shell: pwsh
+        run: ./tests/test_docker_backend_contract.ps1
+
 
       - name: Verify file version and source-state contract
         shell: pwsh

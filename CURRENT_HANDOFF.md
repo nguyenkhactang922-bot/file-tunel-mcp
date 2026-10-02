@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMG-022-checkpoint-restore`
+Branch: `chatgpt/FMG-024-docker-backend`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE FMG-022 changes pending verification.
+Expected worktree at handoff: ACTIVE FMG-024 Docker backend changes pending native verification.
 
 ## Completed technical program
 
@@ -1354,3 +1354,26 @@ FMG-023 Execution Backend Interface is DONE / MAIN VERIFIED.
 
 FMG-024 Optional Docker Isolated Backend is CLAIMED / ACTIVE on `chatgpt/FMG-024-docker-backend`, based directly on verified main `d71fbc08e9e08f65c59ce5e05649e0dc629f7935`.
 NEXT_EXACT_ACTION: deep-read FMG-023 backend + policy/config/artifact/evidence primitives; probe Docker availability read-only; implement only frozen FMG-024 scope. Docker remains optional, HostExecutionBackend remains the startup/default fallback.
+
+
+## FMG-024 interrupted-work recovery - 2026-10-02
+
+Recovery classification: INTERRUPTED, not restarted from task start.
+A forced Git index refresh exposed three real source modifications that normal status initially missed because worktree stat metadata was stale: windows/src/FileMCP.Core/EvidenceStore.cs, ExecutionBackend.cs and LocalTools.cs. These partial changes extend execution-backend evidence identity/metadata for FMG-024 but were incomplete: EvidenceCoordinator still called the old EvidenceBackendId API and the Windows core did not compile. Docker CLI 29.6.2 is installed locally, but the Docker daemon is currently unavailable (local npipe endpoint missing).
+Checkpoint preserved: FMG-023 remains DONE / MAIN VERIFIED; FMG-024 remains ACTIVE. Resume the partial evidence-identity work, complete cross-platform parity, then implement the frozen Docker backend. Do not discard or restart these partial changes.
+
+
+## FMG-024 local affected-gate checkpoint - 2026-10-02
+
+State: ACTIVE / LOCAL AFFECTED GATES PASS / NATIVE VERIFY PENDING on `chatgpt/FMG-024-docker-backend`.
+
+Implemented scope currently includes: optional server-owned Docker process+PTY backend; digest-pinned local image allowlist; workspace-only bind mount revalidation; non-root user; read-only rootfs; cap-drop ALL; no-new-privileges; CPU/memory/PID caps; network-none default; explicit network policy gate; no hidden image pull (`--pull never`); image healthcheck disabled; local-only Docker daemon authority; request Docker-control environment override rejection; owned-label lifecycle/orphan cleanup; evidence backend/image/resource/network metadata; Windows/macOS config/runtime wiring; host backend remains default when Docker mode is not selected.
+
+Local proof:
+- Windows solution Release warnings-as-errors: PASS, 0 warnings / 0 errors.
+- FMG-024 Windows targeted runtime: 21 assertions PASS.
+- catalog/parity/exec_process/PTY/evidence/execution-backend/docker-backend contracts: PASS; catalog unchanged 1.13.0 / 46 tools.
+- Docker CLI 29.6.2 is installed; local Docker daemon is currently unavailable, so no claim of live container-engine success is made.
+- Full Windows runtime attempt reached unrelated pre-existing desktop single-instance test and timed out; isolated retry reproduced that unrelated timeout. FMG-024-specific gates remain PASS. Native Verify is the next authoritative cross-platform/full-regression gate.
+
+NEXT_EXACT_ACTION: complete state contract + scoped diff review, commit/push the exact FMG-024 candidate, require native Verify on macOS / Windows x64 / native Windows ARM64, repair only failed stages, then exact-head review -> PR/merge -> merged-main Verify -> FMG-024 MAIN VERIFIED -> claim FMG-025.

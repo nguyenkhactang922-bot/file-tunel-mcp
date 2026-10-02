@@ -182,7 +182,8 @@ final class LocalTools {
         quarantineStageForTests: ((String) -> Void)? = nil,
         repositoryQueryOptions: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions(),
         checkpointOptions: WorkspaceCheckpointOptions = WorkspaceCheckpointOptions(),
-        executionBackend: (any ExecutionBackend)? = nil
+        executionBackend: (any ExecutionBackend)? = nil,
+        dockerExecutionBackend: DockerExecutionBackendConfiguration? = nil
     ) throws {
         self.resolver = resolver
         let versionService = try FileVersionService(resolver: resolver)
@@ -229,8 +230,19 @@ final class LocalTools {
         self.gitUserEmail = gitUserEmail
         self.policy = policy
         let activeExecEnvironment = try ExecProcessEnvironmentAuthority(patterns: execEnvironmentAllowList)
+        if executionBackend != nil, dockerExecutionBackend?.enabled == true {
+            throw MCPServerError.operationFailed("Execution backend injection and Docker backend configuration are mutually exclusive")
+        }
         if let executionBackend {
             self.executionBackend = executionBackend
+        } else if let dockerExecutionBackend, dockerExecutionBackend.enabled {
+            self.executionBackend = try DockerExecutionBackend(
+                resolver: resolver,
+                environmentAuthority: activeExecEnvironment,
+                artifactStore: artifactFactory(),
+                configuration: dockerExecutionBackend,
+                allowNetworkEnabled: policy.allowsOpenWorldExecutionBackend
+            )
         } else {
             self.executionBackend = try HostExecutionBackend(
                 resolver: resolver,
@@ -240,6 +252,7 @@ final class LocalTools {
         }
         try ExecutionBackendContracts.validate(self.executionBackend.descriptor)
         try ExecutionBackendContracts.validate(self.executionBackend.health)
+        try ExecutionBackendContracts.validate(self.executionBackend.evidenceIdentity)
         self.enableCommands = policy.legacyUnsafeGitCompatibility
         self.checkpoints = try WorkspaceCheckpointService(
             resolver: resolver,
@@ -574,8 +587,25 @@ final class LocalTools {
         executionBackend.stopAll()
     }
 
-    func evidenceBackendID(toolName: String) -> String {
-        isExecutionBackendTool(toolName) ? executionBackend.descriptor.id : HostExecutionBackend.backendID
+    func evidenceBackendIdentity(toolName: String) throws -> ExecutionBackendEvidenceIdentity {
+        if !isExecutionBackendTool(toolName) {
+            return ExecutionBackendEvidenceIdentity(
+                backendID: HostExecutionBackend.backendID,
+                metadata: [
+                    "workspace_mode": "host-contained",
+                    "network_policy": "host",
+                    "resource_policy": "host-process",
+                ]
+            )
+        }
+        let descriptor = executionBackend.descriptor
+        try ExecutionBackendContracts.validate(descriptor)
+        let identity = executionBackend.evidenceIdentity
+        try ExecutionBackendContracts.validate(identity)
+        guard identity.backendID == descriptor.id else {
+            throw MCPServerError.operationFailed("Execution backend evidence identity does not match selected backend")
+        }
+        return identity
     }
 
     private func isExecutionBackendTool(_ toolName: String) -> Bool {
@@ -2808,7 +2838,8 @@ final class LocalMCPServer {
         limits: LocalMCPServerLimits = .standard,
         policyConfiguration: LocalPolicyConfiguration? = nil,
         execEnvironmentAllowList: [String] = [],
-        evidenceStore: EvidenceStore? = nil
+        evidenceStore: EvidenceStore? = nil,
+        dockerExecutionBackend: DockerExecutionBackendConfiguration? = nil
     ) throws {
         guard localAuthToken.utf8.count >= 32 else {
             throw MCPServerError.invalidArguments("Local MCP authentication token is too short")
@@ -2838,6 +2869,7 @@ final class LocalMCPServer {
             gitUserEmail: gitUserEmail,
             policy: activePolicy,
             execEnvironmentAllowList: execEnvironmentAllowList,
+            dockerExecutionBackend: dockerExecutionBackend,
             skillRegistry: activeSkills
         )
         let activeEvidenceStore = evidenceStore ?? EvidenceStore()
@@ -3383,7 +3415,7 @@ final class LocalMCPServer {
 
             let callMeta = params["_meta"] as? [String: Any]
             let evidenceRequest = try EvidenceRequestSpec.parse(meta: callMeta, toolName: toolName)
-            evidenceRun = evidenceCoordinator.begin(request: evidenceRequest, operationID: operationID, toolName: toolName)
+            evidenceRun = try evidenceCoordinator.begin(request: evidenceRequest, operationID: operationID, toolName: toolName)
             if evidenceRun?.blockedBeforeDispatch == true {
                 throw MCPServerError.operationFailed("Required evidence unavailable before launch: \(evidenceRun?.blockReason ?? "unknown")")
             }

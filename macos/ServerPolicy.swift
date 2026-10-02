@@ -99,6 +99,12 @@ final class ServerPolicy {
         return state.configuration.profile == FileMCPPolicyProfiles.legacyCommandCompatible
     }
 
+    var allowsOpenWorldExecutionBackend: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return state.configuration.profile == FileMCPPolicyProfiles.custom
+            && state.configuration.customAllowNetworkOpenWorld
+    }
+
     var allowsExplicitHistoryMove: Bool {
         lock.lock(); defer { lock.unlock() }
         let configuration = state.configuration

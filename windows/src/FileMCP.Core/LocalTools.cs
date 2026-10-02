@@ -67,7 +67,8 @@ internal sealed partial class LocalTools
         Action<string>? quarantineStageForTests = null,
         RepositoryIntelligenceQueryOptions? repositoryQueryOptions = null,
         WorkspaceCheckpointOptions? checkpointOptions = null,
-        IExecutionBackend? executionBackend = null)
+        IExecutionBackend? executionBackend = null,
+        DockerExecutionBackendConfiguration? dockerExecutionBackend = null)
     {
         _resolver = new SafePathResolver(allowedDirectory);
         _fileVersions = new FileVersionService(_resolver);
@@ -110,9 +111,20 @@ internal sealed partial class LocalTools
         _gitUserEmail = gitUserEmail;
         _policy = policy;
         var environmentAuthority = new ExecProcessEnvironmentAuthority(execEnvironmentAllowList);
-        _executionBackend = executionBackend ?? new HostExecutionBackend(_resolver, environmentAuthority, artifactFactory);
+        if (executionBackend is not null && dockerExecutionBackend is not null)
+            throw new FileMcpException("Execution backend injection and Docker backend configuration are mutually exclusive");
+        _executionBackend = executionBackend
+            ?? (dockerExecutionBackend?.Enabled == true
+                ? new DockerExecutionBackend(
+                    _resolver,
+                    environmentAuthority,
+                    artifactFactory(),
+                    dockerExecutionBackend,
+                    _policy.AllowsOpenWorldExecutionBackend)
+                : new HostExecutionBackend(_resolver, environmentAuthority, artifactFactory));
         ExecutionBackendContracts.ValidateDescriptor(_executionBackend.Descriptor);
         ExecutionBackendContracts.ValidateHealth(_executionBackend.Health);
+        ExecutionBackendContracts.ValidateEvidenceIdentity(_executionBackend.EvidenceIdentity);
         _enableCommands = _policy.LegacyUnsafeGitCompatibility;
         CanonicalToolCatalog.ValidateHandlerCoverage("local_tools", HandlerToolNames);
         if (!_enableCommands)
@@ -362,12 +374,24 @@ internal sealed partial class LocalTools
         try { _executionBackend.StopAllAsync().GetAwaiter().GetResult(); } catch { }
     }
 
-    internal string EvidenceBackendId(string toolName)
+    internal ExecutionBackendEvidenceIdentity EvidenceBackendIdentity(string toolName)
     {
-        if (!IsExecutionBackendTool(toolName)) return HostExecutionBackend.BackendId;
+        if (!IsExecutionBackendTool(toolName))
+            return new ExecutionBackendEvidenceIdentity(
+                HostExecutionBackend.BackendId,
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["workspace_mode"] = "host-contained",
+                    ["network_policy"] = "host",
+                    ["resource_policy"] = "host-process",
+                });
         var descriptor = _executionBackend.Descriptor;
         ExecutionBackendContracts.ValidateDescriptor(descriptor);
-        return descriptor.Id;
+        var identity = _executionBackend.EvidenceIdentity;
+        ExecutionBackendContracts.ValidateEvidenceIdentity(identity);
+        if (!string.Equals(identity.BackendId, descriptor.Id, StringComparison.Ordinal))
+            throw new FileMcpException("Execution backend evidence identity does not match selected backend");
+        return identity;
     }
 
     private static bool IsExecutionBackendTool(string toolName) =>
