@@ -28,5 +28,9 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 
 - FMG-020: DONE / MAIN VERIFIED at 4f99a60ba91abc0040364f70c9df86478fc4dab2 (Verify 36675201004 SUCCESS).
 - FMG-021: DONE / MAIN VERIFIED at `12874be49a3bc8eaacdeb0dfb2aea33eb9ac087e` (merged-main Verify `36698092398` SUCCESS).
-- FMG-022: ACTIVE on `chatgpt/FMG-022-checkpoint-restore`.
-- NEXT_EXACT_ACTION: deep-read checkpoint manifest/capture + Mutation Guard/apply_edits/quarantine/SourceStateRef primitives, then implement transactional checkpoint restore with divergence guard, mandatory rollback checkpoint, index restoration, post-restore verification and rollback/partial_recovery_required handling. FMG-023 remains blocked until FMG-022 MAIN VERIFIED.
+- FMG-022: DONE / MAIN VERIFIED. PR #41 merged as `f3e4254c5a32d48d95b28372d0eff56880aeb5f5`; merged-main Verify `36986797605` SUCCESS.
+- Drive-root project_context hotfix: MAIN VERIFIED. PR #42 merged as `9b6162fd9c79e755922f2865efef6b1eefc6402e`; merged-main Verify `36991621549` SUCCESS.
+- FMG-023: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING on `chatgpt/FMG-023-execution-backend`.
+- Candidate `fe05746759592d3ef3354e92b4969b9f246fdb41`; Verify `36996922253` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Evidence: `docs/evidence/FMG-023_EXECUTION_BACKEND_INTERFACE_EVIDENCE.md`.
+- NEXT_EXACT_ACTION: commit/push evidence-state closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-023 MAIN VERIFIED -> claim FMG-024.

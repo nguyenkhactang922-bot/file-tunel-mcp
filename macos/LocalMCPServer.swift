@@ -132,8 +132,7 @@ final class LocalTools {
     private let gitUserEmail: String
     private let enableCommands: Bool
     private let policy: ServerPolicy
-    private let execEnvironment: ExecProcessEnvironmentAuthority
-    private let pty: PersistentPtyService
+    private let executionBackend: any ExecutionBackend
     private let fileVersions: FileVersionService
     private let editAdapters: EditAdapterService
     private let batchFiles: BatchFileService
@@ -182,7 +181,8 @@ final class LocalTools {
         quarantineOptions: QuarantineServiceOptions? = nil,
         quarantineStageForTests: ((String) -> Void)? = nil,
         repositoryQueryOptions: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions(),
-        checkpointOptions: WorkspaceCheckpointOptions = WorkspaceCheckpointOptions()
+        checkpointOptions: WorkspaceCheckpointOptions = WorkspaceCheckpointOptions(),
+        executionBackend: (any ExecutionBackend)? = nil
     ) throws {
         self.resolver = resolver
         let versionService = try FileVersionService(resolver: resolver)
@@ -229,12 +229,17 @@ final class LocalTools {
         self.gitUserEmail = gitUserEmail
         self.policy = policy
         let activeExecEnvironment = try ExecProcessEnvironmentAuthority(patterns: execEnvironmentAllowList)
-        self.execEnvironment = activeExecEnvironment
-        self.pty = try PersistentPtyService(
-            resolver: resolver,
-            environmentAuthority: activeExecEnvironment,
-            artifactFactory: artifactFactory
-        )
+        if let executionBackend {
+            self.executionBackend = executionBackend
+        } else {
+            self.executionBackend = try HostExecutionBackend(
+                resolver: resolver,
+                environmentAuthority: activeExecEnvironment,
+                artifactFactory: artifactFactory
+            )
+        }
+        try ExecutionBackendContracts.validate(self.executionBackend.descriptor)
+        try ExecutionBackendContracts.validate(self.executionBackend.health)
         self.enableCommands = policy.legacyUnsafeGitCompatibility
         self.checkpoints = try WorkspaceCheckpointService(
             resolver: resolver,
@@ -477,7 +482,7 @@ final class LocalTools {
                 context: executionContext
             ))
         case "pty_start":
-            return objectOutput(try pty.start(
+            return objectOutput(try ptyStart(
                 executable: requiredString(arguments, "executable"),
                 arguments: try stringArray(arguments, "arguments"),
                 cwd: string(arguments, "cwd", default: ""),
@@ -489,34 +494,34 @@ final class LocalTools {
                 spillOutput: bool(arguments, "spill_output", default: false)
             ))
         case "pty_read":
-            return objectOutput(try pty.read(
+            return objectOutput(try ptyRead(
                 sessionID: requiredString(arguments, "session_id"),
                 cursor: string(arguments, "cursor", default: ""),
                 maxBytes: int(arguments, "max_bytes", default: 65_536),
                 context: executionContext
             ))
         case "pty_write":
-            return objectOutput(try pty.write(
+            return objectOutput(try ptyWrite(
                 sessionID: requiredString(arguments, "session_id"),
                 data: requiredString(arguments, "data")
             ))
         case "pty_resize":
-            return objectOutput(try pty.resize(
+            return objectOutput(try ptyResize(
                 sessionID: requiredString(arguments, "session_id"),
                 columns: requiredInt(arguments, "columns"),
                 rows: requiredInt(arguments, "rows")
             ))
         case "pty_signal":
-            return objectOutput(try pty.signal(
+            return objectOutput(try ptySignal(
                 sessionID: requiredString(arguments, "session_id"),
                 signal: requiredString(arguments, "signal")
             ))
         case "pty_stop":
-            return objectOutput(try pty.stop(
+            return objectOutput(try ptyStop(
                 sessionID: requiredString(arguments, "session_id")
             ))
         case "pty_list":
-            return objectOutput(pty.list())
+            return objectOutput(try ptyList())
         case "exec_process":
             return objectOutput(try execProcess(
                 executable: requiredString(arguments, "executable"),
@@ -566,7 +571,96 @@ final class LocalTools {
     }
 
     func stopAllPtySessions() {
-        pty.stopAll()
+        executionBackend.stopAll()
+    }
+
+    func evidenceBackendID(toolName: String) -> String {
+        isExecutionBackendTool(toolName) ? executionBackend.descriptor.id : HostExecutionBackend.backendID
+    }
+
+    private func isExecutionBackendTool(_ toolName: String) -> Bool {
+        toolName == "exec_process" || toolName.hasPrefix("pty_")
+    }
+
+    private func requireExecutionBackend(_ capability: String) throws -> ExecutionBackendDescriptor {
+        let descriptor = executionBackend.descriptor
+        try ExecutionBackendContracts.validate(descriptor)
+        try ExecutionBackendContracts.requireCapability(descriptor, capability)
+        let health = executionBackend.health
+        try ExecutionBackendContracts.validate(health)
+        guard health.available else {
+            throw MCPServerError.operationFailed("Execution backend unavailable: \(descriptor.id) (\(health.state))")
+        }
+        return descriptor
+    }
+
+    private func ptyStart(
+        executable: String,
+        arguments: [String],
+        cwd: String,
+        environmentOverrides: [String: String],
+        columns: Int,
+        rows: Int,
+        idleTTLSeconds: Int,
+        maxLifetimeSeconds: Int,
+        spillOutput: Bool
+    ) throws -> [String: Any] {
+        let descriptor = try requireExecutionBackend(ExecutionBackendCapabilities.pty)
+        let result = try executionBackend.startPty(
+            executable: executable,
+            arguments: arguments,
+            cwd: cwd,
+            environmentOverrides: environmentOverrides,
+            columns: columns,
+            rows: rows,
+            idleTTLSeconds: idleTTLSeconds,
+            maxLifetimeSeconds: maxLifetimeSeconds,
+            spillOutput: spillOutput
+        )
+        return try ExecutionBackendContracts.attachMetadata(result, descriptor: descriptor)
+    }
+
+    private func ptyRead(sessionID: String, cursor: String, maxBytes: Int, context: ToolExecutionContext?) throws -> [String: Any] {
+        let descriptor = try requireExecutionBackend(ExecutionBackendCapabilities.pty)
+        let result = try executionBackend.readPty(sessionID: sessionID, cursor: cursor, maxBytes: maxBytes, context: context)
+        return try ExecutionBackendContracts.attachMetadata(result, descriptor: descriptor)
+    }
+
+    private func ptyWrite(sessionID: String, data: String) throws -> [String: Any] {
+        let descriptor = try requireExecutionBackend(ExecutionBackendCapabilities.pty)
+        return try ExecutionBackendContracts.attachMetadata(
+            executionBackend.writePty(sessionID: sessionID, data: data),
+            descriptor: descriptor
+        )
+    }
+
+    private func ptyResize(sessionID: String, columns: Int, rows: Int) throws -> [String: Any] {
+        let descriptor = try requireExecutionBackend(ExecutionBackendCapabilities.pty)
+        return try ExecutionBackendContracts.attachMetadata(
+            executionBackend.resizePty(sessionID: sessionID, columns: columns, rows: rows),
+            descriptor: descriptor
+        )
+    }
+
+    private func ptySignal(sessionID: String, signal: String) throws -> [String: Any] {
+        let descriptor = try requireExecutionBackend(ExecutionBackendCapabilities.pty)
+        return try ExecutionBackendContracts.attachMetadata(
+            executionBackend.signalPty(sessionID: sessionID, signal: signal),
+            descriptor: descriptor
+        )
+    }
+
+    private func ptyStop(sessionID: String) throws -> [String: Any] {
+        let descriptor = try requireExecutionBackend(ExecutionBackendCapabilities.pty)
+        return try ExecutionBackendContracts.attachMetadata(
+            executionBackend.stopPty(sessionID: sessionID),
+            descriptor: descriptor
+        )
+    }
+
+    private func ptyList() throws -> [String: Any] {
+        let descriptor = try requireExecutionBackend(ExecutionBackendCapabilities.pty)
+        return try ExecutionBackendContracts.attachMetadata(executionBackend.listPty(), descriptor: descriptor)
     }
 
     private func listFiles(
@@ -1575,27 +1669,25 @@ final class LocalTools {
             throw MCPServerError.invalidArguments("output_limit_bytes must be 1...\(maxToolProcessOutputBytes)")
         }
 
-        let workdir = try resolver.resolve(cwd)
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: workdir.path, isDirectory: &isDirectory), isDirectory.boolValue else {
-            throw MCPServerError.invalidPath("No such working directory: \(cwd.isEmpty ? "." : cwd)")
-        }
-        let environment = try execEnvironment.build(overrides: environmentOverrides)
+        let descriptor = try requireExecutionBackend(ExecutionBackendCapabilities.process)
 
         commandSlots.wait()
         defer { commandSlots.signal() }
         try policy.authorize("exec_process", prepared: preparedPolicy)
-        let result = try ProcessRunner.run(
-            executable: executable,
-            arguments: arguments,
-            cwd: workdir.path,
-            environment: environment,
-            timeoutSeconds: timeoutSeconds,
-            outputLimitBytes: outputLimitBytes,
+        let result = try executionBackend.runProcess(
+            ExecutionProcessRequest(
+                executable: executable,
+                arguments: arguments,
+                cwd: cwd,
+                environmentOverrides: environmentOverrides,
+                timeoutSeconds: timeoutSeconds,
+                outputLimitBytes: outputLimitBytes
+            ),
             shouldCancel: { executionContext.map { !$0.tryContinue() } ?? false }
         )
+        try ExecutionBackendContracts.validate(result)
         let terminalState = result.cancelled ? "cancelled" : (result.timedOut ? "timed_out" : "exited")
-        return [
+        return try ExecutionBackendContracts.attachMetadata([
             "terminal_state": terminalState,
             "exit_code": Int(result.exitCode),
             "stdout": result.stdout,
@@ -1606,7 +1698,7 @@ final class LocalTools {
             "stderr_truncated": result.stderrTruncated,
             "stdout_omitted_bytes": result.stdoutOmittedBytes,
             "stderr_omitted_bytes": result.stderrOmittedBytes,
-        ]
+        ], descriptor: descriptor)
     }
 
     private func runCommand(command: String, cwd: String, timeoutSeconds: Int) throws -> String {

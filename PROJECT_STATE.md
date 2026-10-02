@@ -1230,3 +1230,53 @@ Remediation is test-harness only:
 Affected-stage local proof: project-state contract PASS; checkpoint-restore contract PASS (catalog 1.13.0 / 46 tools / transactional parity); Swift shell syntax PASS; `git diff --check` PASS.
 
 NEXT_EXACT_ACTION: commit/push this test-only watchdog remediation, require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64, then scoped review -> PR/merge -> merged-main Verify -> FMG-022 DONE / MAIN VERIFIED -> claim FMG-023.
+
+## FMG-022 + drive-root hotfix closure / FMG-023 claim - 2026-10-02
+
+FMG-022 Checkpoint Restore Transaction is DONE / MAIN VERIFIED.
+- PR #41 merged as `f3e4254c5a32d48d95b28372d0eff56880aeb5f5`.
+- Exact-head push Verify `36750333286`: SUCCESS.
+- Merged-main Verify `36986797605`: SUCCESS on macOS / Windows x64 / Windows ARM64.
+
+Drive-root `project_context` hotfix is MAIN VERIFIED.
+- PR #42 exact head `aa681c99bddd145bcbba9a0b62d6d566eef9691c`.
+- Push Verify `36988088942`: SUCCESS.
+- PR Verify `36991043837`: SUCCESS.
+- Merge main `9b6162fd9c79e755922f2865efef6b1eefc6402e`.
+- Merged-main Verify `36991621549`: SUCCESS.
+- Live D:\ FileMCP runtime PID 16240 remains active from the already-swapped verified binary.
+
+FMG-023 Execution Backend Interface is CLAIMED / ACTIVE on `chatgpt/FMG-023-execution-backend`, based directly on merged main `9b6162fd9c79e755922f2865efef6b1eefc6402e`.
+NEXT_EXACT_ACTION: implement only the frozen process+PTY backend abstraction: IExecutionBackend + HostExecutionBackend, backend identity/version/capabilities, workspace mapping, environment mediation hooks, health/lifecycle/cleanup and evidence backend identity. File/Git tools remain host-native. FMG-024 remains blocked until FMG-023 MAIN VERIFIED.
+
+## FMG-023 resume checkpoint - 2026-10-02
+
+Runtime recovery classification: PASS for the previously interrupted full Windows runtime stage; it was not restarted.
+- prior wrapper result marker: exit code 0
+- log completed windows-core-tests: ok (974 assertions)
+- FMG-023 targeted execution-backend suite had already passed 18 assertions
+- existing PTY-only suite had already passed 23 assertions
+- new static execution-backend contract had already passed
+- live FileMCP connector process remains PID 16240 from the verified FMG013-ready binary and was not restarted
+
+FMG-023 remains ACTIVE on chatgpt/FMG-023-execution-backend.
+Checkpoint now PASS: Windows full runtime regression.
+NEXT_EXACT_ACTION: run only remaining affected non-runtime gates (Release/warnings-as-errors + catalog/parity + exec/PTY/evidence/execution-backend contracts), inspect scoped diff, then commit/push exact candidate for native macOS/Windows x64/Windows ARM64 Verify. Do not rerun the 974-assertion Windows runtime unless source changes after this checkpoint.
+
+
+## FMG-023 local verification - 2026-10-02
+
+State: LOCAL VERIFIED / NATIVE CI PENDING on chatgpt/FMG-023-execution-backend.
+Local proof: Windows Release solution build with warnings-as-errors PASS (0 warnings / 0 errors using existing restore assets); full Windows runtime 975 assertions PASS; targeted execution-backend 19 assertions PASS; catalog/parity + exec_process + PTY + evidence + execution-backend contracts PASS; diff check PASS.
+Scoped review PASS after repairing one forward-compatibility issue: backend descriptor modes are bounded generic identifiers so FMG-024 Docker can supply container-mounted/network/resource modes without weakening host defaults.
+Evidence: docs/evidence/FMG-023_EXECUTION_BACKEND_INTERFACE_EVIDENCE.md.
+NEXT_EXACT_ACTION: commit/push exact FMG-023 candidate, require native Verify on macOS + Windows x64 + Windows ARM64, then scoped exact-head review -> PR/merge -> merged-main Verify -> FMG-023 MAIN VERIFIED -> claim FMG-024.
+
+
+## FMG-023 exact-head native verification / review - 2026-10-02
+
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING.
+Candidate: fe05746759592d3ef3354e92b4969b9f246fdb41.
+Verify run 36996922253: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Scoped review: PASS; no P0/P1 FMG-023 finding remains.
+NEXT_EXACT_ACTION: commit/push evidence-state closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-023 DONE / MAIN VERIFIED -> claim FMG-024.

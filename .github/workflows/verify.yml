@@ -47,6 +47,7 @@ jobs:
             macos/RepositoryIntelligenceQuery.swift \
             macos/QuarantineService.swift \
             macos/PersistentPty.swift \
+            macos/ExecutionBackend.swift \
             macos/WorkspaceCheckpoint.swift \
             macos/EvidenceSupport.swift \
             macos/ToolCatalog.swift \
@@ -135,6 +136,10 @@ jobs:
       - name: Verify persistent PTY contract
         shell: pwsh
         run: ./tests/test_persistent_pty_contract.ps1
+
+      - name: Verify execution backend interface contract
+        shell: pwsh
+        run: ./tests/test_execution_backend_contract.ps1
 
       - name: Verify file version and source-state contract
         shell: pwsh
@@ -278,6 +283,10 @@ jobs:
       - name: Verify persistent PTY contract
         shell: pwsh
         run: ./tests/test_persistent_pty_contract.ps1
+
+      - name: Verify execution backend interface contract
+        shell: pwsh
+        run: ./tests/test_execution_backend_contract.ps1
 
       - name: Verify file version and source-state contract
         shell: pwsh

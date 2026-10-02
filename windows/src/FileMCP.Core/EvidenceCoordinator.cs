@@ -6,6 +6,7 @@ internal sealed record EvidenceRun(
     string EvidenceId,
     string OperationId,
     string ToolName,
+    string BackendId,
     EvidenceRequestSpec Request,
     bool DurableStarted,
     long StartedEpochMs,
@@ -37,6 +38,7 @@ internal sealed class EvidenceCoordinator
         if (request is null) return null;
         var evidenceId = EvidenceStore.NewEvidenceId();
         var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var backendId = _tools.EvidenceBackendId(toolName);
         var policy = _policy.Capture();
         var durable = true;
         try
@@ -49,7 +51,7 @@ internal sealed class EvidenceCoordinator
                 toolName,
                 request.CriterionId,
                 started,
-                "host-native",
+                backendId,
                 policy.Generation,
                 policy.Hash,
                 CanonicalToolCatalog.CatalogHash,
@@ -87,6 +89,7 @@ internal sealed class EvidenceCoordinator
             evidenceId,
             operationId,
             toolName,
+            backendId,
             request,
             durable,
             started,
@@ -187,6 +190,7 @@ internal sealed class EvidenceCoordinator
             ["operation_state"] = evaluation.OperationState,
             ["verification_state"] = verification,
             ["criterion_id"] = run.Request.CriterionId,
+            ["backend_id"] = run.BackendId,
             ["source_binding"] = sourceBinding,
             ["source_state_id"] = sourceState?["source_state_id"]?.DeepClone(),
             ["project_context_digest"] = projectContextDigest,

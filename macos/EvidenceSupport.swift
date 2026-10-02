@@ -275,6 +275,7 @@ struct EvidenceRun {
     let evidenceID: String
     let operationID: String
     let toolName: String
+    let backendID: String
     let request: EvidenceRequestSpec
     let durableStarted: Bool
     let startedEpochMs: Int64
@@ -300,13 +301,14 @@ final class EvidenceCoordinator {
         guard let request else { return nil }
         let evidenceID = EvidenceStore.newEvidenceID()
         let started = Int64(Date().timeIntervalSince1970 * 1000)
+        let backendID = tools.evidenceBackendID(toolName: toolName)
         let snapshot = policy.capture()
         var durable = true
         do {
             try store.begin(EvidenceRecord(
                 evidenceID: evidenceID, operationID: operationID, workspaceFingerprint: workspaceFingerprint,
                 toolName: toolName, criterionID: request.criterionID, startedEpochMs: started, endedEpochMs: nil,
-                operationState: "running", verificationState: "not-run", backendID: "host-native",
+                operationState: "running", verificationState: "not-run", backendID: backendID,
                 sourceStateJSON: nil, sourceStateID: nil, projectContextDigest: nil,
                 policyGeneration: snapshot.generation, policyHash: snapshot.hash,
                 catalogHash: CanonicalToolCatalog.shared.catalogHash, catalogVersion: CanonicalToolCatalog.shared.catalogVersion,
@@ -331,7 +333,7 @@ final class EvidenceCoordinator {
         }
         let blocked = request.required && (!durable || !preAvailable)
         let reason = !durable ? "durable_store_unavailable" : (!preAvailable ? "freshness_precondition_unavailable" : nil)
-        return EvidenceRun(evidenceID: evidenceID, operationID: operationID, toolName: toolName, request: request, durableStarted: durable, startedEpochMs: started, preSourceStateID: preSource, preProjectContextDigest: preContext, blockedBeforeDispatch: blocked, blockReason: reason)
+        return EvidenceRun(evidenceID: evidenceID, operationID: operationID, toolName: toolName, backendID: backendID, request: request, durableStarted: durable, startedEpochMs: started, preSourceStateID: preSource, preProjectContextDigest: preContext, blockedBeforeDispatch: blocked, blockReason: reason)
     }
 
     func complete(run: EvidenceRun?, isError: Bool, structuredContent: [String: Any]?, context: ToolExecutionContext?) -> [String: Any]? {
@@ -373,7 +375,7 @@ final class EvidenceCoordinator {
                     evidenceID: run.evidenceID, operationID: run.operationID, workspaceFingerprint: workspaceFingerprint,
                     toolName: run.toolName, criterionID: run.request.criterionID, startedEpochMs: run.startedEpochMs,
                     endedEpochMs: Int64(Date().timeIntervalSince1970 * 1000), operationState: evaluation.operationState,
-                    verificationState: verification, backendID: "host-native", sourceStateJSON: sourceJSON,
+                    verificationState: verification, backendID: run.backendID, sourceStateJSON: sourceJSON,
                     sourceStateID: sourceState?["source_state_id"] as? String, projectContextDigest: projectContextDigest,
                     policyGeneration: finalPolicy.generation, policyHash: finalPolicy.hash,
                     catalogHash: CanonicalToolCatalog.shared.catalogHash, catalogVersion: CanonicalToolCatalog.shared.catalogVersion,
@@ -389,7 +391,7 @@ final class EvidenceCoordinator {
         let metadata: [String: Any] = [
             "schema_version": Self.metadataSchemaVersion, "evidence_id": run.evidenceID, "operation_id": run.operationID,
             "storage_status": durable ? "durable" : "unavailable", "operation_state": evaluation.operationState,
-            "verification_state": verification, "criterion_id": run.request.criterionID, "source_binding": sourceBinding,
+            "verification_state": verification, "criterion_id": run.request.criterionID, "backend_id": run.backendID, "source_binding": sourceBinding,
             "source_state_id": sourceState?["source_state_id"] ?? NSNull(), "project_context_digest": projectContextDigest ?? NSNull(),
             "policy_generation": finalPolicy.generation, "policy_hash": finalPolicy.hash,
             "catalog_hash": CanonicalToolCatalog.shared.catalogHash, "catalog_version": CanonicalToolCatalog.shared.catalogVersion,
