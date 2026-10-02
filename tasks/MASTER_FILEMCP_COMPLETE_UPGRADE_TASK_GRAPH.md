@@ -361,7 +361,7 @@ Negative tests:
 
 ## FMG-021 - Workspace Checkpoint Capture
 
-State: ACTIVE
+State: DONE / MAIN VERIFIED
 Depends: FMG-014, FMG-006, FMG-011
 
 Scope:
@@ -390,7 +390,7 @@ Negative tests:
 
 ## FMG-022 - Checkpoint Restore Transaction
 
-State: BLOCKED
+State: ACTIVE
 Depends: FMG-021, FMG-008, FMG-009, FMG-016
 
 Scope:

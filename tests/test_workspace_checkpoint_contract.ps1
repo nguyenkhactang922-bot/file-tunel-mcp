@@ -5,16 +5,14 @@ $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 $Catalog = Get-Content "contracts/tool_catalog.v1.json" -Raw | ConvertFrom-Json
-if ($Catalog.catalogVersion -ne "1.12.0") { throw "FMG-021 requires catalogVersion 1.12.0." }
-if ($Catalog.tools.Count -ne 45) { throw "FMG-021 requires exactly 45 canonical tools." }
+if ($Catalog.catalogVersion -ne "1.13.0") { throw "FMG-021 requires catalogVersion 1.13.0." }
+if ($Catalog.tools.Count -ne 46) { throw "FMG-021 requires exactly 46 canonical tools." }
 
 $Names = @($Catalog.tools | ForEach-Object { $_.name })
 $CheckpointNames = @("checkpoint_capture", "checkpoint_list", "checkpoint_get", "checkpoint_delete")
 foreach ($Name in $CheckpointNames) {
     if ($Names -notcontains $Name) { throw "Missing FMG-021 canonical tool: $Name" }
 }
-if ($Names -contains "checkpoint_restore") { throw "FMG-022 restore must remain blocked until FMG-021 is MAIN VERIFIED." }
-
 $Capture = $Catalog.tools | Where-Object name -eq "checkpoint_capture"
 if ($Capture.risk -ne "medium" -or $Capture.effect -ne "write") { throw "checkpoint_capture policy metadata mismatch." }
 if ($Capture.capabilities -notcontains "workspace.checkpoint" -or $Capture.capabilities -notcontains "filesystem.read") {
@@ -33,7 +31,7 @@ foreach ($Property in @("excluded_count", "include_untracked", "include_ignored"
     if ($null -eq $Get.definition.outputSchema.properties.$Property) { throw "checkpoint_get output missing $Property." }
 }
 $EntryProps = $Get.definition.outputSchema.properties.entries.items.properties
-foreach ($Property in @("relative_path", "staged", "unstaged", "untracked", "ignored", "generated", "index_sha256", "worktree_sha256", "index_excluded_reason", "worktree_excluded_reason")) {
+foreach ($Property in @("relative_path", "staged", "unstaged", "untracked", "ignored", "generated", "index_mode", "index_sha256", "worktree_sha256", "index_excluded_reason", "worktree_excluded_reason")) {
     if ($null -eq $EntryProps.$Property) { throw "checkpoint entry metadata missing $Property." }
 }
 
@@ -121,4 +119,4 @@ if ($MacBuild.IndexOf('macos/WorkspaceCheckpoint.swift', [StringComparison]::Ord
     throw "macOS app build does not include WorkspaceCheckpoint.swift."
 }
 
-Write-Host "workspace-checkpoint-contract: ok (catalog=1.12.0 tools=45 capture-only parity)"
+Write-Host "workspace-checkpoint-contract: ok (catalog=1.13.0 tools=46 capture parity retained after FMG-022)"

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "1.12.0",
+  "catalogVersion": "1.13.0",
   "protocolVersions": {
     "modern": "2026-07-28",
     "legacy": [
@@ -2625,6 +2625,18 @@
                     "type": "integer",
                     "minimum": 0
                   },
+                  "index_mode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "100644",
+                      "100755",
+                      "120000",
+                      null
+                    ]
+                  },
                   "worktree_size_bytes": {
                     "type": "integer",
                     "minimum": 0
@@ -2673,6 +2685,7 @@
                   "generated",
                   "worktree_exists",
                   "index_size_bytes",
+                  "index_mode",
                   "worktree_size_bytes",
                   "index_sha256",
                   "worktree_sha256",
@@ -2727,6 +2740,140 @@
         "annotations": {
           "readOnlyHint": true,
           "destructiveHint": false,
+          "openWorldHint": false
+        }
+      }
+    },
+    {
+      "name": "checkpoint_restore",
+      "handler": "local_tools",
+      "risk": "high",
+      "effect": "write",
+      "capabilities": [
+        "filesystem.read",
+        "filesystem.write",
+        "filesystem.delete",
+        "git.index.write",
+        "workspace.checkpoint"
+      ],
+      "availability": {},
+      "definition": {
+        "name": "checkpoint_restore",
+        "description": "Transactionally restore an authenticated workspace checkpoint. Default history_mode=preserve refuses divergent HEAD. Explicit history_mode=move may move HEAD only when a stronger local custom high-risk policy allows both write and delete effects. A mandatory rollback checkpoint is retained until post-restore verification succeeds; rollback failure returns partial_recovery_required.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "checkpoint_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "history_mode": {
+              "type": "string",
+              "enum": [
+                "preserve",
+                "move"
+              ],
+              "default": "preserve"
+            },
+            "dry_run": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "checkpoint_ref"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "checkpoint_ref": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "planned",
+                "restored",
+                "rolled_back",
+                "partial_recovery_required"
+              ]
+            },
+            "repository_relative_path": {
+              "type": "string"
+            },
+            "history_mode": {
+              "type": "string",
+              "enum": [
+                "preserve",
+                "move"
+              ]
+            },
+            "original_head_oid": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "target_head_oid": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rollback_checkpoint_ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "recovered_incomplete": {
+              "type": "boolean"
+            },
+            "cleanup_pending": {
+              "type": "boolean"
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rollback_error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "checkpoint_ref",
+            "state",
+            "repository_relative_path",
+            "history_mode",
+            "original_head_oid",
+            "target_head_oid",
+            "rollback_checkpoint_ref",
+            "path_count",
+            "skipped_count",
+            "recovered_incomplete",
+            "error",
+            "rollback_error"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
           "openWorldHint": false
         }
       }

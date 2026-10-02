@@ -30,6 +30,13 @@ internal sealed partial class LocalTools
         return await RunGitBlobAsync(repo, oid, cancellationToken).ConfigureAwait(false);
     }
 
+    private Task<byte[]> ReadGitObjectBlobAsync(string repo, string objectSpec, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(objectSpec) || objectSpec.Length > 8192 || objectSpec.Contains('\0'))
+            throw new FileMcpException("Checkpoint Git object spec is invalid");
+        return RunGitBlobAsync(repo, objectSpec, cancellationToken);
+    }
+
     private async Task<byte[]> RunGitBlobAsync(string repo, string oid, CancellationToken cancellationToken)
     {
         await _gitSlots.WaitAsync(cancellationToken).ConfigureAwait(false);

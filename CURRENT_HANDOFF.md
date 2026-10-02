@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMG-021-workspace-checkpoint`
+Branch: `chatgpt/FMG-022-checkpoint-restore`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE FMG-021 changes pending verification.
+Expected worktree at handoff: ACTIVE FMG-022 changes pending verification.
 
 ## Completed technical program
 
@@ -1247,3 +1247,48 @@ Exact-head `3aa0f5977beef12435871fc337332cb4a1c25630`, Verify run `36695888973`:
 - Local evidence after remediation: workspace-checkpoint contract PASS; Git Bash syntax PASS; `git diff --check` PASS.
 
 NEXT_EXACT_ACTION: commit/push this test-harness-only remediation, require a fresh exact-head Verify. Do not modify ProcessRunner/Job Object semantics unless the x64 failure reproduces on the new exact head or independent evidence proves a product defect. FMG-022 remains BLOCKED until FMG-021 MAIN VERIFIED.
+
+## FMG-021 MAIN VERIFIED -> FMG-022 CLAIMED - 2026-09-30
+
+FMG-021 Workspace Checkpoint Capture is DONE / MAIN VERIFIED.
+- PR #40 merged to main as `12874be49a3bc8eaacdeb0dfb2aea33eb9ac087e`.
+- Exact-head `1bfc56a75a433603faff087025b1fa38766054d1`: push Verify `36696693545` SUCCESS and PR Verify `36697495870` SUCCESS.
+- Merged-main Verify run `36698092398`: SUCCESS on macOS, Windows x64 and Windows ARM64.
+- FMG-022 Checkpoint Restore Transaction is CLAIMED / ACTIVE on branch `chatgpt/FMG-022-checkpoint-restore`.
+- Dependencies FMG-021, FMG-008, FMG-009, FMG-016 are all DONE / MAIN VERIFIED.
+NEXT_EXACT_ACTION: deep-read the existing WorkspaceCheckpointService/manifest format plus Mutation Guard, apply_edits/versioned mutation, quarantine restore transaction and SourceStateRef/Git primitives; implement restore plan + divergence guard + mandatory rollback checkpoint + staged/unstaged/untracked/index restore + verification/rollback terminal states. Do not begin FMG-023 before FMG-022 MAIN VERIFIED.
+
+## FMG-022 local verification checkpoint - 2026-09-30
+
+State: ACTIVE / LOCAL VERIFIED / NATIVE CI PENDING on `chatgpt/FMG-022-checkpoint-restore`.
+Local proof: state + checkpoint-restore contract PASS; catalog 1.13.0 / 46 tools + parity PASS; targeted Windows restore 29 assertions PASS; Windows Release 0 warnings/errors; full Windows runtime 955 assertions PASS; macOS runtime/build shell syntax PASS.
+Evidence: `docs/evidence/FMG-022_CHECKPOINT_RESTORE_TRANSACTION_EVIDENCE.md`.
+NEXT_EXACT_ACTION: inspect latest `fork/main` and remote FMG-022 branch/PR before commit/push; sync only if needed, then exact-head native Verify -> scoped review -> PR/merge -> merged-main Verify -> FMG-022 MAIN VERIFIED -> claim FMG-023.
+
+## Final local diff-hygiene checkpoint
+
+Before commit, scoped diff review found one literal NUL byte in `WorkspaceCheckpointGit.cs`, causing Git to classify the C# source as binary. The source byte was normalized to the canonical C# escape `\0` without changing runtime semantics. Post-fix proof: `git diff --check` PASS; Windows test-project build PASS 0 warnings/errors; targeted checkpoint restore PASS 29 assertions.
+
+## Native Verify attempt 1 remediation - 2026-09-30
+
+Run `36709124346` on `381b5eacf32942df54337c003239f84fc14c5728`: Windows ARM64 passed; macOS product static verification and catalog passed, then Swift integration compilation failed only because one FMG-022 test assertion executed throwing `String(contentsOf:)` inside non-throwing `precondition` autoclosure. Product restore code was not implicated.
+
+Remediation is test-only: the throwing file read is hoisted into `crDryTrackedText` before `precondition`. Local affected-stage proof: zero remaining `precondition(try String(contentsOf:))` occurrences, Swift shell syntax PASS, checkpoint-restore contract PASS, `git diff --check` PASS.
+
+NEXT_EXACT_ACTION: commit/push this test-only remediation and require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64.
+
+## FMG-022 native Verify attempt 2 remediation - 2026-10-01
+
+Run `36709652846` on exact head `4ddd8ab8afaab916f089e9cafd132927cc596613`: Windows x64 SUCCESS; Windows ARM64 SUCCESS; macOS static/catalog PASS, then Swift runtime reached FMG-022 restore fixtures but the server-test process did not open the four HTTP listeners within the existing 90-second pre-listener watchdog.
+
+Root cause is test-harness startup budget, not checkpoint-restore product semantics: the server-test executable intentionally runs repository-intelligence/query, PTY, checkpoint-capture and transactional checkpoint-restore native fixtures before constructing/listening on the HTTP servers. FMG-021/022 materially increased legitimate pre-listener fixture time beyond the stale 90-second watchdog.
+
+Remediation is test-harness only:
+- pass SERVER_PID into the readiness probe;
+- extend only the pre-listener fixture watchdog from 90s to 240s;
+- fail fast if the server-test process exits before listeners become ready;
+- keep all FileMCP product timeouts unchanged.
+
+Affected-stage local proof: project-state contract PASS; checkpoint-restore contract PASS (catalog 1.13.0 / 46 tools / transactional parity); Swift shell syntax PASS; `git diff --check` PASS.
+
+NEXT_EXACT_ACTION: commit/push this test-only watchdog remediation, require a new exact-head native Verify on macOS / Windows x64 / Windows ARM64, then scoped review -> PR/merge -> merged-main Verify -> FMG-022 DONE / MAIN VERIFIED -> claim FMG-023.

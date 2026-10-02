@@ -99,6 +99,15 @@ final class ServerPolicy {
         return state.configuration.profile == FileMCPPolicyProfiles.legacyCommandCompatible
     }
 
+    var allowsExplicitHistoryMove: Bool {
+        lock.lock(); defer { lock.unlock() }
+        let configuration = state.configuration
+        return configuration.profile == FileMCPPolicyProfiles.custom
+            && configuration.customMaxRisk == "high"
+            && configuration.customAllowedEffects.contains("write")
+            && configuration.customAllowedEffects.contains("delete")
+    }
+
     func capture() -> PolicySnapshot {
         lock.lock(); defer { lock.unlock() }
         return PolicySnapshot(generation: state.generation, hash: state.hash)
