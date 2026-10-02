@@ -30,7 +30,6 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - FMG-021: DONE / MAIN VERIFIED at `12874be49a3bc8eaacdeb0dfb2aea33eb9ac087e` (merged-main Verify `36698092398` SUCCESS).
 - FMG-022: DONE / MAIN VERIFIED. PR #41 merged as `f3e4254c5a32d48d95b28372d0eff56880aeb5f5`; merged-main Verify `36986797605` SUCCESS.
 - Drive-root project_context hotfix: MAIN VERIFIED. PR #42 merged as `9b6162fd9c79e755922f2865efef6b1eefc6402e`; merged-main Verify `36991621549` SUCCESS.
-- FMG-023: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-ONLY CLOSURE VERIFY PENDING on `chatgpt/FMG-023-execution-backend`.
-- Candidate `fe05746759592d3ef3354e92b4969b9f246fdb41`; Verify `36996922253` SUCCESS on macOS / Windows x64 / native Windows ARM64.
-- Evidence: `docs/evidence/FMG-023_EXECUTION_BACKEND_INTERFACE_EVIDENCE.md`.
-- NEXT_EXACT_ACTION: commit/push evidence-state closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-023 MAIN VERIFIED -> claim FMG-024.
+- FMG-023: DONE / MAIN VERIFIED. PR #43 merged as `d71fbc08e9e08f65c59ce5e05649e0dc629f7935`; PR Verify `36998198466` SUCCESS; merged-main Verify `36998939456` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- FMG-024: CLAIMED / ACTIVE on `chatgpt/FMG-024-docker-backend`, based directly on merged main `d71fbc08e9e08f65c59ce5e05649e0dc629f7935`.
+- NEXT_EXACT_ACTION: deep-read the FMG-023 backend contract + local policy/config/Artifact/Evidence primitives, probe Docker availability without changing state, then implement the frozen optional Docker isolated backend with local-only authority, digest pinning, mount revalidation, mandatory resource/security flags, network-none default, owned-label lifecycle/cleanup, exec+PTY mapping and explicit evidence identity.

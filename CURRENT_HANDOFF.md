@@ -1342,3 +1342,15 @@ Candidate: fe05746759592d3ef3354e92b4969b9f246fdb41.
 Verify run 36996922253: SUCCESS on macOS / Windows x64 / native Windows ARM64.
 Scoped review: PASS; no P0/P1 FMG-023 finding remains.
 NEXT_EXACT_ACTION: commit/push evidence-state closure head, require native Verify all three lanes, then PR/merge -> merged-main Verify -> FMG-023 DONE / MAIN VERIFIED -> claim FMG-024.
+
+
+## FMG-023 closure / FMG-024 claim - 2026-10-02
+
+FMG-023 Execution Backend Interface is DONE / MAIN VERIFIED.
+- PR #43 head `ba5cf3ebdf91a7c3eb34263948d7a99729ba6d6f`; PR Verify `36998198466`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Merge commit `d71fbc08e9e08f65c59ce5e05649e0dc629f7935`.
+- Merged-main Verify `36998939456`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Existing live FileMCP connector PID 16240 was not restarted.
+
+FMG-024 Optional Docker Isolated Backend is CLAIMED / ACTIVE on `chatgpt/FMG-024-docker-backend`, based directly on verified main `d71fbc08e9e08f65c59ce5e05649e0dc629f7935`.
+NEXT_EXACT_ACTION: deep-read FMG-023 backend + policy/config/artifact/evidence primitives; probe Docker availability read-only; implement only frozen FMG-024 scope. Docker remains optional, HostExecutionBackend remains the startup/default fallback.
