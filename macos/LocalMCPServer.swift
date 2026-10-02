@@ -2869,8 +2869,8 @@ final class LocalMCPServer {
             gitUserEmail: gitUserEmail,
             policy: activePolicy,
             execEnvironmentAllowList: execEnvironmentAllowList,
-            dockerExecutionBackend: dockerExecutionBackend,
-            skillRegistry: activeSkills
+            skillRegistry: activeSkills,
+            dockerExecutionBackend: dockerExecutionBackend
         )
         let activeEvidenceStore = evidenceStore ?? EvidenceStore()
         self.evidenceStore = activeEvidenceStore

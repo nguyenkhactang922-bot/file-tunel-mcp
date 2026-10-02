@@ -1377,3 +1377,11 @@ Local proof:
 - Full Windows runtime attempt reached unrelated pre-existing desktop single-instance test and timed out; isolated retry reproduced that unrelated timeout. FMG-024-specific gates remain PASS. Native Verify is the next authoritative cross-platform/full-regression gate.
 
 NEXT_EXACT_ACTION: complete state contract + scoped diff review, commit/push the exact FMG-024 candidate, require native Verify on macOS / Windows x64 / native Windows ARM64, repair only failed stages, then exact-head review -> PR/merge -> merged-main Verify -> FMG-024 MAIN VERIFIED -> claim FMG-025.
+
+
+## FMG-024 native Verify attempt 1 remediation - 2026-10-03
+
+Verify run `37042165795` on `8fe0217e941e6b3c78e4f7ec487ad03e1733d745`: Windows x64 SUCCESS including full integration/build/smoke; native Windows ARM64 SUCCESS. macOS failed only at warnings-as-errors static typecheck because the `LocalTools` call placed `dockerExecutionBackend:` before the earlier-declared `skillRegistry:` argument. No Docker behavior/runtime assertion failed.
+
+Remediation is macOS wiring-only: reorder those two named arguments to match the initializer declaration. Preserve all Windows PASS checkpoints.
+NEXT_EXACT_ACTION: commit/push this macOS-only remediation and require fresh native Verify; repair only any newly failed stage.
