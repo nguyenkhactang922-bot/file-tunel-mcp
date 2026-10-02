@@ -229,8 +229,11 @@ internal sealed class ProjectContextService
 
     private List<string> Hierarchy(string scopeDirectory)
     {
-        var root = Path.GetFullPath(_resolver.Root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var scope = Path.GetFullPath(scopeDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        // Keep filesystem roots such as C:\\ intact. Trimming their separator turns
+        // an absolute Windows drive root into the drive-relative form `C:`, which
+        // makes Path.GetRelativePath depend on the process working directory.
+        var root = Path.GetFullPath(_resolver.Root);
+        var scope = Path.GetFullPath(scopeDirectory);
         var relative = Path.GetRelativePath(root, scope);
         if (relative.StartsWith("..", StringComparison.Ordinal)) throw new FileMcpException("Project context scope escaped the shared root");
         var result = new List<string> { root };

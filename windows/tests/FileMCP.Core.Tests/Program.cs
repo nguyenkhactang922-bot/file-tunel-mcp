@@ -3721,6 +3721,19 @@ internal static class Program
         Assert(firstContent["scope_path"]!.GetValue<string>() == "sub/deep", "project_context file scope resolves to parent directory");
         Assert(firstContent["source_trust"]!.GetValue<string>() == "repository_untrusted" && !firstContent["grants_authority"]!.GetValue<bool>(), "project_context is explicitly non-authoritative");
         Assert(firstContent["authority_statement"]!.GetValue<string>().Contains("never grant", StringComparison.OrdinalIgnoreCase), "project_context authority statement is explicit");
+        if (OperatingSystem.IsWindows())
+        {
+            var driveRoot = Path.GetPathRoot(workspace)
+                ?? throw new InvalidOperationException("Windows project_context test workspace must have a drive root");
+            var driveScopedResolver = new SafePathResolver(driveRoot);
+            var driveScopedContext = new ProjectContextService(driveScopedResolver, policy);
+            var targetPath = Path.Combine(workspace, "sub", "deep", "target.txt");
+            var targetRelative = Path.GetRelativePath(driveRoot, targetPath);
+            var driveScoped = driveScopedContext.Capture(targetRelative, "", 10, includeSkills: false, context: null);
+            var expectedDriveScope = Path.GetRelativePath(driveRoot, Path.GetDirectoryName(targetPath)!).Replace('\\', '/');
+            Assert(driveScoped["scope_path"]!.GetValue<string>() == expectedDriveScope, "project_context preserves absolute Windows drive roots when building hierarchy");
+        }
+
         var sources = firstContent["sources"]!.AsArray();
         Assert(sources.Count == 3, "project_context discovers one effective instruction file per hierarchy scope");
         Assert(sources[0]!["relative_path"]!.GetValue<string>() == "AGENTS.md" && sources[0]!["precedence"]!.GetValue<int>() == 0, "project_context root source ordered first");
