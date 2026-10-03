@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMG-024-docker-backend`
+Branch: `chatgpt/FMG-025-adversarial-gate`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE FMG-024 Docker backend changes pending native verification.
+Expected worktree at handoff: ACTIVE FMG-025 adversarial-gate candidate changes pending exact-head native verification.
 
 ## Completed technical program
 
@@ -1435,3 +1435,16 @@ FMG-024 Optional Docker Isolated Backend is DONE / MAIN VERIFIED.
 
 FMG-025 Advanced Cross-Platform Adversarial Gate is CLAIMED / ACTIVE on `chatgpt/FMG-025-adversarial-gate`, based directly on verified main `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
 NEXT_EXACT_ACTION: inventory the frozen FMG-014..024 advanced surfaces and existing negative/contract suites, build the FMG-025 adversarial matrix, run only the required cross-platform/privacy/security/parity gates, add missing adversarial coverage if a real gap is found, preserve live Docker as environment-blocked unless an engine becomes available, then evidence/review/commit/PR/merge/main-verify before FMG-026.
+
+
+## FMG-025 local adversarial gate - 2026-10-03
+
+FMG-025 inventory found no production/runtime implementation gap. Existing FMG-014..024 negative suites already cover the frozen advanced capabilities; the missing task-level gap was an aggregate CI-enforced gate proving complete cross-platform wiring plus privacy/foundation invariants.
+- Added `tests/test_advanced_adversarial_gate.ps1`.
+- Wired the aggregate gate exactly once into Windows x64 Verify and once into native Windows ARM64 Verify; macOS remains independently verified by native Swift typecheck/runtime/build.
+- Local aggregate gate: PASS.
+- `git diff --check`: PASS.
+- Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+- Production/runtime implementation files changed: none.
+
+NEXT_EXACT_ACTION: commit the FMG-025 gate/evidence/state candidate, push the exact head, require native Verify on macOS / Windows x64 / native Windows ARM64, repair only a real failed stage, then exact-head review -> PR/merge -> merged-main Verify -> FMG-025 DONE / MAIN VERIFIED -> claim FMG-026.

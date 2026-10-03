@@ -145,6 +145,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_docker_backend_contract.ps1
 
+      - name: Verify advanced cross-platform adversarial gate
+        shell: pwsh
+        run: ./tests/test_advanced_adversarial_gate.ps1
+
 
       - name: Verify file version and source-state contract
         shell: pwsh
@@ -295,6 +299,10 @@ jobs:
       - name: Verify optional Docker isolated backend contract
         shell: pwsh
         run: ./tests/test_docker_backend_contract.ps1
+
+      - name: Verify advanced cross-platform adversarial gate
+        shell: pwsh
+        run: ./tests/test_advanced_adversarial_gate.ps1
 
 
       - name: Verify file version and source-state contract

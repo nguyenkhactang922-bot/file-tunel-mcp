@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `chatgpt/FMG-024-docker-backend`
+Active branch: `chatgpt/FMG-025-adversarial-gate`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1355,3 +1355,15 @@ FMG-024 Optional Docker Isolated Backend is DONE / MAIN VERIFIED.
 
 FMG-025 Advanced Cross-Platform Adversarial Gate is CLAIMED / ACTIVE on `chatgpt/FMG-025-adversarial-gate` from verified main `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
 NEXT_EXACT_ACTION: inventory FMG-014..024 advanced surfaces and their negative/contract suites, construct and execute the FMG-025 cross-platform adversarial/privacy/security matrix, repair only real gaps, then evidence/review/commit/PR/merge/main-verify before FMG-026.
+
+
+## FMG-025 local gate checkpoint - 2026-10-03
+
+- FMG-025 remains ACTIVE on `chatgpt/FMG-025-adversarial-gate`.
+- Inventory: existing FMG-014..024 negative/runtime suites are present; no production implementation repair was required.
+- Added aggregate cross-platform adversarial gate and CI wiring for Windows x64/native ARM64 while preserving native macOS Swift verification.
+- Local `tests/test_advanced_adversarial_gate.ps1`: PASS.
+- `git diff --check`: PASS.
+- Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: commit/push exact FMG-025 candidate -> native Verify all three lanes -> repair only actual failed stage -> exact-head review -> PR/merge -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.

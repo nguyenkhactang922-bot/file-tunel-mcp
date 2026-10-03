@@ -35,3 +35,12 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - Evidence: `docs/evidence/FMG-024_OPTIONAL_DOCKER_ISOLATED_BACKEND_EVIDENCE.md`.
 - FMG-025: CLAIMED / ACTIVE on `chatgpt/FMG-025-adversarial-gate`, based directly on verified main `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
 - NEXT_EXACT_ACTION: inventory FMG-014..024 advanced surfaces and existing negative/contract suites; execute the cross-platform adversarial/privacy/security/parity matrix, repair only real gaps, then evidence/review/commit/PR/merge/main-verify before FMG-026.
+
+
+## FMG-025 active checkpoint - 2026-10-03
+
+- State: ACTIVE / LOCAL ADVERSARIAL GATE PASS.
+- Branch: `chatgpt/FMG-025-adversarial-gate`.
+- New gate: `tests/test_advanced_adversarial_gate.ps1` PASS locally; CI wiring added to Windows x64 + native Windows ARM64; macOS native Swift runtime/build remains authoritative.
+- Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+- NEXT_EXACT_ACTION: commit/push exact candidate -> native Verify macOS/Windows x64/Windows ARM64 -> exact-head review -> PR/merge -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.
