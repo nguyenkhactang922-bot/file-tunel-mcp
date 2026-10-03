@@ -1521,3 +1521,26 @@ Post-user-restart verification did NOT replace the live desktop runtime.
 BLOCKER: the old FileMCP desktop instance must be exited manually before launching FMG026-ready. Opening the new EXE while PID `16240` is alive triggers single-instance behavior and leaves the old runtime active.
 
 NEXT_EXACT_ACTION: manually exit the currently running FileMCP desktop/tray instance so PID `16240` disappears, then launch `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, reconnect this FileMCP connector, and resume LIVE ADVANCED PROOF ONLY. Do not rerun Verify `37109212534`.
+
+
+## FMG-026 live advanced proof PASS / GitHub closure pending - 2026-10-03
+
+FMG-026 remains ACTIVE on `chatgpt/FMG-026-complete-regression`, but the runtime/deployment blocker and live advanced proof are now resolved.
+- Active runtime: PID `17860`, `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`.
+- Runtime SHA-256: `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
+- Both child tunnel profiles are live/ready and forward to local MCP ports `8008` / `8010`.
+- Canonical catalog remains `1.13.0` / `46` tools / SHA-256 `429cc8cef94900f034798e10e9beac28aaadbb23b6fd5458611fb335a71c239c`.
+- Effective current policy surface is intentionally `45/46`: custom/high allows direct execution and all effects, but `CustomPolicyAllowShell=false`, so only `run_command` is hidden. Do not enable shell merely to reach 46.
+- Exact-head native full regression/package Verify `37109212534` remains frozen PASS on macOS / Windows x64 / native Windows ARM64. DO NOT rerun it merely for closure.
+- Prior live basic file/Git/direct-exec/project-context/evidence proof remains PASS.
+- LIVE ADVANCED PROOF now PASS: batch + ContentRef; quarantine delete/list/get/restore; search/replace + unified-diff adapters; repo-intelligence facade on bounded Git fixture; checkpoint capture/list/get/dry-run restore/restore/delete; native Windows ConPTY start/list/resize/write/read/signal/stop.
+- Full FileMCP repo `repo_map` first uncached request returned one upstream `502`; bounded live fixture proved the same handler/query facade works. Existing repository-intelligence contracts/runtime remain covered by frozen full regression. No production defect or repair is claimed from that large-repo first-build transport timeout.
+- Temporary proof fixture was fully cleaned up; no source/product implementation file changed.
+- Optional Docker live engine proof remains explicitly ENVIRONMENT BLOCKED because the daemon is unavailable.
+- Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
+
+STATUS: **PASS_LOCAL / LIVE_ADVANCED_PASS / GITHUB_CLOSURE_PENDING**.
+
+NEXT_EXACT_ACTION: run project-state contract + `git diff --check` + exact closure diff review; commit only FMG-026 evidence/state closure files; inspect real remote branch/PR state before side effects; push exact closure candidate; require exact-head GitHub Verify/checks; review/create exactly one PR targeting `main`; merge exact reviewed head; require merged-main Verify; only then record `COMPLETE_UPGRADE_MAIN_VERIFIED` / FMG-026 DONE.
+
+DO_NOT_REPEAT: do not rerun Verify `37109212534`; do not restart PID `17860`; do not enable `run_command` shell authority; do not repeat live advanced proof unless a material runtime/source change invalidates this checkpoint.

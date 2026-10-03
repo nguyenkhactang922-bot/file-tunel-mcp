@@ -132,3 +132,96 @@ Remaining blocker only:
 - then resume LIVE ADVANCED PROOF ONLY for artifact/batch/quarantine/edit-adapter/repo-intelligence/PTY/checkpoint surfaces.
 
 Do not mark FMG-026 DONE and do not create `COMPLETE_UPGRADE_MAIN_VERIFIED` evidence until the live advanced proof and final merge/main verification both pass.
+
+
+## Live advanced proof after FMG026-ready runtime swap - 2026-10-03
+
+Status: **LIVE ADVANCED PROOF PASS / GITHUB CLOSURE PENDING**.
+
+Runtime and transport truth:
+- active desktop PID `17860` is `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`;
+- executable SHA-256 is `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`;
+- `filemcp` and `filemcp-e` tunnel clients are children of this runtime and both report `/healthz=live` and `/readyz=ready`;
+- local MCP endpoints are `127.0.0.1:8008/mcp` and `127.0.0.1:8010/mcp`;
+- canonical catalog remains `1.13.0` / `46` tools / SHA-256 `429cc8cef94900f034798e10e9beac28aaadbb23b6fd5458611fb335a71c239c`;
+- active local policy is custom/high with every effect allowed and open-world execution allowed, but `CustomPolicyAllowShell=false`; therefore the effective policy-filtered surface is intentionally `45/46`, with only compatibility shell tool `run_command` hidden. No shell authority was enabled merely to increase the visible count.
+
+Live advanced surface proof used one opaque FileMCP logical-chat correlation handle and a dedicated temporary fixture outside the Git repository. No secret, prompt text, command payload, file payload, auth token, or bearer credential is persisted in this evidence.
+
+### Batch + Artifact / ContentRef - PASS
+
+- `batch_stat`: `3/3` fixture files completed, `partial=false`.
+- `batch_read`: small file delivered inline; bounded read of a `1248`-byte file with `max_bytes=64` and `allow_content_ref=true` returned a real authenticated ContentRef.
+- spilled blob identity: `sha256:72577538da4aa02f35769e123f0fcf7c0e8a592c334ca63e0b8df50437538316`.
+
+### Quarantine delete/list/get/restore - PASS
+
+A versioned fixture file completed the full transaction:
+- dry-run source/version validation PASS;
+- authenticated quarantine creation PASS;
+- metadata `list` and `get` PASS;
+- manifest hash `sha256:e22512310052af93326d8d9eb79e527ca962510de26a39c8215e97939b287ff0`;
+- restore to the original path PASS.
+
+### Model-friendly edit adapters - PASS
+
+On a versioned fixture:
+- `apply_search_replace` committed one unambiguous edit (`alpha` -> `ALPHA`);
+- `apply_unified_diff` committed one validated hunk (`beta` -> `BETA`);
+- reread verified the final `ALPHA / BETA / gamma` content.
+
+### Repository intelligence query facade - PASS on bounded live Git fixture
+
+A disposable two-file C# Git fixture was initialized and staged under the live workspace:
+- `repo_map`: PASS, `2/2` files, provider `lexical-symbols` `1.0.0`, `grants_authority=false`, `raw_source_persisted=false`;
+- source state identity: `sha256:6cacef9af0d8fab1395414b2ebe75bf9e1550f0078777e71d127ec66f5874629`;
+- `symbol_search("Program")`: PASS with one exact type result at `Program.cs:3`;
+- `related_files("Program.cs")`: PASS with a valid empty-result envelope.
+
+Nuance: the first `repo_map` request against the full FileMCP repository reached the live handler but returned an upstream `502` while the corresponding large-repository intelligence cache did not yet exist. Source inspection confirms an uncached first request must build a bounded full generation before cache publication. The bounded live Git fixture proves the runtime query facade itself is operational; the existing FMG-018/FMG-019 repository-intelligence contract/runtime suites remain covered by frozen full regression Verify `37109212534`. No production repair is claimed or introduced from the one large-repository transport timeout.
+
+### Workspace checkpoint capture/restore/delete - PASS
+
+On the disposable Git fixture:
+- `checkpoint_capture`: PASS with two staged files, independent staged/worktree hashes and manifest hash `sha256:275374b689e4450979ac2988010c652d9e494285a5f7b37ca1fde8493eab27de`;
+- `checkpoint_list` / `checkpoint_get`: PASS;
+- controlled worktree drift + one untracked file was introduced;
+- restore dry-run returned `state=planned`, `path_count=3`;
+- transactional restore returned `state=restored`, `recovered_incomplete=false`, `cleanup_pending=false`;
+- post-restore Git state returned to only the original two staged files, original bytes were verified, and the untracked drift file was removed;
+- `checkpoint_delete`: PASS.
+
+### Native PTY - PASS
+
+Windows ConPTY live proof:
+- `pty_start`: PASS with `actual_pty=true`, `pty_backend=windows-conpty`, `grants_authority=false`;
+- `pty_list`: PASS;
+- `pty_resize`: PASS;
+- `pty_write` + `pty_read`: PASS with marker `FMG026_PTY_OK`;
+- `pty_signal(ctrl_c)`: PASS;
+- `pty_stop`: PASS and final list recorded the session as stopped.
+
+### Fixture cleanup - PASS
+
+The proof fixture was fully removed from the shared root. Direct recursive deletion was blocked by the external safety layer after a successful dry-run, so cleanup used the safer authenticated quarantine path. A read-only Git object created by Git was the only failed cleanup substage; its read-only attribute was cleared on the disposable fixture only, then the retry quarantined the remaining tree successfully. Final `Test-Path D:\.fmg026-live-proof` = `False`.
+
+### Final local FMG-026 acceptance checkpoint
+
+PASS and preserved:
+- native complete regression/package Verify `37109212534` on macOS / Windows x64 / native Windows ARM64 (do not rerun merely for closure);
+- Secure MCP Tunnel live/readiness proof;
+- prior basic live file/Git/direct-exec/project-context/evidence proof;
+- live artifact/ContentRef + batch proof;
+- live quarantine transaction proof;
+- live edit-adapter proof;
+- live repository-intelligence facade proof on a bounded Git fixture;
+- live checkpoint transaction proof;
+- live native Windows ConPTY proof;
+- proof-fixture cleanup;
+- canonical catalog identity and correct policy-filtered `45/46` effective surface, with `run_command` intentionally hidden because shell authority is disabled.
+
+Optional Docker live engine proof remains **ENVIRONMENT BLOCKED** because the local Docker daemon is unavailable; the frozen availability rule permits this explicit limitation and no fake Docker PASS is claimed.
+
+FMG-026 is **not DONE yet**. `COMPLETE_UPGRADE_MAIN_VERIFIED` must not be recorded until the closure candidate is committed, pushed to the writable GitHub remote, exact-head required checks are green, the reviewed head is merged to `main`, and the resulting `main` passes its required merged-main verification.
+
+NEXT_EXACT_ACTION: review closure-only diff and state contract -> commit exact closure candidate -> inspect real remote branch/PR state before side effects -> push exact candidate -> require exact-head GitHub Verify/checks -> review/create exactly one PR to `main` -> merge the exact reviewed head -> verify resulting `main` -> record `COMPLETE_UPGRADE_MAIN_VERIFIED` / FMG-026 DONE only from real post-merge evidence.

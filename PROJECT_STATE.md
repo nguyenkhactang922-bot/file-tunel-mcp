@@ -1431,3 +1431,35 @@ NEXT_EXACT_ACTION: close active FileMCP desktop normally -> launch FMG026-ready 
 BLOCKER: user must fully exit old FileMCP desktop/tray instance before launching FMG026-ready; otherwise single-instance activation keeps old runtime alive.
 
 NEXT_EXACT_ACTION: exit old FileMCP so PID `16240` disappears -> launch FMG026-ready -> reconnect -> verify new PID/path/hash + 46-tool discovery -> run LIVE ADVANCED PROOF ONLY -> closure evidence/state -> push/PR/merge/merged-main verify.
+
+
+## FMG-026 local acceptance - live advanced proof PASS - 2026-10-03
+
+State: **PASS_LOCAL / LIVE_ADVANCED_PASS / GITHUB_CLOSURE_PENDING**.
+
+Verified runtime/deployment:
+- PID `17860` runs `dist/windows-x64/FileMCP-FMG026-ready/FileMCP.exe` with SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`;
+- both Secure MCP Tunnel profiles are live/ready on local MCP ports `8008` and `8010`;
+- canonical catalog = `1.13.0` / `46` tools / SHA-256 `429cc8cef94900f034798e10e9beac28aaadbb23b6fd5458611fb335a71c239c`;
+- current local custom policy intentionally exposes `45/46` effective tools because `CustomPolicyAllowShell=false`; only `run_command` is hidden. Direct `exec_process` and the advanced non-shell surfaces remain authorized.
+
+Verified acceptance:
+- frozen exact-head native regression/package Verify `37109212534`: PASS macOS / Windows x64 / native Windows ARM64;
+- prior basic live MCP proof: PASS;
+- live batch/stat/read + authenticated ContentRef: PASS;
+- live quarantine delete/list/get/restore: PASS;
+- live search/replace + unified-diff adapters: PASS;
+- live repository-intelligence `repo_map` / `symbol_search` / `related_files` facade: PASS on bounded Git fixture;
+- live workspace checkpoint capture/list/get/restore/delete transaction: PASS;
+- live Windows native ConPTY start/list/resize/write/read/signal/stop: PASS;
+- temporary proof fixture cleanup: PASS;
+- production/source implementation changes caused by live proof: NONE;
+- optional Docker live engine proof: ENVIRONMENT BLOCKED (daemon unavailable), allowed by frozen availability rule.
+
+Nuance: an uncached `repo_map` against the full FileMCP repository returned one upstream `502` while no intelligence cache existed; the bounded live fixture proves the query facade/runtime is operational and the frozen full regression already covers FMG-018/019 contracts/runtime. No product defect is asserted from this transport/first-build timeout.
+
+Canonical evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: project-state contract + `git diff --check` + scoped closure review -> commit exact evidence/state candidate -> inspect remote branch/PR state -> push exact candidate -> exact-head GitHub Verify/checks -> one reviewed PR to `main` -> merge reviewed head -> merged-main Verify -> record `COMPLETE_UPGRADE_MAIN_VERIFIED` and FMG-026 DONE only from real post-merge evidence.
+
+Do not rerun `37109212534`, restart the correct live runtime, or enable shell merely to expose `run_command`.

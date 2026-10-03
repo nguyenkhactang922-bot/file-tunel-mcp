@@ -93,3 +93,18 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - Automated stop/start helper was blocked by safety policy; no side effect occurred.
 - BLOCKER: manually exit old FileMCP desktop/tray instance before launching FMG026-ready.
 - NEXT_EXACT_ACTION: exit PID `16240` via normal FileMCP UI/tray -> launch `dist/windows-x64/FileMCP-FMG026-ready/FileMCP.exe` -> reconnect -> verify 46 tools -> LIVE ADVANCED PROOF ONLY -> closure/PR/merge/main-verify.
+
+
+## FMG-026 live advanced proof closure checkpoint - 2026-10-03
+
+- State: **PASS_LOCAL / LIVE_ADVANCED_PASS / GITHUB_CLOSURE_PENDING**.
+- Native complete regression/package Verify `37109212534`: PASS and frozen; do not rerun merely for docs/state closure.
+- Active runtime: PID `17860`, FMG026-ready SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
+- Canonical catalog: `46`; effective current policy surface: `45`, with only `run_command` intentionally hidden because `CustomPolicyAllowShell=false`.
+- Live advanced acceptance PASS: batch + ContentRef; quarantine transaction; edit adapters; repository-intelligence facade on bounded Git fixture; checkpoint transaction; Windows native ConPTY lifecycle.
+- Prior basic live MCP proof remains PASS.
+- Temporary fixture cleanup PASS; production/source implementation delta from live proof: NONE.
+- Docker live engine remains ENVIRONMENT BLOCKED by unavailable daemon under the frozen availability rule.
+- Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
+
+Historical closure sequence: verify state contract + `git diff --check` + exact scoped diff; commit evidence/state closure; inspect remote branch/PR state; push exact head; require exact-head GitHub Verify/checks; review/create one PR to `main`; merge exact reviewed head; require merged-main Verify; only then mark `COMPLETE_UPGRADE_MAIN_VERIFIED` / FMG-026 DONE and continue to the next eligible task/program state.
