@@ -120,6 +120,13 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - `FILEMCP COMPLETE-UPGRADE CORE = COMPLETE_UPGRADE_MAIN_VERIFIED`.
 - Evidence: `docs/evidence/COMPLETE_UPGRADE_MAIN_VERIFIED.md` and `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
 - Optional Docker live engine proof remains ENVIRONMENT BLOCKED under the frozen availability rule.
-- Current governance state-sync branch: `state/FMG-026-main-verified`.
+- Governance state-sync: DONE / MAIN VERIFIED. PR #48 head `552edec938379d309d26a3eab2b0005f0cefcdeb` merged as `5a5abed27e523dac4f62c27e8808c3bb03a6d874`; merged-main Verify `37135393780` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 
-Historical continuation sequence: complete this state-only branch through commit -> push -> exact-head Verify -> PR -> review -> merge -> exact resulting-main verification. Only after that state-sync closure may the next dependency-ready FMUX task be claimed; current graph inspection identifies FMUX-011 as the first candidate.
+## FMUX-011 active pointer - 2026-10-03
+
+- FMUX-011 Repository Intelligence: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING.
+- Branch: `chatgpt/FMUX-011-repository-intelligence`, based directly on verified `fork/main=5a5abed27e523dac4f62c27e8808c3bb03a6d874`.
+- Dependencies FMUX-002, FMUX-003, FMG-018 and FMG-019 are DONE / MAIN VERIFIED.
+- Scope implemented: Repository page; repository summary; observed repo map, symbol search and related-files results; provider/version/completeness prominently shown; bounded metadata-only rows; no raw source/ContentRef tokens; no authority expansion.
+- Exact-head checkpoint: candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0`; push Verify `37138794626` SUCCESS on macOS / Windows x64 / native Windows ARM64; scoped review PASS with no P0/P1.
+- NEXT_EXACT_ACTION: commit/push evidence-state-only closure head -> exact-head native Verify on closure SHA -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify. FMUX-012 remains blocked until FMUX-011 MAIN VERIFIED.

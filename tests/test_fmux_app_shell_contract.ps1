@@ -44,7 +44,7 @@ if (-not $mac.Contains('shellStatusLabel')) {
     throw "macOS global runtime status context is missing."
 }
 
-foreach ($forbidden in @('Repository"', 'Terminal"', 'Recovery"', 'Evidence"')) {
+foreach ($forbidden in @('Terminal"', 'Recovery"')) {
     if ($winXaml.Contains($forbidden)) {
         throw "Windows shell exposes not-yet-implemented FMUX destination: $forbidden"
     }

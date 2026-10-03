@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `state/FMG-026-main-verified`
+Active branch: `chatgpt/FMUX-011-repository-intelligence`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1485,6 +1485,10 @@ The verification evidence does **not** claim a main-branch workflow run; it prov
 
 Optional Docker live engine proof remains ENVIRONMENT BLOCKED under the frozen availability rule.
 
-Governance state-sync remains ACTIVE on `state/FMG-026-main-verified`. Dependent FMUX work is not yet claimed until this state-only branch itself reaches remote PR merge and exact resulting-main verification.
+Governance state-sync is DONE / MAIN VERIFIED. PR #48 merged the state-only closure as resulting main `5a5abed27e523dac4f62c27e8808c3bb03a6d874`; exact resulting-main Verify `37135393780` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 
-NEXT_EXACT_ACTION: finish/review state-only closure -> commit -> push -> exact-head Verify -> one PR to main -> review -> merge with expected-head guard -> verify exact resulting main commit -> then inspect FMUX dependency authority and claim the lowest dependency-ready task (currently expected FMUX-011).
+FMUX-011 Repository Intelligence is CLAIMED / ACTIVE on `chatgpt/FMUX-011-repository-intelligence`, based directly on verified main `5a5abed27e523dac4f62c27e8808c3bb03a6d874`. Dependencies FMUX-002, FMUX-003, FMG-018 and FMG-019 are all DONE / MAIN VERIFIED.
+
+FMUX-011 exact-head checkpoint: NATIVE VERIFIED / SCOPED REVIEW PASS. Candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0` passed push Verify `37138794626` on macOS / Windows x64 / native Windows ARM64, including FMUX Repository contract plus native integration/build/package/smoke gates. No P0/P1 remains. Runtime PID `17860` is unchanged and correct.
+
+NEXT_EXACT_ACTION: commit/push the evidence-state-only FMUX-011 closure head -> require exact-head native Verify on the closure SHA -> create/review exactly one PR to `main` -> merge exact reviewed head -> verify exact resulting main. FMUX-012 remains blocked until FMUX-011 MAIN VERIFIED.

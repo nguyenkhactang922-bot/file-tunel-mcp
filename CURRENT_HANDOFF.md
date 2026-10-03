@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `state/FMG-026-main-verified`
+Branch: `chatgpt/FMUX-011-repository-intelligence`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE governance state-sync for FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED, based exactly on verified main `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`.
+Expected worktree at handoff: ACTIVE FMUX-011 Repository Intelligence implementation, based exactly on verified main `5a5abed27e523dac4f62c27e8808c3bb03a6d874`; FMG-026 technical closure and governance state-sync are DONE / MAIN VERIFIED.
 
 ## Completed technical program
 
@@ -1567,3 +1567,22 @@ CURRENT STATE-SYNC: ACTIVE on `state/FMG-026-main-verified`, based exactly on ve
 NEXT_EXACT_ACTION: finish the state-sync diff, project-state contract and diff review; commit/push this state-only closure; exact-head Verify; one PR to `main`; review/merge with head guard; verify the exact resulting main commit. Then re-evaluate the frozen FMUX graph and claim the lowest dependency-ready task (current graph indicates FMUX-011).
 
 DO_NOT_REPEAT: do not rerun FMG-026 live proof or Verify `37109212534`; do not restart correct runtime PID `17860`; do not enable shell authority merely to expose `run_command`.
+
+## FMG-026 state-sync MAIN VERIFIED / FMUX-011 claimed - 2026-10-03
+
+Repo/runtime recovery proved the governance closure completed after the prior stream ended:
+- PR #48 state-sync head `552edec938379d309d26a3eab2b0005f0cefcdeb` passed push Verify `37134381070` and PR Verify `37134966010` on macOS / Windows x64 / native Windows ARM64;
+- PR #48 merged into actual `main` commit `5a5abed27e523dac4f62c27e8808c3bb03a6d874`;
+- merged-main PushEvent Verify `37135393780` completed SUCCESS on all three native lanes;
+- `fork/main` points exactly to `5a5abed27e523dac4f62c27e8808c3bb03a6d874`;
+- correct FMG026-ready runtime remains PID `17860`; do not restart it.
+
+Therefore the FMG-026 governance state-sync is DONE / MAIN VERIFIED and dependency authority permits the next FMUX task.
+
+FMUX-011 Repository Intelligence is CLAIMED / ACTIVE on `chatgpt/FMUX-011-repository-intelligence`, created directly from verified `fork/main=5a5abed27e523dac4f62c27e8808c3bb03a6d874`. Side-effect guard found no existing FMUX-011 branch, PR or commit.
+
+Frozen scope: Repository page only; repository summary; observed `repo_map`, `symbol_search`, `related_files`; provider/version/completeness prominently shown; bounded metadata-only presentation; never persist/log raw source or raw ContentRef tokens; repository intelligence never grants authority or claims exhaustive symbol truth.
+
+EXACT-HEAD CHECKPOINT: FMUX-011 candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0` is NATIVE VERIFIED and scoped review PASS. Push Verify `37138794626` succeeded on macOS / Windows x64 / native Windows ARM64, including native integration/build/package/smoke gates and the FMUX Repository Intelligence presentation contract. No P0/P1 remains in scope. Runtime PID `17860` remains correct and was not restarted.
+
+NEXT_EXACT_ACTION: commit/push the evidence-state-only FMUX-011 closure head, require exact-head native Verify on that new closure SHA, then create/review exactly one PR to `main` -> merge exact reviewed head with guard -> verify exact resulting main. Do not begin FMUX-012 before FMUX-011 MAIN VERIFIED.

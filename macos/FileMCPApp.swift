@@ -216,6 +216,36 @@ private struct ChangeEvent {
     let detail: String
 }
 
+private struct RepositoryItemEvent {
+    let path: String
+    let name: String
+    let kind: String
+    let detail: String
+    let score: String
+}
+
+private struct RepositoryResultEvent {
+    let timestamp: Date
+    let workspace: String
+    let queryKind: String
+    let providerID: String
+    let providerVersion: String
+    let completeness: String
+    let sourceStateID: String
+    let grantsAuthority: Bool
+    let rawSourcePersisted: Bool
+    let partial: Bool
+    let truncated: Bool
+    let truncationReason: String?
+    let returnedCount: Int
+    let totalCount: Int
+    let symbolSupport: Bool
+    let ambiguous: Bool
+    let displayTruncated: Bool
+    let artifactState: String
+    let entries: [RepositoryItemEvent]
+}
+
 private struct ArtifactBatchEntryEvent {
     let path: String
     let state: String
@@ -273,11 +303,14 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private var filteredActivityEvents: [ActivityEvent] = []
     private var changeEvents: [ChangeEvent] = []
     private var evidenceEvents: [EvidenceEvent] = []
+    private var repositoryEvents: [RepositoryResultEvent] = []
+    private var selectedRepositoryEvent: RepositoryResultEvent?
     private var artifactBatchEvents: [ArtifactBatchEvent] = []
     private var selectedArtifactBatch: ArtifactBatchEvent?
     private let maxActivityEvents = 500
     private let maxChangeEvents = 250
     private let maxEvidenceEvents = 500
+    private let maxRepositoryEvents = 100
     private let maxArtifactBatchEvents = 100
 
     private let tunnelIDField = NSTextField()
@@ -300,6 +333,12 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private let changesDetailLabel = NSTextField(wrappingLabelWithString: "Select a captured mutation event.")
     private let evidenceTableView = NSTableView()
     private let evidenceDetailLabel = NSTextField(wrappingLabelWithString: "Select an evidence record.")
+    private let repositoryResultTableView = NSTableView()
+    private let repositoryItemTableView = NSTableView()
+    private let repositoryProviderLabel = NSTextField(wrappingLabelWithString: "No repository-intelligence result captured yet.")
+    private let repositorySummaryLabel = NSTextField(wrappingLabelWithString: "Waiting for real repo_map, symbol_search or related_files output.")
+    private let repositorySourceLabel = NSTextField(wrappingLabelWithString: "Source state: not observed")
+    private let repositoryItemDetailLabel = NSTextField(wrappingLabelWithString: "Select an observed repository result.")
     private let artifactBatchTableView = NSTableView()
     private let artifactEntryTableView = NSTableView()
     private let artifactBatchSummaryLabel = NSTextField(wrappingLabelWithString: "No batch result captured yet.")
@@ -444,6 +483,49 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             column.width = width
             evidenceTableView.addTableColumn(column)
         }
+
+        repositoryResultTableView.delegate = self
+        repositoryResultTableView.dataSource = self
+        repositoryResultTableView.headerView = NSTableHeaderView()
+        repositoryResultTableView.usesAlternatingRowBackgroundColors = true
+        repositoryResultTableView.allowsMultipleSelection = false
+        for (identifier, title, width) in [
+            ("repository-time", "Time", 72.0),
+            ("repository-workspace", "Workspace", 84.0),
+            ("repository-query", "Query", 110.0),
+            ("repository-count", "Returned", 88.0),
+            ("repository-state", "State", 90.0),
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = width
+            repositoryResultTableView.addTableColumn(column)
+        }
+
+        repositoryItemTableView.delegate = self
+        repositoryItemTableView.dataSource = self
+        repositoryItemTableView.headerView = NSTableHeaderView()
+        repositoryItemTableView.usesAlternatingRowBackgroundColors = true
+        repositoryItemTableView.allowsMultipleSelection = false
+        for (identifier, title, width) in [
+            ("repository-item-path", "Path", 210.0),
+            ("repository-item-name", "Name / language", 120.0),
+            ("repository-item-kind", "Kind", 90.0),
+            ("repository-item-detail", "Detail", 230.0),
+            ("repository-item-score", "Score", 64.0),
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = width
+            repositoryItemTableView.addTableColumn(column)
+        }
+        repositoryProviderLabel.maximumNumberOfLines = 4
+        repositorySummaryLabel.maximumNumberOfLines = 4
+        repositorySummaryLabel.textColor = .secondaryLabelColor
+        repositorySourceLabel.maximumNumberOfLines = 3
+        repositorySourceLabel.textColor = .secondaryLabelColor
+        repositoryItemDetailLabel.maximumNumberOfLines = 5
+        repositoryItemDetailLabel.textColor = .secondaryLabelColor
 
         artifactBatchTableView.delegate = self
         artifactBatchTableView.dataSource = self
@@ -820,6 +902,60 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             evidenceScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
         ])
 
+        let repositoryResultScroll = NSScrollView()
+        repositoryResultScroll.documentView = repositoryResultTableView
+        repositoryResultScroll.hasVerticalScroller = true
+        repositoryResultScroll.borderType = .bezelBorder
+        repositoryResultScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let repositoryItemScroll = NSScrollView()
+        repositoryItemScroll.documentView = repositoryItemTableView
+        repositoryItemScroll.hasVerticalScroller = true
+        repositoryItemScroll.borderType = .bezelBorder
+        repositoryItemScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let repositoryHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Repository Intelligence",
+            description: "Observed read-only repository map, symbol and relation metadata. Provider completeness is heuristic and never grants authority or exhaustive source truth."
+        )
+        let repositoryTruth = NSStackView(views: [
+            repositoryProviderLabel,
+            repositorySummaryLabel,
+            repositorySourceLabel,
+        ])
+        repositoryTruth.orientation = .vertical
+        repositoryTruth.alignment = .leading
+        repositoryTruth.spacing = 4
+
+        let repositoryTables = NSStackView(views: [repositoryResultScroll, repositoryItemScroll])
+        repositoryTables.orientation = .horizontal
+        repositoryTables.alignment = .top
+        repositoryTables.distribution = .fillEqually
+        repositoryTables.spacing = 10
+        repositoryTables.translatesAutoresizingMaskIntoConstraints = false
+
+        let repositoryRoot = NSStackView(views: [
+            repositoryHeader,
+            repositoryTruth,
+            repositoryTables,
+            repositoryItemDetailLabel,
+        ])
+        repositoryRoot.orientation = .vertical
+        repositoryRoot.alignment = .leading
+        repositoryRoot.spacing = 8
+        repositoryRoot.translatesAutoresizingMaskIntoConstraints = false
+
+        let repositoryPage = NSView()
+        repositoryPage.addSubview(repositoryRoot)
+        NSLayoutConstraint.activate([
+            repositoryRoot.leadingAnchor.constraint(equalTo: repositoryPage.leadingAnchor, constant: 12),
+            repositoryRoot.trailingAnchor.constraint(equalTo: repositoryPage.trailingAnchor, constant: -12),
+            repositoryRoot.topAnchor.constraint(equalTo: repositoryPage.topAnchor, constant: 12),
+            repositoryRoot.bottomAnchor.constraint(equalTo: repositoryPage.bottomAnchor, constant: -12),
+            repositoryResultScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
+            repositoryItemScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
+        ])
+
         let artifactBatchScroll = NSScrollView()
         artifactBatchScroll.documentView = artifactBatchTableView
         artifactBatchScroll.hasVerticalScroller = true
@@ -983,6 +1119,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         evidenceTab.label = "Evidence"
         evidenceTab.view = evidencePage
 
+        let repositoryTab = NSTabViewItem(identifier: "repository")
+        repositoryTab.label = "Repository"
+        repositoryTab.view = repositoryPage
+
         let artifactTab = NSTabViewItem(identifier: "artifacts")
         artifactTab.label = "Artifacts"
         artifactTab.view = artifactPage
@@ -998,6 +1138,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         tabs.addTabViewItem(activityTab)
         tabs.addTabViewItem(changesTab)
         tabs.addTabViewItem(evidenceTab)
+        tabs.addTabViewItem(repositoryTab)
         tabs.addTabViewItem(artifactTab)
         tabs.addTabViewItem(logTab)
         tabs.selectTabViewItem(withIdentifier: "home")
@@ -1034,6 +1175,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             navigationButton("Activity", action: #selector(showActivity)),
             navigationButton("Changes", action: #selector(showChanges)),
             navigationButton("Evidence", action: #selector(showEvidence)),
+            navigationButton("Repository", action: #selector(showRepository)),
             navigationButton("Artifacts", action: #selector(showArtifacts)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
             NSView(),
@@ -1297,12 +1439,49 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if tableView == activityTableView { return filteredActivityEvents.count }
         if tableView == changesTableView { return changeEvents.count }
         if tableView == evidenceTableView { return evidenceEvents.count }
+        if tableView == repositoryResultTableView { return repositoryEvents.count }
+        if tableView == repositoryItemTableView { return selectedRepositoryEvent?.entries.count ?? 0 }
         if tableView == artifactBatchTableView { return artifactBatchEvents.count }
         if tableView == artifactEntryTableView { return selectedArtifactBatch?.entries.count ?? 0 }
         return 0
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        if tableView == repositoryResultTableView {
+            guard row >= 0, row < repositoryEvents.count, let tableColumn else { return nil }
+            let event = repositoryEvents[repositoryEvents.count - 1 - row]
+            let text: String
+            switch tableColumn.identifier.rawValue {
+            case "repository-time":
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm:ss"
+                text = formatter.string(from: event.timestamp)
+            case "repository-workspace": text = event.workspace
+            case "repository-query": text = event.queryKind
+            case "repository-count": text = event.totalCount > 0 ? "\(event.returnedCount)/\(event.totalCount)" : "\(event.returnedCount)"
+            default: text = event.partial || event.truncated || event.displayTruncated ? "Partial" : "Observed"
+            }
+            let label = NSTextField(labelWithString: text)
+            label.lineBreakMode = .byTruncatingTail
+            return label
+        }
+
+        if tableView == repositoryItemTableView {
+            guard let result = selectedRepositoryEvent, row >= 0, row < result.entries.count, let tableColumn else { return nil }
+            let entry = result.entries[row]
+            let text: String
+            switch tableColumn.identifier.rawValue {
+            case "repository-item-path": text = entry.path
+            case "repository-item-name": text = entry.name
+            case "repository-item-kind": text = entry.kind
+            case "repository-item-detail": text = entry.detail
+            default: text = entry.score
+            }
+            let label = NSTextField(labelWithString: text)
+            label.lineBreakMode = .byTruncatingTail
+            return label
+        }
+
         if tableView == artifactBatchTableView {
             guard row >= 0, row < artifactBatchEvents.count, let tableColumn else { return nil }
             let event = artifactBatchEvents[artifactBatchEvents.count - 1 - row]
@@ -1413,6 +1592,53 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard let table = notification.object as? NSTableView else { return }
 
+        if table === repositoryResultTableView {
+            let row = repositoryResultTableView.selectedRow
+            guard row >= 0, row < repositoryEvents.count else {
+                selectedRepositoryEvent = nil
+                repositoryItemTableView.reloadData()
+                repositoryProviderLabel.stringValue = "Select a captured repository-intelligence result."
+                repositorySummaryLabel.stringValue = "No synthetic repository state is shown."
+                repositorySourceLabel.stringValue = "Source state: not observed"
+                repositoryItemDetailLabel.stringValue = "Select an observed repository result."
+                return
+            }
+
+            let event = repositoryEvents[repositoryEvents.count - 1 - row]
+            selectedRepositoryEvent = event
+            repositoryItemTableView.reloadData()
+            repositoryItemTableView.deselectAll(nil)
+            repositoryProviderLabel.stringValue =
+                "\(event.providerID) \(event.providerVersion) | completeness=\(event.completeness) | grants_authority=\(event.grantsAuthority) | raw_source_persisted=\(event.rawSourcePersisted)"
+            var flags: [String] = []
+            if event.partial { flags.append("partial") }
+            if event.truncated { flags.append("truncated:\(event.truncationReason ?? "unknown")") }
+            if event.displayTruncated { flags.append("display-bounded") }
+            if event.ambiguous { flags.append("ambiguous") }
+            let state = flags.isEmpty ? "observed" : flags.joined(separator: ", ")
+            repositorySummaryLabel.stringValue =
+                "\(event.queryKind): \(event.returnedCount)/\(event.totalCount) returned | \(state) | \(event.entries.count) metadata row(s) displayed | symbol_support=\(event.symbolSupport) | artifact_state=\(event.artifactState). Provider completeness is descriptive, not exhaustive truth."
+            repositorySourceLabel.stringValue = "Source state: \(event.sourceStateID)"
+            repositoryItemDetailLabel.stringValue = "Observed metadata only; raw source, cursors and opaque ContentRef tokens are not copied into this view."
+            return
+        }
+
+        if table === repositoryItemTableView {
+            guard let result = selectedRepositoryEvent else {
+                repositoryItemDetailLabel.stringValue = "Select an observed repository result."
+                return
+            }
+            let row = repositoryItemTableView.selectedRow
+            guard row >= 0, row < result.entries.count else {
+                repositoryItemDetailLabel.stringValue = "Select a metadata row."
+                return
+            }
+            let entry = result.entries[row]
+            repositoryItemDetailLabel.stringValue =
+                "Path: \(entry.path) | Name/language: \(entry.name) | Kind: \(entry.kind) | \(entry.detail) | Score: \(entry.score.isEmpty ? "N/A" : entry.score)"
+            return
+        }
+
         if table === artifactBatchTableView {
             let row = artifactBatchTableView.selectedRow
             guard row >= 0, row < artifactBatchEvents.count else {
@@ -1517,6 +1743,70 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         }
         let event = filteredActivityEvents[row]
         activityDetailLabel.stringValue = "\(event.kind) | \(event.workspace)\n\(event.detail)"
+    }
+
+    private func captureRepositoryIntelligenceEvent(from line: String, workspace: String) {
+        let marker = "[RepositoryIntelligenceResult] "
+        guard let range = line.range(of: marker) else { return }
+        let jsonText = String(line[range.upperBound...])
+        guard let data = jsonText.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+
+        func text(_ key: String, fallback: String = "unknown") -> String {
+            (object[key] as? String) ?? fallback
+        }
+        func integer(_ key: String) -> Int {
+            (object[key] as? NSNumber)?.intValue ?? 0
+        }
+        func bool(_ key: String) -> Bool {
+            (object[key] as? NSNumber)?.boolValue ?? false
+        }
+
+        let queryKind = text("query_kind", fallback: "repository")
+        var entries: [RepositoryItemEvent] = []
+        if let rawEntries = object["entries"] as? [[String: Any]] {
+            for entry in rawEntries {
+                let path = (entry["path"] as? String) ?? "(unknown)"
+                let name = (entry["name"] as? String) ?? (entry["language"] as? String) ?? ""
+                let kind = (entry["kind"] as? String) ?? (queryKind == "repo_map" ? "file" : "")
+                let detail: String
+                if queryKind == "repo_map" {
+                    detail = "language=\((entry["language"] as? String) ?? "unknown") | size=\((entry["size_bytes"] as? NSNumber)?.intValue ?? 0) B | symbols=\((entry["symbol_count"] as? NSNumber)?.intValue ?? 0) | imports=\((entry["import_count"] as? NSNumber)?.intValue ?? 0) | relations=\((entry["relation_count"] as? NSNumber)?.intValue ?? 0) | supported=\((entry["supported_language"] as? NSNumber)?.boolValue ?? false)"
+                } else if queryKind == "symbol_search" {
+                    detail = "line=\((entry["line"] as? NSNumber)?.intValue ?? 0)"
+                } else if queryKind == "related_files" {
+                    detail = "direction=\((entry["direction"] as? String) ?? "unknown")"
+                } else {
+                    detail = "Observed metadata"
+                }
+                let score = (entry["score"] as? NSNumber).map { String(format: "%.3f", $0.doubleValue) } ?? ""
+                entries.append(RepositoryItemEvent(path: path, name: name, kind: kind, detail: detail, score: score))
+            }
+        }
+
+        var total = integer("total_items")
+        if total == 0 { total = integer("total_results") }
+        repositoryEvents.append(RepositoryResultEvent(
+            timestamp: Date(),
+            workspace: workspace,
+            queryKind: queryKind,
+            providerID: text("provider_id"),
+            providerVersion: text("provider_version"),
+            completeness: text("completeness"),
+            sourceStateID: text("source_state_id"),
+            grantsAuthority: bool("grants_authority"),
+            rawSourcePersisted: bool("raw_source_persisted"),
+            partial: bool("partial"),
+            truncated: bool("truncated") || bool("generation_truncated"),
+            truncationReason: (object["truncation_reason"] as? String) ?? (object["generation_truncation_reason"] as? String),
+            returnedCount: integer("returned_count"),
+            totalCount: total,
+            symbolSupport: bool("symbol_support"),
+            ambiguous: bool("ambiguous"),
+            displayTruncated: bool("display_truncated"),
+            artifactState: text("artifact_state", fallback: "none"),
+            entries: entries
+        ))
     }
 
     private func captureArtifactBatchEvent(from line: String, workspace: String) {
@@ -1652,6 +1942,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             }
 
             captureEvidenceEvent(from: line, workspace: workspace)
+            captureRepositoryIntelligenceEvent(from: line, workspace: workspace)
             captureArtifactBatchEvent(from: line, workspace: workspace)
             let summary = line.count <= 140 ? line : String(line.prefix(137)) + "..."
             activityEvents.append(ActivityEvent(timestamp: Date(), kind: kind, workspace: workspace, summary: summary, detail: line))
@@ -1669,6 +1960,9 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if evidenceEvents.count > maxEvidenceEvents {
             evidenceEvents.removeFirst(evidenceEvents.count - maxEvidenceEvents)
         }
+        if repositoryEvents.count > maxRepositoryEvents {
+            repositoryEvents.removeFirst(repositoryEvents.count - maxRepositoryEvents)
+        }
         if artifactBatchEvents.count > maxArtifactBatchEvents {
             artifactBatchEvents.removeFirst(artifactBatchEvents.count - maxArtifactBatchEvents)
         }
@@ -1680,6 +1974,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         }
         if tabs.selectedTabViewItem?.identifier as? String == "evidence" {
             evidenceTableView.reloadData()
+        }
+        if tabs.selectedTabViewItem?.identifier as? String == "repository" {
+            repositoryResultTableView.reloadData()
+            if selectedRepositoryEvent != nil { repositoryItemTableView.reloadData() }
         }
         if tabs.selectedTabViewItem?.identifier as? String == "artifacts" {
             artifactBatchTableView.reloadData()
@@ -1695,6 +1993,12 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     @objc private func showEvidence() {
         evidenceTableView.reloadData()
         tabs.selectTabViewItem(withIdentifier: "evidence")
+    }
+
+    @objc private func showRepository() {
+        repositoryResultTableView.reloadData()
+        if selectedRepositoryEvent != nil { repositoryItemTableView.reloadData() }
+        tabs.selectTabViewItem(withIdentifier: "repository")
     }
 
     @objc private func showArtifacts() {

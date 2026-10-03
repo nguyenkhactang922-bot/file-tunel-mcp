@@ -164,8 +164,11 @@ Scope:
 
 ## FMUX-011 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Repository Intelligence
 
-State: BLOCKED
-Depends: FMUX-002, FMUX-003, FMG-018, FMG-019.
+State: ACTIVE / CLAIMED
+Branch: `chatgpt/FMUX-011-repository-intelligence`.
+Depends: FMUX-002, FMUX-003, FMG-018, FMG-019 — all DONE / MAIN VERIFIED.
+Checkpoint: exact candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0` is NATIVE VERIFIED; push Verify `37138794626` SUCCESS on macOS / Windows x64 / native Windows ARM64; scoped review PASS.
+NEXT_EXACT_ACTION: commit/push evidence-state-only closure head -> exact-head native Verify on closure SHA -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify.
 
 Scope:
 - repository summary;
