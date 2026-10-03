@@ -124,9 +124,9 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 
 ## FMUX-011 active pointer - 2026-10-03
 
-- FMUX-011 Repository Intelligence: ACTIVE / LOCAL VERIFIED / REMOTE PENDING.
+- FMUX-011 Repository Intelligence: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING.
 - Branch: `chatgpt/FMUX-011-repository-intelligence`, based directly on verified `fork/main=5a5abed27e523dac4f62c27e8808c3bb03a6d874`.
 - Dependencies FMUX-002, FMUX-003, FMG-018 and FMG-019 are DONE / MAIN VERIFIED.
 - Scope implemented: Repository page; repository summary; observed repo map, symbol search and related-files results; provider/version/completeness prominently shown; bounded metadata-only rows; no raw source/ContentRef tokens; no authority expansion.
-- Local checkpoint: FMUX Repository contract, repo-query contract, app-shell contract, project-state contract, Windows Release warnings-as-errors build, and diff-check PASS; no test/build process remains alive.
-- NEXT_EXACT_ACTION: commit exact candidate -> inspect remote branch/PR -> push once -> exact-head native Verify -> scoped review -> PR/merge -> merged-main Verify. FMUX-012 remains blocked until FMUX-011 MAIN VERIFIED.
+- Exact-head checkpoint: candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0`; push Verify `37138794626` SUCCESS on macOS / Windows x64 / native Windows ARM64; scoped review PASS with no P0/P1.
+- NEXT_EXACT_ACTION: commit/push evidence-state-only closure head -> exact-head native Verify on closure SHA -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify. FMUX-012 remains blocked until FMUX-011 MAIN VERIFIED.

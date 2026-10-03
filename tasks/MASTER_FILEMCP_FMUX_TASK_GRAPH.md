@@ -167,8 +167,8 @@ Scope:
 State: ACTIVE / CLAIMED
 Branch: `chatgpt/FMUX-011-repository-intelligence`.
 Depends: FMUX-002, FMUX-003, FMG-018, FMG-019 — all DONE / MAIN VERIFIED.
-Checkpoint: local implementation and affected local verification PASS; remote lifecycle pending.
-NEXT_EXACT_ACTION: commit exact FMUX-011 candidate -> inspect remote branch/PR -> push once -> exact-head native Verify -> scoped review -> PR/merge -> merged-main Verify.
+Checkpoint: exact candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0` is NATIVE VERIFIED; push Verify `37138794626` SUCCESS on macOS / Windows x64 / native Windows ARM64; scoped review PASS.
+NEXT_EXACT_ACTION: commit/push evidence-state-only closure head -> exact-head native Verify on closure SHA -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify.
 
 Scope:
 - repository summary;

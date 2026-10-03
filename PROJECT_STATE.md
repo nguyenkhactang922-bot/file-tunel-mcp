@@ -1489,6 +1489,6 @@ Governance state-sync is DONE / MAIN VERIFIED. PR #48 merged the state-only clos
 
 FMUX-011 Repository Intelligence is CLAIMED / ACTIVE on `chatgpt/FMUX-011-repository-intelligence`, based directly on verified main `5a5abed27e523dac4f62c27e8808c3bb03a6d874`. Dependencies FMUX-002, FMUX-003, FMG-018 and FMG-019 are all DONE / MAIN VERIFIED.
 
-FMUX-011 local checkpoint: IMPLEMENTATION + AFFECTED LOCAL VERIFY PASS. Sanitized metadata-only Repository Intelligence projection/UI exists on Windows and macOS; FMUX contract/query/app-shell/project-state gates, Windows Release warnings-as-errors build, and diff-check are recorded PASS in `docs/evidence/FMUX-011_REPOSITORY_INTELLIGENCE_UX_EVIDENCE.md`. No active test/build process remains. Runtime PID `17860` is unchanged and correct.
+FMUX-011 exact-head checkpoint: NATIVE VERIFIED / SCOPED REVIEW PASS. Candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0` passed push Verify `37138794626` on macOS / Windows x64 / native Windows ARM64, including FMUX Repository contract plus native integration/build/package/smoke gates. No P0/P1 remains. Runtime PID `17860` is unchanged and correct.
 
-NEXT_EXACT_ACTION: commit the exact local candidate -> inspect remote/PR state -> push once -> exact-head native Verify on macOS / Windows x64 / native Windows ARM64 -> scoped review -> PR/merge -> merged-main Verify. FMUX-012 remains blocked until FMUX-011 MAIN VERIFIED.
+NEXT_EXACT_ACTION: commit/push the evidence-state-only FMUX-011 closure head -> require exact-head native Verify on the closure SHA -> create/review exactly one PR to `main` -> merge exact reviewed head -> verify exact resulting main. FMUX-012 remains blocked until FMUX-011 MAIN VERIFIED.

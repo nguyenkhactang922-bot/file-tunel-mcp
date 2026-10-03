@@ -4,7 +4,7 @@ Date: 2026-10-03
 Task: FMUX-011 — Repository Intelligence
 Branch: `chatgpt/FMUX-011-repository-intelligence`
 Verified base: `fork/main = 5a5abed27e523dac4f62c27e8808c3bb03a6d874`
-State: ACTIVE / candidate implementation; remote exact-head and resulting-main gates pending.
+State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / EVIDENCE-STATE CLOSURE PENDING.
 
 ## Frozen scope
 
@@ -51,11 +51,20 @@ Environment-limited, not a source failure:
 - `tests/test_windows_runtime.ps1` cannot complete clean restore under FileMCP's intentionally minimal mediated local process environment. After restoring `OS=Windows_NT` inside the child shell, tunnel local-auth passed, then NuGet restore failed with the already-known `Value cannot be null. (Parameter 'path1')` minimal-environment issue. The no-restore Release build is clean; GitHub native Windows Verify is the clean-restore/integration authority.
 - macOS compiler/runtime is not available on this Windows host. GitHub `macos-26` Verify is the native `swiftc -warnings-as-errors`, integration, app-build, and bundled-resource authority.
 
-## Remote gates required before PASS
+## Exact-head native verification / scoped review
 
-1. Push exact candidate commit to writable GitHub remote.
-2. Exact-head Verify must succeed on macOS, Windows x64, and native Windows ARM64.
-3. Scoped review and PR to `main`.
-4. PR exact-head checks green; merge reviewed exact head.
-5. Verify exact resulting `main` commit on all required native lanes.
-6. Only after that remote evidence exists may FMUX-011 be marked DONE / MAIN VERIFIED and FMUX-012 be dependency-ready.
+- Exact candidate: `8c84912c5280fb599ad91632f5458d8b7a42f2a0`.
+- Push Verify: `37138794626` — SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- macOS: static/typecheck, catalog, native integration, app build and bundled-resource verification PASS.
+- Windows x64: Release build, FMUX-011 contract, full integration, x64/ARM64 package build, app smoke, resources and upload PASS.
+- Windows ARM64: FMUX-011 contract, native build, app smoke, resources and package upload PASS.
+- Scoped diff review against `fork/main=5a5abed27e523dac4f62c27e8808c3bb03a6d874`: PASS; no P0/P1 remains. Repository Intelligence presentation remains bounded, metadata-only, read-only and non-authoritative; raw source, raw ContentRef tokens and cursors are not projected.
+
+## Remaining remote gates before DONE
+
+1. Commit/push this evidence-state-only closure head.
+2. Require exact-head Verify on the closure SHA because the commit identity changes.
+3. Create/review exactly one PR targeting `main` after that closure head is green.
+4. Merge the exact reviewed head with head guard.
+5. Verify the exact resulting `main` commit on all required native lanes.
+6. Only then mark FMUX-011 DONE / MAIN VERIFIED and re-evaluate the FMUX dependency graph.
