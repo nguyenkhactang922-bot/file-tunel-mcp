@@ -54,3 +54,11 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - Exact-head review: PASS; no production/runtime implementation change for FMG-025.
 - Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 - NEXT_EXACT_ACTION: commit/push evidence/state-only closure head -> exact-head native Verify -> single PR -> merge after green verification -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-025 closure / FMG-026 claim - 2026-10-03
+
+- FMG-025: DONE / MAIN VERIFIED. PR #45 merged as `59ee366f504160b2132355e3d2dae9ce3b524646`; merged-main Verify `37107116084` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR Verify `37106541799`: final SUCCESS on all three lanes after rerunning only the transient Windows x64 health-url file-sharing failure; no source change was required.
+- FMG-026: CLAIMED / ACTIVE on `chatgpt/FMG-026-complete-regression`, based directly on verified main `59ee366f504160b2132355e3d2dae9ce3b524646`.
+- NEXT_EXACT_ACTION: inventory existing complete-regression/live-proof assets; map the frozen FMG-026 scope to executable proof, identify only real gaps, then run the required final full regression and live advanced proof, produce COMPLETE_UPGRADE_MAIN_VERIFIED candidate evidence, exact-head verify/review/PR/merge/main-verify.

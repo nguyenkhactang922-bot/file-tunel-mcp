@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMG-025-adversarial-gate`
+Branch: `chatgpt/FMG-026-complete-regression`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE FMG-025 adversarial-gate candidate changes pending exact-head native verification.
+Expected worktree at handoff: ACTIVE FMG-026 final regression/live-proof verification from verified main `59ee366f504160b2132355e3d2dae9ce3b524646`.
 
 ## Completed technical program
 
@@ -1460,3 +1460,18 @@ FMG-025 candidate head `a4098e2c72fa3ba92f1fcff4898d726ed42aa614` is EXACT-HEAD 
 - Evidence updated: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 
 NEXT_EXACT_ACTION: commit/push the evidence/state-only FMG-025 closure head, require native Verify on that exact closure head, then reuse/create exactly one PR -> require green PR verification -> merge with expected-head guard -> merged-main Verify -> FMG-025 DONE / MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-025 MAIN VERIFIED / FMG-026 claim - 2026-10-03
+
+FMG-025 Advanced Cross-Platform Adversarial Gate is DONE / MAIN VERIFIED.
+- Closure head `48cb3f0a6b9fee6a935c47a18a03ec79a26793bd`: push Verify `37096948452` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #45 Verify `37106541799`: final SUCCESS on all three lanes. Initial Windows x64 runtime attempt hit a transient `runtime-dynamic-health.health-url` file-sharing race; only the failed Windows job was rerun on the identical head and passed without source changes.
+- PR #45 merged with expected-head guard as `59ee366f504160b2132355e3d2dae9ce3b524646`.
+- Merged-main Verify `37107116084`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+
+FMG-026 Complete Regression + Live Advanced Proof is CLAIMED / ACTIVE on `chatgpt/FMG-026-complete-regression`, based directly on verified main `59ee366f504160b2132355e3d2dae9ce3b524646`.
+Existing live FileMCP/tunnel processes are preserved; do not restart them merely for FMG-026 discovery.
+
+NEXT_EXACT_ACTION: inventory existing FMG-026/final-regression/live-proof scripts and prior durable evidence; map each frozen FMG-026 scope item to an existing executable proof, identify only real coverage gaps, then execute the required final complete regression and live advanced proof without duplicating already-running processes. Optional Docker live proof remains subject to the frozen availability rule.

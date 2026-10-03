@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `chatgpt/FMG-025-adversarial-gate`
+Active branch: `chatgpt/FMG-026-complete-regression`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1379,3 +1379,15 @@ NEXT_EXACT_ACTION: commit/push exact FMG-025 candidate -> native Verify all thre
 - FMG-025 remains ACTIVE until PR merge and merged-main Verify succeed.
 
 NEXT_EXACT_ACTION: commit/push evidence/state-only closure head -> exact-head native Verify all three lanes -> single PR/review -> merge with expected-head guard -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-025 MAIN VERIFIED / FMG-026 ACTIVE - 2026-10-03
+
+- FMG-025 is DONE / MAIN VERIFIED.
+- PR #45 merged as `59ee366f504160b2132355e3d2dae9ce3b524646`.
+- Closure push Verify `37096948452`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR Verify `37106541799`: final SUCCESS on all three lanes; one transient Windows x64 health-url file-sharing race passed on rerun of only the failed job with no source change.
+- Merged-main Verify `37107116084`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- FMG-026 Complete Regression + Live Advanced Proof is CLAIMED / ACTIVE on `chatgpt/FMG-026-complete-regression` from verified main `59ee366f504160b2132355e3d2dae9ce3b524646`.
+
+NEXT_EXACT_ACTION: inventory final-regression/live-proof assets for FMG-026, build an executable proof matrix from existing scripts/evidence, repair only real gaps, then run the required complete regression + live advanced proof, record COMPLETE_UPGRADE_MAIN_VERIFIED candidate evidence, exact-head verify/review/PR/merge/merged-main verify.
