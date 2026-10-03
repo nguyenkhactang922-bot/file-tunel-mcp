@@ -1448,3 +1448,15 @@ FMG-025 inventory found no production/runtime implementation gap. Existing FMG-0
 - Production/runtime implementation files changed: none.
 
 NEXT_EXACT_ACTION: commit the FMG-025 gate/evidence/state candidate, push the exact head, require native Verify on macOS / Windows x64 / native Windows ARM64, repair only a real failed stage, then exact-head review -> PR/merge -> merged-main Verify -> FMG-025 DONE / MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-025 exact-head verified / review pass - 2026-10-03
+
+FMG-025 candidate head `a4098e2c72fa3ba92f1fcff4898d726ed42aa614` is EXACT-HEAD NATIVE VERIFIED.
+- Push Verify `37096296869`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- New aggregate adversarial gate: PASS in Windows x64 and native Windows ARM64 jobs.
+- macOS native static verification, integration runtime, app build and bundled-resource verification: PASS.
+- Exact-head diff review against `fork/main`: PASS; no Windows/macOS production/runtime implementation file changed, no tool-catalog drift, no privacy/security weakening, no duplicate advanced runtime-suite execution introduced.
+- Evidence updated: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: commit/push the evidence/state-only FMG-025 closure head, require native Verify on that exact closure head, then reuse/create exactly one PR -> require green PR verification -> merge with expected-head guard -> merged-main Verify -> FMG-025 DONE / MAIN VERIFIED -> claim FMG-026.

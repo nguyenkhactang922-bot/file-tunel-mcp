@@ -44,3 +44,13 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - New gate: `tests/test_advanced_adversarial_gate.ps1` PASS locally; CI wiring added to Windows x64 + native Windows ARM64; macOS native Swift runtime/build remains authoritative.
 - Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 - NEXT_EXACT_ACTION: commit/push exact candidate -> native Verify macOS/Windows x64/Windows ARM64 -> exact-head review -> PR/merge -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-025 exact-head verification checkpoint - 2026-10-03
+
+- State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS.
+- Candidate head: `a4098e2c72fa3ba92f1fcff4898d726ed42aa614`.
+- Push Verify `37096296869`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Exact-head review: PASS; no production/runtime implementation change for FMG-025.
+- Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+- NEXT_EXACT_ACTION: commit/push evidence/state-only closure head -> exact-head native Verify -> single PR -> merge after green verification -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.

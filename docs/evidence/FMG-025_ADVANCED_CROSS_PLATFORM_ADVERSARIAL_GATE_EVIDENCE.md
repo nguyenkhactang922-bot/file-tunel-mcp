@@ -1,6 +1,6 @@
 # FMG-025 Advanced Cross-Platform Adversarial Gate Evidence
 
-Status: LOCAL GATE PASS / EXACT-HEAD NATIVE VERIFY PENDING
+Status: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS / PR PENDING
 Date: 2026-10-03
 Branch: `chatgpt/FMG-025-adversarial-gate`
 Base: verified main `2bd859a966f9f49075ffc7d0a544154cb5d76498`
@@ -56,4 +56,19 @@ Observed output:
 
 ## Remaining closure path
 
-NEXT_EXACT_ACTION: commit the FMG-025 gate/evidence/state candidate, push the exact head, require native Verify on macOS / Windows x64 / native Windows ARM64, repair only a real failed stage, then perform exact-head review, PR/merge and merged-main Verify before marking FMG-025 DONE / MAIN VERIFIED and claiming FMG-026.
+## Exact-head native verification
+
+Candidate head: `a4098e2c72fa3ba92f1fcff4898d726ed42aa614`.
+Push Verify: `37096296869`.
+Result: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Native Windows ARM64 executed `Verify advanced cross-platform adversarial gate`: PASS and completed the full job SUCCESS.
+- Windows x64 executed the aggregate gate plus all existing advanced contract/runtime/package steps: SUCCESS.
+- macOS native Swift static verification, integration tests, app build and bundled-resource verification: SUCCESS.
+
+## Exact-head review
+
+`git diff --name-status fork/main...HEAD` confirms the branch changes only CI/test/evidence/state files. No Windows/macOS production/runtime implementation file changed for FMG-025. Review found no scope leak, no catalog/tool-surface change, no weakened privacy/security rule and no duplicate runtime-suite execution inside the aggregate gate.
+
+## Remaining closure path
+
+NEXT_EXACT_ACTION: sync this exact-head Verify/review checkpoint into state, commit/push the evidence/state-only closure head, require native Verify on that exact closure head, then create/reuse the single PR, merge only after green PR verification, require merged-main Verify, mark FMG-025 DONE / MAIN VERIFIED and claim FMG-026.

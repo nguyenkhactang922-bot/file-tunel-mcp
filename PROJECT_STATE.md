@@ -1367,3 +1367,15 @@ NEXT_EXACT_ACTION: inventory FMG-014..024 advanced surfaces and their negative/c
 - Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 
 NEXT_EXACT_ACTION: commit/push exact FMG-025 candidate -> native Verify all three lanes -> repair only actual failed stage -> exact-head review -> PR/merge -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-025 exact-head native verify checkpoint - 2026-10-03
+
+- Candidate head: `a4098e2c72fa3ba92f1fcff4898d726ed42aa614`.
+- Push Verify `37096296869`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Aggregate FMG-025 adversarial gate: PASS on Windows x64 and native Windows ARM64.
+- Native macOS static/runtime/build/resource verification: PASS.
+- Exact-head review: PASS; FMG-025 changes are limited to CI/test/evidence/state surfaces and do not alter production/runtime implementation.
+- FMG-025 remains ACTIVE until PR merge and merged-main Verify succeed.
+
+NEXT_EXACT_ACTION: commit/push evidence/state-only closure head -> exact-head native Verify all three lanes -> single PR/review -> merge with expected-head guard -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.
