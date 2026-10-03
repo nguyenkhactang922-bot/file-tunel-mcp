@@ -7,9 +7,41 @@ IDEA -> CAPTURE -> LIVING DESIGN -> DEEP DIVE -> INDEPENDENT REVIEW -> SOLUTION 
 No feature code before this gate is complete.
 
 ## Implementation gate
-CLAIM -> ANALYZE -> PLAN -> CODE -> TEST -> EVIDENCE -> VERIFY -> COMMIT -> REVIEW -> MERGE -> DONE -> NEXT READY TASK.
+CLAIM -> ANALYZE -> PLAN -> CODE -> TEST -> EVIDENCE -> VERIFY -> COMMIT -> PUSH REMOTE -> PR -> REVIEW -> MERGE MAIN -> VERIFY MAIN -> MAIN VERIFIED -> DONE -> NEXT READY TASK.
 
 Before every task confirm git root/branch/HEAD/status and read AGENTS.md, CURRENT_HANDOFF.md, PROJECT_STATE.md, and tasks/TASK_QUEUE.md. Resume NEXT_EXACT_ACTION rather than restarting work.
+
+## Mandatory GitHub remote / PR / MAIN VERIFIED completion gate
+
+This gate is mandatory for FileMCP and supersedes any older wording that could be read as allowing a local commit to finish a task.
+
+A task/change is NOT DONE merely because it is committed locally, locally tested, has a clean worktree, or has a green branch build. Local commits are checkpoints only.
+
+The minimum completion sequence is:
+
+EXACT CANDIDATE COMMIT
+-> PUSH TO CONFIGURED WRITABLE GITHUB REMOTE
+-> PR TARGETING `main`
+-> EXACT-HEAD REQUIRED CI/CHECKS GREEN
+-> REVIEW COMPLETE
+-> MERGE THE REVIEWED HEAD INTO `main`
+-> CONFIRM `main` CONTAINS THE MERGE
+-> RUN/CONFIRM REQUIRED MERGED-MAIN VERIFICATION
+-> RECORD MAIN COMMIT + VERIFICATION EVIDENCE
+-> MAIN VERIFIED
+-> DONE.
+
+Hard rules:
+- Every implementation, fix, refactor, docs/process-law change, release change, and task closure must reach the configured writable GitHub remote and be merged to `main` through a pull request.
+- `COMMIT LOCAL`, `LOCAL VERIFIED`, `PASS LOCAL`, clean status, or a local artifact MUST NOT be labeled `DONE`.
+- `PUSHED` is not `DONE`; `PR OPEN` is not `DONE`; `PR GREEN` is not `DONE`; `MERGED` is not `DONE` until the required post-merge main verification has passed.
+- `MAIN VERIFIED` means the required verification contract has been satisfied for the actual post-merge `main` commit. A pre-merge branch run cannot be reused as proof of merged-main verification unless the verification contract explicitly proves the exact same resulting main commit and the task law allows that equivalence.
+- If remote access, authentication, push, PR creation, review, merge, or merged-main verification is unavailable, preserve the task as `ACTIVE` or `BLOCKED` with precise `NEXT_EXACT_ACTION`; never convert the blockage into local `DONE`.
+- State/evidence must preserve lifecycle granularity: local checkpoint, local verified, remote pushed, PR open, PR green/reviewed, merged, main verification pending, MAIN VERIFIED, DONE.
+- Before any side-effect retry (push, PR creation, merge, publish, release, migration), inspect the real remote/PR/runtime state first to avoid duplicates after stream interruption.
+- Do not claim a dependent next task if its prerequisite requires `MAIN VERIFIED` and has not reached that state.
+- Direct local-only completion is forbidden. Direct-to-main completion that bypasses the required PR/review gate is forbidden.
+- The durable source of truth for completion is the combination of repository state, GitHub remote/PR state, verification evidence, and the resulting `main` commit; chat text is never sufficient proof.
 
 ## Complete current-scope freeze law
 

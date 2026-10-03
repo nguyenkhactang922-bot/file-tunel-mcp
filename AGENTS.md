@@ -12,7 +12,19 @@
 - Multi-drive workspaces remain independent security/runtime boundaries; aggregation is read-only.
 - TCP connections must never be presented as distinct chats.
 - Build/test evidence is mandatory before PASS.
-- Lifecycle after architecture freeze: CLAIM -> ANALYZE -> PLAN -> CODE -> TEST -> EVIDENCE -> VERIFY -> COMMIT -> REVIEW -> MERGE -> DONE.
+- Lifecycle after architecture freeze: CLAIM -> ANALYZE -> PLAN -> CODE -> TEST -> EVIDENCE -> VERIFY -> COMMIT -> PUSH REMOTE -> PR -> REVIEW -> MERGE MAIN -> VERIFY MAIN -> MAIN VERIFIED -> DONE -> NEXT READY TASK.
+
+## Mandatory GitHub remote / PR / MAIN VERIFIED completion law
+
+- Every implementation, fix, refactor, documentation/process-law change, release change, and task closure in this repository MUST end on the configured writable GitHub remote and MUST be merged into `main` through a pull request.
+- A local commit is only a durable checkpoint. `COMMIT LOCAL`, `LOCAL VERIFIED`, a clean worktree, or a locally green build/test MUST NEVER be interpreted or recorded as `DONE`.
+- Before a task may become `DONE`, all of the following are mandatory and must have durable evidence: the exact candidate commit exists; the task branch is pushed to the configured writable GitHub remote; a PR targets `main`; required exact-head CI/checks are green; review is complete; the exact reviewed head is merged; `main` contains the merge; required merged-main verification/checks are green; and state/evidence records the resulting main commit as `MAIN VERIFIED`.
+- Direct local-only completion and silent direct-to-main completion are forbidden. If GitHub, authentication, remote push, PR creation, review, merge, or merged-main verification is unavailable, the task remains `ACTIVE` or `BLOCKED` with `NEXT_EXACT_ACTION`; it does not become `DONE`.
+- A successful pre-merge branch CI run is not `MAIN VERIFIED`. `MAIN VERIFIED` refers only to evidence collected from the post-merge `main` commit required by the task's verification contract.
+- State files MUST distinguish at least: local checkpoint / local verified / remote pushed / PR open / PR green-reviewed / merged / main verification pending / MAIN VERIFIED / DONE. They must never collapse these into a local `DONE`.
+- Before push/PR/merge or any retry with side effects, inspect the real remote/PR/merge state first so interrupted chat streams cannot create duplicate pushes, duplicate PRs, duplicate merges, or duplicate release actions.
+- The next task in a dependency chain MUST NOT be claimed when its prerequisite requires `MAIN VERIFIED` and has not reached that state.
+- Any historical text that appears to allow `COMMIT -> DONE` is superseded by this section.
 
 ## Complete-current-scope pre-code law
 
