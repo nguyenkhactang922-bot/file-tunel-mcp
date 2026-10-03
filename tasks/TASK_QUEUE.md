@@ -31,6 +31,26 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - FMG-022: DONE / MAIN VERIFIED. PR #41 merged as `f3e4254c5a32d48d95b28372d0eff56880aeb5f5`; merged-main Verify `36986797605` SUCCESS.
 - Drive-root project_context hotfix: MAIN VERIFIED. PR #42 merged as `9b6162fd9c79e755922f2865efef6b1eefc6402e`; merged-main Verify `36991621549` SUCCESS.
 - FMG-023: DONE / MAIN VERIFIED. PR #43 merged as `d71fbc08e9e08f65c59ce5e05649e0dc629f7935`; PR Verify `36998198466` SUCCESS; merged-main Verify `36998939456` SUCCESS on macOS / Windows x64 / native Windows ARM64.
-- FMG-024: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / LIVE DOCKER ENVIRONMENT-BLOCKED on `chatgpt/FMG-024-docker-backend`; candidate `557ddaa157f5897bf3d5c5be8e6a1f498fbc2200`; Verify `37043531330` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- FMG-024: DONE / MAIN VERIFIED. PR #44 head `d0495da7f0d70e1fc14e93e928ba52a2d9ffee89` merged as `2bd859a966f9f49075ffc7d0a544154cb5d76498`; PR Verify `37094506166` final SUCCESS; merged-main Verify `37095113136` SUCCESS on macOS / Windows x64 / native Windows ARM64. Live Docker engine proof remains environment-blocked because the local daemon is unavailable.
 - Evidence: `docs/evidence/FMG-024_OPTIONAL_DOCKER_ISOLATED_BACKEND_EVIDENCE.md`.
-- NEXT_EXACT_ACTION: commit/push evidence/state-only FMG-024 closure head, require native Verify all three lanes, then PR/merge/merged-main Verify -> FMG-024 MAIN VERIFIED -> claim FMG-025.
+- FMG-025: CLAIMED / ACTIVE on `chatgpt/FMG-025-adversarial-gate`, based directly on verified main `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
+- NEXT_EXACT_ACTION: inventory FMG-014..024 advanced surfaces and existing negative/contract suites; execute the cross-platform adversarial/privacy/security/parity matrix, repair only real gaps, then evidence/review/commit/PR/merge/main-verify before FMG-026.
+
+
+## FMG-025 active checkpoint - 2026-10-03
+
+- State: ACTIVE / LOCAL ADVERSARIAL GATE PASS.
+- Branch: `chatgpt/FMG-025-adversarial-gate`.
+- New gate: `tests/test_advanced_adversarial_gate.ps1` PASS locally; CI wiring added to Windows x64 + native Windows ARM64; macOS native Swift runtime/build remains authoritative.
+- Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+- NEXT_EXACT_ACTION: commit/push exact candidate -> native Verify macOS/Windows x64/Windows ARM64 -> exact-head review -> PR/merge -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-025 exact-head verification checkpoint - 2026-10-03
+
+- State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS.
+- Candidate head: `a4098e2c72fa3ba92f1fcff4898d726ed42aa614`.
+- Push Verify `37096296869`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Exact-head review: PASS; no production/runtime implementation change for FMG-025.
+- Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+- NEXT_EXACT_ACTION: commit/push evidence/state-only closure head -> exact-head native Verify -> single PR -> merge after green verification -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.

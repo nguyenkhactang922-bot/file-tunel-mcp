@@ -83,3 +83,14 @@ Per the frozen task graph, FMG-024 may be CODE/CONTRACT/NATIVE VERIFIED with liv
 ## Closure path
 
 NEXT_EXACT_ACTION: commit/push this evidence/state-only closure, require native Verify on the resulting exact head, then PR/merge, require merged-main Verify, mark FMG-024 DONE / MAIN VERIFIED, and claim FMG-025.
+
+
+## Final closure
+
+FMG-024 is DONE / MAIN VERIFIED.
+- Evidence/state closure head: `d0495da7f0d70e1fc14e93e928ba52a2d9ffee89`.
+- Push Verify `37094158297`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #44 Verify `37094506166`: final SUCCESS on all three lanes. Its first Windows x64 integration attempt failed the pre-existing bounded ProcessRunner output assertion, while the same exact head had already passed push Verify; rerunning the failed Windows job on the unchanged head passed, so no unrelated production/test code was modified.
+- PR #44 merged as `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
+- Merged-main Verify `37095113136`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Live Docker container-engine proof remains explicitly environment-blocked because the local daemon was unavailable. No live Docker PASS is claimed.

@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMG-024-docker-backend`
+Branch: `chatgpt/FMG-025-adversarial-gate`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE FMG-024 Docker backend changes pending native verification.
+Expected worktree at handoff: ACTIVE FMG-025 adversarial-gate candidate changes pending exact-head native verification.
 
 ## Completed technical program
 
@@ -1406,3 +1406,57 @@ FMG-024 Optional Docker Isolated Backend is EXACT-HEAD NATIVE VERIFIED / SCOPED 
 - Local Docker CLI 29.6.2 is present but the daemon was unavailable during verification, so live container-engine success is explicitly NOT claimed; this is allowed by the frozen FMG-024 availability rule and must remain environment-blocked until a real engine proof exists.
 
 NEXT_EXACT_ACTION: commit/push the evidence/state-only FMG-024 closure head, require native Verify on that exact head, then PR/merge -> merged-main Verify -> mark FMG-024 DONE / MAIN VERIFIED -> claim FMG-025 Advanced Cross-Platform Adversarial Gate.
+
+
+## FMG-024 MAIN VERIFIED / FMG-025 claimed - 2026-10-03
+
+FMG-024 Optional Docker Isolated Backend is DONE / MAIN VERIFIED.
+- Closure head: `d0495da7f0d70e1fc14e93e928ba52a2d9ffee89`.
+- PR #44 Verify `37094506166`: SUCCESS after rerunning only the transiently failed Windows x64 job; macOS / Windows x64 / native Windows ARM64 all PASS.
+- PR #44 merged as `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
+- Merged-main Verify `37095113136`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Live Docker engine proof remains explicitly environment-blocked because the local daemon is unavailable; no fake live PASS is claimed.
+
+FMG-025 Advanced Cross-Platform Adversarial Gate is CLAIMED / ACTIVE on `chatgpt/FMG-025-adversarial-gate` from merged main `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
+
+NEXT_EXACT_ACTION: audit existing advanced negative/runtime coverage against the frozen FMG-025 scope, add the missing cross-platform adversarial gate and only the missing negative tests, run affected local gates, record evidence/state, then exact-head native Verify -> review -> PR/merge -> merged-main Verify -> FMG-025 MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-024 closure / FMG-025 claim - 2026-10-03
+
+FMG-024 Optional Docker Isolated Backend is DONE / MAIN VERIFIED.
+- PR #44 head `d0495da7f0d70e1fc14e93e928ba52a2d9ffee89` merged as `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
+- Exact-head push Verify `37094158297`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR Verify `37094506166`: final SUCCESS on macOS / Windows x64 / native Windows ARM64. The first Windows x64 integration attempt hit the pre-existing bounded-output timing/assertion flake; rerun on the identical head passed without source changes, so no unrelated code change was introduced.
+- Merged-main Verify `37095113136`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Live Docker engine proof remains explicitly ENVIRONMENT-BLOCKED because the local Docker daemon is unavailable; no fake live PASS is claimed. The frozen availability rule permits FMG-024 closure with this limitation recorded.
+- Evidence: `docs/evidence/FMG-024_OPTIONAL_DOCKER_ISOLATED_BACKEND_EVIDENCE.md`.
+- Existing live FileMCP connector PID 16240 was not restarted.
+
+FMG-025 Advanced Cross-Platform Adversarial Gate is CLAIMED / ACTIVE on `chatgpt/FMG-025-adversarial-gate`, based directly on verified main `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
+NEXT_EXACT_ACTION: inventory the frozen FMG-014..024 advanced surfaces and existing negative/contract suites, build the FMG-025 adversarial matrix, run only the required cross-platform/privacy/security/parity gates, add missing adversarial coverage if a real gap is found, preserve live Docker as environment-blocked unless an engine becomes available, then evidence/review/commit/PR/merge/main-verify before FMG-026.
+
+
+## FMG-025 local adversarial gate - 2026-10-03
+
+FMG-025 inventory found no production/runtime implementation gap. Existing FMG-014..024 negative suites already cover the frozen advanced capabilities; the missing task-level gap was an aggregate CI-enforced gate proving complete cross-platform wiring plus privacy/foundation invariants.
+- Added `tests/test_advanced_adversarial_gate.ps1`.
+- Wired the aggregate gate exactly once into Windows x64 Verify and once into native Windows ARM64 Verify; macOS remains independently verified by native Swift typecheck/runtime/build.
+- Local aggregate gate: PASS.
+- `git diff --check`: PASS.
+- Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+- Production/runtime implementation files changed: none.
+
+NEXT_EXACT_ACTION: commit the FMG-025 gate/evidence/state candidate, push the exact head, require native Verify on macOS / Windows x64 / native Windows ARM64, repair only a real failed stage, then exact-head review -> PR/merge -> merged-main Verify -> FMG-025 DONE / MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-025 exact-head verified / review pass - 2026-10-03
+
+FMG-025 candidate head `a4098e2c72fa3ba92f1fcff4898d726ed42aa614` is EXACT-HEAD NATIVE VERIFIED.
+- Push Verify `37096296869`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- New aggregate adversarial gate: PASS in Windows x64 and native Windows ARM64 jobs.
+- macOS native static verification, integration runtime, app build and bundled-resource verification: PASS.
+- Exact-head diff review against `fork/main`: PASS; no Windows/macOS production/runtime implementation file changed, no tool-catalog drift, no privacy/security weakening, no duplicate advanced runtime-suite execution introduced.
+- Evidence updated: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: commit/push the evidence/state-only FMG-025 closure head, require native Verify on that exact closure head, then reuse/create exactly one PR -> require green PR verification -> merge with expected-head guard -> merged-main Verify -> FMG-025 DONE / MAIN VERIFIED -> claim FMG-026.

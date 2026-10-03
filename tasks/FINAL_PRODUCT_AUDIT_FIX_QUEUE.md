@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: FMG-024 is ACTIVE on `chatgpt/FMG-024-docker-backend`. Preserve FMG-023 MAIN VERIFIED. Complete scoped FMG-024 review and local affected gates, commit/push the exact candidate, require native Verify on macOS / Windows x64 / native Windows ARM64, repair only failed stages, then exact-head review -> PR/merge -> merged-main Verify -> FMG-024 MAIN VERIFIED -> claim FMG-025.
+AUTHORITATIVE NEXT_EXACT_ACTION: FMG-025 is ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS on `chatgpt/FMG-025-adversarial-gate`. Candidate `a4098e2c72fa3ba92f1fcff4898d726ed42aa614` passed push Verify `37096296869` on macOS / Windows x64 / native Windows ARM64. Commit/push the evidence/state-only closure head, require native Verify on that exact closure head, then reuse/create exactly one PR, merge only after green PR verification with expected-head guard, require merged-main Verify, mark FMG-025 DONE / MAIN VERIFIED, then claim FMG-026.
