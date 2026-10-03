@@ -3448,6 +3448,7 @@ final class LocalMCPServer {
             }
 
             emitArtifactBatchUIEventSafely(toolName: toolName, structuredContent: structuredContent)
+            emitRepositoryIntelligenceUIEventSafely(toolName: toolName, structuredContent: structuredContent)
 
             let evidenceMetadata = evidenceCoordinator.complete(
                 run: evidenceRun,
@@ -3488,6 +3489,48 @@ final class LocalMCPServer {
             if modern { result = modernCompleteResult(result) }
             return jsonRPCResult(id: id, result: result)
         }
+    }
+
+    private func emitRepositoryIntelligenceUIEventSafely(toolName: String, structuredContent: [String: Any]) {
+        guard toolName == "repo_map" || toolName == "symbol_search" || toolName == "related_files" else { return }
+
+        var projected: [String: Any] = [:]
+        for key in [
+            "query_kind", "provider_id", "provider_version", "completeness", "source_state_id",
+            "grants_authority", "raw_source_persisted", "generation_truncated", "generation_truncation_reason",
+            "partial", "truncated", "truncation_reason", "returned_count", "total_items", "total_results",
+            "symbol_support", "ambiguous", "exact_match_count", "artifact_state"
+        ] {
+            if let value = structuredContent[key] { projected[key] = value }
+        }
+
+        let sourceEntries: [[String: Any]]
+        if toolName == "repo_map" {
+            sourceEntries = structuredContent["items"] as? [[String: Any]] ?? []
+        } else {
+            sourceEntries = structuredContent["results"] as? [[String: Any]] ?? []
+        }
+
+        let safeKeys = [
+            "path", "language", "size_bytes", "supported_language", "symbol_count", "import_count",
+            "relation_count", "name", "kind", "line", "score", "direction"
+        ]
+        var projectedEntries: [[String: Any]] = []
+        for entry in sourceEntries.prefix(200) {
+            var item: [String: Any] = [:]
+            for key in safeKeys {
+                if let value = entry[key] { item[key] = value }
+            }
+            projectedEntries.append(item)
+        }
+
+        projected["entries"] = projectedEntries
+        projected["display_truncated"] = sourceEntries.count > projectedEntries.count
+
+        guard JSONSerialization.isValidJSONObject(projected),
+              let data = try? JSONSerialization.data(withJSONObject: projected, options: [.sortedKeys]),
+              let text = String(data: data, encoding: .utf8) else { return }
+        log("[RepositoryIntelligenceResult] \(text)\n")
     }
 
     private func emitArtifactBatchUIEventSafely(toolName: String, structuredContent: [String: Any]) {

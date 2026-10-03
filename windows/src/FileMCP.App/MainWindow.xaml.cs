@@ -36,10 +36,12 @@ public partial class MainWindow : Window
     private readonly List<ActivityRow> _activityRows = new();
     private readonly List<ChangeRow> _changeRows = new();
     private readonly List<EvidenceRow> _evidenceRows = new();
+    private readonly List<RepositoryResultRow> _repositoryRows = new();
     private readonly List<ArtifactBatchRow> _artifactBatchRows = new();
     private const int MaxActivityRows = 500;
     private const int MaxChangeRows = 250;
     private const int MaxEvidenceRows = 500;
+    private const int MaxRepositoryRows = 100;
     private const int MaxArtifactBatchRows = 100;
     private string _lastImportantEvent = "No recent issue";
     private const int MaxLogCharacters = 500_000;
@@ -1094,6 +1096,11 @@ public partial class MainWindow : Window
         MainTabs.SelectedItem = EvidenceTab;
         RefreshEvidenceGrid();
     }
+    private void NavigateRepository_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = RepositoryTab;
+        RefreshRepositoryGrid();
+    }
     private void NavigateArtifacts_Click(object sender, RoutedEventArgs e)
     {
         MainTabs.SelectedItem = ArtifactsTab;
@@ -1115,7 +1122,8 @@ public partial class MainWindow : Window
         SetNavigationButtonPresentation(NavActivityButton, "Activity", "A");
         SetNavigationButtonPresentation(NavChangesButton, "Changes", "C");
         SetNavigationButtonPresentation(NavEvidenceButton, "Evidence", "E");
-        SetNavigationButtonPresentation(NavArtifactsButton, "Artifacts", "R");
+        SetNavigationButtonPresentation(NavRepositoryButton, "Repository", "R");
+        SetNavigationButtonPresentation(NavArtifactsButton, "Artifacts", "B");
         SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
 
         ShellWorkspaceText.Visibility = _navigationCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -1306,6 +1314,39 @@ public partial class MainWindow : Window
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
 
+    private sealed record RepositoryItemRow(
+        string Path,
+        string Name,
+        string Kind,
+        string Detail,
+        string ScoreDisplay);
+
+    private sealed record RepositoryResultRow(
+        DateTimeOffset Timestamp,
+        string Workspace,
+        string QueryKind,
+        string ProviderId,
+        string ProviderVersion,
+        string Completeness,
+        string SourceStateId,
+        bool GrantsAuthority,
+        bool RawSourcePersisted,
+        bool Partial,
+        bool Truncated,
+        string? TruncationReason,
+        int ReturnedCount,
+        int TotalCount,
+        bool SymbolSupport,
+        bool Ambiguous,
+        bool DisplayTruncated,
+        string ArtifactState,
+        IReadOnlyList<RepositoryItemRow> Entries)
+    {
+        public string Time => Timestamp.ToLocalTime().ToString("HH:mm:ss");
+        public string CountDisplay => TotalCount > 0 ? $"{ReturnedCount}/{TotalCount}" : ReturnedCount.ToString();
+        public string StateDisplay => Partial || Truncated || DisplayTruncated ? "Partial" : "Observed";
+    }
+
     private sealed record ArtifactBatchEntryRow(
         string Path,
         string State,
@@ -1400,6 +1441,7 @@ public partial class MainWindow : Window
                 workspace = line[1..close];
 
             TryCaptureEvidenceRow(line, workspace);
+            TryCaptureRepositoryRow(line, workspace);
             TryCaptureArtifactBatchRow(line, workspace);
 
             var lower = line.ToLowerInvariant();
@@ -1424,6 +1466,8 @@ public partial class MainWindow : Window
             _changeRows.RemoveRange(0, _changeRows.Count - MaxChangeRows);
         if (_evidenceRows.Count > MaxEvidenceRows)
             _evidenceRows.RemoveRange(0, _evidenceRows.Count - MaxEvidenceRows);
+        if (_repositoryRows.Count > MaxRepositoryRows)
+            _repositoryRows.RemoveRange(0, _repositoryRows.Count - MaxRepositoryRows);
         if (_artifactBatchRows.Count > MaxArtifactBatchRows)
             _artifactBatchRows.RemoveRange(0, _artifactBatchRows.Count - MaxArtifactBatchRows);
 
@@ -1433,8 +1477,128 @@ public partial class MainWindow : Window
             RefreshChangesGrid();
         if (IsLoaded && MainTabs.SelectedItem == EvidenceTab)
             RefreshEvidenceGrid();
+        if (IsLoaded && MainTabs.SelectedItem == RepositoryTab)
+            RefreshRepositoryGrid();
         if (IsLoaded && MainTabs.SelectedItem == ArtifactsTab)
             RefreshArtifactBatchGrid();
+    }
+
+    private void TryCaptureRepositoryRow(string line, string workspace)
+    {
+        const string marker = "[RepositoryIntelligenceResult] ";
+        var markerIndex = line.IndexOf(marker, StringComparison.Ordinal);
+        if (markerIndex < 0) return;
+
+        try
+        {
+            var json = line[(markerIndex + marker.Length)..];
+            var node = JsonNode.Parse(json)?.AsObject();
+            if (node is null) return;
+
+            static string Text(JsonObject obj, string key, string fallback = "unknown") =>
+                obj[key] is JsonValue value && value.TryGetValue<string>(out var text) ? text : fallback;
+            static string? OptionalText(JsonObject obj, string key) =>
+                obj[key] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+            static int Int(JsonObject obj, string key) =>
+                obj[key] is JsonValue value && value.TryGetValue<int>(out var number) ? number : 0;
+            static bool Bool(JsonObject obj, string key) =>
+                obj[key] is JsonValue value && value.TryGetValue<bool>(out var flag) && flag;
+            static string Score(JsonObject obj)
+            {
+                if (obj["score"] is JsonValue value && value.TryGetValue<double>(out var score))
+                    return score.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+                return "";
+            }
+
+            var queryKind = Text(node, "query_kind", "repository");
+            var entries = new List<RepositoryItemRow>();
+            if (node["entries"] is JsonArray array)
+            {
+                foreach (var child in array)
+                {
+                    if (child is not JsonObject entry) continue;
+                    var path = Text(entry, "path", "(unknown)");
+                    var name = OptionalText(entry, "name") ?? OptionalText(entry, "language") ?? "";
+                    var kind = OptionalText(entry, "kind") ?? (queryKind == "repo_map" ? "file" : "");
+                    var detail = queryKind switch
+                    {
+                        "repo_map" => $"language={Text(entry, "language", "unknown")} | size={Int(entry, "size_bytes"):N0} B | symbols={Int(entry, "symbol_count")} | imports={Int(entry, "import_count")} | relations={Int(entry, "relation_count")} | supported={Bool(entry, "supported_language")}",
+                        "symbol_search" => $"line={Int(entry, "line")}",
+                        "related_files" => $"direction={Text(entry, "direction", "unknown")}",
+                        _ => "Observed metadata"
+                    };
+                    entries.Add(new RepositoryItemRow(path, name, kind, detail, Score(entry)));
+                }
+            }
+
+            var total = Int(node, "total_items");
+            if (total == 0) total = Int(node, "total_results");
+            _repositoryRows.Add(new RepositoryResultRow(
+                DateTimeOffset.Now,
+                workspace,
+                queryKind,
+                Text(node, "provider_id", "unknown"),
+                Text(node, "provider_version", "unknown"),
+                Text(node, "completeness", "unknown"),
+                Text(node, "source_state_id", "unknown"),
+                Bool(node, "grants_authority"),
+                Bool(node, "raw_source_persisted"),
+                Bool(node, "partial"),
+                Bool(node, "truncated") || Bool(node, "generation_truncated"),
+                OptionalText(node, "truncation_reason") ?? OptionalText(node, "generation_truncation_reason"),
+                Int(node, "returned_count"),
+                total,
+                Bool(node, "symbol_support"),
+                Bool(node, "ambiguous"),
+                Bool(node, "display_truncated"),
+                Text(node, "artifact_state", "none"),
+                entries));
+        }
+        catch
+        {
+            // Repository UI ignores malformed presentation telemetry rather than inventing state.
+        }
+    }
+
+    private void RefreshRepositoryGrid()
+    {
+        var visible = _repositoryRows.AsEnumerable().Reverse().ToArray();
+        RepositoryResultGrid.ItemsSource = visible;
+        RepositoryResultCountText.Text = visible.Length == 0
+            ? "0 captured repository-intelligence results | waiting for real repo_map / symbol_search / related_files output"
+            : $"{visible.Length} captured repository-intelligence result(s) | max {MaxRepositoryRows}";
+        if (visible.Length == 0)
+        {
+            RepositoryItemGrid.ItemsSource = Array.Empty<RepositoryItemRow>();
+            RepositoryProviderText.Text = "No repository-intelligence result captured yet.";
+            RepositorySummaryText.Text = "Waiting for real repo_map, symbol_search or related_files output.";
+            RepositorySourceText.Text = "Not observed";
+        }
+    }
+
+    private void RepositoryResultGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (RepositoryResultGrid.SelectedItem is not RepositoryResultRow row)
+        {
+            RepositoryItemGrid.ItemsSource = Array.Empty<RepositoryItemRow>();
+            RepositoryProviderText.Text = "Select a captured repository-intelligence result.";
+            RepositorySummaryText.Text = "No synthetic repository state is shown.";
+            RepositorySourceText.Text = "Not observed";
+            return;
+        }
+
+        RepositoryItemGrid.ItemsSource = row.Entries;
+        RepositoryProviderText.Text =
+            $"{row.ProviderId} {row.ProviderVersion} | completeness={row.Completeness} | grants_authority={row.GrantsAuthority} | raw_source_persisted={row.RawSourcePersisted}";
+        var flags = new List<string>();
+        if (row.Partial) flags.Add("partial");
+        if (row.Truncated) flags.Add($"truncated:{row.TruncationReason ?? "unknown"}");
+        if (row.DisplayTruncated) flags.Add("display-bounded");
+        if (row.Ambiguous) flags.Add("ambiguous");
+        var state = flags.Count == 0 ? "observed" : string.Join(", ", flags);
+        RepositorySummaryText.Text =
+            $"{row.QueryKind}: {row.ReturnedCount}/{row.TotalCount} returned | {state} | {row.Entries.Count} metadata row(s) displayed | symbol_support={row.SymbolSupport} | artifact_state={row.ArtifactState}. Provider completeness is descriptive, not exhaustive truth.";
+        RepositorySourceText.Text = $"source_state_id={row.SourceStateId}";
     }
 
     private void TryCaptureArtifactBatchRow(string line, string workspace)

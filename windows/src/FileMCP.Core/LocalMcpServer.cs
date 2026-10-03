@@ -493,6 +493,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 }
 
                 EmitArtifactBatchUiEventSafely(name, output.StructuredContent);
+                EmitRepositoryIntelligenceUiEventSafely(name, output.StructuredContent);
 
                 var evidenceMetadata = await _evidenceCoordinator.CompleteAsync(
                     evidenceRun,
@@ -535,6 +536,56 @@ public sealed class LocalMcpServer : IAsyncDisposable
                 try { _sessions?.CompleteToolCall(sessionCall.Value, HttpBodyByteLength(response), isError, latency); }
                 catch (Exception ex) { _log($"[Telemetry] session metric ignored: {ex.Message}\n"); }
             }
+        }
+    }
+
+    private void EmitRepositoryIntelligenceUiEventSafely(string toolName, JsonObject structuredContent)
+    {
+        if (toolName is not ("repo_map" or "symbol_search" or "related_files")) return;
+        try
+        {
+            var projected = new JsonObject();
+            foreach (var key in new[]
+            {
+                "query_kind", "provider_id", "provider_version", "completeness", "source_state_id",
+                "grants_authority", "raw_source_persisted", "generation_truncated", "generation_truncation_reason",
+                "partial", "truncated", "truncation_reason", "returned_count", "total_items", "total_results",
+                "symbol_support", "ambiguous", "exact_match_count", "artifact_state"
+            })
+            {
+                if (structuredContent[key] is JsonNode value) projected[key] = value.DeepClone();
+            }
+
+            var sourceEntries = toolName == "repo_map"
+                ? structuredContent["items"] as JsonArray
+                : structuredContent["results"] as JsonArray;
+            var projectedEntries = new JsonArray();
+            if (sourceEntries is not null)
+            {
+                foreach (var node in sourceEntries)
+                {
+                    if (projectedEntries.Count >= 200) break;
+                    if (node is not JsonObject entry) continue;
+                    var item = new JsonObject();
+                    foreach (var key in new[]
+                    {
+                        "path", "language", "size_bytes", "supported_language", "symbol_count", "import_count",
+                        "relation_count", "name", "kind", "line", "score", "direction"
+                    })
+                    {
+                        if (entry[key] is JsonNode value) item[key] = value.DeepClone();
+                    }
+                    projectedEntries.Add(item);
+                }
+            }
+
+            projected["entries"] = projectedEntries;
+            projected["display_truncated"] = sourceEntries is not null && sourceEntries.Count > projectedEntries.Count;
+            _log("[RepositoryIntelligenceResult] " + projected.ToJsonString() + "\n");
+        }
+        catch (Exception ex)
+        {
+            _log($"[RepositoryIntelligence] UI projection ignored: {ex.GetType().Name}\n");
         }
     }
 

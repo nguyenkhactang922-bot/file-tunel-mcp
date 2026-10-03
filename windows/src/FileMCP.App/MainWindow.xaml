@@ -89,6 +89,8 @@
                         Margin="0,0,0,4" Click="NavigateChanges_Click" AutomationProperties.Name="Changes"/>
                 <Button x:Name="NavEvidenceButton" Content="Evidence" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateEvidence_Click" AutomationProperties.Name="Evidence"/>
+                <Button x:Name="NavRepositoryButton" Content="Repository" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateRepository_Click" AutomationProperties.Name="Repository intelligence"/>
                 <Button x:Name="NavArtifactsButton" Content="Artifacts" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateArtifacts_Click" AutomationProperties.Name="Artifacts and batch results"/>
                 <Button x:Name="NavDiagnosticsButton" Content="Diagnostics" HorizontalContentAlignment="Left"
@@ -781,6 +783,61 @@
                     <TextBlock x:Name="EvidenceCountText" Grid.Row="2" Margin="0,8,0,0"
                                Style="{StaticResource FileMcpCaptionText}"
                                Text="0 captured evidence records"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Repository" x:Name="RepositoryTab">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <controls:PageHeader Title="Repository Intelligence"
+                                         Description="Observed read-only repository map, symbol and relation metadata. Provider completeness is heuristic and never grants authority or exhaustive source truth."/>
+                    <Border Grid.Row="1" Style="{StaticResource FileMcpCardBorder}" Margin="0,12,0,12">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Provider / completeness"/>
+                            <TextBlock x:Name="RepositoryProviderText" FontWeight="SemiBold" Text="No repository-intelligence result captured yet." TextWrapping="Wrap"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Latest observed result" Margin="0,8,0,0"/>
+                            <TextBlock x:Name="RepositorySummaryText" Text="Waiting for real repo_map, symbol_search or related_files output." TextWrapping="Wrap"/>
+                            <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Source state" Margin="0,8,0,0"/>
+                            <TextBlock x:Name="RepositorySourceText" Text="Not observed" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*"/>
+                            <ColumnDefinition Width="3*"/>
+                        </Grid.ColumnDefinitions>
+                        <DataGrid x:Name="RepositoryResultGrid"
+                                  AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                                  EnableRowVirtualization="True" SelectionMode="Single"
+                                  SelectionChanged="RepositoryResultGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="80"/>
+                                <DataGridTextColumn Header="Workspace" Binding="{Binding Workspace}" Width="85"/>
+                                <DataGridTextColumn Header="Query" Binding="{Binding QueryKind}" Width="110"/>
+                                <DataGridTextColumn Header="Returned" Binding="{Binding CountDisplay}" Width="90"/>
+                                <DataGridTextColumn Header="State" Binding="{Binding StateDisplay}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <DataGrid x:Name="RepositoryItemGrid" Grid.Column="1" Margin="12,0,0,0"
+                                  AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                                  EnableRowVirtualization="True" SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Path" Binding="{Binding Path}" Width="2*"/>
+                                <DataGridTextColumn Header="Name / language" Binding="{Binding Name}" Width="*"/>
+                                <DataGridTextColumn Header="Kind" Binding="{Binding Kind}" Width="90"/>
+                                <DataGridTextColumn Header="Detail" Binding="{Binding Detail}" Width="2*"/>
+                                <DataGridTextColumn Header="Score" Binding="{Binding ScoreDisplay}" Width="70"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                    <TextBlock x:Name="RepositoryResultCountText" Grid.Row="3" Margin="0,8,0,0"
+                               Style="{StaticResource FileMcpCaptionText}"
+                               Text="0 captured repository-intelligence results"/>
                 </Grid>
             </TabItem>
 
