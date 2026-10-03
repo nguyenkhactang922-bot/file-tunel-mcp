@@ -450,7 +450,8 @@ Negative tests:
 
 ## FMG-024 - Optional Docker Isolated Backend
 
-State: ACTIVE
+State: DONE / MAIN VERIFIED
+Closure: PR #44 merged as `2bd859a966f9f49075ffc7d0a544154cb5d76498`; PR Verify `37094506166` final SUCCESS; merged-main Verify `37095113136` SUCCESS on macOS / Windows x64 / native Windows ARM64. Live Docker engine proof remains explicitly environment-blocked because the local daemon is unavailable.
 Depends: FMG-023, FMG-020, FMG-014, FMG-003, FMG-004
 
 Scope:
@@ -497,7 +498,8 @@ Live proof requirement:
 
 ## FMG-025 - Advanced Cross-Platform Adversarial Gate
 
-State: BLOCKED
+State: CLAIMED / ACTIVE
+Branch/base: `chatgpt/FMG-025-adversarial-gate` from verified main `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
 Depends: FMG-014 through FMG-024
 
 Scope:

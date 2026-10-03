@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: FMG-024 is ACTIVE on `chatgpt/FMG-024-docker-backend`. Preserve FMG-023 MAIN VERIFIED. Complete scoped FMG-024 review and local affected gates, commit/push the exact candidate, require native Verify on macOS / Windows x64 / native Windows ARM64, repair only failed stages, then exact-head review -> PR/merge -> merged-main Verify -> FMG-024 MAIN VERIFIED -> claim FMG-025.
+AUTHORITATIVE NEXT_EXACT_ACTION: FMG-024 is DONE / MAIN VERIFIED via PR #44 merge `2bd859a966f9f49075ffc7d0a544154cb5d76498` and merged-main Verify `37095113136` SUCCESS on macOS / Windows x64 / native Windows ARM64. Live Docker proof remains explicitly environment-blocked. FMG-025 Advanced Cross-Platform Adversarial Gate is ACTIVE on `chatgpt/FMG-025-adversarial-gate`. Inventory FMG-014..024 advanced surfaces and existing negative/contract suites; execute the required cross-platform parity/privacy/security/backend-lifecycle adversarial matrix, repair only real gaps, then evidence/review/commit/PR/merge/main-verify before FMG-026.
