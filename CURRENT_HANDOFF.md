@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMG-025-adversarial-gate`
+Branch: `chatgpt/FMG-026-complete-regression`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE FMG-025 adversarial-gate candidate changes pending exact-head native verification.
+Expected worktree at handoff: ACTIVE FMG-026 final regression/live-proof verification from verified main `59ee366f504160b2132355e3d2dae9ce3b524646`.
 
 ## Completed technical program
 
@@ -1460,3 +1460,87 @@ FMG-025 candidate head `a4098e2c72fa3ba92f1fcff4898d726ed42aa614` is EXACT-HEAD 
 - Evidence updated: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
 
 NEXT_EXACT_ACTION: commit/push the evidence/state-only FMG-025 closure head, require native Verify on that exact closure head, then reuse/create exactly one PR -> require green PR verification -> merge with expected-head guard -> merged-main Verify -> FMG-025 DONE / MAIN VERIFIED -> claim FMG-026.
+
+
+## FMG-025 MAIN VERIFIED / FMG-026 claim - 2026-10-03
+
+FMG-025 Advanced Cross-Platform Adversarial Gate is DONE / MAIN VERIFIED.
+- Closure head `48cb3f0a6b9fee6a935c47a18a03ec79a26793bd`: push Verify `37096948452` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #45 Verify `37106541799`: final SUCCESS on all three lanes. Initial Windows x64 runtime attempt hit a transient `runtime-dynamic-health.health-url` file-sharing race; only the failed Windows job was rerun on the identical head and passed without source changes.
+- PR #45 merged with expected-head guard as `59ee366f504160b2132355e3d2dae9ce3b524646`.
+- Merged-main Verify `37107116084`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Evidence: `docs/evidence/FMG-025_ADVANCED_CROSS_PLATFORM_ADVERSARIAL_GATE_EVIDENCE.md`.
+
+FMG-026 Complete Regression + Live Advanced Proof is CLAIMED / ACTIVE on `chatgpt/FMG-026-complete-regression`, based directly on verified main `59ee366f504160b2132355e3d2dae9ce3b524646`.
+Existing live FileMCP/tunnel processes are preserved; do not restart them merely for FMG-026 discovery.
+
+NEXT_EXACT_ACTION: inventory existing FMG-026/final-regression/live-proof scripts and prior durable evidence; map each frozen FMG-026 scope item to an existing executable proof, identify only real coverage gaps, then execute the required final complete regression and live advanced proof without duplicating already-running processes. Optional Docker live proof remains subject to the frozen availability rule.
+
+
+## FMG-026 pre-restart regression/live-proof checkpoint - 2026-10-03
+
+FMG-026 remains CLAIMED / ACTIVE on `chatgpt/FMG-026-complete-regression`.
+- Resume classification: INTERRUPTED at claim/inventory; no FMG-026 test/build process was alive, so work resumed from the durable inventory checkpoint rather than restarting prior tasks.
+- Full regression/package authority: `.github/workflows/verify.yml` already covers original runtime + FMG-001..025 contracts, Windows x64/native ARM64 build/package/smoke, and native macOS runtime/build/resource verification.
+- Existing FileMCP PID `16240` plus tunnel PIDs `10896` / `15204` were preserved.
+- Tunnel discovery: `filemcp` and `filemcp-e` `/healthz=live`, `/readyz=ready`; no restart performed.
+- Live basic FileMCP proof: correlation + file write/read + versioned apply_edits + Git status + exec_process + project_context + evidence dispatch PASS; temp proof file deleted and worktree restored clean.
+- Canonical source catalog: 46 tools, SHA-256 `429cc8cef94900f034798e10e9beac28aaadbb23b6fd5458611fb335a71c239c`.
+- Current ChatGPT/FileMCP connector discovery: 22 tools. Advanced batch/quarantine/edit-adapter/repo-intelligence/checkpoint/PTY/run-command surfaces are not yet discoverable, so live advanced proof is BLOCKED rather than falsely marked PASS.
+- Prepared `dist/windows-x64/FileMCP-FMG026-ready/FileMCP.exe`, SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`, with bundled canonical 46-tool catalog matching source.
+- Prepared archive `dist/FileMCP-FMG026-ready-windows-x64.zip`, SHA-256 `db0b0d8e31362d29e5e41554f305c84881b560fd1cdf39cabe976bfd2a0ad9aa`.
+- Docker CLI exists but daemon is unavailable; optional live Docker proof remains ENVIRONMENT BLOCKED per frozen rule.
+- Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: commit/push this FMG-026 checkpoint and require exact-head native Verify as the full regression/package gate. Repair only an actual failed stage. When native Verify is green, preserve that PASS and replace the active desktop with `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, reconnect/rediscover the canonical 46-tool connector, then resume LIVE ADVANCED PROOF ONLY; do not rerun the green regression.
+
+
+## FMG-026 exact-head native regression PASS / live advanced blocker - 2026-10-03
+
+- Exact head verified: `21d0c6ed05a749be363b108a7a965a7f0deaef9e`.
+- Push Verify `37109212534`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Full contract/runtime/package/smoke regression is now a durable PASS checkpoint and must not be rerun merely because the desktop connector is restarted.
+- Remaining FMG-026 blocker is only live advanced connector proof: active desktop PID `16240` serves the stale 22-tool connector while canonical source/FMG026-ready contains 46 tools.
+- FMG026-ready executable: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
+
+NEXT_EXACT_ACTION: USER-RUNTIME HANDOFF ONLY — close the currently running FileMCP desktop normally, launch `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, then reconnect/resume ChatGPT with FileMCP. On resume, first verify the new process/hash and that connector discovery exposes all 46 canonical tools; then run LIVE ADVANCED PROOF ONLY. Do NOT rerun Verify `37109212534` or any already-PASS regression stage.
+
+
+## FMG-026 reconnect blocker - 2026-10-03
+
+Post-user-restart verification did NOT replace the live desktop runtime.
+- Git branch: `chatgpt/FMG-026-complete-regression`.
+- Local HEAD: `b702e66fdd43c2c72db82d6f97c03bdc77e3e706`.
+- Worktree: clean.
+- Exact-head native Verify `37109212534` remains preserved PASS on macOS / Windows x64 / native Windows ARM64; DO NOT rerun it.
+- Active FileMCP remains PID `16240` at `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`, SHA-256 `69c86f752321ef318c4ddd27dd566a9883a98fea774cd5fc021ec72b92117a7d`.
+- Current connector still discovers 22 tools, not the canonical 46 tools.
+- FMG026-ready binary remains prepared at `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
+- Attempt to launch an out-of-process helper that would stop the old FileMCP and start FMG026-ready was blocked by the OpenAI safety layer; no process was killed or restarted.
+
+BLOCKER: the old FileMCP desktop instance must be exited manually before launching FMG026-ready. Opening the new EXE while PID `16240` is alive triggers single-instance behavior and leaves the old runtime active.
+
+NEXT_EXACT_ACTION: manually exit the currently running FileMCP desktop/tray instance so PID `16240` disappears, then launch `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, reconnect this FileMCP connector, and resume LIVE ADVANCED PROOF ONLY. Do not rerun Verify `37109212534`.
+
+
+## FMG-026 live advanced proof PASS / GitHub closure pending - 2026-10-03
+
+FMG-026 remains ACTIVE on `chatgpt/FMG-026-complete-regression`, but the runtime/deployment blocker and live advanced proof are now resolved.
+- Active runtime: PID `17860`, `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`.
+- Runtime SHA-256: `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
+- Both child tunnel profiles are live/ready and forward to local MCP ports `8008` / `8010`.
+- Canonical catalog remains `1.13.0` / `46` tools / SHA-256 `429cc8cef94900f034798e10e9beac28aaadbb23b6fd5458611fb335a71c239c`.
+- Effective current policy surface is intentionally `45/46`: custom/high allows direct execution and all effects, but `CustomPolicyAllowShell=false`, so only `run_command` is hidden. Do not enable shell merely to reach 46.
+- Exact-head native full regression/package Verify `37109212534` remains frozen PASS on macOS / Windows x64 / native Windows ARM64. DO NOT rerun it merely for closure.
+- Prior live basic file/Git/direct-exec/project-context/evidence proof remains PASS.
+- LIVE ADVANCED PROOF now PASS: batch + ContentRef; quarantine delete/list/get/restore; search/replace + unified-diff adapters; repo-intelligence facade on bounded Git fixture; checkpoint capture/list/get/dry-run restore/restore/delete; native Windows ConPTY start/list/resize/write/read/signal/stop.
+- Full FileMCP repo `repo_map` first uncached request returned one upstream `502`; bounded live fixture proved the same handler/query facade works. Existing repository-intelligence contracts/runtime remain covered by frozen full regression. No production defect or repair is claimed from that large-repo first-build transport timeout.
+- Temporary proof fixture was fully cleaned up; no source/product implementation file changed.
+- Optional Docker live engine proof remains explicitly ENVIRONMENT BLOCKED because the daemon is unavailable.
+- Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
+
+STATUS: **PASS_LOCAL / LIVE_ADVANCED_PASS / GITHUB_CLOSURE_PENDING**.
+
+NEXT_EXACT_ACTION: run project-state contract + `git diff --check` + exact closure diff review; commit only FMG-026 evidence/state closure files; inspect real remote branch/PR state before side effects; push exact closure candidate; require exact-head GitHub Verify/checks; review/create exactly one PR targeting `main`; merge exact reviewed head; require merged-main Verify; only then record `COMPLETE_UPGRADE_MAIN_VERIFIED` / FMG-026 DONE.
+
+DO_NOT_REPEAT: do not rerun Verify `37109212534`; do not restart PID `17860`; do not enable `run_command` shell authority; do not repeat live advanced proof unless a material runtime/source change invalidates this checkpoint.

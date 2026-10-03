@@ -498,8 +498,8 @@ Live proof requirement:
 
 ## FMG-025 - Advanced Cross-Platform Adversarial Gate
 
-State: CLAIMED / ACTIVE
-Branch/base: `chatgpt/FMG-025-adversarial-gate` from verified main `2bd859a966f9f49075ffc7d0a544154cb5d76498`.
+State: DONE / MAIN VERIFIED
+Branch/base: PR #45 merged as `59ee366f504160b2132355e3d2dae9ce3b524646`; merged-main Verify `37107116084` SUCCESS.
 Depends: FMG-014 through FMG-024
 
 Scope:
@@ -517,7 +517,7 @@ Acceptance:
 
 ## FMG-026 - Complete Regression + Live Advanced Proof
 
-State: BLOCKED
+State: CLAIMED / ACTIVE
 Depends: FMG-025
 
 Scope:
