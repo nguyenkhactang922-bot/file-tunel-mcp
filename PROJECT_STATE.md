@@ -1391,3 +1391,18 @@ NEXT_EXACT_ACTION: commit/push evidence/state-only closure head -> exact-head na
 - FMG-026 Complete Regression + Live Advanced Proof is CLAIMED / ACTIVE on `chatgpt/FMG-026-complete-regression` from verified main `59ee366f504160b2132355e3d2dae9ce3b524646`.
 
 NEXT_EXACT_ACTION: inventory final-regression/live-proof assets for FMG-026, build an executable proof matrix from existing scripts/evidence, repair only real gaps, then run the required complete regression + live advanced proof, record COMPLETE_UPGRADE_MAIN_VERIFIED candidate evidence, exact-head verify/review/PR/merge/merged-main verify.
+
+
+## FMG-026 pre-restart checkpoint - 2026-10-03
+
+- FMG-026 state: ACTIVE / NATIVE REGRESSION CHECKPOINT PENDING / LIVE ADVANCED PROOF BLOCKED ON CONNECTOR REDISCOVERY.
+- Resume classification: INTERRUPTED at claim/inventory; no FMG-026 process was alive.
+- Existing bridge/tunnel runtime preserved; live tunnel health/readiness PASS.
+- Live basic file/Git/exec/project-context/evidence dispatch proof PASS through the currently connected FileMCP surface.
+- Canonical source catalog: 46 tools, SHA-256 `429cc8cef94900f034798e10e9beac28aaadbb23b6fd5458611fb335a71c239c`.
+- Current connector discovery exposes 22 tools, so advanced live batch/quarantine/edit-adapter/repo-intelligence/checkpoint/PTY proof cannot yet be claimed.
+- FMG026-ready x64 binary prepared with the canonical 46-tool catalog: executable SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
+- Optional Docker live proof: ENVIRONMENT BLOCKED because Docker daemon is unavailable.
+- Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: commit/push exact FMG-026 checkpoint -> require normal native Verify full regression/package gate -> repair only actual failed stage -> once green, preserve that PASS -> deploy/reconnect `dist/windows-x64/FileMCP-FMG026-ready/FileMCP.exe` -> rediscover 46-tool connector -> run LIVE ADVANCED PROOF ONLY -> closure evidence/state -> exact-head verify/review/PR/merge/merged-main verify -> COMPLETE_UPGRADE_MAIN_VERIFIED.

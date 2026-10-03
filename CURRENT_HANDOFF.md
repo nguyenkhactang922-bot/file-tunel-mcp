@@ -1475,3 +1475,21 @@ FMG-026 Complete Regression + Live Advanced Proof is CLAIMED / ACTIVE on `chatgp
 Existing live FileMCP/tunnel processes are preserved; do not restart them merely for FMG-026 discovery.
 
 NEXT_EXACT_ACTION: inventory existing FMG-026/final-regression/live-proof scripts and prior durable evidence; map each frozen FMG-026 scope item to an existing executable proof, identify only real coverage gaps, then execute the required final complete regression and live advanced proof without duplicating already-running processes. Optional Docker live proof remains subject to the frozen availability rule.
+
+
+## FMG-026 pre-restart regression/live-proof checkpoint - 2026-10-03
+
+FMG-026 remains CLAIMED / ACTIVE on `chatgpt/FMG-026-complete-regression`.
+- Resume classification: INTERRUPTED at claim/inventory; no FMG-026 test/build process was alive, so work resumed from the durable inventory checkpoint rather than restarting prior tasks.
+- Full regression/package authority: `.github/workflows/verify.yml` already covers original runtime + FMG-001..025 contracts, Windows x64/native ARM64 build/package/smoke, and native macOS runtime/build/resource verification.
+- Existing FileMCP PID `16240` plus tunnel PIDs `10896` / `15204` were preserved.
+- Tunnel discovery: `filemcp` and `filemcp-e` `/healthz=live`, `/readyz=ready`; no restart performed.
+- Live basic FileMCP proof: correlation + file write/read + versioned apply_edits + Git status + exec_process + project_context + evidence dispatch PASS; temp proof file deleted and worktree restored clean.
+- Canonical source catalog: 46 tools, SHA-256 `429cc8cef94900f034798e10e9beac28aaadbb23b6fd5458611fb335a71c239c`.
+- Current ChatGPT/FileMCP connector discovery: 22 tools. Advanced batch/quarantine/edit-adapter/repo-intelligence/checkpoint/PTY/run-command surfaces are not yet discoverable, so live advanced proof is BLOCKED rather than falsely marked PASS.
+- Prepared `dist/windows-x64/FileMCP-FMG026-ready/FileMCP.exe`, SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`, with bundled canonical 46-tool catalog matching source.
+- Prepared archive `dist/FileMCP-FMG026-ready-windows-x64.zip`, SHA-256 `db0b0d8e31362d29e5e41554f305c84881b560fd1cdf39cabe976bfd2a0ad9aa`.
+- Docker CLI exists but daemon is unavailable; optional live Docker proof remains ENVIRONMENT BLOCKED per frozen rule.
+- Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
+
+NEXT_EXACT_ACTION: commit/push this FMG-026 checkpoint and require exact-head native Verify as the full regression/package gate. Repair only an actual failed stage. When native Verify is green, preserve that PASS and replace the active desktop with `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, reconnect/rediscover the canonical 46-tool connector, then resume LIVE ADVANCED PROOF ONLY; do not rerun the green regression.
