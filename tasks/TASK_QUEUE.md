@@ -108,3 +108,18 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
 
 Historical closure sequence: verify state contract + `git diff --check` + exact scoped diff; commit evidence/state closure; inspect remote branch/PR state; push exact head; require exact-head GitHub Verify/checks; review/create one PR to `main`; merge exact reviewed head; require merged-main Verify; only then mark `COMPLETE_UPGRADE_MAIN_VERIFIED` / FMG-026 DONE and continue to the next eligible task/program state.
+
+
+## FMG-026 complete-upgrade core closure - 2026-10-03
+
+- Primary technical state: **DONE / MAIN VERIFIED**.
+- Closure head `e39877808b3fb0394b5b5a2608d6489ad6d8404f` passed push Verify `37120899485` and PR #47 Verify `37121297945` on macOS / Windows x64 / native Windows ARM64.
+- PR #47 merged as `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`.
+- GitHub omitted the normal main PushEvent/check suite for that merge, so post-merge verification used a zero-delta verification-only ref pointing exactly to the actual main commit.
+- Exact-main-commit Verify `37121899760`, `headSha=03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`: SUCCESS on all three native lanes.
+- `FILEMCP COMPLETE-UPGRADE CORE = COMPLETE_UPGRADE_MAIN_VERIFIED`.
+- Evidence: `docs/evidence/COMPLETE_UPGRADE_MAIN_VERIFIED.md` and `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
+- Optional Docker live engine proof remains ENVIRONMENT BLOCKED under the frozen availability rule.
+- Current governance state-sync branch: `state/FMG-026-main-verified`.
+
+Historical continuation sequence: complete this state-only branch through commit -> push -> exact-head Verify -> PR -> review -> merge -> exact resulting-main verification. Only after that state-sync closure may the next dependency-ready FMUX task be claimed; current graph inspection identifies FMUX-011 as the first candidate.

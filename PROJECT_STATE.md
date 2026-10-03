@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `chatgpt/FMG-026-complete-regression`
+Active branch: `state/FMG-026-main-verified`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1463,3 +1463,28 @@ Canonical evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PRO
 NEXT_EXACT_ACTION: project-state contract + `git diff --check` + scoped closure review -> commit exact evidence/state candidate -> inspect remote branch/PR state -> push exact candidate -> exact-head GitHub Verify/checks -> one reviewed PR to `main` -> merge reviewed head -> merged-main Verify -> record `COMPLETE_UPGRADE_MAIN_VERIFIED` and FMG-026 DONE only from real post-merge evidence.
 
 Do not rerun `37109212534`, restart the correct live runtime, or enable shell merely to expose `run_command`.
+
+
+## FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED - state synchronization in progress - 2026-10-03
+
+Primary technical completion is verified:
+- FMG-026 closure candidate `e39877808b3fb0394b5b5a2608d6489ad6d8404f`;
+- exact-head push Verify `37120899485`: SUCCESS all native lanes;
+- PR #47 Verify `37121297945`: SUCCESS all native lanes;
+- PR #47 merged into resulting main `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`;
+- GitHub emitted no main PushEvent/check suite for this particular merge;
+- verification-only ref `verify/FMG-026-main-03cf7c0` points exactly to that existing main commit with zero source/tree delta;
+- exact-main-commit Verify `37121899760`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Therefore:
+- `FMG-026 = DONE / MAIN VERIFIED` technically;
+- `FILEMCP COMPLETE-UPGRADE CORE = COMPLETE_UPGRADE_MAIN_VERIFIED` at `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`;
+- durable evidence is `docs/evidence/COMPLETE_UPGRADE_MAIN_VERIFIED.md` plus the canonical FMG-026 evidence file.
+
+The verification evidence does **not** claim a main-branch workflow run; it proves the exact actual post-merge main SHA through a verification-only ref because GitHub omitted the normal main push event.
+
+Optional Docker live engine proof remains ENVIRONMENT BLOCKED under the frozen availability rule.
+
+Governance state-sync remains ACTIVE on `state/FMG-026-main-verified`. Dependent FMUX work is not yet claimed until this state-only branch itself reaches remote PR merge and exact resulting-main verification.
+
+NEXT_EXACT_ACTION: finish/review state-only closure -> commit -> push -> exact-head Verify -> one PR to main -> review -> merge with expected-head guard -> verify exact resulting main commit -> then inspect FMUX dependency authority and claim the lowest dependency-ready task (currently expected FMUX-011).

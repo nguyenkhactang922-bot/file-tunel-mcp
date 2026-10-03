@@ -517,7 +517,8 @@ Acceptance:
 
 ## FMG-026 - Complete Regression + Live Advanced Proof
 
-State: CLAIMED / ACTIVE
+State: DONE / MAIN VERIFIED
+Program result: DONE / COMPLETE_UPGRADE_MAIN_VERIFIED at `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`; evidence: `docs/evidence/COMPLETE_UPGRADE_MAIN_VERIFIED.md`.
 Depends: FMG-025
 
 Scope:
