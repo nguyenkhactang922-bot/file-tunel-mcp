@@ -1406,3 +1406,14 @@ NEXT_EXACT_ACTION: inventory final-regression/live-proof assets for FMG-026, bui
 - Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
 
 NEXT_EXACT_ACTION: commit/push exact FMG-026 checkpoint -> require normal native Verify full regression/package gate -> repair only actual failed stage -> once green, preserve that PASS -> deploy/reconnect `dist/windows-x64/FileMCP-FMG026-ready/FileMCP.exe` -> rediscover 46-tool connector -> run LIVE ADVANCED PROOF ONLY -> closure evidence/state -> exact-head verify/review/PR/merge/merged-main verify -> COMPLETE_UPGRADE_MAIN_VERIFIED.
+
+
+## FMG-026 native regression PASS / live advanced proof pending - 2026-10-03
+
+- Exact branch head `21d0c6ed05a749be363b108a7a965a7f0deaef9e` passed native Verify `37109212534` on macOS / Windows x64 / native Windows ARM64.
+- Complete contract/runtime/package/smoke regression checkpoint: PASS and frozen; do not rerun after connector restart.
+- FMG-026 remains ACTIVE, not DONE.
+- Remaining blocker: current live connector discovers 22/46 tools. Canonical 46-tool FMG026-ready desktop is prepared locally.
+- Required desktop: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe` (SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`).
+
+NEXT_EXACT_ACTION: close active FileMCP desktop normally -> launch FMG026-ready -> reconnect ChatGPT/FileMCP -> verify new process/hash + 46-tool discovery -> run LIVE ADVANCED PROOF ONLY -> update closure evidence/state -> push closure head -> review/PR/merge -> merged-main Verify -> COMPLETE_UPGRADE_MAIN_VERIFIED.

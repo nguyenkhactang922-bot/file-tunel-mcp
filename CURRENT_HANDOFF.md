@@ -1493,3 +1493,14 @@ FMG-026 remains CLAIMED / ACTIVE on `chatgpt/FMG-026-complete-regression`.
 - Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
 
 NEXT_EXACT_ACTION: commit/push this FMG-026 checkpoint and require exact-head native Verify as the full regression/package gate. Repair only an actual failed stage. When native Verify is green, preserve that PASS and replace the active desktop with `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, reconnect/rediscover the canonical 46-tool connector, then resume LIVE ADVANCED PROOF ONLY; do not rerun the green regression.
+
+
+## FMG-026 exact-head native regression PASS / live advanced blocker - 2026-10-03
+
+- Exact head verified: `21d0c6ed05a749be363b108a7a965a7f0deaef9e`.
+- Push Verify `37109212534`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Full contract/runtime/package/smoke regression is now a durable PASS checkpoint and must not be rerun merely because the desktop connector is restarted.
+- Remaining FMG-026 blocker is only live advanced connector proof: active desktop PID `16240` serves the stale 22-tool connector while canonical source/FMG026-ready contains 46 tools.
+- FMG026-ready executable: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
+
+NEXT_EXACT_ACTION: USER-RUNTIME HANDOFF ONLY — close the currently running FileMCP desktop normally, launch `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, then reconnect/resume ChatGPT with FileMCP. On resume, first verify the new process/hash and that connector discovery exposes all 46 canonical tools; then run LIVE ADVANCED PROOF ONLY. Do NOT rerun Verify `37109212534` or any already-PASS regression stage.

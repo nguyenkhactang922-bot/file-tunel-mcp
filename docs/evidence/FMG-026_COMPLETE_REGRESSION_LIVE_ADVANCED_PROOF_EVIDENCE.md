@@ -108,3 +108,27 @@ BLOCKED pending deployment/connector rediscovery:
 - live artifact/batch/quarantine/edit-adapter/repo-intelligence/PTY/checkpoint proof on the canonical 46-tool connector surface.
 
 NEXT_EXACT_ACTION: commit/push this checkpoint on the exact FMG-026 head and require the normal native Verify workflow as the full regression/package gate. Repair only a real failed stage. After exact-head native Verify is green, preserve that PASS; then the active FileMCP desktop must be replaced by `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe` and ChatGPT connector discovery must expose the canonical 46-tool surface. Resume LIVE ADVANCED PROOF ONLY from that checkpoint; do not rerun the already-green native regression. After live advanced proof passes, update evidence/state, push the closure head, review/PR/merge, require merged-main Verify, and only then create/mark `COMPLETE_UPGRADE_MAIN_VERIFIED` evidence and FMG-026 DONE.
+
+
+## Exact-head native full regression checkpoint - 2026-10-03
+
+PASS on exact branch head `21d0c6ed05a749be363b108a7a965a7f0deaef9e`:
+- push Verify run `37109212534`: SUCCESS;
+- macOS native static verification: PASS;
+- macOS native integration runtime: PASS;
+- macOS app build + bundled-resource verification: PASS;
+- Windows x64 complete contract matrix FMG-001..025: PASS;
+- Windows x64 integration runtime: PASS;
+- Windows x64 + arm64 release builds: PASS;
+- Windows packaged app smoke: PASS;
+- native Windows ARM64 complete advanced contract matrix: PASS;
+- native Windows ARM64 release build/package/smoke/resources: PASS.
+
+This full regression/package checkpoint is now frozen PASS and MUST NOT be rerun merely because the FileMCP desktop is replaced/reconnected for the remaining live advanced proof.
+
+Remaining blocker only:
+- the active desktop/connector still exposes 22/46 tools;
+- replace the active desktop with `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe` and reconnect ChatGPT/FileMCP until connector discovery exposes all 46 canonical tools;
+- then resume LIVE ADVANCED PROOF ONLY for artifact/batch/quarantine/edit-adapter/repo-intelligence/PTY/checkpoint surfaces.
+
+Do not mark FMG-026 DONE and do not create `COMPLETE_UPGRADE_MAIN_VERIFIED` evidence until the live advanced proof and final merge/main verification both pass.

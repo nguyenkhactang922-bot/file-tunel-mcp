@@ -74,3 +74,11 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - Docker live proof: ENVIRONMENT BLOCKED; daemon unavailable.
 - Evidence: `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
 - NEXT_EXACT_ACTION: commit/push this exact checkpoint -> native Verify full regression/package gate -> repair only real failed stage -> after green Verify, preserve PASS and deploy/reconnect FMG026-ready -> rediscover 46 tools -> LIVE ADVANCED PROOF ONLY -> closure/PR/merge/main-verify.
+
+
+## FMG-026 native regression PASS / runtime handoff - 2026-10-03
+
+- State: ACTIVE / NATIVE REGRESSION PASS / LIVE ADVANCED PROOF BLOCKED ON CONNECTOR REDISCOVERY.
+- Exact head `21d0c6ed05a749be363b108a7a965a7f0deaef9e` -> Verify `37109212534` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Preserve this PASS; do not rerun native regression after desktop restart.
+- NEXT_EXACT_ACTION: close current FileMCP desktop -> launch `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe` -> reconnect -> verify 46-tool discovery -> LIVE ADVANCED PROOF ONLY -> closure/PR/merge/main-verify.
