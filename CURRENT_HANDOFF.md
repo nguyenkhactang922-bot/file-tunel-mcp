@@ -1393,3 +1393,16 @@ Verify run `37042897103` on `a5e55248857f2c9e65bb222acbf8a1c8202b4d13`: Windows 
 
 Remediation is macOS syntax-only: restore the missing struct-closing brace. Preserve all Windows PASS checkpoints and do not rerun local Windows stages.
 NEXT_EXACT_ACTION: commit/push this macOS syntax-only remediation and require fresh native Verify; repair only any newly failed stage.
+
+
+## FMG-024 exact-head native verification / scoped review - 2026-10-03
+
+FMG-024 Optional Docker Isolated Backend is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / LIVE DOCKER ENVIRONMENT-BLOCKED.
+- Exact candidate: `557ddaa157f5897bf3d5c5be8e6a1f498fbc2200`.
+- Verify run `37043531330`: SUCCESS on macOS / Windows x64 / native Windows ARM64; Docker backend contract and full native build/integration gates PASS.
+- Canonical catalog unchanged: `1.13.0` / 46 tools / SHA-256 `30ecf017a35db8ebeb6344786576664035f504cae8996a0c4a223df797254364`.
+- Scoped security review: PASS; no P0/P1 finding remains. Host backend remains default, Docker selection is local/server-owned, image is digest-pinned and local-allowlisted, network-none default is policy-gated, workspace-only bind and resource/security controls are verified, Docker socket/privileged mode are absent, request Docker-control overrides fail closed, and cleanup does not delete containers failing ownership/workspace label checks.
+- Docker Desktop/engine semantics and limitations are documented in `docs/evidence/FMG-024_OPTIONAL_DOCKER_ISOLATED_BACKEND_EVIDENCE.md`.
+- Local Docker CLI 29.6.2 is present but the daemon was unavailable during verification, so live container-engine success is explicitly NOT claimed; this is allowed by the frozen FMG-024 availability rule and must remain environment-blocked until a real engine proof exists.
+
+NEXT_EXACT_ACTION: commit/push the evidence/state-only FMG-024 closure head, require native Verify on that exact head, then PR/merge -> merged-main Verify -> mark FMG-024 DONE / MAIN VERIFIED -> claim FMG-025 Advanced Cross-Platform Adversarial Gate.

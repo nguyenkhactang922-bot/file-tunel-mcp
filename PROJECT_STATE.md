@@ -1331,3 +1331,15 @@ Verify run `37042897103` on `a5e55248857f2c9e65bb222acbf8a1c8202b4d13`: Windows 
 
 Remediation is macOS syntax-only: restore the missing struct-closing brace. Preserve all Windows PASS checkpoints and do not rerun local Windows stages.
 NEXT_EXACT_ACTION: commit/push this macOS syntax-only remediation and require fresh native Verify; repair only any newly failed stage.
+
+
+## FMG-024 exact-head native verification / scoped review - 2026-10-03
+
+FMG-024 Optional Docker Isolated Backend is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / LIVE DOCKER ENVIRONMENT-BLOCKED.
+- Exact candidate: `557ddaa157f5897bf3d5c5be8e6a1f498fbc2200`.
+- Verify run `37043531330`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Scoped review: PASS; no P0/P1 remains in frozen FMG-024 scope.
+- Evidence: `docs/evidence/FMG-024_OPTIONAL_DOCKER_ISOLATED_BACKEND_EVIDENCE.md`.
+- Live Docker engine proof remains environment-blocked because Docker CLI is installed but the local daemon endpoint is unavailable; no fake live PASS is recorded.
+
+NEXT_EXACT_ACTION: commit/push the evidence/state-only FMG-024 closure head, require native Verify on that exact head, then PR/merge -> merged-main Verify -> FMG-024 DONE / MAIN VERIFIED -> claim FMG-025.
