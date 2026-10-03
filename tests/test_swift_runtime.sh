@@ -1691,6 +1691,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/runtime-test" \
     macos/QuarantineService.swift \
     macos/PersistentPty.swift \
     macos/ExecutionBackend.swift \
+    macos/DockerExecutionBackend.swift \
     macos/WorkspaceCheckpoint.swift \
     macos/LocalMCPServer.swift \
     macos/TunnelSupervisor.swift \
@@ -4321,6 +4322,16 @@ print("swift-workspace-checkpoint-restore: ok")
 
 final class TestExecutionBackend: ExecutionBackend {
     let descriptor: ExecutionBackendDescriptor
+    var evidenceIdentity: ExecutionBackendEvidenceIdentity {
+        ExecutionBackendEvidenceIdentity(
+            backendID: descriptor.id,
+            metadata: [
+                "workspace_mode": descriptor.workspaceMode,
+                "network_policy": descriptor.networkMode,
+                "resource_policy": descriptor.resourceMode,
+            ]
+        )
+    }
     var health: ExecutionBackendHealth
     var processResult: ProcessResult
     private(set) var processCalls = 0
@@ -4388,6 +4399,33 @@ final class TestExecutionBackend: ExecutionBackend {
     }
 
     func stopAll() {}
+}
+
+final class TestDockerCliRunner: DockerCliRunning {
+    let ptyExecutable = "/usr/bin/true"
+    private let handler: ([String]) -> ProcessResult
+    private(set) var calls: [[String]] = []
+
+    init(handler: @escaping ([String]) -> ProcessResult) {
+        self.handler = handler
+    }
+
+    func run(
+        arguments: [String],
+        environment: [String: String],
+        timeoutSeconds: Int,
+        outputLimitBytes: Int,
+        shouldCancel: (() -> Bool)?
+    ) throws -> ProcessResult {
+        if shouldCancel?() == true {
+            return ProcessResult(
+                exitCode: 130, stdout: "", stderr: "", timedOut: false, cancelled: true,
+                stdoutTruncated: false, stderrTruncated: false, stdoutOmittedBytes: 0, stderrOmittedBytes: 0
+            )
+        }
+        calls.append(arguments)
+        return handler(arguments)
+    }
 }
 
 func backendDescriptor(_ id: String, _ capabilities: [String]) -> ExecutionBackendDescriptor {
@@ -4495,7 +4533,7 @@ let ebEvidence = EvidenceCoordinator(
     workspaceFingerprint: EvidenceStore.workspaceFingerprint(root.path),
     log: { _ in }
 )
-let ebEvidenceRun = ebEvidence.begin(
+let ebEvidenceRun = try ebEvidence.begin(
     request: EvidenceRequestSpec(criterionID: "tool.success", repoPath: nil, relevantPaths: [], required: false),
     operationID: "op_" + String(repeating: "a", count: 32),
     toolName: "exec_process"
@@ -4626,6 +4664,153 @@ precondition(
 )
 ebHost.stopAll()
 
+let dockerDigest = "sha256:" + String(repeating: "a", count: 64)
+let dockerImage = "example.invalid/filemcp/test@" + dockerDigest
+let dockerConfig = DockerExecutionBackendConfiguration(
+    enabled: true,
+    image: dockerImage,
+    allowedImages: [dockerImage],
+    networkEnabled: false,
+    cpuLimit: 2,
+    memoryBytes: 512 * 1024 * 1024,
+    pidsLimit: 128,
+    user: "1000:1000",
+    startupTimeoutSeconds: 10,
+    idleTTLSeconds: 60,
+    maxLifetimeSeconds: 120
+)
+
+expectBackendFailure("FMG-024 Swift unpinned image", containing: "digest-pinned") {
+    try DockerExecutionBackend.validateConfiguration(
+        DockerExecutionBackendConfiguration(
+            enabled: true,
+            image: "ubuntu:latest",
+            allowedImages: ["ubuntu:latest"]
+        )
+    )
+}
+
+let dockerNoopRunner = TestDockerCliRunner { _ in
+    ProcessResult(
+        exitCode: 0, stdout: "", stderr: "", timedOut: false, cancelled: false,
+        stdoutTruncated: false, stderrTruncated: false, stdoutOmittedBytes: 0, stderrOmittedBytes: 0
+    )
+}
+let dockerBackend = try DockerExecutionBackend(
+    resolver: ebResolver,
+    environmentAuthority: try ExecProcessEnvironmentAuthority(patterns: ["SAFE_*", "DOCKER_HOST"]),
+    artifactStore: crArtifacts,
+    configuration: dockerConfig,
+    allowNetworkEnabled: false,
+    docker: dockerNoopRunner
+)
+let dockerCreate = try dockerBackend.buildCreateArgumentsForTest(
+    containerName: "filemcp-test",
+    leaseID: String(repeating: "b", count: 24)
+)
+precondition(
+    dockerCreate.contains("--pull")
+        && dockerCreate.contains("never")
+        && dockerCreate.contains("--no-healthcheck")
+        && dockerCreate.contains("--read-only")
+        && dockerCreate.contains("ALL")
+        && dockerCreate.contains("no-new-privileges")
+        && dockerCreate.contains("--pids-limit")
+        && dockerCreate.contains("--cpus")
+        && dockerCreate.contains("--memory")
+        && dockerCreate.contains("--network")
+        && dockerCreate.contains("none")
+        && dockerCreate.contains("--user"),
+    "FMG-024 Swift Docker create must carry mandatory isolation/resource controls"
+)
+precondition(
+    dockerCreate.filter { $0 == "--mount" }.count == 1
+        && dockerCreate.contains(where: { $0.contains("dst=/workspace") })
+        && !dockerCreate.contains(where: { $0.localizedCaseInsensitiveContains("docker.sock") }),
+    "FMG-024 Swift Docker create must expose one workspace bind and no Docker socket"
+)
+precondition(
+    dockerBackend.evidenceIdentity.metadata["image_digest"] == dockerDigest
+        && dockerBackend.evidenceIdentity.metadata["network_policy"] == "none"
+        && dockerBackend.descriptor.capabilities.contains(ExecutionBackendCapabilities.isolation)
+        && dockerBackend.descriptor.capabilities.contains(ExecutionBackendCapabilities.networkNone),
+    "FMG-024 Swift evidence/capability identity must bind image/network/isolation"
+)
+expectBackendFailure("FMG-024 Swift daemon-control override", containing: "reserved") {
+    _ = try dockerBackend.runProcess(
+        ExecutionProcessRequest(
+            executable: "echo",
+            arguments: [],
+            cwd: "",
+            environmentOverrides: ["DOCKER_HOST": "tcp://attacker.invalid:2375"],
+            timeoutSeconds: 10,
+            outputLimitBytes: 4096
+        ),
+        shouldCancel: nil
+    )
+}
+precondition(dockerNoopRunner.calls.isEmpty, "FMG-024 Swift daemon-control override must fail before daemon side effects")
+dockerBackend.stopAll()
+
+let dockerNetworkConfig = DockerExecutionBackendConfiguration(
+    enabled: true,
+    image: dockerImage,
+    allowedImages: [dockerImage],
+    networkEnabled: true,
+    cpuLimit: 2,
+    memoryBytes: 512 * 1024 * 1024,
+    pidsLimit: 128,
+    user: "1000:1000",
+    startupTimeoutSeconds: 10,
+    idleTTLSeconds: 60,
+    maxLifetimeSeconds: 120
+)
+expectBackendFailure("FMG-024 Swift network policy", containing: "network") {
+    _ = try DockerExecutionBackend(
+        resolver: ebResolver,
+        environmentAuthority: try ExecProcessEnvironmentAuthority(patterns: []),
+        artifactStore: crArtifacts,
+        configuration: dockerNetworkConfig,
+        allowNetworkEnabled: false,
+        docker: dockerNoopRunner
+    )
+}
+
+let dockerDownRunner = TestDockerCliRunner { _ in
+    ProcessResult(
+        exitCode: 1, stdout: "", stderr: "daemon unavailable", timedOut: false, cancelled: false,
+        stdoutTruncated: false, stderrTruncated: false, stdoutOmittedBytes: 0, stderrOmittedBytes: 0
+    )
+}
+let dockerDown = try DockerExecutionBackend(
+    resolver: ebResolver,
+    environmentAuthority: try ExecProcessEnvironmentAuthority(patterns: []),
+    artifactStore: crArtifacts,
+    configuration: dockerConfig,
+    allowNetworkEnabled: false,
+    docker: dockerDownRunner
+)
+expectBackendFailure("FMG-024 Swift daemon unavailable", containing: "daemon") {
+    _ = try dockerDown.runProcess(
+        ExecutionProcessRequest(
+            executable: "echo",
+            arguments: ["x"],
+            cwd: "",
+            environmentOverrides: [:],
+            timeoutSeconds: 10,
+            outputLimitBytes: 4096
+        ),
+        shouldCancel: nil
+    )
+}
+precondition(
+    !dockerDownRunner.calls.contains(where: { $0.first == "create" }),
+    "FMG-024 Swift daemon failure must have no container create side effect"
+)
+dockerDown.stopAll()
+
+print("swift-docker-backend: ok")
+
 print("swift-execution-backend: ok")
 
 
@@ -4700,6 +4885,7 @@ swiftc -framework Network -framework Security -o "$TMP_DIR/server-test" \
     macos/QuarantineService.swift \
     macos/PersistentPty.swift \
     macos/ExecutionBackend.swift \
+    macos/DockerExecutionBackend.swift \
     macos/WorkspaceCheckpoint.swift \
     macos/LocalMCPServer.swift \
     "$TMP_DIR/main.swift"

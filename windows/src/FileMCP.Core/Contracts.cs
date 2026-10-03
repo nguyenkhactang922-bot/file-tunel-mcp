@@ -43,7 +43,8 @@ public sealed record LocalMcpConfiguration(
     string GitUserEmail,
     bool EnableCommands,
     LocalPolicyConfiguration? PolicyConfiguration = null,
-    IReadOnlyList<string>? ExecEnvironmentAllowList = null);
+    IReadOnlyList<string>? ExecEnvironmentAllowList = null,
+    DockerExecutionBackendConfiguration? DockerExecutionBackend = null);
 
 public enum LocalMcpRuntimeStatus
 {
@@ -105,6 +106,17 @@ public sealed class FileMcpSettings
     public bool CustomPolicyAllowNetworkOpenWorld { get; set; }
     public bool CustomPolicyAllowShell { get; set; }
     public List<string> ExecEnvironmentAllowList { get; set; } = [];
+    public string ExecutionBackendMode { get; set; } = "host";
+    public string DockerImage { get; set; } = "";
+    public List<string> DockerAllowedImages { get; set; } = [];
+    public bool DockerNetworkEnabled { get; set; }
+    public double DockerCpuLimit { get; set; } = 2.0;
+    public int DockerMemoryMb { get; set; } = 2048;
+    public int DockerPidsLimit { get; set; } = 128;
+    public string DockerUser { get; set; } = "1000:1000";
+    public int DockerStartupTimeoutSeconds { get; set; } = 30;
+    public int DockerIdleTtlSeconds { get; set; } = 900;
+    public int DockerMaxLifetimeSeconds { get; set; } = 7200;
     public bool OtlpEnabled { get; set; }
     public string OtlpEndpoint { get; set; } = OtlpTelemetrySettings.DefaultEndpoint;
 }

@@ -89,3 +89,14 @@ Exact-head scoped review: PASS.
 No P0/P1 finding remains in FMG-023 scope. The backend abstraction is process+PTY only, HostExecutionBackend remains default, file/Git authority remains host-native, backend selection/identity is server-owned, and the generic descriptor-mode repair leaves FMG-024 isolated backend implementation possible without weakening current host defaults.
 
 NEXT_EXACT_ACTION: commit this evidence/state-only closure, push, require Verify on the evidence-only head, then PR/merge and merged-main Verify.
+
+
+## MAIN VERIFIED closure
+
+PR: #43
+PR head: ba5cf3ebdf91a7c3eb34263948d7a99729ba6d6f
+PR Verify: 36998198466 SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Merge commit: d71fbc08e9e08f65c59ce5e05649e0dc629f7935
+Merged-main Verify: 36998939456 SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Final status: FMG-023 DONE / MAIN VERIFIED.

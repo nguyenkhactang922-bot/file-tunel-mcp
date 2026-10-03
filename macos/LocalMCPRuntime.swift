@@ -15,6 +15,7 @@ struct LocalMCPConfiguration {
     let enableCommands: Bool
     let policyConfiguration: LocalPolicyConfiguration?
     let execEnvironmentAllowList: [String]
+    let dockerExecutionBackend: DockerExecutionBackendConfiguration?
 
     init(
         tunnelID: String,
@@ -27,7 +28,8 @@ struct LocalMCPConfiguration {
         gitUserEmail: String,
         enableCommands: Bool,
         policyConfiguration: LocalPolicyConfiguration? = nil,
-        execEnvironmentAllowList: [String] = []
+        execEnvironmentAllowList: [String] = [],
+        dockerExecutionBackend: DockerExecutionBackendConfiguration? = nil
     ) {
         self.tunnelID = tunnelID
         self.apiKey = apiKey
@@ -40,6 +42,7 @@ struct LocalMCPConfiguration {
         self.enableCommands = enableCommands
         self.policyConfiguration = policyConfiguration
         self.execEnvironmentAllowList = execEnvironmentAllowList
+        self.dockerExecutionBackend = dockerExecutionBackend
     }
 }
 
@@ -243,7 +246,8 @@ final class LocalMCPRuntime {
                 localAuthToken: localAuthToken,
                 log: { [weak self] text in self?.emitLog(text) },
                 policyConfiguration: configuration.policyConfiguration,
-                execEnvironmentAllowList: configuration.execEnvironmentAllowList
+                execEnvironmentAllowList: configuration.execEnvironmentAllowList,
+                dockerExecutionBackend: configuration.dockerExecutionBackend
             )
             try server.start()
             self.server = server

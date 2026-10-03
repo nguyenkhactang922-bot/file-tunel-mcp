@@ -295,7 +295,8 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
                     _workspaceKey,
                     _observability?.StandardTelemetry,
                     configuration.PolicyConfiguration,
-                    configuration.ExecEnvironmentAllowList);
+                    configuration.ExecEnvironmentAllowList,
+                    configuration.DockerExecutionBackend);
                 await _server.StartAsync(cancellationToken).ConfigureAwait(false);
                 lock (_stateGate) _localServerReady = true;
 

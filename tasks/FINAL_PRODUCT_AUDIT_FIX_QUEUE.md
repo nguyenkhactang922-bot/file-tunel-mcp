@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: from canonical PROJECT_ROOT `D:\Tools\FileMCP` only, FMG-021 is DONE / MAIN VERIFIED at merge commit `12874be49a3bc8eaacdeb0dfb2aea33eb9ac087e` with merged-main Verify `36698092398` SUCCESS. FMG-022 Checkpoint Restore Transaction is ACTIVE on branch `chatgpt/FMG-022-checkpoint-restore`. Deep-read existing checkpoint manifest/capture, Mutation Guard, atomic apply_edits/versioning, quarantine restore and SourceStateRef/Git primitives; then implement restore plan, divergence guard, mandatory rollback checkpoint, staged/unstaged/untracked/index restoration, verification, rollback and `partial_recovery_required`. Do not begin FMG-023 before FMG-022 MAIN VERIFIED.
+AUTHORITATIVE NEXT_EXACT_ACTION: FMG-024 is ACTIVE on `chatgpt/FMG-024-docker-backend`. Preserve FMG-023 MAIN VERIFIED. Complete scoped FMG-024 review and local affected gates, commit/push the exact candidate, require native Verify on macOS / Windows x64 / native Windows ARM64, repair only failed stages, then exact-head review -> PR/merge -> merged-main Verify -> FMG-024 MAIN VERIFIED -> claim FMG-025.

@@ -108,6 +108,7 @@ struct EvidenceRecord: Codable {
     var operationState: String
     var verificationState: String
     var backendID: String
+    var backendMetadata: [String: String]? = nil
     var sourceStateJSON: String?
     var sourceStateID: String?
     var projectContextDigest: String?
@@ -127,7 +128,7 @@ private struct EvidenceSnapshot: Codable {
 }
 
 final class EvidenceStore {
-    static let schemaVersion = 1
+    static let schemaVersion = 2
     static let maxSourceStateJSONBytes = 256 * 1024
     static let defaultRetention: TimeInterval = 30 * 24 * 60 * 60
     static let defaultMaxRecords = 10_000
@@ -211,10 +212,12 @@ final class EvidenceStore {
         let data = try Data(contentsOf: fileURL)
         guard data.count <= maxStoreBytes else { throw MCPServerError.operationFailed("Evidence storage-size quota is exhausted") }
         let snapshot = try JSONDecoder().decode(EvidenceSnapshot.self, from: data)
-        guard snapshot.schemaVersion == Self.schemaVersion else { throw MCPServerError.operationFailed("Unsupported evidence snapshot schema version") }
+        guard snapshot.schemaVersion == 1 || snapshot.schemaVersion == Self.schemaVersion else {
+            throw MCPServerError.operationFailed("Unsupported evidence snapshot schema version")
+        }
         var recovered = cleanup(snapshot.records)
         let nowMs = Int64(now().timeIntervalSince1970 * 1000)
-        var changed = recovered.count != snapshot.records.count
+        var changed = recovered.count != snapshot.records.count || snapshot.schemaVersion != Self.schemaVersion
         for index in recovered.indices where recovered[index].operationState == "running" {
             recovered[index].operationState = "unknown"
             recovered[index].verificationState = "unknown"
@@ -276,6 +279,7 @@ struct EvidenceRun {
     let operationID: String
     let toolName: String
     let backendID: String
+    let backendMetadata: [String: String]
     let request: EvidenceRequestSpec
     let durableStarted: Bool
     let startedEpochMs: Int64
@@ -297,18 +301,20 @@ final class EvidenceCoordinator {
         self.store = store; self.tools = tools; self.policy = policy; self.workspaceFingerprint = workspaceFingerprint; self.log = log
     }
 
-    func begin(request: EvidenceRequestSpec?, operationID: String, toolName: String) -> EvidenceRun? {
+    func begin(request: EvidenceRequestSpec?, operationID: String, toolName: String) throws -> EvidenceRun? {
         guard let request else { return nil }
         let evidenceID = EvidenceStore.newEvidenceID()
         let started = Int64(Date().timeIntervalSince1970 * 1000)
-        let backendID = tools.evidenceBackendID(toolName: toolName)
+        let backendIdentity = try tools.evidenceBackendIdentity(toolName: toolName)
+        let backendID = backendIdentity.backendID
+        let backendMetadata = backendIdentity.metadata
         let snapshot = policy.capture()
         var durable = true
         do {
             try store.begin(EvidenceRecord(
                 evidenceID: evidenceID, operationID: operationID, workspaceFingerprint: workspaceFingerprint,
                 toolName: toolName, criterionID: request.criterionID, startedEpochMs: started, endedEpochMs: nil,
-                operationState: "running", verificationState: "not-run", backendID: backendID,
+                operationState: "running", verificationState: "not-run", backendID: backendID, backendMetadata: backendMetadata,
                 sourceStateJSON: nil, sourceStateID: nil, projectContextDigest: nil,
                 policyGeneration: snapshot.generation, policyHash: snapshot.hash,
                 catalogHash: CanonicalToolCatalog.shared.catalogHash, catalogVersion: CanonicalToolCatalog.shared.catalogVersion,
@@ -333,7 +339,7 @@ final class EvidenceCoordinator {
         }
         let blocked = request.required && (!durable || !preAvailable)
         let reason = !durable ? "durable_store_unavailable" : (!preAvailable ? "freshness_precondition_unavailable" : nil)
-        return EvidenceRun(evidenceID: evidenceID, operationID: operationID, toolName: toolName, backendID: backendID, request: request, durableStarted: durable, startedEpochMs: started, preSourceStateID: preSource, preProjectContextDigest: preContext, blockedBeforeDispatch: blocked, blockReason: reason)
+        return EvidenceRun(evidenceID: evidenceID, operationID: operationID, toolName: toolName, backendID: backendID, backendMetadata: backendMetadata, request: request, durableStarted: durable, startedEpochMs: started, preSourceStateID: preSource, preProjectContextDigest: preContext, blockedBeforeDispatch: blocked, blockReason: reason)
     }
 
     func complete(run: EvidenceRun?, isError: Bool, structuredContent: [String: Any]?, context: ToolExecutionContext?) -> [String: Any]? {
@@ -375,7 +381,7 @@ final class EvidenceCoordinator {
                     evidenceID: run.evidenceID, operationID: run.operationID, workspaceFingerprint: workspaceFingerprint,
                     toolName: run.toolName, criterionID: run.request.criterionID, startedEpochMs: run.startedEpochMs,
                     endedEpochMs: Int64(Date().timeIntervalSince1970 * 1000), operationState: evaluation.operationState,
-                    verificationState: verification, backendID: run.backendID, sourceStateJSON: sourceJSON,
+                    verificationState: verification, backendID: run.backendID, backendMetadata: run.backendMetadata, sourceStateJSON: sourceJSON,
                     sourceStateID: sourceState?["source_state_id"] as? String, projectContextDigest: projectContextDigest,
                     policyGeneration: finalPolicy.generation, policyHash: finalPolicy.hash,
                     catalogHash: CanonicalToolCatalog.shared.catalogHash, catalogVersion: CanonicalToolCatalog.shared.catalogVersion,
@@ -391,7 +397,7 @@ final class EvidenceCoordinator {
         let metadata: [String: Any] = [
             "schema_version": Self.metadataSchemaVersion, "evidence_id": run.evidenceID, "operation_id": run.operationID,
             "storage_status": durable ? "durable" : "unavailable", "operation_state": evaluation.operationState,
-            "verification_state": verification, "criterion_id": run.request.criterionID, "backend_id": run.backendID, "source_binding": sourceBinding,
+            "verification_state": verification, "criterion_id": run.request.criterionID, "backend_id": run.backendID, "backend_metadata": run.backendMetadata, "source_binding": sourceBinding,
             "source_state_id": sourceState?["source_state_id"] ?? NSNull(), "project_context_digest": projectContextDigest ?? NSNull(),
             "policy_generation": finalPolicy.generation, "policy_hash": finalPolicy.hash,
             "catalog_hash": CanonicalToolCatalog.shared.catalogHash, "catalog_version": CanonicalToolCatalog.shared.catalogVersion,
@@ -452,7 +458,7 @@ final class EvidenceCoordinator {
             "current_source_state_id": currentSource ?? NSNull(), "project_context_digest": record.projectContextDigest ?? NSNull(),
             "current_project_context_digest": currentContext ?? NSNull(), "policy_generation": record.policyGeneration,
             "policy_hash": record.policyHash, "catalog_hash": record.catalogHash, "catalog_version": record.catalogVersion,
-            "backend_id": record.backendID, "exit_code": record.exitCode ?? NSNull(), "timed_out": record.timedOut,
+            "backend_id": record.backendID, "backend_metadata": record.backendMetadata ?? [:], "exit_code": record.exitCode ?? NSNull(), "timed_out": record.timedOut,
             "cancelled": record.cancelled, "truncated": record.truncated, "started_epoch_ms": record.startedEpochMs,
             "ended_epoch_ms": record.endedEpochMs ?? NSNull(),
         ]

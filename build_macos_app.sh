@@ -69,6 +69,7 @@ chmod 755 "$APP/Contents/MacOS/tunnel-client"
     "$ROOT/macos/QuarantineService.swift" \
     "$ROOT/macos/PersistentPty.swift" \
     "$ROOT/macos/ExecutionBackend.swift" \
+    "$ROOT/macos/DockerExecutionBackend.swift" \
     "$ROOT/macos/WorkspaceCheckpoint.swift" \
     "$ROOT/macos/EvidenceSupport.swift" \
     "$ROOT/macos/ToolCatalog.swift" \

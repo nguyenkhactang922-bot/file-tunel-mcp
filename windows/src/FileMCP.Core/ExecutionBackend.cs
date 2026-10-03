@@ -11,6 +11,11 @@ internal static class ExecutionBackendCapabilities
     public const string EnvironmentMediation = "environment_mediation";
     public const string HostNetwork = "host_network";
     public const string Cleanup = "cleanup";
+    public const string Isolation = "isolation";
+    public const string NetworkNone = "network_none";
+    public const string NetworkEnabled = "network_enabled";
+    public const string DigestPinnedImage = "digest_pinned_image";
+    public const string ResourceLimits = "resource_limits";
 }
 
 internal sealed record ExecutionBackendDescriptor(
@@ -24,6 +29,20 @@ internal sealed record ExecutionBackendDescriptor(
 
 internal sealed record ExecutionBackendHealth(bool Available, string State, string? Detail = null);
 
+internal sealed record ExecutionBackendEvidenceIdentity(
+    string BackendId,
+    IReadOnlyDictionary<string, string> Metadata)
+{
+    public string ToCanonicalJson()
+    {
+        ExecutionBackendContracts.ValidateEvidenceIdentity(this);
+        var json = new JsonObject();
+        foreach (var pair in Metadata.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            json[pair.Key] = pair.Value;
+        return json.ToJsonString();
+    }
+}
+
 internal sealed record ExecutionProcessRequest(
     string Executable,
     IReadOnlyList<string> Arguments,
@@ -36,6 +55,7 @@ internal interface IExecutionBackend : IAsyncDisposable
 {
     ExecutionBackendDescriptor Descriptor { get; }
     ExecutionBackendHealth Health { get; }
+    ExecutionBackendEvidenceIdentity EvidenceIdentity { get; }
 
     Task<ProcessResult> RunProcessAsync(ExecutionProcessRequest request, CancellationToken cancellationToken);
 
@@ -110,6 +130,22 @@ internal static class ExecutionBackendContracts
             throw new FileMcpException("Execution backend health is inconsistent");
     }
 
+    public static void ValidateEvidenceIdentity(ExecutionBackendEvidenceIdentity identity)
+    {
+        if (!IdentifierPattern.IsMatch(identity.BackendId))
+            throw new FileMcpException("Execution backend evidence identity is invalid");
+        if (identity.Metadata.Count > 32)
+            throw new FileMcpException("Execution backend evidence metadata is too large");
+        foreach (var pair in identity.Metadata)
+        {
+            if (!IdentifierPattern.IsMatch(pair.Key))
+                throw new FileMcpException("Execution backend evidence metadata key is invalid");
+            if (string.IsNullOrWhiteSpace(pair.Value) || pair.Value.Length > 1024 ||
+                pair.Value.Any(ch => ch is '\0' or '\r' or '\n' || char.IsControl(ch)))
+                throw new FileMcpException("Execution backend evidence metadata value is invalid");
+        }
+    }
+
     public static void RequireCapability(ExecutionBackendDescriptor descriptor, string capability)
     {
         ValidateDescriptor(descriptor);
@@ -166,6 +202,15 @@ internal sealed class HostExecutionBackend : IExecutionBackend
         NetworkMode: "host",
         ResourceMode: "host-process");
 
+    private static readonly ExecutionBackendEvidenceIdentity HostEvidenceIdentity = new(
+        BackendId,
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["workspace_mode"] = "host-contained",
+            ["network_policy"] = "host",
+            ["resource_policy"] = "host-process",
+        });
+
     private readonly SafePathResolver _resolver;
     private readonly ExecProcessEnvironmentAuthority _environmentAuthority;
     private readonly PersistentPtyService _pty;
@@ -177,6 +222,7 @@ internal sealed class HostExecutionBackend : IExecutionBackend
         Func<ArtifactContentStore> artifactFactory)
     {
         ExecutionBackendContracts.ValidateDescriptor(HostDescriptor);
+        ExecutionBackendContracts.ValidateEvidenceIdentity(HostEvidenceIdentity);
         _resolver = resolver;
         _environmentAuthority = environmentAuthority;
         _pty = new PersistentPtyService(resolver, environmentAuthority, artifactFactory);
@@ -186,6 +232,7 @@ internal sealed class HostExecutionBackend : IExecutionBackend
     public ExecutionBackendHealth Health => _disposed
         ? new ExecutionBackendHealth(false, "disposed")
         : new ExecutionBackendHealth(true, "ready");
+    public ExecutionBackendEvidenceIdentity EvidenceIdentity => HostEvidenceIdentity;
 
     public async Task<ProcessResult> RunProcessAsync(ExecutionProcessRequest request, CancellationToken cancellationToken)
     {

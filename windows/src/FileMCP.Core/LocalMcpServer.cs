@@ -58,22 +58,22 @@ public sealed class LocalMcpServer : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _acceptLoop;
 
-    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null, LogicalSessionRegistry? sessions = null, string? workspaceKey = null, McpStandardTelemetry? standardTelemetry = null, LocalPolicyConfiguration? policyConfiguration = null, IReadOnlyList<string>? execEnvironmentAllowList = null)
-        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicyFor(enableCommands, policyConfiguration), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, LocalMcpServerLimits.Default, execEnvironmentAllowList, null)
+    public LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter = null, LogicalChatCorrelationService? chatCorrelation = null, LogicalSessionRegistry? sessions = null, string? workspaceKey = null, McpStandardTelemetry? standardTelemetry = null, LocalPolicyConfiguration? policyConfiguration = null, IReadOnlyList<string>? execEnvironmentAllowList = null, DockerExecutionBackendConfiguration? dockerExecutionBackend = null)
+        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicyFor(enableCommands, policyConfiguration), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, LocalMcpServerLimits.Default, execEnvironmentAllowList, null, dockerExecutionBackend)
     {
     }
 
     internal LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter, LogicalChatCorrelationService? chatCorrelation, LogicalSessionRegistry? sessions, string? workspaceKey, McpStandardTelemetry? standardTelemetry, LocalMcpServerLimits limits)
-        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, limits, null, null)
+        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands), localAuthToken, log, usageMeter, chatCorrelation, sessions, workspaceKey, standardTelemetry, limits, null, null, null)
     {
     }
 
     internal LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, bool enableCommands, string localAuthToken, Action<string> log, LocalMcpServerLimits limits, EvidenceStore evidenceStore)
-        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands), localAuthToken, log, null, null, null, null, null, limits, null, evidenceStore)
+        : this(port, allowedDirectory, gitUserName, gitUserEmail, ServerPolicy.FromLegacy(enableCommands), localAuthToken, log, null, null, null, null, null, limits, null, evidenceStore, null)
     {
     }
 
-    private LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter, LogicalChatCorrelationService? chatCorrelation, LogicalSessionRegistry? sessions, string? workspaceKey, McpStandardTelemetry? standardTelemetry, LocalMcpServerLimits limits, IReadOnlyList<string>? execEnvironmentAllowList, EvidenceStore? evidenceStore)
+    private LocalMcpServer(ushort port, string allowedDirectory, string gitUserName, string gitUserEmail, ServerPolicy policy, string localAuthToken, Action<string> log, WorkspaceUsageMeter? usageMeter, LogicalChatCorrelationService? chatCorrelation, LogicalSessionRegistry? sessions, string? workspaceKey, McpStandardTelemetry? standardTelemetry, LocalMcpServerLimits limits, IReadOnlyList<string>? execEnvironmentAllowList, EvidenceStore? evidenceStore, DockerExecutionBackendConfiguration? dockerExecutionBackend)
     {
         if (Encoding.UTF8.GetByteCount(localAuthToken) < 32) throw new FileMcpException("Local MCP authentication token is too short");
         limits.Validate();
@@ -87,7 +87,7 @@ public sealed class LocalMcpServer : IAsyncDisposable
         CanonicalToolCatalog.ValidateProtocolContract(FileMcpConstants.ModernProtocolVersion, FileMcpConstants.LegacySupportedVersions);
         CanonicalToolCatalog.ValidateHandlerCoverage("server", ServerHandlerToolNames);
         _skills = new CodexSkillRegistry(allowedDirectory, log);
-        _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, _policy, execEnvironmentAllowList, skillRegistry: _skills);
+        _tools = new LocalTools(allowedDirectory, gitUserName, gitUserEmail, _policy, execEnvironmentAllowList, skillRegistry: _skills, dockerExecutionBackend: dockerExecutionBackend);
         _evidenceCoordinator = new EvidenceCoordinator(_evidenceStore, _tools, _policy, _workspaceFingerprint, _log);
     }
 

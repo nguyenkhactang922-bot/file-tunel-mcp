@@ -75,6 +75,18 @@ internal sealed class ServerPolicy
     public long Generation { get { lock (_gate) return _state.Generation; } }
     public string Hash { get { lock (_gate) return _state.Hash; } }
     public bool LegacyUnsafeGitCompatibility { get { lock (_gate) return _state.Configuration.Profile == FileMcpPolicyProfiles.LegacyCommandCompatible; } }
+    public bool AllowsOpenWorldExecutionBackend
+    {
+        get
+        {
+            lock (_gate)
+            {
+                var configuration = _state.Configuration;
+                return configuration.Profile == FileMcpPolicyProfiles.Custom &&
+                       configuration.CustomAllowNetworkOpenWorld;
+            }
+        }
+    }
     public bool AllowsExplicitHistoryMove
     {
         get

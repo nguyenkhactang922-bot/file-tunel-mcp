@@ -423,7 +423,7 @@ Negative tests:
 
 ## FMG-023 - Execution Backend Interface
 
-State: ACTIVE
+State: DONE / MAIN VERIFIED
 Depends: FMG-013, FMG-005, FMG-011
 
 Scope:
@@ -450,7 +450,7 @@ Negative tests:
 
 ## FMG-024 - Optional Docker Isolated Backend
 
-State: BLOCKED
+State: ACTIVE
 Depends: FMG-023, FMG-020, FMG-014, FMG-003, FMG-004
 
 Scope:

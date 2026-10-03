@@ -7,6 +7,7 @@ internal sealed record EvidenceRun(
     string OperationId,
     string ToolName,
     string BackendId,
+    string BackendMetadataJson,
     EvidenceRequestSpec Request,
     bool DurableStarted,
     long StartedEpochMs,
@@ -38,7 +39,9 @@ internal sealed class EvidenceCoordinator
         if (request is null) return null;
         var evidenceId = EvidenceStore.NewEvidenceId();
         var started = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var backendId = _tools.EvidenceBackendId(toolName);
+        var backendIdentity = _tools.EvidenceBackendIdentity(toolName);
+        var backendId = backendIdentity.BackendId;
+        var backendMetadataJson = backendIdentity.ToCanonicalJson();
         var policy = _policy.Capture();
         var durable = true;
         try
@@ -52,6 +55,7 @@ internal sealed class EvidenceCoordinator
                 request.CriterionId,
                 started,
                 backendId,
+                backendMetadataJson,
                 policy.Generation,
                 policy.Hash,
                 CanonicalToolCatalog.CatalogHash,
@@ -90,6 +94,7 @@ internal sealed class EvidenceCoordinator
             operationId,
             toolName,
             backendId,
+            backendMetadataJson,
             request,
             durable,
             started,
@@ -191,6 +196,7 @@ internal sealed class EvidenceCoordinator
             ["verification_state"] = verification,
             ["criterion_id"] = run.Request.CriterionId,
             ["backend_id"] = run.BackendId,
+            ["backend_metadata"] = JsonNode.Parse(run.BackendMetadataJson),
             ["source_binding"] = sourceBinding,
             ["source_state_id"] = sourceState?["source_state_id"]?.DeepClone(),
             ["project_context_digest"] = projectContextDigest,
@@ -289,6 +295,7 @@ internal sealed class EvidenceCoordinator
             ["catalog_hash"] = record.CatalogHash,
             ["catalog_version"] = record.CatalogVersion,
             ["backend_id"] = record.BackendId,
+            ["backend_metadata"] = JsonNode.Parse(record.BackendMetadataJson),
             ["exit_code"] = record.ExitCode,
             ["timed_out"] = record.TimedOut,
             ["cancelled"] = record.Cancelled,
