@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMG-026-complete-regression`
+Branch: `state/FMG-026-main-verified`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE FMG-026 final regression/live-proof verification from verified main `59ee366f504160b2132355e3d2dae9ce3b524646`.
+Expected worktree at handoff: ACTIVE governance state-sync for FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED, based exactly on verified main `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`.
 
 ## Completed technical program
 
@@ -1544,3 +1544,26 @@ STATUS: **PASS_LOCAL / LIVE_ADVANCED_PASS / GITHUB_CLOSURE_PENDING**.
 NEXT_EXACT_ACTION: run project-state contract + `git diff --check` + exact closure diff review; commit only FMG-026 evidence/state closure files; inspect real remote branch/PR state before side effects; push exact closure candidate; require exact-head GitHub Verify/checks; review/create exactly one PR targeting `main`; merge exact reviewed head; require merged-main Verify; only then record `COMPLETE_UPGRADE_MAIN_VERIFIED` / FMG-026 DONE.
 
 DO_NOT_REPEAT: do not rerun Verify `37109212534`; do not restart PID `17860`; do not enable `run_command` shell authority; do not repeat live advanced proof unless a material runtime/source change invalidates this checkpoint.
+
+
+## FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED / state-sync pending - 2026-10-03
+
+Primary FMG-026 technical closure is verified on real post-merge `main`.
+- Primary closure head: `e39877808b3fb0394b5b5a2608d6489ad6d8404f`.
+- Push Verify `37120899485`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #47 Verify `37121297945`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #47 merged with expected-head guard.
+- Resulting main commit: `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`.
+- GitHub emitted the PR merged event but no main PushEvent/check suite for this merge. A verification-only ref with zero commit/tree delta was created pointing exactly to the actual main commit: `verify/FMG-026-main-03cf7c0`.
+- Exact-main-commit Verify `37121899760`, `headSha=03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- There was no main-branch workflow run for this merge; do not claim one.
+- Durable evidence: `docs/evidence/COMPLETE_UPGRADE_MAIN_VERIFIED.md` and `docs/evidence/FMG-026_COMPLETE_REGRESSION_LIVE_ADVANCED_PROOF_EVIDENCE.md`.
+- Optional Docker live engine proof remains ENVIRONMENT BLOCKED under the frozen availability rule; no fake live Docker PASS.
+
+Technical result: `FMG-026 = DONE / MAIN VERIFIED`; FileMCP complete-upgrade core = `COMPLETE_UPGRADE_MAIN_VERIFIED` at `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`.
+
+CURRENT STATE-SYNC: ACTIVE on `state/FMG-026-main-verified`, based exactly on verified main `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`. This state-sync itself must complete GitHub push -> PR -> review -> merge -> exact resulting-main verification before dependent FMUX work may be claimed.
+
+NEXT_EXACT_ACTION: finish the state-sync diff, project-state contract and diff review; commit/push this state-only closure; exact-head Verify; one PR to `main`; review/merge with head guard; verify the exact resulting main commit. Then re-evaluate the frozen FMUX graph and claim the lowest dependency-ready task (current graph indicates FMUX-011).
+
+DO_NOT_REPEAT: do not rerun FMG-026 live proof or Verify `37109212534`; do not restart correct runtime PID `17860`; do not enable shell authority merely to expose `run_command`.

@@ -225,3 +225,27 @@ Optional Docker live engine proof remains **ENVIRONMENT BLOCKED** because the lo
 FMG-026 is **not DONE yet**. `COMPLETE_UPGRADE_MAIN_VERIFIED` must not be recorded until the closure candidate is committed, pushed to the writable GitHub remote, exact-head required checks are green, the reviewed head is merged to `main`, and the resulting `main` passes its required merged-main verification.
 
 NEXT_EXACT_ACTION: review closure-only diff and state contract -> commit exact closure candidate -> inspect real remote branch/PR state before side effects -> push exact candidate -> require exact-head GitHub Verify/checks -> review/create exactly one PR to `main` -> merge the exact reviewed head -> verify resulting `main` -> record `COMPLETE_UPGRADE_MAIN_VERIFIED` / FMG-026 DONE only from real post-merge evidence.
+
+
+## FMG-026 primary merge and exact-main verification - 2026-10-03
+
+FMG-026 primary closure commit `e39877808b3fb0394b5b5a2608d6489ad6d8404f` completed the required remote lifecycle:
+- push Verify `37120899485`: SUCCESS on macOS / Windows x64 / native Windows ARM64;
+- PR #47 exact-head Verify `37121297945`: SUCCESS on macOS / Windows x64 / native Windows ARM64;
+- scoped review PASS;
+- PR #47 merged with expected-head guard;
+- resulting main commit: `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`.
+
+GitHub advanced `main` to that merge commit but emitted no repository `PushEvent` for this merge and created no check suite on the merge SHA. This differs from prior FileMCP merges and is preserved as an observed platform event anomaly rather than hidden.
+
+A verification-only remote ref was therefore created with **zero tree/commit delta**:
+`verify/FMG-026-main-03cf7c0 -> 03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`.
+
+Verify run `37121899760` ran on exact `headSha=03cf7c082e29fb9eb576a875e4d73b018d5cc9f0` and completed SUCCESS on Windows x64, native Windows ARM64, and macOS. This is real verification of the actual post-merge main commit; it is not a pre-merge-run substitution and is not described as a `main`-branch workflow run.
+
+Primary technical result:
+- `FMG-026 = DONE / MAIN VERIFIED` at `03cf7c082e29fb9eb576a875e4d73b018d5cc9f0`;
+- `FILEMCP COMPLETE-UPGRADE CORE = COMPLETE_UPGRADE_MAIN_VERIFIED`;
+- durable summary evidence: `docs/evidence/COMPLETE_UPGRADE_MAIN_VERIFIED.md`.
+
+This final status becomes canonical only after the present state-sync branch itself completes push -> PR -> review -> merge -> exact resulting-main verification. Do not claim the dependent FMUX lane before that state-sync lifecycle is complete.
