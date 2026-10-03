@@ -82,3 +82,14 @@ FileMCP is locked to `D:\Tools\FileMCP`. Sibling FileMCP worktrees were audited 
 - Exact head `21d0c6ed05a749be363b108a7a965a7f0deaef9e` -> Verify `37109212534` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 - Preserve this PASS; do not rerun native regression after desktop restart.
 - NEXT_EXACT_ACTION: close current FileMCP desktop -> launch `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe` -> reconnect -> verify 46-tool discovery -> LIVE ADVANCED PROOF ONLY -> closure/PR/merge/main-verify.
+
+
+## FMG-026 runtime-swap blocker - 2026-10-03
+
+- State: ACTIVE / NATIVE REGRESSION PASS / LIVE ADVANCED PROOF BLOCKED.
+- Verify `37109212534`: SUCCESS on macOS / Windows x64 / native Windows ARM64; preserve PASS and DO NOT rerun.
+- Active runtime remains stale PID `16240` on FMG013-ready; connector remains 22/46 tools.
+- FMG026-ready x64 binary is prepared with canonical 46-tool catalog.
+- Automated stop/start helper was blocked by safety policy; no side effect occurred.
+- BLOCKER: manually exit old FileMCP desktop/tray instance before launching FMG026-ready.
+- NEXT_EXACT_ACTION: exit PID `16240` via normal FileMCP UI/tray -> launch `dist/windows-x64/FileMCP-FMG026-ready/FileMCP.exe` -> reconnect -> verify 46 tools -> LIVE ADVANCED PROOF ONLY -> closure/PR/merge/main-verify.

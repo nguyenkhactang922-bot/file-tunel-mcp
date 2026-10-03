@@ -1504,3 +1504,20 @@ NEXT_EXACT_ACTION: commit/push this FMG-026 checkpoint and require exact-head na
 - FMG026-ready executable: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
 
 NEXT_EXACT_ACTION: USER-RUNTIME HANDOFF ONLY — close the currently running FileMCP desktop normally, launch `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, then reconnect/resume ChatGPT with FileMCP. On resume, first verify the new process/hash and that connector discovery exposes all 46 canonical tools; then run LIVE ADVANCED PROOF ONLY. Do NOT rerun Verify `37109212534` or any already-PASS regression stage.
+
+
+## FMG-026 reconnect blocker - 2026-10-03
+
+Post-user-restart verification did NOT replace the live desktop runtime.
+- Git branch: `chatgpt/FMG-026-complete-regression`.
+- Local HEAD: `b702e66fdd43c2c72db82d6f97c03bdc77e3e706`.
+- Worktree: clean.
+- Exact-head native Verify `37109212534` remains preserved PASS on macOS / Windows x64 / native Windows ARM64; DO NOT rerun it.
+- Active FileMCP remains PID `16240` at `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG013-ready\FileMCP.exe`, SHA-256 `69c86f752321ef318c4ddd27dd566a9883a98fea774cd5fc021ec72b92117a7d`.
+- Current connector still discovers 22 tools, not the canonical 46 tools.
+- FMG026-ready binary remains prepared at `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
+- Attempt to launch an out-of-process helper that would stop the old FileMCP and start FMG026-ready was blocked by the OpenAI safety layer; no process was killed or restarted.
+
+BLOCKER: the old FileMCP desktop instance must be exited manually before launching FMG026-ready. Opening the new EXE while PID `16240` is alive triggers single-instance behavior and leaves the old runtime active.
+
+NEXT_EXACT_ACTION: manually exit the currently running FileMCP desktop/tray instance so PID `16240` disappears, then launch `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`, reconnect this FileMCP connector, and resume LIVE ADVANCED PROOF ONLY. Do not rerun Verify `37109212534`.

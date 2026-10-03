@@ -1417,3 +1417,17 @@ NEXT_EXACT_ACTION: commit/push exact FMG-026 checkpoint -> require normal native
 - Required desktop: `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe` (SHA-256 `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`).
 
 NEXT_EXACT_ACTION: close active FileMCP desktop normally -> launch FMG026-ready -> reconnect ChatGPT/FileMCP -> verify new process/hash + 46-tool discovery -> run LIVE ADVANCED PROOF ONLY -> update closure evidence/state -> push closure head -> review/PR/merge -> merged-main Verify -> COMPLETE_UPGRADE_MAIN_VERIFIED.
+
+
+## FMG-026 manual-runtime-swap blocker - 2026-10-03
+
+- FMG-026 remains ACTIVE; native full regression is already PASS and preserved.
+- Verify `37109212534`: SUCCESS on macOS / Windows x64 / native Windows ARM64; DO NOT rerun.
+- Active runtime is still stale PID `16240`, `FileMCP-FMG013-ready\FileMCP.exe`, hash `69c86f752321ef318c4ddd27dd566a9883a98fea774cd5fc021ec72b92117a7d`.
+- Connector remains 22/46 tools.
+- FMG026-ready binary is prepared with canonical 46-tool catalog at `dist/windows-x64/FileMCP-FMG026-ready/FileMCP.exe`, hash `07330f6a9af2609d4cd96b80c18503066953f2dc3152d91a1c46ffdfb998be23`.
+- Automated self-replacement helper was blocked by safety policy; no side effect occurred.
+
+BLOCKER: user must fully exit old FileMCP desktop/tray instance before launching FMG026-ready; otherwise single-instance activation keeps old runtime alive.
+
+NEXT_EXACT_ACTION: exit old FileMCP so PID `16240` disappears -> launch FMG026-ready -> reconnect -> verify new PID/path/hash + 46-tool discovery -> run LIVE ADVANCED PROOF ONLY -> closure evidence/state -> push/PR/merge/merged-main verify.
