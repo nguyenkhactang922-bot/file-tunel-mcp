@@ -1570,3 +1570,14 @@ NEXT_EXACT_ACTION: scoped final diff review -> candidate commit -> side-effect g
 - Targeted fix: use `terminalStringList(metadata, "backend_capabilities")` directly. No backend truth, policy, Docker, or authority semantics changed.
 - Targeted local recheck: FMUX-015 contract PASS; `git diff --check` PASS.
 - Next: commit the macOS compile fix + this checkpoint -> side-effect guard -> push exact new head -> require a fresh three-lane Verify. Do not manually rerun attempt `37197764997`.
+
+
+## FMUX-015 exact-head verification / review - 2026-10-04
+
+FMUX-015 Backend / Isolation UX is ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS.
+- Exact head `14194caa6ce05b584bbcf3d3cf3f38f8316bf963`.
+- Push Verify `37198123123`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Scoped review: PASS; presentation remains read-only/non-authoritative; no backend selector, Docker mutation, Docker CLI/container action, or synthetic Docker availability.
+- Runtime PID `17860` unchanged; Docker daemon remains environment-blocked.
+
+NEXT_EXACT_ACTION: create an evidence-state-only closure commit, push exact closure head, require three-lane Verify, then one reviewed PR -> guarded merge -> exact resulting-main Verify. FMUX-016 remains blocked until FMUX-015 is DONE / MAIN VERIFIED.

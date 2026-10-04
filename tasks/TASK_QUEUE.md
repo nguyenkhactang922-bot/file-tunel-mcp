@@ -218,3 +218,13 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Targeted fix: use `terminalStringList(metadata, "backend_capabilities")` directly. No backend truth, policy, Docker, or authority semantics changed.
 - Targeted local recheck: FMUX-015 contract PASS; `git diff --check` PASS.
 - Next: commit the macOS compile fix + this checkpoint -> side-effect guard -> push exact new head -> require a fresh three-lane Verify. Do not manually rerun attempt `37197764997`.
+
+
+## FMUX-015 exact-head verification / closure pending - 2026-10-04
+
+- FMUX-015 Backend / Isolation UX: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS.
+- Fix head `14194caa6ce05b584bbcf3d3cf3f38f8316bf963`; push Verify `37198123123` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Attempt-1 macOS-only Swift typecheck defect is closed; Windows/runtime behavior was unchanged by the fix.
+- Scoped review PASS: no backend selector, Docker configuration mutation, Docker CLI/container action or presentation authority; Docker unavailability remains explicit truth.
+- Runtime PID `17860` remains correct; no restart.
+- Next: evidence/state-only closure commit -> push exact closure head -> exact-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify -> FMUX-015 DONE / MAIN VERIFIED -> FMUX-016 becomes dependency-ready.

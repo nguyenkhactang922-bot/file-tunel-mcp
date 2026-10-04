@@ -1669,3 +1669,15 @@ NEXT_EXACT_ACTION: scoped final diff review -> candidate commit -> side-effect g
 - Targeted fix: use `terminalStringList(metadata, "backend_capabilities")` directly. No backend truth, policy, Docker, or authority semantics changed.
 - Targeted local recheck: FMUX-015 contract PASS; `git diff --check` PASS.
 - Next: commit the macOS compile fix + this checkpoint -> side-effect guard -> push exact new head -> require a fresh three-lane Verify. Do not manually rerun attempt `37197764997`.
+
+
+## FMUX-015 exact-head attempt 2 / closure checkpoint - 2026-10-04
+
+FMUX-015 Backend / Isolation UX is ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS on `chatgpt/FMUX-015-backend-isolation-ux`.
+- Fix head `14194caa6ce05b584bbcf3d3cf3f38f8316bf963`.
+- Push Verify `37198123123`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Attempt-1 macOS Swift typecheck defect is closed; no Windows/runtime behavior changed in the fix.
+- Final scoped diff review: PASS; no P0/P1, no presentation authority expansion, `git diff --check` PASS.
+- Runtime PID `17860` remains correct and was not restarted. Docker live engine remains environment-blocked; UI truth remains host-native / Docker not selected-not probed.
+
+NEXT_EXACT_ACTION: commit/push the evidence-state-only FMUX-015 closure head -> require exact-head Verify on the closure SHA -> create/review exactly one PR to `main` -> merge exact reviewed head with guard -> verify exact resulting `main`. Only after merged-main verification may FMUX-015 become DONE / MAIN VERIFIED and FMUX-016 Onboarding be claimed.
