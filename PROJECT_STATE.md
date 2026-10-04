@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `state/FMUX-015-main-verified`
+Active branch: `chatgpt/FMUX-016-onboarding`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1594,3 +1594,42 @@ FMUX-015 Backend / Isolation UX: DONE / MAIN VERIFIED technically.
 Governance state-sync is ACTIVE on `state/FMUX-015-main-verified`, based exactly on verified main `e481b86569a61af89f448eb8ccfcdd4b3881cebd`. No product/runtime source changes are part of this sync. FMUX-016 Onboarding is dependency-ready in the product graph but remains blocked until this state-sync itself is MAIN VERIFIED.
 
 NEXT_EXACT_ACTION: commit/push this state-only closure -> exact-head Verify -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify; then claim FMUX-016 Onboarding from verified main.
+
+
+## FMUX-015 state-sync MAIN VERIFIED / FMUX-016 claimed - 2026-10-04
+
+FMUX-015 governance state-sync: DONE / MAIN VERIFIED.
+- State-sync head `f8ef470804626f48e2e45d94ffc525270505f153`; push Verify `37215015760` SUCCESS.
+- PR #55 exact-head Verify `37215434170` SUCCESS; PR #55 merged as `987c7f836830b55f019a786b0a7b218281d7ef99`.
+- Merged-main Verify `37215916252` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMUX-016 Onboarding: ACTIVE / CLAIMED on `chatgpt/FMUX-016-onboarding`, based exactly on verified main `987c7f836830b55f019a786b0a7b218281d7ef99`.
+Frozen scope: first-run setup, workspace selection, credential/connect, policy choice, connection test, completion handoff to Home. Onboarding must reuse existing authority/truth and must not create a parallel credential store, policy authority, backend selector, or synthetic connection state.
+
+NEXT_EXACT_ACTION: deep-read current Windows/macOS startup, workspace/profile configuration, policy controls, connect/tunnel health and Home navigation; derive the minimum cross-platform onboarding flow and contract tests before implementation. Do not restart runtime PID `17860`.
+
+
+## FMUX-016 Onboarding local verification - 2026-10-04
+
+FMUX-016: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-016-onboarding`, based exactly on verified main `987c7f836830b55f019a786b0a7b218281d7ef99`.
+
+Implementation truth:
+- guided first-run Setup on Windows WPF and macOS AppKit;
+- existing workspace/policy/connection surfaces remain authoritative;
+- existing Windows Credential Manager / macOS Keychain reused;
+- connection test uses existing runtime start/connect path and is PASS only from actual `Running` state;
+- finish marker is presentation-only and grants no runtime/tool authority;
+- complete legacy setups migrate without forcing onboarding; incomplete setups do not auto-skip.
+
+Local verification PASS: FMUX-016 contract, app-shell contract, presentation contract, project-state contract, diff check, Windows Release build 0 warnings / 0 errors. macOS native compilation is pending exact-head GitHub Verify because local Windows host has no `swiftc`. Evidence: `docs/evidence/FMUX-016_ONBOARDING_UX_EVIDENCE.md`. Runtime PID `17860` unchanged.
+
+NEXT_EXACT_ACTION: final scoped review -> candidate commit -> remote/PR/main side-effect guard -> push exact head -> three-lane native Verify -> closure evidence/state -> closure-head Verify -> reviewed PR -> merge -> merged-main Verify. Do not claim FMUX-017 before FMUX-016 and its governance state-sync are MAIN VERIFIED.
+
+
+## FMUX-016 exact-head native verified - 2026-10-04
+
+FMUX-016 candidate `bb8480d05e80459865dbac8322813c4309d2ea19` is EXACT-HEAD NATIVE VERIFIED. Push Verify `37218197455` SUCCESS on macOS / Windows x64 / native Windows ARM64. Scoped review PASS; no P0/P1 remains and onboarding does not grant authority beyond existing workspace/policy/credential/runtime paths. Runtime PID `17860` unchanged.
+
+State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING.
+
+NEXT_EXACT_ACTION: state/evidence-only closure commit -> push exact closure head -> three-lane Verify -> one reviewed PR to `main` -> guarded merge -> exact resulting-main Verify. FMUX-017 remains blocked until FMUX-016 governance closure is MAIN VERIFIED.

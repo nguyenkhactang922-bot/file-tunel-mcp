@@ -119,4 +119,6 @@ public sealed class FileMcpSettings
     public int DockerMaxLifetimeSeconds { get; set; } = 7200;
     public bool OtlpEnabled { get; set; }
     public string OtlpEndpoint { get; set; } = OtlpTelemetrySettings.DefaultEndpoint;
+    // Presentation-only first-run completion marker. It grants no runtime or tool authority.
+    public bool OnboardingCompleted { get; set; }
 }

@@ -100,6 +100,7 @@ public partial class MainWindow : Window
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowFromTray);
 
         RefreshRuntimeUi();
+        InitializeOnboardingExperience();
         _ = StartObservabilityAsync();
         RefreshOverviewLiveUi();
         _ = RefreshOverviewPeriodAsync(force: true);
@@ -717,6 +718,7 @@ public partial class MainWindow : Window
             SaveConnectionFields();
             _settingsStore.Save(_settings);
             UpdateApiKeyStatus();
+            RefreshOnboardingExperience();
             AppendLog("Connection settings saved.\n");
 
             if (_runtimes.Values.Any(runtime => runtime.State.Status != LocalMcpRuntimeStatus.Stopped))
@@ -737,6 +739,7 @@ public partial class MainWindow : Window
             SaveSettingsFields();
             _settingsStore.Save(_settings);
             AppendLog("Workspace settings saved.\n");
+            RefreshOnboardingExperience();
 
             if (_runtimes.Values.Any(runtime => runtime.State.Status != LocalMcpRuntimeStatus.Stopped))
                 AppendLog("Workspace changes will take effect after the affected workspace reconnects.\n");
@@ -1055,6 +1058,7 @@ public partial class MainWindow : Window
         UpdateWorkspaceStatus(key, state);
         UpdateConnectButton();
         UpdateShellContext();
+        RefreshOnboardingExperience();
 
         if (state.Status == LocalMcpRuntimeStatus.Failed && !string.IsNullOrEmpty(state.Error))
             ShowError($"Drive {key}: {state.Error}");
@@ -1068,7 +1072,107 @@ public partial class MainWindow : Window
         UpdateConnectButton();
         UpdateShellContext();
         UpdateConnectionExperience();
+        RefreshOnboardingExperience();
         if (MainTabs.SelectedItem == WorkspacesTab) RefreshWorkspaceRows();
+    }
+
+    private void InitializeOnboardingExperience()
+    {
+        if (!_settings.OnboardingCompleted && HasExistingConfiguredSetup())
+        {
+            _settings.OnboardingCompleted = true;
+            try { _settingsStore.Save(_settings); }
+            catch (Exception ex) { AppendLog($"[Setup] Could not persist legacy onboarding migration: {ex.Message}\n"); }
+        }
+
+        RefreshOnboardingExperience();
+        if (!_settings.OnboardingCompleted)
+            MainTabs.SelectedItem = OnboardingTab;
+    }
+
+    private bool HasExistingConfiguredSetup() =>
+        _credentialStore.HasSavedApiKey &&
+        _settings.Workspaces.Any(workspace =>
+            workspace.Enabled &&
+            LocalMcpRuntime.IsValidTunnelId(workspace.TunnelId?.Trim() ?? "") &&
+            !string.IsNullOrWhiteSpace(workspace.AllowedDirectory) &&
+            Directory.Exists(workspace.AllowedDirectory));
+
+    private bool AllEnabledWorkspacesRunning()
+    {
+        var enabled = WorkspaceKeys.Where(key => EnabledBox(key).IsChecked == true).ToArray();
+        return enabled.Length > 0 && enabled.All(key => _runtimes.TryGetValue(key, out var runtime) && runtime.State.Status == LocalMcpRuntimeStatus.Running);
+    }
+
+    private void RefreshOnboardingExperience()
+    {
+        if (OnboardingWorkspaceStatusText is null) return;
+        var enabled = WorkspaceKeys.Where(key => EnabledBox(key).IsChecked == true).ToArray();
+        var workspaceReady = enabled.Length > 0 && enabled.All(key =>
+        {
+            var path = PathBox(key).Text.Trim();
+            return path.Length > 0 && Directory.Exists(path) && PathBelongsToDrive(path, key);
+        });
+        var policy = PolicyProfileComboBox.SelectedValue?.ToString() ?? FileMcpPolicyProfiles.Restricted;
+        var credentialReady = _credentialStore.HasSavedApiKey || ApiKeyBox.Password.Trim().Length > 0;
+        var tunnelsReady = enabled.Length > 0 && enabled.All(key => LocalMcpRuntime.IsValidTunnelId(TunnelBox(key).Text.Trim()));
+        var running = enabled.Count(key => _runtimes.TryGetValue(key, out var runtime) && runtime.State.Status == LocalMcpRuntimeStatus.Running);
+        var allRunning = enabled.Length > 0 && running == enabled.Length;
+
+        NavOnboardingButton.Visibility = _settings.OnboardingCompleted ? Visibility.Collapsed : Visibility.Visible;
+        OnboardingWorkspaceStatusText.Text = workspaceReady
+            ? $"Ready: {enabled.Length} enabled workspace(s) with existing roots."
+            : "Choose at least one enabled workspace with an existing root.";
+        OnboardingPolicyStatusText.Text = $"Server-enforced profile: {policy}.";
+        OnboardingCredentialStatusText.Text = credentialReady && tunnelsReady
+            ? "Ready: credential present and every enabled workspace has a valid Tunnel ID."
+            : "Incomplete: store the runtime API key securely and configure valid Tunnel IDs.";
+        OnboardingConnectionStatusText.Text = allRunning
+            ? $"PASS: {running}/{enabled.Length} enabled runtime(s) report Running."
+            : $"Not passed: {running}/{enabled.Length} enabled runtime(s) report Running.";
+        OnboardingTestButton.IsEnabled = workspaceReady && credentialReady && tunnelsReady;
+        OnboardingFinishButton.IsEnabled = allRunning;
+        OnboardingSummaryText.Text = allRunning
+            ? "Connection test passed against live runtime state. Finish setup to continue to Home."
+            : "Complete workspace, policy and connection settings, then test the real runtime connection.";
+    }
+
+    private void NavigateOnboarding_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshOnboardingExperience();
+        MainTabs.SelectedItem = OnboardingTab;
+    }
+
+    private void OnboardingWorkspace_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = SettingsTab;
+    private void OnboardingPolicy_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = SettingsTab;
+    private void OnboardingConnection_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedItem = ConnectionTab;
+
+    private void OnboardingTestConnection_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshOnboardingExperience();
+        if (AllEnabledWorkspacesRunning()) return;
+        var active = _runtimes.Values.Any(runtime => runtime.State.Status is LocalMcpRuntimeStatus.Running or LocalMcpRuntimeStatus.Restarting or LocalMcpRuntimeStatus.Cooldown or LocalMcpRuntimeStatus.Starting or LocalMcpRuntimeStatus.Stopping);
+        if (active)
+        {
+            ShowError("Connection test uses current runtime truth. Resolve the current partial/transitioning runtime state in Connections before testing again.");
+            return;
+        }
+        OnboardingConnectionStatusText.Text = "Testing: starting the configured runtime(s)...";
+        Connect_Click(sender, e);
+    }
+
+    private void OnboardingFinish_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshOnboardingExperience();
+        if (!AllEnabledWorkspacesRunning())
+        {
+            ShowError("Finish setup is available only after every enabled runtime reports Running.");
+            return;
+        }
+        _settings.OnboardingCompleted = true;
+        _settingsStore.Save(_settings);
+        RefreshOnboardingExperience();
+        MainTabs.SelectedItem = OverviewTab;
     }
 
     private void UpdateShellContext()
