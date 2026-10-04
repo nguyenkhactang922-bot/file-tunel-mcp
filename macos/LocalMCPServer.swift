@@ -2809,6 +2809,7 @@ private final class MCPConnectionLease {
 
 final class LocalMCPServer {
     private static let handlerToolNames: Set<String> = ["filemcp_observability_connect", "evidence_get"]
+    private static let presentationPtyToolNames: Set<String> = ["pty_list", "pty_read", "pty_resize", "pty_signal", "pty_stop"]
     private let port: UInt16
     private let localAuthToken: String
     private let tools: LocalTools
@@ -2887,6 +2888,22 @@ final class LocalMCPServer {
         stateLock.lock()
         defer { stateLock.unlock() }
         return ready
+    }
+
+    func callPresentationPtyTool(name: String, arguments: [String: Any]) throws -> [String: Any] {
+        guard Self.presentationPtyToolNames.contains(name) else {
+            throw MCPServerError.operationFailed("Tool is not available to the desktop presentation bridge: \(name)")
+        }
+        guard isReady else {
+            throw MCPServerError.operationFailed("Local MCP server is not ready")
+        }
+        return try tools.call(name: name, arguments: arguments).structuredContent
+    }
+
+    func presentationPolicyMetadata() -> [String: Any] {
+        var metadata = policy.metadata()
+        metadata["presentation_grants_authority"] = false
+        return metadata
     }
 
     func captureSourceStateRefForTest(repoPath: String, relevantPaths: [String] = []) throws -> [String: Any] {

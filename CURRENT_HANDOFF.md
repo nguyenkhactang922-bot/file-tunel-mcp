@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMUX-011-repository-intelligence`
+Branch: `chatgpt/FMUX-012-terminal-pty`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE FMUX-011 Repository Intelligence implementation, based exactly on verified main `5a5abed27e523dac4f62c27e8808c3bb03a6d874`; FMG-026 technical closure and governance state-sync are DONE / MAIN VERIFIED.
+Expected worktree at handoff: ACTIVE FMUX-012 Terminal / PTY implementation, based exactly on verified main `d378faa0807435be7ca21eff1c573518779c5dd4`; FMUX-011 is DONE / MAIN VERIFIED and runtime PID `17860` remains correct.
 
 ## Completed technical program
 
@@ -1585,4 +1585,12 @@ Frozen scope: Repository page only; repository summary; observed `repo_map`, `sy
 
 EXACT-HEAD CHECKPOINT: FMUX-011 candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0` is NATIVE VERIFIED and scoped review PASS. Push Verify `37138794626` succeeded on macOS / Windows x64 / native Windows ARM64, including native integration/build/package/smoke gates and the FMUX Repository Intelligence presentation contract. No P0/P1 remains in scope. Runtime PID `17860` remains correct and was not restarted.
 
-NEXT_EXACT_ACTION: commit/push the evidence-state-only FMUX-011 closure head, require exact-head native Verify on that new closure SHA, then create/review exactly one PR to `main` -> merge exact reviewed head with guard -> verify exact resulting main. Do not begin FMUX-012 before FMUX-011 MAIN VERIFIED.
+FMUX-011 FINAL: DONE / MAIN VERIFIED. Closure head `0b9c08f052418a20f48e4b688cc41dc93eb21117` passed push Verify `37139506323`; PR #49 exact-head Verify `37139999329` passed all three native lanes; PR #49 merged as `d378faa0807435be7ca21eff1c573518779c5dd4`; merged-main Verify `37140380944` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMUX-012 Terminal / PTY is ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-012-terminal-pty`, based directly on verified `fork/main=d378faa0807435be7ca21eff1c573518779c5dd4`. Dependencies FMUX-002, FMUX-003 and FMG-020 are DONE / MAIN VERIFIED. Runtime PID `17860` remains correct and was not restarted.
+
+Frozen scope: session list; active terminal; bounded output; stop/signal/resize controls; backend/policy/session status. UI must consume real FMG-020 structured PTY truth only, preserve bounded output, never persist/log secret-like stdin or raw PTY bytes beyond existing runtime semantics, never invent resume after restart, and never expand authority.
+
+Local FMUX-012 evidence: Terminal contract PASS; app-shell PASS; presentation PASS; Repository regression PASS; persistent PTY contract PASS; project-state contract PASS; `git diff --check` PASS; Windows Release build for the FMUX-012 Windows source checkpoint PASS with 0 warnings / 0 errors. Evidence: `docs/evidence/FMUX-012_TERMINAL_PTY_UX_EVIDENCE.md`. Native macOS and Windows ARM64 verification remain exact-head CI gates.
+
+NEXT_EXACT_ACTION: run side-effect guard for remote branch/PR state, create exact FMUX-012 candidate commit, push to writable GitHub remote, require exact-head Verify on macOS / Windows x64 / native Windows ARM64, then scoped review and evidence-state closure. Do not rerun FMUX-011/FMG-020 or restart correct runtime PID `17860`.

@@ -246,6 +246,28 @@ private struct RepositoryResultEvent {
     let entries: [RepositoryItemEvent]
 }
 
+private struct TerminalSessionEvent {
+    let sessionID: String
+    let pid: Int?
+    let state: String
+    let lastActivityEpochMs: Int64
+    let earliestCursor: String
+    let endCursor: String
+    let exitCode: Int?
+    let spillRefCount: Int
+    let actualPTY: Bool
+    let restartResumeSupported: Bool
+    let grantsAuthority: Bool
+    let backendID: String
+    let backendVersion: String
+    let backendCapabilities: String
+    let policyProfile: String
+    let policyGeneration: Int64
+    let policyHash: String
+
+    var isControllable: Bool { state.caseInsensitiveCompare("running") == .orderedSame }
+}
+
 private struct ArtifactBatchEntryEvent {
     let path: String
     let state: String
@@ -305,6 +327,12 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private var evidenceEvents: [EvidenceEvent] = []
     private var repositoryEvents: [RepositoryResultEvent] = []
     private var selectedRepositoryEvent: RepositoryResultEvent?
+    private var terminalSessions: [TerminalSessionEvent] = []
+    private var terminalReadCursors: [String: String] = [:]
+    private var terminalRefreshInProgress = false
+    private var terminalTimer: Timer?
+    private let terminalReadWindowBytes = 16 * 1024
+    private let maxTerminalOutputCharacters = 64 * 1024
     private var artifactBatchEvents: [ArtifactBatchEvent] = []
     private var selectedArtifactBatch: ArtifactBatchEvent?
     private let maxActivityEvents = 500
@@ -339,6 +367,16 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private let repositorySummaryLabel = NSTextField(wrappingLabelWithString: "Waiting for real repo_map, symbol_search or related_files output.")
     private let repositorySourceLabel = NSTextField(wrappingLabelWithString: "Source state: not observed")
     private let repositoryItemDetailLabel = NSTextField(wrappingLabelWithString: "Select an observed repository result.")
+    private let terminalTableView = NSTableView()
+    private let terminalOutputView = NSTextView()
+    private let terminalBackendLabel = NSTextField(wrappingLabelWithString: "No live PTY session observed.")
+    private let terminalPolicyLabel = NSTextField(wrappingLabelWithString: "No connected workspace selected.")
+    private let terminalStatusLabel = NSTextField(wrappingLabelWithString: "0 observed PTY sessions | restart resume unsupported")
+    private let terminalCtrlCButton = NSButton(title: "Ctrl+C", target: nil, action: nil)
+    private let terminalStopButton = NSButton(title: "Stop", target: nil, action: nil)
+    private let terminalResizeButton = NSButton(title: "Resize", target: nil, action: nil)
+    private let terminalColumnsField = NSTextField(string: "120")
+    private let terminalRowsField = NSTextField(string: "30")
     private let artifactBatchTableView = NSTableView()
     private let artifactEntryTableView = NSTableView()
     private let artifactBatchSummaryLabel = NSTextField(wrappingLabelWithString: "No batch result captured yet.")
@@ -526,6 +564,50 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         repositorySourceLabel.textColor = .secondaryLabelColor
         repositoryItemDetailLabel.maximumNumberOfLines = 5
         repositoryItemDetailLabel.textColor = .secondaryLabelColor
+
+        terminalTableView.delegate = self
+        terminalTableView.dataSource = self
+        terminalTableView.headerView = NSTableHeaderView()
+        terminalTableView.usesAlternatingRowBackgroundColors = true
+        terminalTableView.allowsMultipleSelection = false
+        for (identifier, title, width) in [
+            ("terminal-state", "State", 86.0),
+            ("terminal-pid", "PID", 72.0),
+            ("terminal-session", "Session", 260.0),
+            ("terminal-activity", "Last activity", 110.0),
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = width
+            terminalTableView.addTableColumn(column)
+        }
+
+        terminalOutputView.isEditable = false
+        terminalOutputView.isSelectable = true
+        terminalOutputView.isRichText = false
+        terminalOutputView.isHorizontallyResizable = true
+        terminalOutputView.autoresizingMask = [.width, .height]
+        terminalOutputView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        terminalOutputView.backgroundColor = NSColor(calibratedWhite: 0.10, alpha: 1.0)
+        terminalOutputView.textColor = .white
+        terminalOutputView.insertionPointColor = .white
+        terminalOutputView.string = ""
+        terminalBackendLabel.maximumNumberOfLines = 4
+        terminalPolicyLabel.maximumNumberOfLines = 4
+        terminalStatusLabel.maximumNumberOfLines = 3
+        terminalStatusLabel.textColor = .secondaryLabelColor
+
+        terminalCtrlCButton.target = self
+        terminalCtrlCButton.action = #selector(terminalSendCtrlC)
+        terminalStopButton.target = self
+        terminalStopButton.action = #selector(terminalStopSession)
+        terminalResizeButton.target = self
+        terminalResizeButton.action = #selector(terminalResizeSession)
+        terminalCtrlCButton.isEnabled = false
+        terminalStopButton.isEnabled = false
+        terminalResizeButton.isEnabled = false
+        terminalColumnsField.alignment = .right
+        terminalRowsField.alignment = .right
 
         artifactBatchTableView.delegate = self
         artifactBatchTableView.dataSource = self
@@ -956,6 +1038,81 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             repositoryItemScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
         ])
 
+        let terminalSessionScroll = NSScrollView()
+        terminalSessionScroll.documentView = terminalTableView
+        terminalSessionScroll.hasVerticalScroller = true
+        terminalSessionScroll.borderType = .bezelBorder
+        terminalSessionScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let terminalOutputScroll = NSScrollView()
+        terminalOutputScroll.hasVerticalScroller = true
+        terminalOutputScroll.hasHorizontalScroller = true
+        terminalOutputScroll.autohidesScrollers = true
+        terminalOutputScroll.borderType = .bezelBorder
+        terminalOutputView.frame = terminalOutputScroll.contentView.bounds
+        terminalOutputView.minSize = NSSize(width: 0, height: terminalOutputScroll.contentSize.height)
+        terminalOutputView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        terminalOutputView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        terminalOutputView.textContainer?.widthTracksTextView = false
+        terminalOutputScroll.documentView = terminalOutputView
+        terminalOutputScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let terminalHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Terminal / PTY",
+            description: "Live workspace-scoped PTY sessions. Output is read in bounded windows and is not copied into FileMCP activity or evidence telemetry."
+        )
+        let terminalTruth = NSStackView(views: [terminalBackendLabel, terminalPolicyLabel])
+        terminalTruth.orientation = .vertical
+        terminalTruth.alignment = .leading
+        terminalTruth.spacing = 4
+
+        let columnsLabel = NSTextField(labelWithString: "Cols")
+        let rowsLabel = NSTextField(labelWithString: "Rows")
+        let terminalControls = NSStackView(views: [
+            terminalCtrlCButton,
+            terminalStopButton,
+            columnsLabel,
+            terminalColumnsField,
+            rowsLabel,
+            terminalRowsField,
+            terminalResizeButton,
+        ])
+        terminalControls.orientation = .horizontal
+        terminalControls.alignment = .centerY
+        terminalControls.spacing = 8
+        terminalColumnsField.widthAnchor.constraint(equalToConstant: 54).isActive = true
+        terminalRowsField.widthAnchor.constraint(equalToConstant: 54).isActive = true
+
+        let terminalTables = NSStackView(views: [terminalSessionScroll, terminalOutputScroll])
+        terminalTables.orientation = .horizontal
+        terminalTables.alignment = .top
+        terminalTables.distribution = .fillEqually
+        terminalTables.spacing = 10
+        terminalTables.translatesAutoresizingMaskIntoConstraints = false
+
+        let terminalRoot = NSStackView(views: [
+            terminalHeader,
+            terminalTruth,
+            terminalTables,
+            terminalControls,
+            terminalStatusLabel,
+        ])
+        terminalRoot.orientation = .vertical
+        terminalRoot.alignment = .leading
+        terminalRoot.spacing = 8
+        terminalRoot.translatesAutoresizingMaskIntoConstraints = false
+
+        let terminalPage = NSView()
+        terminalPage.addSubview(terminalRoot)
+        NSLayoutConstraint.activate([
+            terminalRoot.leadingAnchor.constraint(equalTo: terminalPage.leadingAnchor, constant: 12),
+            terminalRoot.trailingAnchor.constraint(equalTo: terminalPage.trailingAnchor, constant: -12),
+            terminalRoot.topAnchor.constraint(equalTo: terminalPage.topAnchor, constant: 12),
+            terminalRoot.bottomAnchor.constraint(equalTo: terminalPage.bottomAnchor, constant: -12),
+            terminalSessionScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 300),
+            terminalOutputScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 300),
+        ])
+
         let artifactBatchScroll = NSScrollView()
         artifactBatchScroll.documentView = artifactBatchTableView
         artifactBatchScroll.hasVerticalScroller = true
@@ -1123,6 +1280,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         repositoryTab.label = "Repository"
         repositoryTab.view = repositoryPage
 
+        let terminalTab = NSTabViewItem(identifier: "terminal")
+        terminalTab.label = "Terminal"
+        terminalTab.view = terminalPage
+
         let artifactTab = NSTabViewItem(identifier: "artifacts")
         artifactTab.label = "Artifacts"
         artifactTab.view = artifactPage
@@ -1139,6 +1300,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         tabs.addTabViewItem(changesTab)
         tabs.addTabViewItem(evidenceTab)
         tabs.addTabViewItem(repositoryTab)
+        tabs.addTabViewItem(terminalTab)
         tabs.addTabViewItem(artifactTab)
         tabs.addTabViewItem(logTab)
         tabs.selectTabViewItem(withIdentifier: "home")
@@ -1176,6 +1338,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             navigationButton("Changes", action: #selector(showChanges)),
             navigationButton("Evidence", action: #selector(showEvidence)),
             navigationButton("Repository", action: #selector(showRepository)),
+            navigationButton("Terminal", action: #selector(showTerminal)),
             navigationButton("Artifacts", action: #selector(showArtifacts)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
             NSView(),
@@ -1441,6 +1604,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if tableView == evidenceTableView { return evidenceEvents.count }
         if tableView == repositoryResultTableView { return repositoryEvents.count }
         if tableView == repositoryItemTableView { return selectedRepositoryEvent?.entries.count ?? 0 }
+        if tableView == terminalTableView { return terminalSessions.count }
         if tableView == artifactBatchTableView { return artifactBatchEvents.count }
         if tableView == artifactEntryTableView { return selectedArtifactBatch?.entries.count ?? 0 }
         return 0
@@ -1476,6 +1640,28 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             case "repository-item-kind": text = entry.kind
             case "repository-item-detail": text = entry.detail
             default: text = entry.score
+            }
+            let label = NSTextField(labelWithString: text)
+            label.lineBreakMode = .byTruncatingTail
+            return label
+        }
+
+        if tableView == terminalTableView {
+            guard row >= 0, row < terminalSessions.count, let tableColumn else { return nil }
+            let session = terminalSessions[row]
+            let text: String
+            switch tableColumn.identifier.rawValue {
+            case "terminal-state": text = session.state
+            case "terminal-pid": text = session.pid.map(String.init) ?? "-"
+            case "terminal-session": text = session.sessionID
+            default:
+                if session.lastActivityEpochMs > 0 {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "HH:mm:ss"
+                    text = formatter.string(from: Date(timeIntervalSince1970: Double(session.lastActivityEpochMs) / 1000.0))
+                } else {
+                    text = "-"
+                }
             }
             let label = NSTextField(labelWithString: text)
             label.lineBreakMode = .byTruncatingTail
@@ -1636,6 +1822,20 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             let entry = result.entries[row]
             repositoryItemDetailLabel.stringValue =
                 "Path: \(entry.path) | Name/language: \(entry.name) | Kind: \(entry.kind) | \(entry.detail) | Score: \(entry.score.isEmpty ? "N/A" : entry.score)"
+            return
+        }
+
+        if table === terminalTableView {
+            guard !terminalRefreshInProgress else { return }
+            guard let session = selectedTerminalSession() else {
+                terminalBackendLabel.stringValue = "No live PTY session observed."
+                setTerminalControlsEnabled(false)
+                return
+            }
+            terminalReadCursors.removeValue(forKey: session.sessionID)
+            terminalOutputView.string = ""
+            updateTerminalSelection(session)
+            readTerminalOutput(session)
             return
         }
 
@@ -2001,6 +2201,211 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         tabs.selectTabViewItem(withIdentifier: "repository")
     }
 
+    @objc private func showTerminal() {
+        tabs.selectTabViewItem(withIdentifier: "terminal")
+        refreshTerminal(readSelectedOutput: true)
+        if terminalTimer == nil {
+            terminalTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                guard let self,
+                      (self.tabs.selectedTabViewItem?.identifier as? String) == "terminal" else { return }
+                self.refreshTerminal(readSelectedOutput: true)
+            }
+        }
+    }
+
+    private func refreshTerminal(readSelectedOutput: Bool) {
+        guard !terminalRefreshInProgress else { return }
+        terminalRefreshInProgress = true
+        defer { terminalRefreshInProgress = false }
+
+        guard runtime.state == .running else {
+            terminalSessions.removeAll()
+            terminalTableView.reloadData()
+            terminalTableView.deselectAll(nil)
+            terminalBackendLabel.stringValue = "No live PTY session observed."
+            terminalPolicyLabel.stringValue = "Workspace runtime is not connected."
+            terminalStatusLabel.stringValue = "0 observed PTY sessions | restart resume unsupported"
+            setTerminalControlsEnabled(false)
+            return
+        }
+
+        let priorID = selectedTerminalSession()?.sessionID
+        do {
+            let policy = try runtime.presentationPolicyMetadata()
+            let result = try runtime.callPresentationPtyTool(name: "pty_list", arguments: [:])
+            let backendID = terminalString(result, "backend_id", fallback: "unknown")
+            let backendVersion = terminalString(result, "backend_version", fallback: "unknown")
+            let backendCapabilities = terminalStringList(result, "backend_capabilities")
+            let profile = terminalString(policy, "profile", fallback: "unknown")
+            let generation = terminalInt64(policy, "generation")
+            let policyHash = terminalString(policy, "hash", fallback: "unknown")
+            let sessions = result["sessions"] as? [[String: Any]] ?? []
+
+            terminalSessions = sessions.compactMap { session in
+                let sessionID = terminalString(session, "session_id")
+                guard !sessionID.isEmpty else { return nil }
+                return TerminalSessionEvent(
+                    sessionID: sessionID,
+                    pid: terminalInt(session, "pid"),
+                    state: terminalString(session, "state", fallback: "unknown"),
+                    lastActivityEpochMs: terminalInt64(session, "last_activity_epoch_ms"),
+                    earliestCursor: terminalString(session, "earliest_cursor"),
+                    endCursor: terminalString(session, "end_cursor"),
+                    exitCode: terminalInt(session, "exit_code"),
+                    spillRefCount: terminalInt(session, "spill_ref_count") ?? 0,
+                    actualPTY: terminalBool(session, "actual_pty"),
+                    restartResumeSupported: terminalBool(session, "restart_resume_supported"),
+                    grantsAuthority: terminalBool(session, "grants_authority"),
+                    backendID: backendID,
+                    backendVersion: backendVersion,
+                    backendCapabilities: backendCapabilities,
+                    policyProfile: profile,
+                    policyGeneration: generation,
+                    policyHash: policyHash
+                )
+            }.sorted { lhs, rhs in
+                if lhs.lastActivityEpochMs == rhs.lastActivityEpochMs { return lhs.sessionID < rhs.sessionID }
+                return lhs.lastActivityEpochMs > rhs.lastActivityEpochMs
+            }
+
+            terminalTableView.reloadData()
+            let selectedIndex = priorID.flatMap { id in terminalSessions.firstIndex { $0.sessionID == id } }
+                ?? (terminalSessions.isEmpty ? nil : 0)
+            if let selectedIndex {
+                terminalTableView.selectRowIndexes(IndexSet(integer: selectedIndex), byExtendingSelection: false)
+                let selected = terminalSessions[selectedIndex]
+                if priorID != selected.sessionID {
+                    terminalReadCursors.removeValue(forKey: selected.sessionID)
+                    terminalOutputView.string = ""
+                }
+                updateTerminalSelection(selected)
+                if readSelectedOutput { readTerminalOutput(selected) }
+            } else {
+                terminalTableView.deselectAll(nil)
+                terminalBackendLabel.stringValue = "No live PTY session observed."
+                terminalPolicyLabel.stringValue = "profile=\(profile) | generation=\(generation) | presentation_grants_authority=false"
+                setTerminalControlsEnabled(false)
+            }
+            terminalStatusLabel.stringValue = "\(terminalSessions.count) observed PTY session(s) | bounded read=\(terminalReadWindowBytes / 1024) KiB | restart resume unsupported"
+        } catch {
+            terminalSessions.removeAll()
+            terminalTableView.reloadData()
+            terminalTableView.deselectAll(nil)
+            terminalBackendLabel.stringValue = "PTY backend unavailable."
+            terminalPolicyLabel.stringValue = "Policy/runtime state unavailable without expanding authority."
+            terminalStatusLabel.stringValue = "PTY unavailable: \(error.localizedDescription)"
+            setTerminalControlsEnabled(false)
+        }
+    }
+
+    private func readTerminalOutput(_ session: TerminalSessionEvent) {
+        do {
+            let cursor = terminalReadCursors[session.sessionID] ?? session.earliestCursor
+            let result = try runtime.callPresentationPtyTool(name: "pty_read", arguments: [
+                "session_id": session.sessionID,
+                "cursor": cursor,
+                "max_bytes": terminalReadWindowBytes,
+            ])
+            if terminalBool(result, "cursor_evicted") {
+                terminalOutputView.string = "[Older PTY output was evicted from the bounded runtime buffer.]\n"
+            }
+            let text = terminalString(result, "text")
+            if !text.isEmpty { appendTerminalOutput(text) }
+            let nextCursor = terminalString(result, "next_cursor", fallback: cursor)
+            if !nextCursor.isEmpty { terminalReadCursors[session.sessionID] = nextCursor }
+        } catch {
+            terminalStatusLabel.stringValue = "PTY output unavailable: \(error.localizedDescription)"
+        }
+    }
+
+    private func appendTerminalOutput(_ text: String) {
+        var combined = terminalOutputView.string + text
+        if combined.count > maxTerminalOutputCharacters {
+            combined = String(combined.suffix(maxTerminalOutputCharacters))
+        }
+        terminalOutputView.string = combined
+        terminalOutputView.scrollToEndOfDocument(nil)
+    }
+
+    private func selectedTerminalSession() -> TerminalSessionEvent? {
+        let row = terminalTableView.selectedRow
+        guard row >= 0, row < terminalSessions.count else { return nil }
+        return terminalSessions[row]
+    }
+
+    private func updateTerminalSelection(_ session: TerminalSessionEvent) {
+        let exitText = session.exitCode.map(String.init) ?? "-"
+        terminalBackendLabel.stringValue = "\(session.backendID) \(session.backendVersion) | capabilities=\(session.backendCapabilities) | state=\(session.state) | pid=\(session.pid.map(String.init) ?? "-") | exit=\(exitText) | actual_pty=\(session.actualPTY) | restart_resume_supported=\(session.restartResumeSupported) | grants_authority=\(session.grantsAuthority)"
+        let hash = session.policyHash.count > 16 ? String(session.policyHash.prefix(16)) + "..." : session.policyHash
+        terminalPolicyLabel.stringValue = "profile=\(session.policyProfile) | generation=\(session.policyGeneration) | hash=\(hash) | presentation_grants_authority=false"
+        setTerminalControlsEnabled(session.isControllable)
+    }
+
+    private func setTerminalControlsEnabled(_ enabled: Bool) {
+        terminalCtrlCButton.isEnabled = enabled
+        terminalStopButton.isEnabled = enabled
+        terminalResizeButton.isEnabled = enabled
+    }
+
+    @objc private func terminalSendCtrlC() {
+        guard let session = selectedTerminalSession() else { return }
+        executeTerminalControl(session, tool: "pty_signal", arguments: ["session_id": session.sessionID, "signal": "ctrl_c"], success: "Ctrl+C sent")
+    }
+
+    @objc private func terminalStopSession() {
+        guard let session = selectedTerminalSession() else { return }
+        executeTerminalControl(session, tool: "pty_stop", arguments: ["session_id": session.sessionID], success: "PTY session stopped")
+    }
+
+    @objc private func terminalResizeSession() {
+        guard let session = selectedTerminalSession(),
+              let columns = Int(terminalColumnsField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let rows = Int(terminalRowsField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)),
+              (1...500).contains(columns),
+              (1...300).contains(rows) else {
+            terminalStatusLabel.stringValue = "Resize requires columns 1..500 and rows 1..300."
+            return
+        }
+        executeTerminalControl(session, tool: "pty_resize", arguments: [
+            "session_id": session.sessionID,
+            "columns": columns,
+            "rows": rows,
+        ], success: "PTY resized to \(columns)x\(rows)")
+    }
+
+    private func executeTerminalControl(_ session: TerminalSessionEvent, tool: String, arguments: [String: Any], success: String) {
+        do {
+            _ = try runtime.callPresentationPtyTool(name: tool, arguments: arguments)
+            terminalStatusLabel.stringValue = "\(success) | \(session.sessionID)"
+            refreshTerminal(readSelectedOutput: false)
+        } catch {
+            terminalStatusLabel.stringValue = "PTY control blocked/unavailable: \(error.localizedDescription)"
+        }
+    }
+
+    private func terminalString(_ object: [String: Any], _ key: String, fallback: String = "") -> String {
+        object[key] as? String ?? fallback
+    }
+
+    private func terminalInt(_ object: [String: Any], _ key: String) -> Int? {
+        if object[key] is NSNull { return nil }
+        return (object[key] as? NSNumber)?.intValue
+    }
+
+    private func terminalInt64(_ object: [String: Any], _ key: String) -> Int64 {
+        (object[key] as? NSNumber)?.int64Value ?? 0
+    }
+
+    private func terminalBool(_ object: [String: Any], _ key: String) -> Bool {
+        (object[key] as? NSNumber)?.boolValue ?? false
+    }
+
+    private func terminalStringList(_ object: [String: Any], _ key: String) -> String {
+        if let values = object[key] as? [String] { return values.joined(separator: ",") }
+        if let values = object[key] as? [Any] { return values.compactMap { $0 as? String }.joined(separator: ",") }
+        return "none"
+    }
+
     @objc private func showArtifacts() {
         artifactBatchTableView.reloadData()
         if selectedArtifactBatch != nil { artifactEntryTableView.reloadData() }
@@ -2128,7 +2533,11 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     }
 
     func showSettingsTab() { tabs.selectTabViewItem(withIdentifier: "settings") }
-    func shutdownForTermination() { runtime.shutdownImmediately() }
+    func shutdownForTermination() {
+        terminalTimer?.invalidate()
+        terminalTimer = nil
+        runtime.shutdownImmediately()
+    }
 
     @objc private func deleteSavedKey() {
         do {

@@ -27,6 +27,10 @@ internal sealed record LocalMcpServerLimits(int MaxConcurrentConnections, TimeSp
 public sealed class LocalMcpServer : IAsyncDisposable
 {
     private static readonly HashSet<string> ServerHandlerToolNames = new(StringComparer.Ordinal) { "filemcp_observability_connect", "evidence_get" };
+    private static readonly HashSet<string> PresentationPtyToolNames = new(StringComparer.Ordinal)
+    {
+        "pty_list", "pty_read", "pty_resize", "pty_signal", "pty_stop",
+    };
     private static readonly HashSet<string> UnauthenticatedOAuthDiscoveryPaths = new(StringComparer.Ordinal)
     {
         "/.well-known/oauth-protected-resource/mcp",
@@ -93,6 +97,27 @@ public sealed class LocalMcpServer : IAsyncDisposable
 
     private static ServerPolicy ServerPolicyFor(bool enableCommands, LocalPolicyConfiguration? configuration) =>
         configuration is null ? ServerPolicy.FromLegacy(enableCommands) : new ServerPolicy(configuration);
+
+    public async Task<JsonObject> CallPresentationPtyToolAsync(
+        string toolName,
+        JsonObject arguments,
+        CancellationToken cancellationToken = default)
+    {
+        if (!PresentationPtyToolNames.Contains(toolName))
+            throw new FileMcpException($"Tool is not available to the desktop presentation bridge: {toolName}");
+        if (!IsReady)
+            throw new FileMcpException("Local MCP server is not ready");
+
+        var output = await _tools.CallAsync(toolName, arguments, cancellationToken).ConfigureAwait(false);
+        return output.StructuredContent.DeepClone().AsObject();
+    }
+
+    public JsonObject PresentationPolicyMetadata()
+    {
+        var metadata = _policy.Metadata().DeepClone().AsObject();
+        metadata["presentation_grants_authority"] = false;
+        return metadata;
+    }
 
     public bool IsReady { get; private set; }
 

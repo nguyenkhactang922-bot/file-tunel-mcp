@@ -37,7 +37,12 @@ public partial class MainWindow : Window
     private readonly List<ChangeRow> _changeRows = new();
     private readonly List<EvidenceRow> _evidenceRows = new();
     private readonly List<RepositoryResultRow> _repositoryRows = new();
+    private readonly List<TerminalSessionRow> _terminalRows = new();
+    private readonly Dictionary<string, string> _terminalReadCursors = new(StringComparer.Ordinal);
     private readonly List<ArtifactBatchRow> _artifactBatchRows = new();
+    private bool _terminalRefreshRunning;
+    private const int TerminalReadWindowBytes = 16 * 1024;
+    private const int MaxTerminalOutputCharacters = 64 * 1024;
     private const int MaxActivityRows = 500;
     private const int MaxChangeRows = 250;
     private const int MaxEvidenceRows = 500;
@@ -183,6 +188,8 @@ public partial class MainWindow : Window
     {
         await RefreshRuntimeHealthAsync();
         RefreshOverviewLiveUi();
+        if (MainTabs.SelectedItem == TerminalTab)
+            await RefreshTerminalAsync(readSelectedOutput: true);
         if (DateTimeOffset.UtcNow - _lastOverviewPeriodRefreshUtc >= TimeSpan.FromSeconds(5))
             await RefreshOverviewPeriodAsync(force: false);
     }
@@ -1101,6 +1108,11 @@ public partial class MainWindow : Window
         MainTabs.SelectedItem = RepositoryTab;
         RefreshRepositoryGrid();
     }
+    private async void NavigateTerminal_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = TerminalTab;
+        await RefreshTerminalAsync(readSelectedOutput: true);
+    }
     private void NavigateArtifacts_Click(object sender, RoutedEventArgs e)
     {
         MainTabs.SelectedItem = ArtifactsTab;
@@ -1313,6 +1325,34 @@ public partial class MainWindow : Window
         "F" => FStatusText,
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
+
+    private sealed record TerminalSessionRow(
+        string Workspace,
+        string SessionId,
+        int? Pid,
+        string State,
+        long LastActivityEpochMs,
+        string EarliestCursor,
+        string EndCursor,
+        int? ExitCode,
+        int SpillRefCount,
+        bool ActualPty,
+        bool RestartResumeSupported,
+        bool GrantsAuthority,
+        string BackendId,
+        string BackendVersion,
+        string BackendCapabilities,
+        string PolicyProfile,
+        long PolicyGeneration,
+        string PolicyHash)
+    {
+        public string Key => $"{Workspace}|{SessionId}";
+        public string PidDisplay => Pid?.ToString() ?? "-";
+        public string LastActivityDisplay => LastActivityEpochMs <= 0
+            ? "-"
+            : DateTimeOffset.FromUnixTimeMilliseconds(LastActivityEpochMs).ToLocalTime().ToString("HH:mm:ss");
+        public bool IsControllable => string.Equals(State, "running", StringComparison.OrdinalIgnoreCase);
+    }
 
     private sealed record RepositoryItemRow(
         string Path,
@@ -1599,6 +1639,257 @@ public partial class MainWindow : Window
         RepositorySummaryText.Text =
             $"{row.QueryKind}: {row.ReturnedCount}/{row.TotalCount} returned | {state} | {row.Entries.Count} metadata row(s) displayed | symbol_support={row.SymbolSupport} | artifact_state={row.ArtifactState}. Provider completeness is descriptive, not exhaustive truth.";
         RepositorySourceText.Text = $"source_state_id={row.SourceStateId}";
+    }
+
+    private async Task RefreshTerminalAsync(bool readSelectedOutput)
+    {
+        if (_terminalRefreshRunning) return;
+        _terminalRefreshRunning = true;
+        try
+        {
+            var priorSelectionKey = (TerminalSessionGrid.SelectedItem as TerminalSessionRow)?.Key;
+            var rows = new List<TerminalSessionRow>();
+            var unavailable = new List<string>();
+
+            foreach (var workspace in WorkspaceKeys)
+            {
+                if (!_runtimes.TryGetValue(workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running)
+                    continue;
+
+                try
+                {
+                    var policy = runtime.PresentationPolicyMetadata();
+                    var result = await runtime.CallPresentationPtyToolAsync("pty_list", new JsonObject());
+                    var backendId = JsonText(result, "backend_id", "unknown");
+                    var backendVersion = JsonText(result, "backend_version", "unknown");
+                    var capabilities = JsonStringList(result, "backend_capabilities");
+                    if (result["sessions"] is not JsonArray sessions) continue;
+
+                    foreach (var node in sessions)
+                    {
+                        if (node is not JsonObject session) continue;
+                        var sessionId = JsonText(session, "session_id", "");
+                        if (sessionId.Length == 0) continue;
+                        rows.Add(new TerminalSessionRow(
+                            workspace,
+                            sessionId,
+                            JsonNullableInt(session, "pid"),
+                            JsonText(session, "state", "unknown"),
+                            JsonLong(session, "last_activity_epoch_ms"),
+                            JsonText(session, "earliest_cursor", ""),
+                            JsonText(session, "end_cursor", ""),
+                            JsonNullableInt(session, "exit_code"),
+                            JsonInt(session, "spill_ref_count"),
+                            JsonBool(session, "actual_pty"),
+                            JsonBool(session, "restart_resume_supported"),
+                            JsonBool(session, "grants_authority"),
+                            backendId,
+                            backendVersion,
+                            capabilities,
+                            JsonText(policy, "profile", "unknown"),
+                            JsonLong(policy, "generation"),
+                            JsonText(policy, "hash", "unknown")));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    unavailable.Add($"{workspace}: {ex.Message}");
+                }
+            }
+
+            _terminalRows.Clear();
+            _terminalRows.AddRange(rows.OrderBy(row => row.Workspace, StringComparer.Ordinal).ThenBy(row => row.SessionId, StringComparer.Ordinal));
+            TerminalSessionGrid.ItemsSource = null;
+            TerminalSessionGrid.ItemsSource = _terminalRows;
+
+            var selected = priorSelectionKey is null
+                ? _terminalRows.FirstOrDefault()
+                : _terminalRows.FirstOrDefault(row => row.Key == priorSelectionKey) ?? _terminalRows.FirstOrDefault();
+            TerminalSessionGrid.SelectedItem = selected;
+
+            if (selected is null)
+            {
+                TerminalSelectionText.Text = "Select a PTY session";
+                TerminalBackendText.Text = "No live PTY session observed.";
+                TerminalPolicyText.Text = "No connected workspace session selected.";
+                SetTerminalControlsEnabled(false);
+            }
+            else
+            {
+                if (!string.Equals(priorSelectionKey, selected.Key, StringComparison.Ordinal))
+                {
+                    _terminalReadCursors.Remove(selected.Key);
+                    TerminalOutputText.Clear();
+                }
+                UpdateTerminalSelection(selected);
+                if (readSelectedOutput)
+                    await ReadTerminalOutputAsync(selected);
+            }
+
+            TerminalStatusText.Text = unavailable.Count == 0
+                ? $"{_terminalRows.Count} observed PTY session(s) | bounded read={TerminalReadWindowBytes / 1024} KiB | restart resume unsupported"
+                : $"{_terminalRows.Count} observed PTY session(s) | unavailable: {string.Join("; ", unavailable)}";
+        }
+        finally
+        {
+            _terminalRefreshRunning = false;
+        }
+    }
+
+    private async Task ReadTerminalOutputAsync(TerminalSessionRow row)
+    {
+        if (!_runtimes.TryGetValue(row.Workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running)
+            return;
+
+        try
+        {
+            var cursor = _terminalReadCursors.TryGetValue(row.Key, out var saved) ? saved : row.EarliestCursor;
+            var result = await runtime.CallPresentationPtyToolAsync("pty_read", new JsonObject
+            {
+                ["session_id"] = row.SessionId,
+                ["cursor"] = cursor,
+                ["max_bytes"] = TerminalReadWindowBytes,
+            });
+
+            if (JsonBool(result, "cursor_evicted"))
+                TerminalOutputText.Text = "[Older PTY output was evicted from the bounded runtime buffer.]\r\n";
+
+            var text = JsonText(result, "text", "");
+            if (text.Length > 0)
+                AppendTerminalOutput(text);
+
+            var nextCursor = JsonText(result, "next_cursor", cursor);
+            if (nextCursor.Length > 0)
+                _terminalReadCursors[row.Key] = nextCursor;
+        }
+        catch (Exception ex)
+        {
+            TerminalStatusText.Text = $"PTY output unavailable for {row.Workspace}: {ex.Message}";
+        }
+    }
+
+    private void AppendTerminalOutput(string text)
+    {
+        var combined = TerminalOutputText.Text + text;
+        if (combined.Length > MaxTerminalOutputCharacters)
+            combined = combined[^MaxTerminalOutputCharacters..];
+        TerminalOutputText.Text = combined;
+        TerminalOutputText.ScrollToEnd();
+    }
+
+    private void UpdateTerminalSelection(TerminalSessionRow row)
+    {
+        TerminalSelectionText.Text = $"{row.Workspace}: {row.SessionId} | state={row.State} | exit={row.ExitCode?.ToString() ?? "-"}";
+        TerminalBackendText.Text = $"{row.BackendId} {row.BackendVersion} | capabilities={row.BackendCapabilities} | actual_pty={row.ActualPty} | restart_resume_supported={row.RestartResumeSupported} | grants_authority={row.GrantsAuthority}";
+        var hash = row.PolicyHash.Length > 16 ? row.PolicyHash[..16] + "..." : row.PolicyHash;
+        TerminalPolicyText.Text = $"profile={row.PolicyProfile} | generation={row.PolicyGeneration} | hash={hash} | presentation_grants_authority=false";
+        SetTerminalControlsEnabled(row.IsControllable);
+    }
+
+    private void SetTerminalControlsEnabled(bool enabled)
+    {
+        TerminalCtrlCButton.IsEnabled = enabled;
+        TerminalStopButton.IsEnabled = enabled;
+        TerminalResizeButton.IsEnabled = enabled;
+    }
+
+    private async void TerminalSessionGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_terminalRefreshRunning || TerminalSessionGrid.SelectedItem is not TerminalSessionRow row) return;
+        _terminalReadCursors.Remove(row.Key);
+        TerminalOutputText.Clear();
+        UpdateTerminalSelection(row);
+        await ReadTerminalOutputAsync(row);
+    }
+
+    private async void TerminalCtrlC_Click(object sender, RoutedEventArgs e)
+    {
+        if (TerminalSessionGrid.SelectedItem is not TerminalSessionRow row) return;
+        await ExecuteTerminalControlAsync(row, "pty_signal", new JsonObject
+        {
+            ["session_id"] = row.SessionId,
+            ["signal"] = "ctrl_c",
+        }, "Ctrl+C sent");
+    }
+
+    private async void TerminalStop_Click(object sender, RoutedEventArgs e)
+    {
+        if (TerminalSessionGrid.SelectedItem is not TerminalSessionRow row) return;
+        await ExecuteTerminalControlAsync(row, "pty_stop", new JsonObject { ["session_id"] = row.SessionId }, "PTY session stopped");
+    }
+
+    private async void TerminalResize_Click(object sender, RoutedEventArgs e)
+    {
+        if (TerminalSessionGrid.SelectedItem is not TerminalSessionRow row) return;
+        if (!int.TryParse(TerminalColumnsBox.Text.Trim(), out var columns) || columns is < 1 or > 500 ||
+            !int.TryParse(TerminalRowsBox.Text.Trim(), out var rows) || rows is < 1 or > 300)
+        {
+            TerminalStatusText.Text = "Resize requires columns 1..500 and rows 1..300.";
+            return;
+        }
+
+        await ExecuteTerminalControlAsync(row, "pty_resize", new JsonObject
+        {
+            ["session_id"] = row.SessionId,
+            ["columns"] = columns,
+            ["rows"] = rows,
+        }, $"PTY resized to {columns}x{rows}");
+    }
+
+    private async Task ExecuteTerminalControlAsync(TerminalSessionRow row, string toolName, JsonObject arguments, string successMessage)
+    {
+        if (!_runtimes.TryGetValue(row.Workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running)
+        {
+            TerminalStatusText.Text = $"Workspace {row.Workspace} is not connected.";
+            return;
+        }
+
+        try
+        {
+            await runtime.CallPresentationPtyToolAsync(toolName, arguments);
+            TerminalStatusText.Text = $"{successMessage} | {row.Workspace}: {row.SessionId}";
+            await RefreshTerminalAsync(readSelectedOutput: false);
+        }
+        catch (Exception ex)
+        {
+            TerminalStatusText.Text = $"PTY control blocked/unavailable: {ex.Message}";
+        }
+    }
+
+    private static string JsonText(JsonObject obj, string key, string fallback) =>
+        obj[key] is JsonValue value && value.TryGetValue<string>(out var text) ? text : fallback;
+
+    private static int JsonInt(JsonObject obj, string key)
+    {
+        if (obj[key] is not JsonValue value) return 0;
+        if (value.TryGetValue<int>(out var number)) return number;
+        return value.TryGetValue<long>(out var wide) && wide is >= int.MinValue and <= int.MaxValue ? (int)wide : 0;
+    }
+
+    private static int? JsonNullableInt(JsonObject obj, string key)
+    {
+        if (obj[key] is not JsonValue value) return null;
+        if (value.TryGetValue<int>(out var number)) return number;
+        return value.TryGetValue<long>(out var wide) && wide is >= int.MinValue and <= int.MaxValue ? (int)wide : null;
+    }
+
+    private static long JsonLong(JsonObject obj, string key)
+    {
+        if (obj[key] is not JsonValue value) return 0;
+        if (value.TryGetValue<long>(out var number)) return number;
+        return value.TryGetValue<int>(out var narrow) ? narrow : 0;
+    }
+
+    private static bool JsonBool(JsonObject obj, string key) =>
+        obj[key] is JsonValue value && value.TryGetValue<bool>(out var flag) && flag;
+
+    private static string JsonStringList(JsonObject obj, string key)
+    {
+        if (obj[key] is not JsonArray array) return "none";
+        var values = array.OfType<JsonValue>()
+            .Select(value => value.TryGetValue<string>(out var text) ? text : null)
+            .Where(text => !string.IsNullOrWhiteSpace(text));
+        return string.Join(",", values!);
     }
 
     private void TryCaptureArtifactBatchRow(string line, string workspace)

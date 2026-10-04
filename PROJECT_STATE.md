@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `chatgpt/FMUX-011-repository-intelligence`
+Active branch: `chatgpt/FMUX-012-terminal-pty`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1491,4 +1491,10 @@ FMUX-011 Repository Intelligence is CLAIMED / ACTIVE on `chatgpt/FMUX-011-reposi
 
 FMUX-011 exact-head checkpoint: NATIVE VERIFIED / SCOPED REVIEW PASS. Candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0` passed push Verify `37138794626` on macOS / Windows x64 / native Windows ARM64, including FMUX Repository contract plus native integration/build/package/smoke gates. No P0/P1 remains. Runtime PID `17860` is unchanged and correct.
 
-NEXT_EXACT_ACTION: commit/push the evidence-state-only FMUX-011 closure head -> require exact-head native Verify on the closure SHA -> create/review exactly one PR to `main` -> merge exact reviewed head -> verify exact resulting main. FMUX-012 remains blocked until FMUX-011 MAIN VERIFIED.
+FMUX-011 Repository Intelligence: DONE / MAIN VERIFIED. Closure head `0b9c08f052418a20f48e4b688cc41dc93eb21117`; push Verify `37139506323` SUCCESS; PR #49 Verify `37139999329` SUCCESS; merged main `d378faa0807435be7ca21eff1c573518779c5dd4`; merged-main Verify `37140380944` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMUX-012 Terminal / PTY: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-012-terminal-pty`, based directly on verified main `d378faa0807435be7ca21eff1c573518779c5dd4`. Dependencies FMUX-002, FMUX-003 and FMG-020 are DONE / MAIN VERIFIED. Runtime PID `17860` remains correct and was not restarted.
+
+FMUX-012 local verification: Terminal contract PASS; app-shell PASS; presentation PASS; Repository regression PASS; persistent PTY contract PASS; project-state contract PASS; `git diff --check` PASS; Windows Release build for the FMUX-012 Windows source checkpoint PASS with 0 warnings / 0 errors. Evidence: `docs/evidence/FMUX-012_TERMINAL_PTY_UX_EVIDENCE.md`. Native macOS and Windows ARM64 verification are pending exact-head GitHub Verify.
+
+NEXT_EXACT_ACTION: side-effect guard remote branch/PR -> create exact FMUX-012 candidate commit -> push writable GitHub remote -> require exact-head Verify on macOS / Windows x64 / native Windows ARM64 -> scoped review -> evidence-state closure -> PR/review/merge -> merged-main Verify.
