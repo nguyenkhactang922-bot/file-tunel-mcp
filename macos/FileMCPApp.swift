@@ -2971,7 +2971,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             let environmentMode = terminalString(metadata, "backend_environment_mode", fallback: "unknown")
             let networkMode = terminalString(metadata, "backend_network_mode", fallback: "unknown")
             let resourceMode = terminalString(metadata, "backend_resource_mode", fallback: "unknown")
-            let capabilities = terminalStringList(metadata, "backend_capabilities").joined(separator: ",")
+            let capabilities = terminalStringList(metadata, "backend_capabilities")
             let imageDigest = terminalString(metadata, "image_digest", fallback: "-")
             let networkPolicy = terminalString(metadata, "network_policy", fallback: networkMode)
             let resourcePolicy = terminalString(metadata, "resource_policy", fallback: resourceMode)

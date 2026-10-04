@@ -62,3 +62,13 @@ macOS compile/typecheck/build remains PENDING exact-head GitHub Verify because t
 ## Next gate
 
 Create the exact candidate commit, side-effect-guard remote branch/PR state, push once, then require GitHub Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 before PR closure. Local verification is not DONE.
+
+
+## FMUX-015 exact-head attempt 1 / targeted macOS fix - 2026-10-04
+
+- Candidate `d83d4e29f2cbaa84c2cf47c2e98b2b79208ab8f7`; push Verify `37197764997` completed FAILURE.
+- Windows x64: SUCCESS. Native Windows ARM64: SUCCESS. These lane checkpoints are preserved.
+- macOS failed only `Static verification` at Swift typecheck: `terminalStringList(...)` already returns `String`, so the Backend UI's extra `.joined(separator: ",")` was invalid.
+- Targeted fix: use `terminalStringList(metadata, "backend_capabilities")` directly. No backend truth, policy, Docker, or authority semantics changed.
+- Targeted local recheck: FMUX-015 contract PASS; `git diff --check` PASS.
+- Next: commit the macOS compile fix + this checkpoint -> side-effect guard -> push exact new head -> require a fresh three-lane Verify. Do not manually rerun attempt `37197764997`.

@@ -1659,3 +1659,13 @@ FMUX-015 Backend / Isolation UX is ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-015-
 Local gates PASS: FMUX-015 contract, app-shell, presentation, project-state, execution-backend, Docker-backend, diff hygiene, and Windows Release build 0 warnings / 0 errors. Live current runtime remains `host-native` with `presentation_grants_authority=false`; PID `17860` remains correct and was not restarted. Docker live daemon remains environment-blocked; host-native UI therefore says Docker `not selected / not probed` rather than inventing availability. macOS native compile/build is pending exact-head GitHub Verify.
 
 NEXT_EXACT_ACTION: scoped final diff review -> candidate commit -> side-effect guard -> push exact head -> require GitHub Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> then closure evidence/state, one reviewed PR, guarded merge and merged-main Verify. Local verification is not DONE.
+
+
+## FMUX-015 exact-head attempt 1 / targeted macOS fix - 2026-10-04
+
+- Candidate `d83d4e29f2cbaa84c2cf47c2e98b2b79208ab8f7`; push Verify `37197764997` completed FAILURE.
+- Windows x64: SUCCESS. Native Windows ARM64: SUCCESS. These lane checkpoints are preserved.
+- macOS failed only `Static verification` at Swift typecheck: `terminalStringList(...)` already returns `String`, so the Backend UI's extra `.joined(separator: ",")` was invalid.
+- Targeted fix: use `terminalStringList(metadata, "backend_capabilities")` directly. No backend truth, policy, Docker, or authority semantics changed.
+- Targeted local recheck: FMUX-015 contract PASS; `git diff --check` PASS.
+- Next: commit the macOS compile fix + this checkpoint -> side-effect guard -> push exact new head -> require a fresh three-lane Verify. Do not manually rerun attempt `37197764997`.
