@@ -107,3 +107,21 @@ Targeted fixes only:
 - `macos/LocalMCPRuntime.swift` marks the presentation helper closure parameter `@escaping`, matching how it is captured before synchronous dispatch. Native macOS compile/integration re-verification remains CI-only on this Windows host.
 
 The failed run is fully completed. No other CI rerun was started while it was active, Windows implementation source was not changed, and runtime PID `17860` was not restarted.
+
+
+## Exact-head attempt 2 — native verified / scoped review pass
+
+Candidate: `edd996bd43642e8c5399a90ca14cb109db858fd1`
+Verify run: `37176690710`
+Result: SUCCESS on macOS, Windows x64, and native Windows ARM64.
+
+Scoped review result: PASS; no P0/P1 remains.
+- Desktop presentation bridge allowlist is exactly `pty_list`, `pty_read`, `pty_resize`, `pty_signal`, `pty_stop`.
+- `pty_start` and `pty_write` remain outside presentation authority on both native stacks.
+- Read windows remain bounded at 16 KiB and displayed output at 64 KiB.
+- Terminal output is rendered only in the live terminal surface and is not copied into diagnostics/activity evidence.
+- Policy metadata explicitly records `presentation_grants_authority=false`.
+- Restart resume remains explicitly unsupported rather than synthesized.
+- Runtime PID `17860` was not restarted.
+
+Remaining closure gates: evidence-state-only closure commit -> push exact closure SHA -> exact-head Verify -> reviewed PR to `main` -> guarded merge -> merged-main Verify.
