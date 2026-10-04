@@ -1725,3 +1725,12 @@ NEXT_EXACT_ACTION: deep-read existing first-run/workspace/profile/policy/connect
 - Runtime PID `17860` remains correct FMG026-ready and was not restarted.
 
 NEXT_EXACT_ACTION: perform final scoped diff/security review -> create exact candidate commit -> side-effect guard remote branch/PR/main -> push exact head -> require macOS / Windows x64 / native Windows ARM64 Verify. Repair only a real failed stage if any; after exact-head native PASS, record closure evidence/state, verify closure head, then one reviewed PR -> guarded merge -> exact resulting-main Verify -> FMUX-016 MAIN VERIFIED -> governance state-sync before FMUX-017 claim.
+
+
+## FMUX-016 exact-head native verified - 2026-10-04
+
+Candidate `bb8480d05e80459865dbac8322813c4309d2ea19` passed push Verify `37218197455` on macOS / Windows x64 / native Windows ARM64. Scoped authority/truth review PASS with no P0/P1: onboarding reuses existing secure credential, policy, workspace and runtime paths; it grants no new authority and only reports connection PASS from actual `Running` state. Runtime PID `17860` remained unchanged.
+
+State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING.
+
+NEXT_EXACT_ACTION: create a state/evidence-only closure commit -> side-effect guard -> push exact closure head -> require three-lane Verify on that closure SHA -> create/review exactly one PR to `main` -> guarded merge exact reviewed head -> verify exact resulting `main`. Do not rerun successful candidate Verify `37218197455` or restart runtime PID `17860`.

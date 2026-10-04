@@ -1624,3 +1624,12 @@ Implementation truth:
 Local verification PASS: FMUX-016 contract, app-shell contract, presentation contract, project-state contract, diff check, Windows Release build 0 warnings / 0 errors. macOS native compilation is pending exact-head GitHub Verify because local Windows host has no `swiftc`. Evidence: `docs/evidence/FMUX-016_ONBOARDING_UX_EVIDENCE.md`. Runtime PID `17860` unchanged.
 
 NEXT_EXACT_ACTION: final scoped review -> candidate commit -> remote/PR/main side-effect guard -> push exact head -> three-lane native Verify -> closure evidence/state -> closure-head Verify -> reviewed PR -> merge -> merged-main Verify. Do not claim FMUX-017 before FMUX-016 and its governance state-sync are MAIN VERIFIED.
+
+
+## FMUX-016 exact-head native verified - 2026-10-04
+
+FMUX-016 candidate `bb8480d05e80459865dbac8322813c4309d2ea19` is EXACT-HEAD NATIVE VERIFIED. Push Verify `37218197455` SUCCESS on macOS / Windows x64 / native Windows ARM64. Scoped review PASS; no P0/P1 remains and onboarding does not grant authority beyond existing workspace/policy/credential/runtime paths. Runtime PID `17860` unchanged.
+
+State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING.
+
+NEXT_EXACT_ACTION: state/evidence-only closure commit -> push exact closure head -> three-lane Verify -> one reviewed PR to `main` -> guarded merge -> exact resulting-main Verify. FMUX-017 remains blocked until FMUX-016 governance closure is MAIN VERIFIED.

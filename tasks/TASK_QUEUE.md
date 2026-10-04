@@ -249,3 +249,12 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Evidence: `docs/evidence/FMUX-016_ONBOARDING_UX_EVIDENCE.md`.
 - Runtime PID `17860` unchanged; no restart.
 - Next: scoped review -> exact candidate commit -> remote/PR guard -> push exact head -> three-lane Verify -> closure/review/PR/merge -> merged-main Verify; FMUX-017 remains blocked until FMUX-016 governance closure is MAIN VERIFIED.
+
+
+## FMUX-016 exact-head native verified checkpoint - 2026-10-04
+
+- Candidate `bb8480d05e80459865dbac8322813c4309d2ea19`.
+- Push Verify `37218197455`: SUCCESS across macOS / Windows x64 / native Windows ARM64.
+- Scoped review PASS; no P0/P1; no authority expansion or synthetic connection truth.
+- Runtime PID `17860` unchanged.
+- Next: evidence/state-only closure commit -> exact closure-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify; FMUX-017 remains blocked pending FMUX-016 governance MAIN VERIFIED.

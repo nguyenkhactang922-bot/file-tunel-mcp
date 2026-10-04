@@ -64,3 +64,17 @@ CI wiring:
 `ACTIVE / LOCAL VERIFIED / EXACT-HEAD NATIVE VERIFY PENDING`.
 
 Next lifecycle: scoped diff review -> exact candidate commit -> side-effect guard -> push exact head -> require macOS / Windows x64 / native Windows ARM64 Verify -> repair only a real failed stage if any -> evidence/state closure -> exact closure-head Verify -> one reviewed PR to `main` -> guarded merge -> verify the exact resulting `main` -> MAIN VERIFIED -> governance state-sync before claiming FMUX-017.
+
+
+## Exact-head native verification / scoped review
+
+- Candidate head: `bb8480d05e80459865dbac8322813c4309d2ea19`.
+- Push Verify `37218197455`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- FMUX-016 Onboarding presentation contract passed in both Windows lanes; macOS static/integration/build passed on native macOS.
+- Scoped review PASS: no new credential store, policy authority, backend selector, runtime/tool authority, synthetic connection result, or implicit restart path; connection PASS remains bound to actual runtime `Running` state.
+- No P0/P1 finding remains.
+- Runtime PID `17860` remained the correct FMG026-ready runtime and was not restarted.
+
+Current state: `ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING`.
+
+Next: state/evidence-only closure commit -> push exact closure head -> require exact-head three-lane Verify -> create/review exactly one PR to `main` -> guarded merge -> verify exact resulting `main` -> FMUX-016 MAIN VERIFIED -> separate governance state-sync before FMUX-017 claim.
