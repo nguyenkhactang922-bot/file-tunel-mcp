@@ -125,3 +125,14 @@ Scoped review result: PASS; no P0/P1 remains.
 - Runtime PID `17860` was not restarted.
 
 Remaining closure gates: evidence-state-only closure commit -> push exact closure SHA -> exact-head Verify -> reviewed PR to `main` -> guarded merge -> merged-main Verify.
+
+
+## Final GitHub lifecycle / MAIN VERIFIED
+
+- Closure head: `feb365864c32a3f7bb297bc4bba59c6171a73a9d`.
+- Push Verify `37177215836`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #50 exact-head Verify `37177568204`: SUCCESS on all three native lanes.
+- PR #50 merged to `main` as `38b20e633957ea6c279b110dac54072b29df14a6`.
+- Merged-main Verify `37177832479`: SUCCESS on the exact resulting main commit, including FMUX Terminal / PTY presentation contract, native builds, integration, packages, app smoke and resource gates.
+- Final task state: `DONE / MAIN VERIFIED`.
+- Runtime PID `17860` remained the correct FMG026-ready runtime throughout; no restart was required.

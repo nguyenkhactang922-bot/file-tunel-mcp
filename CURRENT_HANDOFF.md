@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMUX-012-terminal-pty`
+Branch: `state/FMUX-012-main-verified`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: ACTIVE FMUX-012 Terminal / PTY implementation, based exactly on verified main `d378faa0807435be7ca21eff1c573518779c5dd4`; FMUX-011 is DONE / MAIN VERIFIED and runtime PID `17860` remains correct.
+Expected worktree at handoff: FMUX-012 state-only MAIN VERIFIED closure on `state/FMUX-012-main-verified`, based exactly on verified main `38b20e633957ea6c279b110dac54072b29df14a6`; product implementation is already DONE / MAIN VERIFIED and runtime PID `17860` remains correct.
 
 ## Completed technical program
 
@@ -1598,3 +1598,10 @@ Exact-head attempt 1: candidate `bae6bea5cf23a2577cd474068472de752cb1944e`, Veri
 Exact-head attempt 2: fix checkpoint `edd996bd43642e8c5399a90ca14cb109db858fd1`, push Verify `37176690710` = SUCCESS on macOS / Windows x64 / native Windows ARM64. Scoped review PASS: presentation bridge allowlist is only `pty_list`, `pty_read`, `pty_resize`, `pty_signal`, `pty_stop`; no `pty_start`/`pty_write` presentation authority; bounded output remains 16 KiB/read and 64 KiB/display; PTY bytes are not copied into diagnostics/activity; `presentation_grants_authority=false`; no P0/P1 remains. Runtime PID `17860` remains unchanged.
 
 NEXT_EXACT_ACTION: commit/push the evidence-state-only FMUX-012 closure head, require exact-head Verify on that closure SHA, then create/review exactly one PR to `main` -> merge exact reviewed head with guard -> verify the exact resulting `main`. Do not rerun successful Verify `37176690710`, FMUX-011/FMG-020 proof, or restart correct runtime PID `17860`.
+
+
+FMUX-012 FINAL: DONE / MAIN VERIFIED. Closure head `feb365864c32a3f7bb297bc4bba59c6171a73a9d` passed push Verify `37177215836` and PR #50 exact-head Verify `37177568204` on macOS / Windows x64 / native Windows ARM64. PR #50 merged as `38b20e633957ea6c279b110dac54072b29df14a6`; merged-main Verify `37177832479` SUCCESS on the exact resulting main commit across all three native lanes. Runtime PID `17860` remained correct and was not restarted.
+
+State-sync checkpoint: current branch `state/FMUX-012-main-verified` is based directly on verified main `38b20e633957ea6c279b110dac54072b29df14a6`. FMUX-013 and FMUX-015 core dependencies are all DONE / MAIN VERIFIED; after this state-sync itself reaches MAIN VERIFIED, the dependency-valid lowest-numbered next task is FMUX-013 Recovery.
+
+NEXT_EXACT_ACTION: complete this FMUX-012 state-only closure through commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify. Only after the state-sync is MAIN VERIFIED, claim FMUX-013 Recovery from the resulting verified `main`; do not rerun FMUX-012 implementation proof or restart correct runtime PID `17860`.
