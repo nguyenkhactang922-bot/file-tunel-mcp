@@ -4,7 +4,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMUX-016-onboarding`
+Branch: `state/FMUX-016-main-verified`
 Git SHA source of truth: run git rev-parse HEAD.
 Expected worktree at handoff: FMUX-015 governance state-sync is DONE / MAIN VERIFIED via PR #55, main `987c7f836830b55f019a786b0a7b218281d7ef99`, merged-main Verify `37215916252`; FMUX-016 Onboarding is ACTIVE / CLAIMED on `chatgpt/FMUX-016-onboarding`, based exactly on that verified main; runtime PID `17860` remains correct and must not be restarted.
 
@@ -1734,3 +1734,18 @@ Candidate `bb8480d05e80459865dbac8322813c4309d2ea19` passed push Verify `3721819
 State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING.
 
 NEXT_EXACT_ACTION: create a state/evidence-only closure commit -> side-effect guard -> push exact closure head -> require three-lane Verify on that closure SHA -> create/review exactly one PR to `main` -> guarded merge exact reviewed head -> verify exact resulting `main`. Do not rerun successful candidate Verify `37218197455` or restart runtime PID `17860`.
+
+
+## FMUX-016 technical MAIN VERIFIED / governance state-sync - 2026-10-05
+
+FMUX-016 Onboarding is DONE / MAIN VERIFIED technically.
+- Candidate `bb8480d05e80459865dbac8322813c4309d2ea19`; push Verify `37218197455`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Closure head `4003ab7569a544f9e5eda54e01f48f6903579e46`; push Verify `37218732623`: SUCCESS on all three native lanes.
+- PR #56 exact-head Verify `37219510769`: SUCCESS; scoped review PASS with no P0/P1 and no presentation/runtime authority expansion.
+- PR #56 merged as `4ec9ad43f1190074c64bea814976e333640707ab`.
+- Merged-main Verify `37219941223`: SUCCESS on the exact resulting `main` across macOS / Windows x64 / native Windows ARM64.
+- Runtime PID `17860` remains the correct FMG026-ready runtime and was not restarted.
+
+Governance state-sync is ACTIVE on `state/FMUX-016-main-verified`, based exactly on verified main `4ec9ad43f1190074c64bea814976e333640707ab`. No product/runtime source change belongs to this sync. FMUX-017 is dependency-ready by the product graph but MUST NOT be claimed until this state-sync itself is MAIN VERIFIED.
+
+NEXT_EXACT_ACTION: complete this state-only closure through state/onboarding contracts + diff hygiene -> commit -> push -> exact-head Verify -> one reviewed PR to `main` -> guarded merge -> merged-main Verify; only then claim FMUX-017 from the resulting verified main.

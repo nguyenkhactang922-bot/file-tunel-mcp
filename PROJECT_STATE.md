@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `chatgpt/FMUX-016-onboarding`
+Active branch: `state/FMUX-016-main-verified`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1633,3 +1633,12 @@ FMUX-016 candidate `bb8480d05e80459865dbac8322813c4309d2ea19` is EXACT-HEAD NATI
 State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING.
 
 NEXT_EXACT_ACTION: state/evidence-only closure commit -> push exact closure head -> three-lane Verify -> one reviewed PR to `main` -> guarded merge -> exact resulting-main Verify. FMUX-017 remains blocked until FMUX-016 governance closure is MAIN VERIFIED.
+
+
+## FMUX-016 technical MAIN VERIFIED / governance state-sync - 2026-10-05
+
+FMUX-016 Onboarding: DONE / MAIN VERIFIED technically. Candidate `bb8480d05e80459865dbac8322813c4309d2ea19` -> push Verify `37218197455` SUCCESS; closure head `4003ab7569a544f9e5eda54e01f48f6903579e46` -> push Verify `37218732623` SUCCESS; PR #56 Verify `37219510769` SUCCESS; merged main `4ec9ad43f1190074c64bea814976e333640707ab`; merged-main Verify `37219941223` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Governance state-sync is ACTIVE on `state/FMUX-016-main-verified`, based exactly on verified main `4ec9ad43f1190074c64bea814976e333640707ab`. This sync is state/evidence-only. FMUX-017 Accessibility / Keyboard / Theme Enforcement is dependency-ready but remains blocked until this governance sync itself is MAIN VERIFIED. Runtime PID `17860` remains correct and was not restarted.
+
+NEXT_EXACT_ACTION: state/onboarding contract + diff hygiene -> commit/push state-only closure -> exact-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify -> then claim FMUX-017 from verified main.

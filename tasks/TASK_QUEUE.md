@@ -258,3 +258,14 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Scoped review PASS; no P0/P1; no authority expansion or synthetic connection truth.
 - Runtime PID `17860` unchanged.
 - Next: evidence/state-only closure commit -> exact closure-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify; FMUX-017 remains blocked pending FMUX-016 governance MAIN VERIFIED.
+
+
+## FMUX-016 closure / next-ready pointer - 2026-10-05
+
+- FMUX-016 Onboarding: DONE / MAIN VERIFIED technically.
+- Candidate `bb8480d05e80459865dbac8322813c4309d2ea19`; push Verify `37218197455` SUCCESS.
+- Closure head `4003ab7569a544f9e5eda54e01f48f6903579e46`; push Verify `37218732623` SUCCESS; PR #56 exact-head Verify `37219510769` SUCCESS; merged main `4ec9ad43f1190074c64bea814976e333640707ab`; merged-main Verify `37219941223` SUCCESS across macOS / Windows x64 / native Windows ARM64.
+- Runtime PID `17860` remains correct; no restart performed.
+- Governance state-sync branch: `state/FMUX-016-main-verified`, based exactly on verified main `4ec9ad43f1190074c64bea814976e333640707ab`.
+- FMUX-017 Accessibility / Keyboard / Theme Enforcement becomes the lowest-numbered dependency-valid next task only after this governance state-sync itself is MAIN VERIFIED.
+- State-sync action: state-only gates -> commit -> push -> exact-head Verify -> reviewed PR -> guarded merge -> merged-main Verify; only then claim FMUX-017.
