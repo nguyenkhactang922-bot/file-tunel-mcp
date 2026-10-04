@@ -228,3 +228,13 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Scoped review PASS: no backend selector, Docker configuration mutation, Docker CLI/container action or presentation authority; Docker unavailability remains explicit truth.
 - Runtime PID `17860` remains correct; no restart.
 - Next: evidence/state-only closure commit -> push exact closure head -> exact-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify -> FMUX-015 DONE / MAIN VERIFIED -> FMUX-016 becomes dependency-ready.
+
+
+## FMUX-015 closure / next-ready pointer - 2026-10-04
+
+- FMUX-015 Backend / Isolation UX: DONE / MAIN VERIFIED technically.
+- Closure head `0c475bc1454bf1eb462931cf91aab1e9f099fd6b`; push Verify `37199011451` SUCCESS; PR #54 exact-head Verify `37199312646` SUCCESS; merged main `e481b86569a61af89f448eb8ccfcdd4b3881cebd`; merged-main Verify `37199892956` SUCCESS across macOS / Windows x64 / native Windows ARM64.
+- Runtime checkpoint: correct FMG026-ready FileMCP remains PID `17860`; no restart performed. Docker live daemon remains environment-blocked and UX does not synthesize availability.
+- State-sync branch: `state/FMUX-015-main-verified`, based exactly on verified main `e481b86569a61af89f448eb8ccfcdd4b3881cebd`.
+- FMUX-016 Onboarding becomes the lowest-numbered dependency-valid next task only after this governance state-sync itself is MAIN VERIFIED.
+- State-sync next action: commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; only then claim FMUX-016 Onboarding.
