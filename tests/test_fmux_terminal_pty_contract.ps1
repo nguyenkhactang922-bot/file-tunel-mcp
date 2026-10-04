@@ -105,11 +105,11 @@ Assert-NotContains $macUiSection 'appendLog(' 'macOS Terminal UI must not copy P
 Assert-NotContains $macUiSection 'pty_write' 'macOS Terminal UI must not expose stdin writing.'
 Assert-NotContains $macUiSection 'pty_start' 'macOS Terminal UI must not start new PTY sessions.'
 
-Assert-Contains $graph '## FMUX-012' 'FMUX-012 task is missing from the frozen task graph.'
-if (-not $graph.Contains('State: ACTIVE / CLAIMED') -and -not $graph.Contains('State: ACTIVE / LOCAL VERIFIED')) {
-    throw 'FMUX-012 must remain active while implementation is under verification.'
+$fmux012 = Section-Between $graph '## FMUX-012' '## FMUX-013'
+if (-not $fmux012.Contains('State: ACTIVE / CLAIMED') -and -not $fmux012.Contains('State: ACTIVE / LOCAL VERIFIED') -and -not $fmux012.Contains('State: DONE / MAIN VERIFIED')) {
+    throw 'FMUX-012 lifecycle must be active during verification or DONE / MAIN VERIFIED after closure.'
 }
-Assert-Contains $graph 'chatgpt/FMUX-012-terminal-pty' 'FMUX-012 graph must identify the active branch.'
+Assert-Contains $fmux012 'Branch: `chatgpt/FMUX-012-terminal-pty`.' 'FMUX-012 graph must identify its implementation branch.'
 
 Write-Output "fmux-terminal-pty-contract: PASS"
 Write-Output "presentation-bridge-tools: pty_list pty_read pty_resize pty_signal pty_stop"

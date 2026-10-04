@@ -1505,3 +1505,8 @@ FMUX-012 Terminal / PTY: DONE / MAIN VERIFIED. Closure head `feb365864c32a3f7bb2
 Governance state-sync for FMUX-012 is ACTIVE on `state/FMUX-012-main-verified`, based exactly on verified main `38b20e633957ea6c279b110dac54072b29df14a6`. No product/runtime source changes are part of this sync. FMUX-013 Recovery is dependency-ready but MUST NOT be claimed until this state-sync itself is MAIN VERIFIED.
 
 NEXT_EXACT_ACTION: commit/push the FMUX-012 state-only closure -> exact-head Verify -> one reviewed PR to `main` -> merge exact head -> merged-main Verify; then claim FMUX-013 Recovery from verified main.
+
+
+FMUX-012 state-sync attempt 1: head `6a6d247f774a379426dc32c9e7022477d888ed95`, Verify `37183274280` completed FAILURE. macOS SUCCESS; Windows x64 and native ARM64 failed only the stale FMUX-012 lifecycle assertion in the presentation contract after the graph moved to `DONE / MAIN VERIFIED`. Targeted contract fix is local PASS together with project-state contract and `git diff --check`; no product/runtime source changed.
+
+NEXT_EXACT_ACTION: commit state-sync contract fix -> confirm remote branch remains `6a6d247f774a379426dc32c9e7022477d888ed95` with no PR -> push new exact head -> require three-lane Verify -> reviewed PR -> merge -> merged-main Verify -> claim FMUX-013.

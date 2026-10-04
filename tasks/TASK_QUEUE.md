@@ -143,3 +143,6 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - State-sync branch: `state/FMUX-012-main-verified`, based exactly on verified main `38b20e633957ea6c279b110dac54072b29df14a6`.
 - FMUX-013 Recovery dependencies FMUX-002, FMUX-003, FMG-016, FMG-021 and FMG-022 are DONE / MAIN VERIFIED; FMUX-013 becomes the lowest-numbered next task after this state-sync is MAIN VERIFIED.
 - State-sync next action: commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; only then claim FMUX-013.
+
+- State-sync attempt 1: head `6a6d247f774a379426dc32c9e7022477d888ed95`, Verify `37183274280` completed FAILURE. macOS SUCCESS; Windows x64/native ARM64 failed only stale FMUX-012 lifecycle assertion after graph closure. Targeted contract fix is local PASS; no product source or runtime changed.
+- State-sync retry action: commit fix -> side-effect guard remote exact old head/no PR -> push new exact head -> three-lane Verify -> reviewed PR -> merge -> merged-main Verify -> only then claim FMUX-013.

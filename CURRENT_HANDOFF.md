@@ -1605,3 +1605,8 @@ FMUX-012 FINAL: DONE / MAIN VERIFIED. Closure head `feb365864c32a3f7bb297bc4bba5
 State-sync checkpoint: current branch `state/FMUX-012-main-verified` is based directly on verified main `38b20e633957ea6c279b110dac54072b29df14a6`. FMUX-013 and FMUX-015 core dependencies are all DONE / MAIN VERIFIED; after this state-sync itself reaches MAIN VERIFIED, the dependency-valid lowest-numbered next task is FMUX-013 Recovery.
 
 NEXT_EXACT_ACTION: complete this FMUX-012 state-only closure through commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify. Only after the state-sync is MAIN VERIFIED, claim FMUX-013 Recovery from the resulting verified `main`; do not rerun FMUX-012 implementation proof or restart correct runtime PID `17860`.
+
+
+State-sync attempt 1: head `6a6d247f774a379426dc32c9e7022477d888ed95`, push Verify `37183274280` completed FAILURE. macOS lane SUCCESS. Windows x64 and native ARM64 each failed only `Verify FMUX Terminal / PTY presentation contract` because the historical FMUX-012 contract accepted only active lifecycle states after the graph correctly moved FMUX-012 to `DONE / MAIN VERIFIED`. The contract is now scoped to the FMUX-012 section and accepts `DONE / MAIN VERIFIED`; targeted `test_fmux_terminal_pty_contract.ps1`, project-state contract and `git diff --check` PASS locally. No product/runtime source was changed and PID `17860` was not restarted.
+
+NEXT_EXACT_ACTION: commit the state-sync lifecycle-contract fix -> side-effect guard remote branch still at `6a6d247f774a379426dc32c9e7022477d888ed95` and no PR -> push new exact head -> require one new three-lane Verify -> reviewed state-sync PR -> merge -> merged-main Verify -> then claim FMUX-013 Recovery.

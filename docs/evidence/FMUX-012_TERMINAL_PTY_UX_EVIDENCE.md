@@ -136,3 +136,14 @@ Remaining closure gates: evidence-state-only closure commit -> push exact closur
 - Merged-main Verify `37177832479`: SUCCESS on the exact resulting main commit, including FMUX Terminal / PTY presentation contract, native builds, integration, packages, app smoke and resource gates.
 - Final task state: `DONE / MAIN VERIFIED`.
 - Runtime PID `17860` remained the correct FMG026-ready runtime throughout; no restart was required.
+
+
+## Governance state-sync attempt 1
+
+- State-sync head: `6a6d247f774a379426dc32c9e7022477d888ed95`.
+- Push Verify `37183274280`: completed FAILURE.
+- macOS lane: SUCCESS.
+- Windows x64 and native Windows ARM64: each failed only `Verify FMUX Terminal / PTY presentation contract` because the contract lifecycle assertion still accepted only active FMUX-012 states after the canonical graph correctly recorded `DONE / MAIN VERIFIED`.
+- Targeted repair: scope lifecycle assertion to the FMUX-012 graph section and accept `ACTIVE / CLAIMED`, `ACTIVE / LOCAL VERIFIED`, or `DONE / MAIN VERIFIED`.
+- Targeted local verification after repair: `tests/test_fmux_terminal_pty_contract.ps1` PASS; `tests/test_project_state_contract.ps1` PASS; `git diff --check` PASS.
+- No product/runtime source changed; runtime PID `17860` was not restarted.
