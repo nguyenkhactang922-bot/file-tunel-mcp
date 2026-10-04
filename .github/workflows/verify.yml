@@ -194,6 +194,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_fmux_backend_isolation_contract.ps1
 
+      - name: Verify FMUX Onboarding presentation contract
+        shell: pwsh
+        run: ./tests/test_fmux_onboarding_contract.ps1
+
       - name: Verify project context contract
         shell: pwsh
         run: ./tests/test_project_context_contract.ps1
@@ -364,6 +368,10 @@ jobs:
       - name: Verify FMUX Backend / Isolation presentation contract
         shell: pwsh
         run: ./tests/test_fmux_backend_isolation_contract.ps1
+
+      - name: Verify FMUX Onboarding presentation contract
+        shell: pwsh
+        run: ./tests/test_fmux_onboarding_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh

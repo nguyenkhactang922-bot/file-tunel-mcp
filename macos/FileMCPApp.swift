@@ -43,6 +43,7 @@ private enum ConfigKey {
     static let dockerStartupTimeoutSeconds = "dockerStartupTimeoutSeconds"
     static let dockerIdleTTLSeconds = "dockerIdleTTLSeconds"
     static let dockerMaxLifetimeSeconds = "dockerMaxLifetimeSeconds"
+    static let onboardingCompleted = "onboardingCompleted"
 }
 
 private final class LoadingButton: NSButton {
@@ -450,6 +451,14 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private let homeStatusLabel = NSTextField(labelWithString: "Runtime stopped")
     private let homeWorkspaceLabel = NSTextField(labelWithString: "No workspace selected")
     private let homeRecentEventLabel = NSTextField(labelWithString: "No recent issue")
+    private var onboardingNavigationButton: NSButton?
+    private let onboardingSummaryLabel = NSTextField(wrappingLabelWithString: "Complete workspace, policy and connection settings, then test the real runtime connection.")
+    private let onboardingWorkspaceLabel = NSTextField(wrappingLabelWithString: "Choose an existing workspace root.")
+    private let onboardingPolicyLabel = NSTextField(wrappingLabelWithString: "Choose the local policy profile enforced by the server.")
+    private let onboardingCredentialLabel = NSTextField(wrappingLabelWithString: "Store the runtime API key securely and configure the Tunnel ID.")
+    private let onboardingConnectionLabel = NSTextField(wrappingLabelWithString: "Not tested. PASS requires the runtime to report Running.")
+    private let onboardingTestButton = NSButton(title: "Test connection", target: nil, action: nil)
+    private let onboardingFinishButton = NSButton(title: "Finish setup", target: nil, action: nil)
     private let workspaceRootLabel = NSTextField(labelWithString: "Not configured")
     private let workspaceStatusLabel = NSTextField(labelWithString: "Stopped")
     private let workspacePolicyLabel = NSTextField(labelWithString: "Default")
@@ -464,6 +473,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         buildUI()
         loadConfiguration()
         configureRuntime()
+        initializeOnboardingExperience()
     }
 
     deinit { shutdownForTermination() }
@@ -1369,6 +1379,43 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             logScroll.bottomAnchor.constraint(equalTo: logPage.bottomAnchor, constant: -12),
         ])
 
+        onboardingTestButton.target = self
+        onboardingTestButton.action = #selector(testOnboardingConnection)
+        onboardingFinishButton.target = self
+        onboardingFinishButton.action = #selector(finishOnboarding)
+        onboardingFinishButton.isEnabled = false
+        let onboardingWorkspaceButton = NSButton(title: "Configure workspace", target: self, action: #selector(showSettings))
+        let onboardingPolicyButton = NSButton(title: "Choose policy", target: self, action: #selector(showSettings))
+        let onboardingConnectionButton = NSButton(title: "Configure connection", target: self, action: #selector(showConnections))
+        let onboardingActions = NSStackView(views: [onboardingTestButton, onboardingFinishButton])
+        onboardingActions.orientation = .horizontal
+        onboardingActions.spacing = 8
+        let onboardingContent = NSStackView(views: [
+            FileMCPFeedbackComponents.pageHeader(
+                title: "Welcome to FileMCP",
+                description: "First-run setup reuses existing workspace, policy, credential and runtime authority."
+            ),
+            onboardingSummaryLabel,
+            NSTextField(labelWithString: "1. Workspace"), onboardingWorkspaceLabel, onboardingWorkspaceButton,
+            NSTextField(labelWithString: "2. Policy"), onboardingPolicyLabel, onboardingPolicyButton,
+            NSTextField(labelWithString: "3. Credential & tunnel"), onboardingCredentialLabel, onboardingConnectionButton,
+            NSTextField(labelWithString: "4. Connection test"), onboardingConnectionLabel, onboardingActions,
+        ])
+        onboardingContent.orientation = .vertical
+        onboardingContent.alignment = .leading
+        onboardingContent.spacing = 7
+        onboardingContent.translatesAutoresizingMaskIntoConstraints = false
+        [onboardingSummaryLabel, onboardingWorkspaceLabel, onboardingPolicyLabel, onboardingCredentialLabel, onboardingConnectionLabel].forEach {
+            $0.maximumNumberOfLines = 3
+        }
+        let onboardingPage = NSView()
+        onboardingPage.addSubview(onboardingContent)
+        NSLayoutConstraint.activate([
+            onboardingContent.leadingAnchor.constraint(equalTo: onboardingPage.leadingAnchor, constant: 12),
+            onboardingContent.trailingAnchor.constraint(lessThanOrEqualTo: onboardingPage.trailingAnchor, constant: -12),
+            onboardingContent.topAnchor.constraint(equalTo: onboardingPage.topAnchor, constant: 12),
+        ])
+
         let homeHeader = FileMCPFeedbackComponents.pageHeader(
             title: "Home",
             description: "Operational health, active workspace and current gateway state.",
@@ -1445,6 +1492,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         tabs.translatesAutoresizingMaskIntoConstraints = false
         tabs.delegate = self
 
+        let onboardingTab = NSTabViewItem(identifier: "onboarding")
+        onboardingTab.label = "Setup"
+        onboardingTab.view = onboardingPage
+
         let homeTab = NSTabViewItem(identifier: "home")
         homeTab.label = "Home"
         homeTab.view = homePage
@@ -1497,6 +1548,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         logTab.label = "Diagnostics"
         logTab.view = logPage
 
+        tabs.addTabViewItem(onboardingTab)
         tabs.addTabViewItem(homeTab)
         tabs.addTabViewItem(workspacesTab)
         tabs.addTabViewItem(configTab)
@@ -1533,10 +1585,13 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         shellStatusLabel.textColor = .secondaryLabelColor
         shellStatusLabel.maximumNumberOfLines = 2
 
+        let setupNavigationButton = navigationButton("Setup", action: #selector(showOnboarding))
+        onboardingNavigationButton = setupNavigationButton
         let sidebar = NSStackView(views: [
             brandTitle,
             brandSubtitle,
             NSBox(),
+            setupNavigationButton,
             navigationButton("Home", action: #selector(showHome)),
             navigationButton("Workspaces", action: #selector(showWorkspaces)),
             navigationButton("Connections", action: #selector(showConnections)),
@@ -1556,6 +1611,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         sidebar.orientation = .vertical
         sidebar.alignment = .leading
         sidebar.spacing = 8
+        sidebar.detachesHiddenViews = true
         sidebar.translatesAutoresizingMaskIntoConstraints = false
         sidebar.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
         sidebar.setContentHuggingPriority(.required, for: .horizontal)
@@ -1744,6 +1800,88 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         saveSettingsConfiguration()
     }
 
+    private func hasExistingConfiguredSetup() -> Bool {
+        let tunnel = tunnelIDField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let directory = directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        var isDirectory: ObjCBool = false
+        return storage.hasSavedAPIKey &&
+            LocalMCPRuntime.isValidTunnelID(tunnel) &&
+            !directory.isEmpty &&
+            FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory) &&
+            isDirectory.boolValue
+    }
+
+    private func initializeOnboardingExperience() {
+        let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: ConfigKey.onboardingCompleted) && hasExistingConfiguredSetup() {
+            defaults.set(true, forKey: ConfigKey.onboardingCompleted)
+        }
+        refreshOnboardingExperience()
+        if !defaults.bool(forKey: ConfigKey.onboardingCompleted) {
+            tabs.selectTabViewItem(withIdentifier: "onboarding")
+        }
+    }
+
+    private func refreshOnboardingExperience() {
+        let defaults = UserDefaults.standard
+        let completed = defaults.bool(forKey: ConfigKey.onboardingCompleted)
+        let directory = directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        var isDirectory: ObjCBool = false
+        let workspaceReady = !directory.isEmpty && FileManager.default.fileExists(atPath: directory, isDirectory: &isDirectory) && isDirectory.boolValue
+        let policy = policyProfilePopup.selectedItem?.representedObject as? String ?? FileMCPPolicyProfiles.restricted
+        let tunnel = tunnelIDField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let credentialReady = storage.hasSavedAPIKey || !apiKeyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let connectionReady = workspaceReady && credentialReady && LocalMCPRuntime.isValidTunnelID(tunnel)
+        let running: Bool
+        switch runtime.state {
+        case .running:
+            running = true
+        default:
+            running = false
+        }
+
+        onboardingNavigationButton?.isHidden = completed
+        onboardingWorkspaceLabel.stringValue = workspaceReady ? "Ready: existing workspace root selected." : "Choose an existing workspace root."
+        onboardingPolicyLabel.stringValue = "Server-enforced profile: \(policy)."
+        onboardingCredentialLabel.stringValue = connectionReady
+            ? "Ready: credential present and Tunnel ID is valid."
+            : "Incomplete: store the runtime API key securely and configure a valid Tunnel ID."
+        onboardingConnectionLabel.stringValue = running ? "PASS: runtime reports Running." : "Not passed: runtime is not Running."
+        onboardingTestButton.isEnabled = connectionReady
+        onboardingFinishButton.isEnabled = running
+        onboardingSummaryLabel.stringValue = running
+            ? "Connection test passed against live runtime state. Finish setup to continue to Home."
+            : "Complete workspace, policy and connection settings, then test the real runtime connection."
+    }
+
+    @objc private func showOnboarding() {
+        refreshOnboardingExperience()
+        tabs.selectTabViewItem(withIdentifier: "onboarding")
+    }
+
+    @objc private func testOnboardingConnection() {
+        refreshOnboardingExperience()
+        switch runtime.state {
+        case .running:
+            return
+        case .stopped, .failed:
+            onboardingConnectionLabel.stringValue = "Testing: starting the configured runtime..."
+            startTunnel()
+        case .starting, .restarting, .cooldown, .stopping:
+            showError("Connection test uses current runtime truth. Wait for the current runtime transition to finish before testing again.")
+        }
+    }
+
+    @objc private func finishOnboarding() {
+        guard case .running = runtime.state else {
+            showError("Finish setup is available only after the runtime reports Running.")
+            return
+        }
+        UserDefaults.standard.set(true, forKey: ConfigKey.onboardingCompleted)
+        refreshOnboardingExperience()
+        showHome()
+    }
+
     @objc private func showHome() {
         tabs.selectTabViewItem(withIdentifier: "home")
     }
@@ -1759,6 +1897,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
 
     @objc private func policyProfileChanged() {
         updatePolicyExplanation()
+        refreshOnboardingExperience()
     }
 
     private func updatePolicyExplanation() {
@@ -3059,6 +3198,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
                 updateAPIKeyPlaceholder()
             }
             saveConnectionConfiguration()
+            refreshOnboardingExperience()
             appendLog("[Runtime] Connection settings saved.\n")
             if runtime.state != .stopped { appendLog("[Runtime] Changes will take effect the next time the tunnel starts.\n") }
             finishLoading(saveConnectionButton)
@@ -3072,6 +3212,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         guard validateSettingsConfiguration() else { return }
         saveSettingsButton.setLoading(true)
         saveSettingsConfiguration()
+        refreshOnboardingExperience()
         appendLog("[Runtime] Settings saved.\n")
         if runtime.state != .stopped { appendLog("[Runtime] Changes will take effect the next time the tunnel starts.\n") }
         finishLoading(saveSettingsButton)
@@ -3166,6 +3307,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         runtime.onStateChange = { [weak self] state in
             DispatchQueue.main.async {
                 self?.updateRunButton(state: state)
+                self?.refreshOnboardingExperience()
                 if case let .failed(message) = state { self?.showError(message) }
             }
         }

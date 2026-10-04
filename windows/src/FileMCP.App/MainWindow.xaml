@@ -75,6 +75,8 @@
                             AutomationProperties.Name="Toggle compact navigation"/>
                 </Grid>
 
+                <Button x:Name="NavOnboardingButton" Content="Setup" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateOnboarding_Click" AutomationProperties.Name="Setup" Visibility="Collapsed"/>
                 <Button x:Name="NavHomeButton" Content="Home" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateHome_Click" AutomationProperties.Name="Home"/>
                 <Button x:Name="NavWorkspacesButton" Content="Workspaces" HorizontalContentAlignment="Left"
@@ -117,6 +119,60 @@
                 <Setter Property="Visibility" Value="Collapsed"/>
             </Style>
         </TabControl.Resources>
+            <TabItem Header="Setup" x:Name="OnboardingTab">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16">
+                        <controls:PageHeader Title="Welcome to FileMCP"
+                                             Description="First-run setup reuses existing workspace, policy, credential and runtime authority."
+                                             Margin="0,0,0,12"/>
+                        <TextBlock x:Name="OnboardingSummaryText" Text="Complete the steps below, then test the real runtime connection." TextWrapping="Wrap" Margin="0,0,0,12"/>
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Text="1. Workspace"/>
+                                    <TextBlock x:Name="OnboardingWorkspaceStatusText" Foreground="Gray" Text="Choose at least one existing workspace root." TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Configure workspace" Click="OnboardingWorkspace_Click" Margin="12,0,0,0"/>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Text="2. Policy"/>
+                                    <TextBlock x:Name="OnboardingPolicyStatusText" Foreground="Gray" Text="Choose the local policy profile enforced by the server." TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Choose policy" Click="OnboardingPolicy_Click" Margin="12,0,0,0"/>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Text="3. Credential &amp; tunnel"/>
+                                    <TextBlock x:Name="OnboardingCredentialStatusText" Foreground="Gray" Text="Store the runtime API key securely and configure Tunnel IDs." TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Configure connection" Click="OnboardingConnection_Click" Margin="12,0,0,0"/>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource FileMcpCardBorder}" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Text="4. Test connection"/>
+                                    <TextBlock x:Name="OnboardingConnectionStatusText" Foreground="Gray" Text="Not tested. PASS requires every enabled runtime to report Running." TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <Button x:Name="OnboardingTestButton" Grid.Column="1" Content="Test connection" Click="OnboardingTestConnection_Click" Margin="12,0,0,0"/>
+                            </Grid>
+                        </Border>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+                            <Button Content="Home" Click="NavigateHome_Click" Margin="0,0,8,0"/>
+                            <Button x:Name="OnboardingFinishButton" Content="Finish setup" Click="OnboardingFinish_Click" IsEnabled="False"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
             <TabItem Header="Home" x:Name="OverviewTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">

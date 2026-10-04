@@ -233,9 +233,12 @@ Scope:
 
 ## FMUX-016 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Onboarding
 
-State: BLOCKED
-Depends: FMUX-004 through FMUX-015 applicable implemented surfaces.
-Governance dependency: FMUX-015 implementation is DONE / MAIN VERIFIED, but FMUX-016 remains BLOCKED until `state/FMUX-015-main-verified` is itself MAIN VERIFIED.
+State: ACTIVE / LOCAL VERIFIED
+Branch: `chatgpt/FMUX-016-onboarding`.
+Depends: FMUX-004 through FMUX-015 applicable implemented surfaces — all DONE / MAIN VERIFIED.
+Checkpoint: local cross-platform onboarding implementation verified on Windows host; FMUX-016/app-shell/presentation/project-state/diff gates PASS; Windows Release build 0 warnings / 0 errors; macOS native compile awaits exact-head GitHub Verify.
+Evidence: `docs/evidence/FMUX-016_ONBOARDING_UX_EVIDENCE.md`.
+NEXT_EXACT_ACTION: final scoped review -> exact candidate commit -> side-effect guard -> push exact head -> macOS / Windows x64 / native Windows ARM64 Verify -> closure evidence/state -> closure-head Verify -> reviewed PR -> guarded merge -> exact resulting-main Verify.
 
 Scope:
 - first-run setup;

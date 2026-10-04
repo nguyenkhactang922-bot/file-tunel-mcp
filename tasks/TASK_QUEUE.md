@@ -238,3 +238,14 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - State-sync branch: `state/FMUX-015-main-verified`, based exactly on verified main `e481b86569a61af89f448eb8ccfcdd4b3881cebd`.
 - FMUX-016 Onboarding becomes the lowest-numbered dependency-valid next task only after this governance state-sync itself is MAIN VERIFIED.
 - State-sync next action: commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; only then claim FMUX-016 Onboarding.
+
+
+## FMUX-016 Onboarding local verified checkpoint - 2026-10-04
+
+- State: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-016-onboarding` from verified main `987c7f836830b55f019a786b0a7b218281d7ef99`.
+- Scope implemented: first-run workspace selection, server-owned policy guidance, existing secure credential/tunnel setup, actual-runtime connection test, and Home handoff.
+- Local gates PASS: FMUX-016 contract, app-shell, presentation, project-state, diff check, Windows Release build 0 warnings / 0 errors.
+- macOS native compile/build: pending exact-head GitHub Verify; local Windows host has no `swiftc`.
+- Evidence: `docs/evidence/FMUX-016_ONBOARDING_UX_EVIDENCE.md`.
+- Runtime PID `17860` unchanged; no restart.
+- Next: scoped review -> exact candidate commit -> remote/PR guard -> push exact head -> three-lane Verify -> closure/review/PR/merge -> merged-main Verify; FMUX-017 remains blocked until FMUX-016 governance closure is MAIN VERIFIED.
