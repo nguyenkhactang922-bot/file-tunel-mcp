@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     private readonly List<RecoveryCheckpointRow> _recoveryCheckpointRows = new();
     private readonly HashSet<string> _plannedCheckpointKeys = new(StringComparer.Ordinal);
     private readonly List<ArtifactBatchRow> _artifactBatchRows = new();
+    private readonly List<BackendStatusRow> _backendRows = new();
     private bool _terminalRefreshRunning;
     private bool _recoveryRefreshRunning;
     private string _recoveryPersistentNotice = "";
@@ -1128,6 +1129,11 @@ public partial class MainWindow : Window
         MainTabs.SelectedItem = ArtifactsTab;
         RefreshArtifactBatchGrid();
     }
+    private void NavigateBackend_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = BackendTab;
+        RefreshBackendGrid();
+    }
     private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
 
     private void CompactNavigation_Click(object sender, RoutedEventArgs e)
@@ -1148,6 +1154,7 @@ public partial class MainWindow : Window
         SetNavigationButtonPresentation(NavTerminalButton, "Terminal", "T");
         SetNavigationButtonPresentation(NavRecoveryButton, "Recovery", "Y");
         SetNavigationButtonPresentation(NavArtifactsButton, "Artifacts", "B");
+        SetNavigationButtonPresentation(NavBackendButton, "Backend", "K");
         SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
 
         ShellWorkspaceText.Visibility = _navigationCompact ? Visibility.Collapsed : Visibility.Visible;
@@ -1377,6 +1384,31 @@ public partial class MainWindow : Window
         public string Key => $"{Workspace}|{CheckpointRef}";
         public string ExpiryDisplay => ExpiresEpochMs <= 0 ? "-" : DateTimeOffset.FromUnixTimeMilliseconds(ExpiresEpochMs).ToLocalTime().ToString("MM-dd HH:mm");
         public bool CanPlan => !Expired;
+    }
+
+    private sealed record BackendStatusRow(
+        string Workspace,
+        string BackendId,
+        string BackendVersion,
+        bool Available,
+        string State,
+        bool IsolationActive,
+        bool DockerSelected,
+        string DockerAvailability,
+        string WorkspaceMode,
+        string EnvironmentMode,
+        string NetworkMode,
+        string ResourceMode,
+        string Capabilities,
+        string ImageDigest,
+        string NetworkPolicy,
+        string ResourcePolicy)
+    {
+        public string Key => Workspace;
+        public string BackendDisplay => $"{BackendId} {BackendVersion}";
+        public string StateDisplay => $"{State}{(Available ? "" : " / unavailable")}";
+        public string IsolationDisplay => IsolationActive ? "isolated" : "host";
+        public string DockerDisplay => DockerSelected ? DockerAvailability : "not selected";
     }
 
     private sealed record TerminalSessionRow(
@@ -1693,6 +1725,81 @@ public partial class MainWindow : Window
             $"{row.QueryKind}: {row.ReturnedCount}/{row.TotalCount} returned | {state} | {row.Entries.Count} metadata row(s) displayed | symbol_support={row.SymbolSupport} | artifact_state={row.ArtifactState}. Provider completeness is descriptive, not exhaustive truth.";
         RepositorySourceText.Text = $"source_state_id={row.SourceStateId}";
     }
+
+    private void RefreshBackendGrid()
+    {
+        var priorKey = (BackendGrid.SelectedItem as BackendStatusRow)?.Key;
+        var rows = new List<BackendStatusRow>();
+        var unavailable = new List<string>();
+        foreach (var workspace in WorkspaceKeys)
+        {
+            if (!_runtimes.TryGetValue(workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running)
+                continue;
+            try
+            {
+                var metadata = runtime.PresentationExecutionBackendMetadata();
+                rows.Add(new BackendStatusRow(
+                    workspace,
+                    JsonText(metadata, "backend_id", "unknown"),
+                    JsonText(metadata, "backend_version", "unknown"),
+                    JsonBool(metadata, "backend_available"),
+                    JsonText(metadata, "backend_state", "unknown"),
+                    JsonBool(metadata, "backend_isolation_active"),
+                    JsonBool(metadata, "docker_selected"),
+                    JsonText(metadata, "docker_availability_state", "unknown"),
+                    JsonText(metadata, "backend_workspace_mode", "unknown"),
+                    JsonText(metadata, "backend_environment_mode", "unknown"),
+                    JsonText(metadata, "backend_network_mode", "unknown"),
+                    JsonText(metadata, "backend_resource_mode", "unknown"),
+                    JsonStringList(metadata, "backend_capabilities"),
+                    JsonText(metadata, "image_digest", "-"),
+                    JsonText(metadata, "network_policy", JsonText(metadata, "backend_network_mode", "unknown")),
+                    JsonText(metadata, "resource_policy", JsonText(metadata, "backend_resource_mode", "unknown"))));
+            }
+            catch (Exception ex)
+            {
+                unavailable.Add($"{workspace}: {ex.Message}");
+            }
+        }
+
+        _backendRows.Clear();
+        _backendRows.AddRange(rows);
+        BackendGrid.ItemsSource = null;
+        BackendGrid.ItemsSource = _backendRows;
+        var selected = priorKey is null ? _backendRows.FirstOrDefault() : _backendRows.FirstOrDefault(row => row.Key == priorKey) ?? _backendRows.FirstOrDefault();
+        if (selected is not null)
+        {
+            BackendGrid.SelectedItem = selected;
+            UpdateBackendSelection(selected);
+        }
+        else
+        {
+            BackendDetailText.Text = "No connected workspace backend is available to observe.";
+        }
+        BackendSummaryText.Text = _backendRows.Count == 0
+            ? "No connected backend observed."
+            : $"{_backendRows.Count} connected workspace backend(s) observed. Read-only presentation; no backend selector is exposed.";
+        BackendStatusText.Text = unavailable.Count == 0
+            ? "presentation_grants_authority=false | Docker not selected means not probed, not available."
+            : $"presentation_grants_authority=false | unavailable observation: {string.Join("; ", unavailable)}";
+    }
+
+    private void UpdateBackendSelection(BackendStatusRow row)
+    {
+        BackendDetailText.Text =
+            $"Workspace {row.Workspace} | {row.BackendDisplay} | state={row.State} | available={row.Available}\n" +
+            $"isolation={row.IsolationDisplay} | workspace={row.WorkspaceMode} | environment={row.EnvironmentMode}\n" +
+            $"network={row.NetworkMode} (policy={row.NetworkPolicy}) | resource={row.ResourceMode} (policy={row.ResourcePolicy})\n" +
+            $"Docker={row.DockerDisplay} | image_digest={row.ImageDigest}\n" +
+            $"capabilities={row.Capabilities}\nPresentation is read-only and grants no execution authority.";
+    }
+
+    private void BackendGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (BackendGrid.SelectedItem is BackendStatusRow row) UpdateBackendSelection(row);
+    }
+
+    private void BackendRefresh_Click(object sender, RoutedEventArgs e) => RefreshBackendGrid();
 
     private async Task RefreshTerminalAsync(bool readSelectedOutput)
     {

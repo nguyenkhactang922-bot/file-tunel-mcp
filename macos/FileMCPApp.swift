@@ -417,6 +417,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private let terminalResizeButton = NSButton(title: "Resize", target: nil, action: nil)
     private let terminalColumnsField = NSTextField(string: "120")
     private let terminalRowsField = NSTextField(string: "30")
+    private let backendSummaryLabel = NSTextField(wrappingLabelWithString: "No connected backend observed.")
+    private let backendDetailLabel = NSTextField(wrappingLabelWithString: "Read-only backend truth; presentation grants no authority.")
+    private let backendStatusLabel = NSTextField(wrappingLabelWithString: "Docker not selected means not probed, not available.")
+    private let backendRefreshButton = NSButton(title: "Refresh", target: nil, action: nil)
     private let recoveryQuarantineTableView = NSTableView()
     private let recoveryCheckpointTableView = NSTableView()
     private let recoveryWorkspaceLabel = NSTextField(wrappingLabelWithString: "No connected workspace selected.")
@@ -658,6 +662,13 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         terminalResizeButton.isEnabled = false
         terminalColumnsField.alignment = .right
         terminalRowsField.alignment = .right
+
+        backendSummaryLabel.maximumNumberOfLines = 4
+        backendDetailLabel.maximumNumberOfLines = 8
+        backendStatusLabel.maximumNumberOfLines = 4
+        backendStatusLabel.textColor = .secondaryLabelColor
+        backendRefreshButton.target = self
+        backendRefreshButton.action = #selector(refreshBackendAction)
 
         recoveryQuarantineTableView.delegate = self
         recoveryQuarantineTableView.dataSource = self
@@ -1326,6 +1337,29 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             artifactEntryScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180),
         ])
 
+        let backendHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Backend / Isolation",
+            description: "Read-only execution backend truth. Presentation never selects or expands backend authority."
+        )
+        let backendRoot = NSStackView(views: [
+            backendHeader,
+            backendSummaryLabel,
+            backendDetailLabel,
+            backendRefreshButton,
+            backendStatusLabel,
+        ])
+        backendRoot.orientation = .vertical
+        backendRoot.alignment = .leading
+        backendRoot.spacing = 8
+        backendRoot.translatesAutoresizingMaskIntoConstraints = false
+        let backendPage = NSView()
+        backendPage.addSubview(backendRoot)
+        NSLayoutConstraint.activate([
+            backendRoot.leadingAnchor.constraint(equalTo: backendPage.leadingAnchor, constant: 12),
+            backendRoot.trailingAnchor.constraint(equalTo: backendPage.trailingAnchor, constant: -12),
+            backendRoot.topAnchor.constraint(equalTo: backendPage.topAnchor, constant: 12),
+        ])
+
         let logPage = NSView()
         logPage.addSubview(logScroll)
         NSLayoutConstraint.activate([
@@ -1455,6 +1489,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         artifactTab.label = "Artifacts"
         artifactTab.view = artifactPage
 
+        let backendTab = NSTabViewItem(identifier: "backend")
+        backendTab.label = "Backend"
+        backendTab.view = backendPage
+
         let logTab = NSTabViewItem(identifier: "log")
         logTab.label = "Diagnostics"
         logTab.view = logPage
@@ -1470,6 +1508,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         tabs.addTabViewItem(terminalTab)
         tabs.addTabViewItem(recoveryTab)
         tabs.addTabViewItem(artifactTab)
+        tabs.addTabViewItem(backendTab)
         tabs.addTabViewItem(logTab)
         tabs.selectTabViewItem(withIdentifier: "home")
 
@@ -1509,6 +1548,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             navigationButton("Terminal", action: #selector(showTerminal)),
             navigationButton("Recovery", action: #selector(showRecovery)),
             navigationButton("Artifacts", action: #selector(showArtifacts)),
+            navigationButton("Backend", action: #selector(showBackend)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
             NSView(),
             shellStatusLabel,
@@ -2900,6 +2940,49 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             recoveryStatusLabel.stringValue = "Checkpoint restore blocked/failed; inspect current recovery state before retry. \(error.localizedDescription)"
         }
         refreshRecovery()
+    }
+
+    @objc private func showBackend() {
+        tabs.selectTabViewItem(withIdentifier: "backend")
+        refreshBackend()
+    }
+
+    @objc private func refreshBackendAction() {
+        refreshBackend()
+    }
+
+    private func refreshBackend() {
+        guard runtime.state == .running else {
+            backendSummaryLabel.stringValue = "No connected backend observed."
+            backendDetailLabel.stringValue = "Workspace runtime is not connected."
+            backendStatusLabel.stringValue = "presentation_grants_authority=false | Docker availability is not inferred while disconnected."
+            return
+        }
+        do {
+            let metadata = try runtime.presentationExecutionBackendMetadata()
+            let backendID = terminalString(metadata, "backend_id", fallback: "unknown")
+            let version = terminalString(metadata, "backend_version", fallback: "unknown")
+            let state = terminalString(metadata, "backend_state", fallback: "unknown")
+            let available = (metadata["backend_available"] as? Bool) ?? false
+            let isolated = (metadata["backend_isolation_active"] as? Bool) ?? false
+            let dockerSelected = (metadata["docker_selected"] as? Bool) ?? false
+            let dockerState = terminalString(metadata, "docker_availability_state", fallback: "unknown")
+            let workspaceMode = terminalString(metadata, "backend_workspace_mode", fallback: "unknown")
+            let environmentMode = terminalString(metadata, "backend_environment_mode", fallback: "unknown")
+            let networkMode = terminalString(metadata, "backend_network_mode", fallback: "unknown")
+            let resourceMode = terminalString(metadata, "backend_resource_mode", fallback: "unknown")
+            let capabilities = terminalStringList(metadata, "backend_capabilities").joined(separator: ",")
+            let imageDigest = terminalString(metadata, "image_digest", fallback: "-")
+            let networkPolicy = terminalString(metadata, "network_policy", fallback: networkMode)
+            let resourcePolicy = terminalString(metadata, "resource_policy", fallback: resourceMode)
+            backendSummaryLabel.stringValue = "\(backendID) \(version) | state=\(state) | available=\(available) | isolation=\(isolated ? "isolated" : "host")"
+            backendDetailLabel.stringValue = "workspace=\(workspaceMode) | environment=\(environmentMode)\nnetwork=\(networkMode) (policy=\(networkPolicy)) | resource=\(resourceMode) (policy=\(resourcePolicy))\nDocker=\(dockerSelected ? dockerState : "not selected / not probed") | image_digest=\(imageDigest)\ncapabilities=\(capabilities)"
+            backendStatusLabel.stringValue = "presentation_grants_authority=false | backend state is observed core truth; unavailable/degraded Docker is not an app failure."
+        } catch {
+            backendSummaryLabel.stringValue = "Backend observation unavailable."
+            backendDetailLabel.stringValue = "No synthetic backend state is shown."
+            backendStatusLabel.stringValue = "presentation_grants_authority=false | \(error.localizedDescription)"
+        }
     }
 
     @objc private func showArtifacts() {

@@ -176,6 +176,16 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         return await server.CallPresentationRecoveryToolAsync(toolName, arguments, cancellationToken).ConfigureAwait(false);
     }
 
+    public JsonObject PresentationExecutionBackendMetadata()
+    {
+        lock (_stateGate)
+        {
+            if (_state.Status != LocalMcpRuntimeStatus.Running || _server is null || !_server.IsReady)
+                throw new FileMcpException("Workspace runtime is not connected");
+            return _server.PresentationExecutionBackendMetadata();
+        }
+    }
+
     public JsonObject PresentationPolicyMetadata()
     {
         lock (_stateGate)

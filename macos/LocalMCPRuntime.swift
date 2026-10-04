@@ -181,6 +181,10 @@ final class LocalMCPRuntime {
         }
     }
 
+    func presentationExecutionBackendMetadata() throws -> [String: Any] {
+        try withPresentationServer { try $0.presentationExecutionBackendMetadata() }
+    }
+
     func presentationPolicyMetadata() throws -> [String: Any] {
         try withPresentationServer { $0.presentationPolicyMetadata() }
     }

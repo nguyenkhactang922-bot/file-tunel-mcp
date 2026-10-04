@@ -188,3 +188,23 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - State-sync branch: `state/FMUX-013-main-verified`, based exactly on verified main `f5fb42c0d842db126cd4de58ddc952633a4676c8`.
 - FMUX-014 is already DONE / MAIN VERIFIED. FMUX-015 dependencies FMUX-003, FMG-023 and FMG-024 are DONE / MAIN VERIFIED; FMUX-015 becomes the lowest-numbered next task after this state-sync is MAIN VERIFIED.
 - State-sync next action: commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; only then claim FMUX-015 Backend / Isolation UX.
+
+## FMUX-013 state-sync closure / FMUX-015 active pointer - 2026-10-04
+
+- FMUX-013 governance state-sync: DONE / MAIN VERIFIED. PR #53 merged as `f76b4e9a84c428080907859591b4aa4ddc40645c`; merged-main Verify `37194838411` SUCCESS across macOS / Windows x64 / native Windows ARM64.
+- FMUX-015 Backend / Isolation UX: ACTIVE / CLAIMED on `chatgpt/FMUX-015-backend-isolation-ux`, based exactly on verified main `f76b4e9a84c428080907859591b4aa4ddc40645c`.
+- Dependencies FMUX-003, FMG-023, FMG-024: DONE / MAIN VERIFIED.
+- Runtime PID `17860` remains correct; no restart performed.
+- Docker live engine remains environment-blocked because the daemon is unavailable; UX must render availability truth rather than a synthetic isolated backend.
+- Task next action: audit existing backend/Docker truth projections and implement bounded cross-platform Backend / Isolation UX, then affected local gates -> exact-head native Verify -> review/PR/merge -> merged-main Verify.
+
+
+## FMUX-015 Backend / Isolation local verification - 2026-10-04
+
+- State: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-015-backend-isolation-ux`; base verified main `f76b4e9a84c428080907859591b4aa4ddc40645c`.
+- Read-only cross-platform UX shows selected backend identity/status, host vs isolation, network/resource/workspace/environment modes, Docker selected/availability state and bounded image/network/resource policy facts.
+- No backend selector, Docker config mutation, Docker CLI/container action, or presentation authority added.
+- Local gates PASS: FMUX-015 contract, app-shell, presentation, project-state, execution-backend, Docker-backend, diff check, Windows Release build 0 warnings / 0 errors.
+- Live runtime remains PID `17860`, backend `host-native`, grants_authority=false; no restart. Docker daemon remains environment-blocked and is not presented as available.
+- macOS native compile/build: pending exact-head GitHub Verify.
+- Next: final scoped diff review -> candidate commit -> remote/PR guard -> push exact head -> three-lane Verify before PR.

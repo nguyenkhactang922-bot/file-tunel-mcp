@@ -394,6 +394,47 @@ internal sealed partial class LocalTools
         return identity;
     }
 
+    internal JsonObject PresentationExecutionBackendMetadata()
+    {
+        var descriptor = _executionBackend.Descriptor;
+        var health = _executionBackend.Health;
+        var identity = _executionBackend.EvidenceIdentity;
+        ExecutionBackendContracts.ValidateDescriptor(descriptor);
+        ExecutionBackendContracts.ValidateHealth(health);
+        ExecutionBackendContracts.ValidateEvidenceIdentity(identity);
+        if (!string.Equals(identity.BackendId, descriptor.Id, StringComparison.Ordinal))
+            throw new FileMcpException("Execution backend evidence identity does not match selected backend");
+
+        var capabilities = new JsonArray();
+        foreach (var capability in descriptor.Capabilities.Order(StringComparer.Ordinal))
+            capabilities.Add(JsonValue.Create(capability));
+
+        var metadata = new JsonObject
+        {
+            ["backend_id"] = descriptor.Id,
+            ["backend_version"] = descriptor.Version,
+            ["backend_capabilities"] = capabilities,
+            ["backend_workspace_mode"] = descriptor.WorkspaceMode,
+            ["backend_environment_mode"] = descriptor.EnvironmentMode,
+            ["backend_network_mode"] = descriptor.NetworkMode,
+            ["backend_resource_mode"] = descriptor.ResourceMode,
+            ["backend_available"] = health.Available,
+            ["backend_state"] = health.State,
+            ["backend_isolation_active"] = descriptor.Capabilities.Contains(ExecutionBackendCapabilities.Isolation, StringComparer.Ordinal),
+            ["docker_selected"] = string.Equals(descriptor.Id, DockerExecutionBackend.BackendId, StringComparison.Ordinal),
+            ["docker_availability_state"] = string.Equals(descriptor.Id, DockerExecutionBackend.BackendId, StringComparison.Ordinal)
+                ? health.State
+                : "not-selected",
+            ["presentation_grants_authority"] = false,
+        };
+
+        foreach (var key in new[] { "image_digest", "workspace_mode", "network_policy", "resource_policy" })
+        {
+            if (identity.Metadata.TryGetValue(key, out var value)) metadata[key] = value;
+        }
+        return metadata;
+    }
+
     private static bool IsExecutionBackendTool(string toolName) =>
         toolName == "exec_process" || toolName.StartsWith("pty_", StringComparison.Ordinal);
 

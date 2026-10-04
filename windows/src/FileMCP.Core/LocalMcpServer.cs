@@ -131,6 +131,13 @@ public sealed class LocalMcpServer : IAsyncDisposable
         return output.StructuredContent.DeepClone().AsObject();
     }
 
+    public JsonObject PresentationExecutionBackendMetadata()
+    {
+        if (!IsReady)
+            throw new FileMcpException("Local MCP server is not ready");
+        return _tools.PresentationExecutionBackendMetadata().DeepClone().AsObject();
+    }
+
     public JsonObject PresentationPolicyMetadata()
     {
         var metadata = _policy.Metadata().DeepClone().AsObject();
