@@ -90,3 +90,20 @@ Native macOS compiler/runtime is not available on this Windows host. The exact-h
 6. Merge the exact reviewed head with head guard.
 7. Require merged-main Verify on the resulting `main` commit.
 8. Only then mark FMUX-012 DONE / MAIN VERIFIED and claim the next dependency-valid FMUX task.
+
+## Exact-head attempt 1 — failed gates and targeted fixes
+
+Candidate: `bae6bea5cf23a2577cd474068472de752cb1944e`
+Verify run: `37175574357`
+Result: FAIL; no PR was created and no merge occurred.
+
+Failure decomposition:
+- Windows x64: failed only `Verify FMUX Repository Intelligence presentation contract` because the historical FMUX-011 regression contract still required literal `State: ACTIVE / CLAIMED` after FMUX-011 had legitimately reached `DONE / MAIN VERIFIED`.
+- Native Windows ARM64: same single stale FMUX-011 lifecycle assertion; subsequent steps were skipped by the workflow after that failure.
+- macOS: static verification reached the native workflow, then integration compilation failed in `LocalMCPRuntime.swift` because `withPresentationServer` captured the implicitly non-escaping generic `body` parameter in a closure stored in `operation`.
+
+Targeted fixes only:
+- `tests/test_fmux_repository_intelligence_contract.ps1` now scopes lifecycle validation to the FMUX-011 graph section and accepts either the historical in-flight state `ACTIVE / CLAIMED` or the closed state `DONE / MAIN VERIFIED`. Targeted local rerun: PASS.
+- `macos/LocalMCPRuntime.swift` marks the presentation helper closure parameter `@escaping`, matching how it is captured before synchronous dispatch. Native macOS compile/integration re-verification remains CI-only on this Windows host.
+
+The failed run is fully completed. No other CI rerun was started while it was active, Windows implementation source was not changed, and runtime PID `17860` was not restarted.

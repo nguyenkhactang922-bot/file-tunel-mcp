@@ -91,8 +91,10 @@ Assert-NotContains $macProjection 'structuredContent["content"]' 'macOS Reposito
 Assert-NotContains $macProjection 'structuredContent["next_cursor"]' 'macOS Repository projection must not copy authenticated cursors.'
 Assert-Contains $macProjection 'sourceEntries.prefix(200)' 'macOS Repository projection must bound displayed entries.'
 
-Assert-Contains $graph '## FMUX-011' 'FMUX-011 task is missing from the frozen task graph.'
-Assert-Contains $graph 'State: ACTIVE / CLAIMED' 'FMUX-011 must remain explicitly claimed while implementation is under verification.'
-Assert-Contains $graph 'chatgpt/FMUX-011-repository-intelligence' 'FMUX-011 graph must identify the active branch.'
+$fmux011 = Section-Between $graph '## FMUX-011' '## FMUX-012'
+Assert-Contains $fmux011 'Branch: `chatgpt/FMUX-011-repository-intelligence`.' 'FMUX-011 graph must identify its branch.'
+if (-not $fmux011.Contains('State: ACTIVE / CLAIMED') -and -not $fmux011.Contains('State: DONE / MAIN VERIFIED')) {
+    throw 'FMUX-011 lifecycle must be either active during verification or DONE / MAIN VERIFIED after closure.'
+}
 
 Write-Host "fmux-repository-intelligence-contract: ok"

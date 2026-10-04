@@ -181,8 +181,8 @@ Scope:
 State: ACTIVE / LOCAL VERIFIED
 Branch: `chatgpt/FMUX-012-terminal-pty`.
 Depends: FMUX-002, FMUX-003, FMG-020 — all DONE / MAIN VERIFIED.
-Checkpoint: native Windows/macOS Terminal source implemented; local FMUX-012/app-shell/presentation/Repository/PTy/state contracts PASS; Windows Release build source checkpoint PASS 0 warnings / 0 errors; evidence `docs/evidence/FMUX-012_TERMINAL_PTY_UX_EVIDENCE.md`.
-NEXT_EXACT_ACTION: side-effect guard -> exact candidate commit -> push -> exact-head native Verify -> scoped review -> evidence-state closure -> reviewed PR/merge -> merged-main Verify.
+Checkpoint: local FMUX-012/app-shell/presentation/persistent-PTY/state contracts PASS; Windows Release build source checkpoint PASS 0 warnings / 0 errors. Exact-head attempt 1 candidate `bae6bea5cf23a2577cd474068472de752cb1944e`, Verify `37175574357` FAIL only from stale FMUX-011 lifecycle assertion on both Windows lanes plus macOS non-escaping closure compile error; both causes fixed locally. Evidence `docs/evidence/FMUX-012_TERMINAL_PTY_UX_EVIDENCE.md`.
+NEXT_EXACT_ACTION: verify two local fixes -> fix commit -> remote/PR side-effect guard -> push new exact head -> exact-head native Verify -> scoped review -> evidence-state closure -> reviewed PR/merge -> merged-main Verify.
 
 Scope:
 - session list;
