@@ -219,8 +219,11 @@ Scope:
 
 ## FMUX-015 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Backend / Isolation UX
 
-State: BLOCKED
-Depends: FMUX-003, FMG-023, FMG-024.
+State: ACTIVE / LOCAL VERIFIED
+Branch: `chatgpt/FMUX-015-backend-isolation-ux`.
+Depends: FMUX-003, FMG-023, FMG-024 — all DONE / MAIN VERIFIED.
+Checkpoint: FMUX-013 governance state-sync PR #53 merged as `f76b4e9a84c428080907859591b4aa4ddc40645c`; merged-main Verify `37194838411` SUCCESS. FMUX-015 fix head `14194caa6ce05b584bbcf3d3cf3f38f8316bf963` passed push Verify `37198123123` on macOS / Windows x64 / native Windows ARM64; scoped review PASS.
+NEXT_EXACT_ACTION: evidence/state-only closure commit -> push exact closure head -> require three-lane GitHub Verify -> one reviewed PR -> guarded merge -> exact resulting-main Verify; only then mark FMUX-015 DONE / MAIN VERIFIED and unblock FMUX-016.
 
 Scope:
 - backend identity/status;

@@ -608,6 +608,38 @@ final class LocalTools {
         return identity
     }
 
+    func presentationExecutionBackendMetadata() throws -> [String: Any] {
+        let descriptor = executionBackend.descriptor
+        let health = executionBackend.health
+        let identity = executionBackend.evidenceIdentity
+        try ExecutionBackendContracts.validate(descriptor)
+        try ExecutionBackendContracts.validate(health)
+        try ExecutionBackendContracts.validate(identity)
+        guard identity.backendID == descriptor.id else {
+            throw MCPServerError.operationFailed("Execution backend evidence identity does not match selected backend")
+        }
+
+        var metadata: [String: Any] = [
+            "backend_id": descriptor.id,
+            "backend_version": descriptor.version,
+            "backend_capabilities": descriptor.capabilities.sorted(),
+            "backend_workspace_mode": descriptor.workspaceMode,
+            "backend_environment_mode": descriptor.environmentMode,
+            "backend_network_mode": descriptor.networkMode,
+            "backend_resource_mode": descriptor.resourceMode,
+            "backend_available": health.available,
+            "backend_state": health.state,
+            "backend_isolation_active": descriptor.capabilities.contains(ExecutionBackendCapabilities.isolation),
+            "docker_selected": descriptor.id == DockerExecutionBackend.backendID,
+            "docker_availability_state": descriptor.id == DockerExecutionBackend.backendID ? health.state : "not-selected",
+            "presentation_grants_authority": false,
+        ]
+        for key in ["image_digest", "workspace_mode", "network_policy", "resource_policy"] {
+            if let value = identity.metadata[key] { metadata[key] = value }
+        }
+        return metadata
+    }
+
     private func isExecutionBackendTool(_ toolName: String) -> Bool {
         toolName == "exec_process" || toolName.hasPrefix("pty_")
     }
@@ -2909,6 +2941,13 @@ final class LocalMCPServer {
             throw MCPServerError.operationFailed("Local MCP server is not ready")
         }
         return try tools.call(name: name, arguments: arguments).structuredContent
+    }
+
+    func presentationExecutionBackendMetadata() throws -> [String: Any] {
+        guard isReady else {
+            throw MCPServerError.operationFailed("Local MCP server is not ready")
+        }
+        return try tools.presentationExecutionBackendMetadata()
     }
 
     func presentationPolicyMetadata() -> [String: Any] {

@@ -97,6 +97,8 @@
                         Margin="0,0,0,4" Click="NavigateRecovery_Click" AutomationProperties.Name="Recovery quarantine and checkpoints"/>
                 <Button x:Name="NavArtifactsButton" Content="Artifacts" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateArtifacts_Click" AutomationProperties.Name="Artifacts and batch results"/>
+                <Button x:Name="NavBackendButton" Content="Backend" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateBackend_Click" AutomationProperties.Name="Backend and isolation status"/>
                 <Button x:Name="NavDiagnosticsButton" Content="Diagnostics" HorizontalContentAlignment="Left"
                         Margin="0,8,0,4" Click="NavigateDiagnostics_Click" AutomationProperties.Name="Diagnostics"/>
             </StackPanel>
@@ -1082,6 +1084,55 @@
                     <TextBlock x:Name="ArtifactBatchCountText" Grid.Row="3" Margin="0,8,0,0"
                                Style="{StaticResource FileMcpCaptionText}"
                                Text="0 captured batch results"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Backend" x:Name="BackendTab">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <controls:PageHeader Title="Backend / Isolation"
+                                         Description="Read-only execution backend truth. Presentation never selects or expands backend authority."/>
+                    <Border Grid.Row="1" Style="{StaticResource FileMcpCardBorder}" Margin="0,12,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="BackendSummaryText" Text="No connected backend observed." TextWrapping="Wrap" FontWeight="SemiBold"/>
+                            <Button Grid.Column="1" Content="Refresh" Padding="10,5" Margin="12,0,0,0" Click="BackendRefresh_Click"/>
+                        </Grid>
+                    </Border>
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3*"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+                        <DataGrid x:Name="BackendGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                                  EnableRowVirtualization="True" SelectionMode="Single" SelectionChanged="BackendGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Workspace" Binding="{Binding Workspace}" Width="78"/>
+                                <DataGridTextColumn Header="Backend" Binding="{Binding BackendDisplay}" Width="150"/>
+                                <DataGridTextColumn Header="State" Binding="{Binding StateDisplay}" Width="110"/>
+                                <DataGridTextColumn Header="Isolation" Binding="{Binding IsolationDisplay}" Width="95"/>
+                                <DataGridTextColumn Header="Network" Binding="{Binding NetworkMode}" Width="100"/>
+                                <DataGridTextColumn Header="Resource" Binding="{Binding ResourceMode}" Width="120"/>
+                                <DataGridTextColumn Header="Docker" Binding="{Binding DockerDisplay}" Width="120"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Border Grid.Column="1" Style="{StaticResource FileMcpCardBorder}" Margin="12,0,0,0">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Selected backend truth"/>
+                                <TextBlock x:Name="BackendDetailText" Margin="0,8,0,0" Text="Select a workspace backend." TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <TextBlock x:Name="BackendStatusText" Grid.Row="3" Margin="0,8,0,0" Style="{StaticResource FileMcpCaptionText}"
+                               Text="presentation_grants_authority=false | Docker not selected means not probed, not available." TextWrapping="Wrap"/>
                 </Grid>
             </TabItem>
 

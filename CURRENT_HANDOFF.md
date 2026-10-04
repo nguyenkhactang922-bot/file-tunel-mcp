@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `chatgpt/FMUX-013-recovery`
+Branch: `chatgpt/FMUX-015-backend-isolation-ux`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: FMUX-013 Recovery ACTIVE / CLAIMED on `chatgpt/FMUX-013-recovery`, based exactly on verified main `dad103c569cbfc6d68b343445287152013c6f29e`; FMUX-012 state-sync is MAIN VERIFIED via PR #51 and merged-main Verify `37186288521`; runtime PID `17860` remains correct and must not be restarted.
+Expected worktree at handoff: FMUX-015 Backend / Isolation UX ACTIVE / CLAIMED on `chatgpt/FMUX-015-backend-isolation-ux`, based exactly on verified main `f76b4e9a84c428080907859591b4aa4ddc40645c`; FMUX-013 governance state-sync is MAIN VERIFIED via PR #53 and merged-main Verify `37194838411`; runtime PID `17860` remains correct and must not be restarted.
 
 ## Completed technical program
 
@@ -1642,3 +1642,42 @@ Governance state-sync is ACTIVE on `state/FMUX-013-main-verified`, based exactly
 Branch: `state/FMUX-013-main-verified`
 
 NEXT_EXACT_ACTION: complete this FMUX-013 state-only closure through commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; only then claim dependency-ready FMUX-015 Backend / Isolation UX from the resulting verified `main`. Do not rerun FMUX-013 implementation proof or restart correct runtime PID `17860`.
+
+## FMUX-013 governance closure / FMUX-015 claim - 2026-10-04
+
+FMUX-013 governance state-sync is DONE / MAIN VERIFIED. State-sync head `f81e8ce71f79864e3d38a6ed6489ea1f4cd47bf7` passed push Verify `37191717888` and PR #53 Verify `37194422557` on macOS / Windows x64 / native Windows ARM64. PR #53 merged as `f76b4e9a84c428080907859591b4aa4ddc40645c`; merged-main Verify `37194838411` SUCCESS on the exact resulting main commit across all three native lanes.
+
+FMUX-015 Backend / Isolation UX is CLAIMED / ACTIVE on `chatgpt/FMUX-015-backend-isolation-ux`, created directly from verified main `f76b4e9a84c428080907859591b4aa4ddc40645c`. Dependencies FMUX-003, FMG-023 and FMG-024 are DONE / MAIN VERIFIED. Runtime PID `17860` remains correct and was not restarted. Docker live engine remains environment-blocked because the local daemon is unavailable; the UX must report this truthfully and must not invent isolated-backend availability.
+
+NEXT_EXACT_ACTION: audit existing FMG-023/FMG-024 backend identity/status, health, Docker availability, image/network/resource policy projections and the current Windows/macOS presentation shell; implement the smallest truthful Backend / Isolation UX with no presentation authority expansion, then run only affected contracts/build gates before exact-head GitHub verification.
+
+
+## FMUX-015 local verification - 2026-10-04
+
+FMUX-015 Backend / Isolation UX is ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-015-backend-isolation-ux`, based exactly on verified main `f76b4e9a84c428080907859591b4aa4ddc40645c`. Windows/macOS now render a read-only server-owned execution-backend snapshot: identity/version/capabilities, health, host-vs-isolated state, network/resource/workspace/environment modes, Docker selected/availability truth and bounded image/network/resource policy metadata. No backend selector, Docker configuration mutation, Docker CLI, container creation or presentation authority was added.
+
+Local gates PASS: FMUX-015 contract, app-shell, presentation, project-state, execution-backend, Docker-backend, diff hygiene, and Windows Release build 0 warnings / 0 errors. Live current runtime remains `host-native` with `presentation_grants_authority=false`; PID `17860` remains correct and was not restarted. Docker live daemon remains environment-blocked; host-native UI therefore says Docker `not selected / not probed` rather than inventing availability. macOS native compile/build is pending exact-head GitHub Verify.
+
+NEXT_EXACT_ACTION: scoped final diff review -> candidate commit -> side-effect guard -> push exact head -> require GitHub Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> then closure evidence/state, one reviewed PR, guarded merge and merged-main Verify. Local verification is not DONE.
+
+
+## FMUX-015 exact-head attempt 1 / targeted macOS fix - 2026-10-04
+
+- Candidate `d83d4e29f2cbaa84c2cf47c2e98b2b79208ab8f7`; push Verify `37197764997` completed FAILURE.
+- Windows x64: SUCCESS. Native Windows ARM64: SUCCESS. These lane checkpoints are preserved.
+- macOS failed only `Static verification` at Swift typecheck: `terminalStringList(...)` already returns `String`, so the Backend UI's extra `.joined(separator: ",")` was invalid.
+- Targeted fix: use `terminalStringList(metadata, "backend_capabilities")` directly. No backend truth, policy, Docker, or authority semantics changed.
+- Targeted local recheck: FMUX-015 contract PASS; `git diff --check` PASS.
+- Next: commit the macOS compile fix + this checkpoint -> side-effect guard -> push exact new head -> require a fresh three-lane Verify. Do not manually rerun attempt `37197764997`.
+
+
+## FMUX-015 exact-head attempt 2 / closure checkpoint - 2026-10-04
+
+FMUX-015 Backend / Isolation UX is ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS on `chatgpt/FMUX-015-backend-isolation-ux`.
+- Fix head `14194caa6ce05b584bbcf3d3cf3f38f8316bf963`.
+- Push Verify `37198123123`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Attempt-1 macOS Swift typecheck defect is closed; no Windows/runtime behavior changed in the fix.
+- Final scoped diff review: PASS; no P0/P1, no presentation authority expansion, `git diff --check` PASS.
+- Runtime PID `17860` remains correct and was not restarted. Docker live engine remains environment-blocked; UI truth remains host-native / Docker not selected-not probed.
+
+NEXT_EXACT_ACTION: commit/push the evidence-state-only FMUX-015 closure head -> require exact-head Verify on the closure SHA -> create/review exactly one PR to `main` -> merge exact reviewed head with guard -> verify exact resulting `main`. Only after merged-main verification may FMUX-015 become DONE / MAIN VERIFIED and FMUX-016 Onboarding be claimed.
