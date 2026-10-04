@@ -93,6 +93,8 @@
                         Margin="0,0,0,4" Click="NavigateRepository_Click" AutomationProperties.Name="Repository intelligence"/>
                 <Button x:Name="NavTerminalButton" Content="Terminal" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateTerminal_Click" AutomationProperties.Name="Terminal PTY sessions"/>
+                <Button x:Name="NavRecoveryButton" Content="Recovery" HorizontalContentAlignment="Left"
+                        Margin="0,0,0,4" Click="NavigateRecovery_Click" AutomationProperties.Name="Recovery quarantine and checkpoints"/>
                 <Button x:Name="NavArtifactsButton" Content="Artifacts" HorizontalContentAlignment="Left"
                         Margin="0,0,0,4" Click="NavigateArtifacts_Click" AutomationProperties.Name="Artifacts and batch results"/>
                 <Button x:Name="NavDiagnosticsButton" Content="Diagnostics" HorizontalContentAlignment="Left"
@@ -912,6 +914,82 @@
                     <TextBlock x:Name="TerminalStatusText" Grid.Row="3" Margin="0,8,0,0"
                                Style="{StaticResource FileMcpCaptionText}"
                                Text="0 observed PTY sessions | restart resume is unsupported"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Recovery" x:Name="RecoveryTab">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <controls:PageHeader Title="Recovery"
+                                         Description="Workspace-scoped quarantine and checkpoint recovery. Restore actions remain subject to core policy, version checks and rollback safeguards."/>
+                    <Border Grid.Row="1" Style="{StaticResource FileMcpCardBorder}" Margin="0,12,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Observed workspace / authority"/>
+                                <TextBlock x:Name="RecoveryWorkspaceText" FontWeight="SemiBold" Text="No connected workspace selected." TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Style="{StaticResource FileMcpCaptionText}" Text="Local policy"/>
+                                <TextBlock x:Name="RecoveryPolicyText" FontWeight="SemiBold" Text="Presentation grants no authority." TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,6,0">
+                            <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Quarantine" Margin="0,0,0,6"/>
+                            <DataGrid x:Name="RecoveryQuarantineGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                                      EnableRowVirtualization="True" SelectionMode="Single" SelectionChanged="RecoveryQuarantineGrid_SelectionChanged">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Workspace" Binding="{Binding Workspace}" Width="78"/>
+                                    <DataGridTextColumn Header="State" Binding="{Binding State}" Width="115"/>
+                                    <DataGridTextColumn Header="Path" Binding="{Binding OriginalPath}" Width="*"/>
+                                    <DataGridTextColumn Header="Entries" Binding="{Binding EntryCount}" Width="72"/>
+                                    <DataGridTextColumn Header="Expires" Binding="{Binding ExpiryDisplay}" Width="120"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                            <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Checkpoints" Margin="0,0,0,6"/>
+                            <DataGrid x:Name="RecoveryCheckpointGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                                      EnableRowVirtualization="True" SelectionMode="Single" SelectionChanged="RecoveryCheckpointGrid_SelectionChanged">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Workspace" Binding="{Binding Workspace}" Width="78"/>
+                                    <DataGridTextColumn Header="Repository" Binding="{Binding RepositoryPath}" Width="*"/>
+                                    <DataGridTextColumn Header="Entries" Binding="{Binding EntryCount}" Width="72"/>
+                                    <DataGridTextColumn Header="Excluded" Binding="{Binding ExcludedCount}" Width="76"/>
+                                    <DataGridTextColumn Header="Expires" Binding="{Binding ExpiryDisplay}" Width="120"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Grid>
+                    <Border Grid.Row="3" Style="{StaticResource FileMcpCardBorder}" Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock x:Name="RecoveryDetailTitle" Style="{StaticResource FileMcpSectionTitleText}" Text="Select a quarantine item or checkpoint"/>
+                            <TextBlock x:Name="RecoveryDetailText" Margin="0,6,0,8" Text="No synthetic recovery state is shown." TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Refresh" Padding="10,5" Margin="0,0,8,0" Click="RecoveryRefresh_Click"/>
+                                <Button x:Name="RecoveryRestoreQuarantineButton" Content="Restore quarantine" Padding="10,5" Margin="0,0,8,0" Click="RecoveryRestoreQuarantine_Click" IsEnabled="False"/>
+                                <Button x:Name="RecoveryPlanCheckpointButton" Content="Plan checkpoint restore" Padding="10,5" Margin="0,0,8,0" Click="RecoveryPlanCheckpoint_Click" IsEnabled="False"/>
+                                <Button x:Name="RecoveryRestoreCheckpointButton" Content="Restore checkpoint" Padding="10,5" Click="RecoveryRestoreCheckpoint_Click" IsEnabled="False"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock x:Name="RecoveryStatusText" Grid.Row="4" Margin="0,8,0,0" Style="{StaticResource FileMcpCaptionText}"
+                               Text="0 quarantine items | 0 checkpoints | partial recovery is surfaced explicitly"/>
                 </Grid>
             </TabItem>
 

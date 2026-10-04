@@ -193,8 +193,11 @@ Scope:
 
 ## FMUX-013 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Recovery
 
-State: BLOCKED
-Depends: FMUX-002, FMUX-003, FMG-016, FMG-021, FMG-022.
+State: ACTIVE / LOCAL VERIFIED
+Branch: `chatgpt/FMUX-013-recovery`.
+Depends: FMUX-002, FMUX-003, FMG-016, FMG-021, FMG-022 — all DONE / MAIN VERIFIED.
+Checkpoint: local Recovery implementation verified from base main `dad103c569cbfc6d68b343445287152013c6f29e`; `test_fmux_recovery_contract.ps1`, app-shell, presentation, project-state and diff hygiene PASS; Windows Release build PASS 0 warnings / 0 errors. Local Windows host has no `swiftc`, so exact-head GitHub macOS native Verify remains mandatory.
+NEXT_EXACT_ACTION: scoped final diff review -> commit candidate -> side-effect guard -> push exact head -> require GitHub Verify success on macOS / Windows x64 / native Windows ARM64; do not claim task DONE before PR merge and merged-main Verify.
 
 Scope:
 - quarantine;

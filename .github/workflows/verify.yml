@@ -186,6 +186,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_fmux_terminal_pty_contract.ps1
 
+      - name: Verify FMUX Recovery presentation contract
+        shell: pwsh
+        run: ./tests/test_fmux_recovery_contract.ps1
+
       - name: Verify project context contract
         shell: pwsh
         run: ./tests/test_project_context_contract.ps1
@@ -348,6 +352,10 @@ jobs:
       - name: Verify FMUX Terminal / PTY presentation contract
         shell: pwsh
         run: ./tests/test_fmux_terminal_pty_contract.ps1
+
+      - name: Verify FMUX Recovery presentation contract
+        shell: pwsh
+        run: ./tests/test_fmux_recovery_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh
