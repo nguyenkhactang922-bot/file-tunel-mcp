@@ -78,3 +78,16 @@ Next lifecycle: scoped diff review -> exact candidate commit -> side-effect guar
 Current state: `ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING`.
 
 Next: state/evidence-only closure commit -> push exact closure head -> require exact-head three-lane Verify -> create/review exactly one PR to `main` -> guarded merge -> verify exact resulting `main` -> FMUX-016 MAIN VERIFIED -> separate governance state-sync before FMUX-017 claim.
+
+
+## Final GitHub lifecycle / MAIN VERIFIED
+
+- Candidate: `bb8480d05e80459865dbac8322813c4309d2ea19`; push Verify `37218197455`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Closure head: `4003ab7569a544f9e5eda54e01f48f6903579e46`; push Verify `37218732623`: SUCCESS on all three native lanes.
+- PR #56 exact-head Verify `37219510769`: SUCCESS on all three native lanes.
+- Scoped PR review: PASS; no P0/P1, no parallel credential/policy/runtime authority, and no synthetic connection truth.
+- PR #56 merged to `main` as `4ec9ad43f1190074c64bea814976e333640707ab`.
+- Merged-main Verify `37219941223`: SUCCESS on the exact resulting main commit across macOS / Windows x64 / native Windows ARM64.
+- Final implementation state: `DONE / MAIN VERIFIED`.
+- Runtime PID `17860` remained the correct FMG026-ready runtime throughout and was not restarted.
+- Governance state-sync is intentionally separate on `state/FMUX-016-main-verified`; FMUX-017 must not be claimed until that state-sync itself is MAIN VERIFIED.
