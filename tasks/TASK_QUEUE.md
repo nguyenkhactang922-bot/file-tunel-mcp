@@ -146,3 +146,6 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 
 - State-sync attempt 1: head `6a6d247f774a379426dc32c9e7022477d888ed95`, Verify `37183274280` completed FAILURE. macOS SUCCESS; Windows x64/native ARM64 failed only stale FMUX-012 lifecycle assertion after graph closure. Targeted contract fix is local PASS; no product source or runtime changed.
 - State-sync retry action: commit fix -> side-effect guard remote exact old head/no PR -> push new exact head -> three-lane Verify -> reviewed PR -> merge -> merged-main Verify -> only then claim FMUX-013.
+
+- State-sync attempt 2: lifecycle-fix head `ad199846fd2d7fe50311c7965f11ca88ddda0999` passed push Verify `37183856103` on macOS / Windows x64 / native Windows ARM64; scoped review PASS, no P0/P1.
+- Next: evidence-state-only closure commit -> side-effect guard -> push new closure head -> exact-head three-lane Verify -> one reviewed PR -> merge -> merged-main Verify -> only then claim FMUX-013.

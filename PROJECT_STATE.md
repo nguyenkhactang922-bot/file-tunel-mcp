@@ -1510,3 +1510,8 @@ NEXT_EXACT_ACTION: commit/push the FMUX-012 state-only closure -> exact-head Ver
 FMUX-012 state-sync attempt 1: head `6a6d247f774a379426dc32c9e7022477d888ed95`, Verify `37183274280` completed FAILURE. macOS SUCCESS; Windows x64 and native ARM64 failed only the stale FMUX-012 lifecycle assertion in the presentation contract after the graph moved to `DONE / MAIN VERIFIED`. Targeted contract fix is local PASS together with project-state contract and `git diff --check`; no product/runtime source changed.
 
 NEXT_EXACT_ACTION: commit state-sync contract fix -> confirm remote branch remains `6a6d247f774a379426dc32c9e7022477d888ed95` with no PR -> push new exact head -> require three-lane Verify -> reviewed PR -> merge -> merged-main Verify -> claim FMUX-013.
+
+
+FMUX-012 state-sync attempt 2: fix head `ad199846fd2d7fe50311c7965f11ca88ddda0999` is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS. Push Verify `37183856103` SUCCESS on macOS / Windows x64 / native Windows ARM64. The lifecycle contract now accepts the already-closed `DONE / MAIN VERIFIED` state without changing product/runtime authority.
+
+NEXT_EXACT_ACTION: commit/push the evidence-state-only state-sync closure head -> exact-head three-lane Verify -> one reviewed PR -> guarded merge -> merged-main Verify -> claim FMUX-013 Recovery from verified main.

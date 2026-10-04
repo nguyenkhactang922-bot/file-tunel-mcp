@@ -147,3 +147,11 @@ Remaining closure gates: evidence-state-only closure commit -> push exact closur
 - Targeted repair: scope lifecycle assertion to the FMUX-012 graph section and accept `ACTIVE / CLAIMED`, `ACTIVE / LOCAL VERIFIED`, or `DONE / MAIN VERIFIED`.
 - Targeted local verification after repair: `tests/test_fmux_terminal_pty_contract.ps1` PASS; `tests/test_project_state_contract.ps1` PASS; `git diff --check` PASS.
 - No product/runtime source changed; runtime PID `17860` was not restarted.
+
+
+## State-sync lifecycle repair verification
+
+- Attempt 1 state-sync head `6a6d247f774a379426dc32c9e7022477d888ed95`, Verify `37183274280`: macOS SUCCESS; Windows x64/native ARM64 failed only the stale lifecycle assertion that did not accept the already-closed FMUX-012 state.
+- Repair head `ad199846fd2d7fe50311c7965f11ca88ddda0999`: contract is scoped to the FMUX-012 graph section and accepts active verification states or `DONE / MAIN VERIFIED` after closure.
+- Push Verify `37183856103`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Scoped review: PASS; no P0/P1; no product/runtime authority change; runtime PID `17860` was not restarted.
