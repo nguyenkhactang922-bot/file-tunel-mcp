@@ -169,6 +169,29 @@ final class LocalMCPRuntime {
         return _state
     }
 
+    func callPresentationPtyTool(name: String, arguments: [String: Any]) throws -> [String: Any] {
+        try withPresentationServer { server in
+            try server.callPresentationPtyTool(name: name, arguments: arguments)
+        }
+    }
+
+    func presentationPolicyMetadata() throws -> [String: Any] {
+        try withPresentationServer { $0.presentationPolicyMetadata() }
+    }
+
+    private func withPresentationServer<T>(_ body: @escaping (LocalMCPServer) throws -> T) throws -> T {
+        let operation = { () throws -> T in
+            guard self.state == .running, let server = self.server, server.isReady else {
+                throw MCPServerError.operationFailed("Workspace runtime is not connected")
+            }
+            return try body(server)
+        }
+        if DispatchQueue.getSpecific(key: queueSpecificKey) != nil {
+            return try operation()
+        }
+        return try queue.sync(execute: operation)
+    }
+
     func start(_ configuration: LocalMCPConfiguration) {
         queue.async { [weak self] in
             self?.startOnQueue(configuration)

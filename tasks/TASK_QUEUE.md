@@ -122,11 +122,14 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Optional Docker live engine proof remains ENVIRONMENT BLOCKED under the frozen availability rule.
 - Governance state-sync: DONE / MAIN VERIFIED. PR #48 head `552edec938379d309d26a3eab2b0005f0cefcdeb` merged as `5a5abed27e523dac4f62c27e8808c3bb03a6d874`; merged-main Verify `37135393780` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 
-## FMUX-011 active pointer - 2026-10-03
+## FMUX-011 closure / FMUX-012 active pointer - 2026-10-04
 
-- FMUX-011 Repository Intelligence: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING.
-- Branch: `chatgpt/FMUX-011-repository-intelligence`, based directly on verified `fork/main=5a5abed27e523dac4f62c27e8808c3bb03a6d874`.
-- Dependencies FMUX-002, FMUX-003, FMG-018 and FMG-019 are DONE / MAIN VERIFIED.
-- Scope implemented: Repository page; repository summary; observed repo map, symbol search and related-files results; provider/version/completeness prominently shown; bounded metadata-only rows; no raw source/ContentRef tokens; no authority expansion.
-- Exact-head checkpoint: candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0`; push Verify `37138794626` SUCCESS on macOS / Windows x64 / native Windows ARM64; scoped review PASS with no P0/P1.
-- NEXT_EXACT_ACTION: commit/push evidence-state-only closure head -> exact-head native Verify on closure SHA -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify. FMUX-012 remains blocked until FMUX-011 MAIN VERIFIED.
+- FMUX-011 Repository Intelligence: DONE / MAIN VERIFIED.
+- FMUX-012 Terminal / PTY: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-012-terminal-pty`, based directly on verified `fork/main=d378faa0807435be7ca21eff1c573518779c5dd4`.
+- Dependencies FMUX-002, FMUX-003 and FMG-020 are DONE / MAIN VERIFIED.
+- Scope implemented: native Windows/macOS Terminal destination; real `pty_list` session state; bounded `pty_read` output; backend/policy/session truth; existing-policy Ctrl+C/stop/resize controls; no `pty_start` or `pty_write` presentation authority.
+- Local evidence: `tests/test_fmux_terminal_pty_contract.ps1`, app-shell, presentation, Repository regression, persistent PTY, project-state and `git diff --check` PASS; Windows Release build source checkpoint PASS 0 warnings / 0 errors. Evidence file: `docs/evidence/FMUX-012_TERMINAL_PTY_UX_EVIDENCE.md`.
+- Runtime checkpoint: correct FMG026-ready FileMCP remains PID `17860`; no restart performed.
+- Exact-head attempt 1: candidate `bae6bea5cf23a2577cd474068472de752cb1944e`, Verify `37175574357` FAIL from stale FMUX-011 lifecycle assertion on Windows x64/ARM64 plus macOS non-escaping closure compile error; both were repaired by the targeted fix checkpoint.
+- Exact-head attempt 2: fix checkpoint `edd996bd43642e8c5399a90ca14cb109db858fd1`, push Verify `37176690710` SUCCESS on macOS / Windows x64 / native Windows ARM64. Scoped review PASS; no P0/P1; presentation allowlist remains list/read/resize/signal/stop only, bounded and non-authoritative.
+- NEXT_EXACT_ACTION: evidence-state-only closure commit -> side-effect guard -> push closure head -> exact-head Verify on closure SHA -> reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify.

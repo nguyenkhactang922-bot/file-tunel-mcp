@@ -182,6 +182,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_fmux_repository_intelligence_contract.ps1
 
+      - name: Verify FMUX Terminal / PTY presentation contract
+        shell: pwsh
+        run: ./tests/test_fmux_terminal_pty_contract.ps1
+
       - name: Verify project context contract
         shell: pwsh
         run: ./tests/test_project_context_contract.ps1
@@ -340,6 +344,10 @@ jobs:
       - name: Verify FMUX Repository Intelligence presentation contract
         shell: pwsh
         run: ./tests/test_fmux_repository_intelligence_contract.ps1
+
+      - name: Verify FMUX Terminal / PTY presentation contract
+        shell: pwsh
+        run: ./tests/test_fmux_terminal_pty_contract.ps1
 
       - name: Verify project context contract
         shell: pwsh

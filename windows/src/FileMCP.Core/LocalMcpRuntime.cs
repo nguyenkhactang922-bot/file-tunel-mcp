@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 
 namespace FileMCP.Core;
 
@@ -142,6 +143,32 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
     public event Action<string>? Log;
 
     public LocalMcpRuntimeState State { get { lock (_stateGate) return _state; } }
+
+    public async Task<JsonObject> CallPresentationPtyToolAsync(
+        string toolName,
+        JsonObject arguments,
+        CancellationToken cancellationToken = default)
+    {
+        LocalMcpServer server;
+        lock (_stateGate)
+        {
+            if (_state.Status != LocalMcpRuntimeStatus.Running || _server is null || !_server.IsReady)
+                throw new FileMcpException("Workspace runtime is not connected");
+            server = _server;
+        }
+
+        return await server.CallPresentationPtyToolAsync(toolName, arguments, cancellationToken).ConfigureAwait(false);
+    }
+
+    public JsonObject PresentationPolicyMetadata()
+    {
+        lock (_stateGate)
+        {
+            if (_state.Status != LocalMcpRuntimeStatus.Running || _server is null || !_server.IsReady)
+                throw new FileMcpException("Workspace runtime is not connected");
+            return _server.PresentationPolicyMetadata();
+        }
+    }
 
     public TunnelSupervisorSnapshot SupervisorSnapshot
     {

@@ -164,11 +164,10 @@ Scope:
 
 ## FMUX-011 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Repository Intelligence
 
-State: ACTIVE / CLAIMED
+State: DONE / MAIN VERIFIED
 Branch: `chatgpt/FMUX-011-repository-intelligence`.
 Depends: FMUX-002, FMUX-003, FMG-018, FMG-019 — all DONE / MAIN VERIFIED.
-Checkpoint: exact candidate `8c84912c5280fb599ad91632f5458d8b7a42f2a0` is NATIVE VERIFIED; push Verify `37138794626` SUCCESS on macOS / Windows x64 / native Windows ARM64; scoped review PASS.
-NEXT_EXACT_ACTION: commit/push evidence-state-only closure head -> exact-head native Verify on closure SHA -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify.
+Checkpoint: closure head `0b9c08f052418a20f48e4b688cc41dc93eb21117`; PR #49 merged as `d378faa0807435be7ca21eff1c573518779c5dd4`; merged-main Verify `37140380944` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 
 Scope:
 - repository summary;
@@ -179,8 +178,11 @@ Scope:
 
 ## FMUX-012 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Terminal / PTY
 
-State: BLOCKED
-Depends: FMUX-002, FMUX-003, FMG-020.
+State: ACTIVE / LOCAL VERIFIED
+Branch: `chatgpt/FMUX-012-terminal-pty`.
+Depends: FMUX-002, FMUX-003, FMG-020 — all DONE / MAIN VERIFIED.
+Checkpoint: NATIVE VERIFIED / SCOPED REVIEW PASS. Fix candidate `edd996bd43642e8c5399a90ca14cb109db858fd1`; push Verify `37176690710` SUCCESS on macOS / Windows x64 / native Windows ARM64. Presentation bridge remains bounded/non-authoritative with list/read/resize/signal/stop only and no start/write. No P0/P1 remains. Evidence `docs/evidence/FMUX-012_TERMINAL_PTY_UX_EVIDENCE.md`.
+NEXT_EXACT_ACTION: evidence-state-only closure commit -> push closure SHA -> exact-head native Verify -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify.
 
 Scope:
 - session list;
