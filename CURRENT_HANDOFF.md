@@ -1634,3 +1634,11 @@ NEXT_EXACT_ACTION: final scoped diff review -> commit FMUX-013 candidate -> side
 FMUX-013 exact-head checkpoint: candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc` is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS. GitHub Verify `37189165659` SUCCESS on macOS / Windows x64 / native Windows ARM64, including macOS typecheck/integration/build and Windows Recovery contract/build/integration/package/smoke. Forbidden UI-authority scan remains empty; runtime PID `17860` remains correct and was not restarted.
 
 NEXT_EXACT_ACTION: commit/push evidence-state-only FMUX-013 closure head -> require exact-head three-lane Verify on the closure SHA -> create/review exactly one PR to `main` -> guarded merge -> merged-main Verify. Do not rerun successful Verify `37189165659`.
+
+
+FMUX-013 FINAL: DONE / MAIN VERIFIED. Closure head `d64e10439932c4bf05186468107ad179eafd28da` passed push Verify `37190237875` and PR #52 exact-head Verify `37190637624` on macOS / Windows x64 / native Windows ARM64. PR #52 merged as `f5fb42c0d842db126cd4de58ddc952633a4676c8`; merged-main Verify `37190970602` SUCCESS on the exact resulting main commit across all three native lanes. Runtime PID `17860` remained correct and was not restarted.
+
+Governance state-sync is ACTIVE on `state/FMUX-013-main-verified`, based exactly on verified main `f5fb42c0d842db126cd4de58ddc952633a4676c8`. FMUX-014 is already DONE / MAIN VERIFIED, and FMUX-015 dependencies FMUX-003, FMG-023 and FMG-024 are all DONE / MAIN VERIFIED.
+Branch: `state/FMUX-013-main-verified`
+
+NEXT_EXACT_ACTION: complete this FMUX-013 state-only closure through commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; only then claim dependency-ready FMUX-015 Backend / Isolation UX from the resulting verified `main`. Do not rerun FMUX-013 implementation proof or restart correct runtime PID `17860`.

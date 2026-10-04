@@ -78,3 +78,14 @@ Candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc` passed GitHub Verify `37189
 Scoped exact-head review: PASS, no P0/P1 found. Forbidden authority scan is empty in Recovery UI sections; the bridge remains the exact six-tool allowlist and runtime PID `17860` remains correct/unrestarted.
 
 State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS. Next: evidence/state-only closure commit -> exact-head Verify of closure SHA -> one reviewed PR -> guarded merge -> merged-main Verify.
+
+
+## Final GitHub lifecycle / MAIN VERIFIED
+
+- Closure head: `d64e10439932c4bf05186468107ad179eafd28da`.
+- Push Verify `37190237875`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #52 exact-head Verify `37190637624`: SUCCESS on all three native lanes.
+- PR #52 merged to `main` as `f5fb42c0d842db126cd4de58ddc952633a4676c8`.
+- Merged-main Verify `37190970602`: SUCCESS on the exact resulting main commit, including FMUX Recovery contract, native builds, integration, packages, app smoke and resource gates.
+- Final task state: `DONE / MAIN VERIFIED`.
+- Runtime PID `17860` remained the correct FMG026-ready runtime throughout; no restart was required.

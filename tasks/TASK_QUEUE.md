@@ -178,3 +178,13 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - macOS typecheck/integration/build and Windows full native lanes are green.
 - Runtime PID `17860` remained correct; no restart.
 - Next: evidence/state-only closure commit -> closure exact-head Verify -> one reviewed PR -> merge -> merged-main Verify.
+
+
+## FMUX-013 closure / next-ready pointer - 2026-10-04
+
+- FMUX-013 Recovery: DONE / MAIN VERIFIED.
+- Closure head `d64e10439932c4bf05186468107ad179eafd28da`; push Verify `37190237875` SUCCESS; PR #52 Verify `37190637624` SUCCESS; merged main `f5fb42c0d842db126cd4de58ddc952633a4676c8`; merged-main Verify `37190970602` SUCCESS across macOS / Windows x64 / native Windows ARM64.
+- Runtime checkpoint: correct FMG026-ready FileMCP remains PID `17860`; no restart performed.
+- State-sync branch: `state/FMUX-013-main-verified`, based exactly on verified main `f5fb42c0d842db126cd4de58ddc952633a4676c8`.
+- FMUX-014 is already DONE / MAIN VERIFIED. FMUX-015 dependencies FMUX-003, FMG-023 and FMG-024 are DONE / MAIN VERIFIED; FMUX-015 becomes the lowest-numbered next task after this state-sync is MAIN VERIFIED.
+- State-sync next action: commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; only then claim FMUX-015 Backend / Isolation UX.

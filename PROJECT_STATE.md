@@ -1534,3 +1534,11 @@ NEXT_EXACT_ACTION: scoped review -> candidate commit -> remote/PR guard -> push 
 FMUX-013 exact-head candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc`: NATIVE VERIFIED / SCOPED REVIEW PASS. Push Verify `37189165659` SUCCESS on macOS / Windows x64 / native Windows ARM64. macOS native compile/typecheck gap is closed. No P0/P1 found; Recovery authority remains bounded to the six declared list/get/restore tools.
 
 NEXT_EXACT_ACTION: evidence/state-only closure commit -> push exact closure head -> exact-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify; do not rerun `37189165659`.
+
+
+FMUX-013 Recovery: DONE / MAIN VERIFIED. Closure head `d64e10439932c4bf05186468107ad179eafd28da`; push Verify `37190237875` SUCCESS; PR #52 exact-head Verify `37190637624` SUCCESS; merged main `f5fb42c0d842db126cd4de58ddc952633a4676c8`; merged-main Verify `37190970602` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Governance state-sync for FMUX-013 is ACTIVE on `state/FMUX-013-main-verified`, based exactly on verified main `f5fb42c0d842db126cd4de58ddc952633a4676c8`. No product/runtime source changes are part of this sync. FMUX-015 Backend / Isolation UX is dependency-ready but MUST NOT be claimed until this state-sync itself is MAIN VERIFIED.
+Active branch: `state/FMUX-013-main-verified`
+
+NEXT_EXACT_ACTION: commit/push the FMUX-013 state-only closure -> exact-head Verify -> one reviewed PR to `main` -> merge exact head -> merged-main Verify; then claim FMUX-015 Backend / Isolation UX from verified main.

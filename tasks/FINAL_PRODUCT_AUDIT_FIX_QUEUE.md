@@ -32,4 +32,4 @@ FPA-009 optional after health-scope decision
 
 ## Next exact action
 
-AUTHORITATIVE NEXT_EXACT_ACTION: FMUX-013 Recovery candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc` is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS; push Verify `37189165659` SUCCESS on macOS / Windows x64 / native Windows ARM64. NEXT: commit/push evidence-state-only closure head -> require exact-head three-lane Verify on closure SHA -> one reviewed PR to `main` -> guarded merge -> merged-main Verify. Do not rerun `37189165659`, completed FMUX-012 proof, or restart correct runtime PID `17860`.
+AUTHORITATIVE NEXT_EXACT_ACTION: FMUX-013 Recovery is DONE / MAIN VERIFIED. PR #52 merged as `f5fb42c0d842db126cd4de58ddc952633a4676c8`; merged-main Verify `37190970602` SUCCESS on macOS / Windows x64 / native Windows ARM64. Current governance work is state-only closure on `state/FMUX-013-main-verified`: commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify. After that state-sync is MAIN VERIFIED, claim dependency-ready FMUX-015 Backend / Isolation UX from the resulting verified `main`. Do not rerun FMUX-013 implementation proof or restart correct runtime PID `17860`.

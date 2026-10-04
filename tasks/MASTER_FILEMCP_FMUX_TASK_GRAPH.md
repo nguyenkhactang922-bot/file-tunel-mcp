@@ -193,11 +193,11 @@ Scope:
 
 ## FMUX-013 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Recovery
 
-State: ACTIVE / LOCAL VERIFIED
+State: DONE / MAIN VERIFIED
 Branch: `chatgpt/FMUX-013-recovery`.
 Depends: FMUX-002, FMUX-003, FMG-016, FMG-021, FMG-022 — all DONE / MAIN VERIFIED.
-Checkpoint: exact-head candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc` passed GitHub Verify `37189165659` on macOS / Windows x64 / native Windows ARM64; scoped review PASS, no P0/P1.
-NEXT_EXACT_ACTION: commit/push evidence-state-only closure head -> require exact-head three-lane Verify -> one reviewed PR -> guarded merge -> merged-main Verify; do not rerun successful candidate Verify `37189165659`.
+Checkpoint: closure head `d64e10439932c4bf05186468107ad179eafd28da`; push Verify `37190237875` SUCCESS; PR #52 Verify `37190637624` SUCCESS; merged main `f5fb42c0d842db126cd4de58ddc952633a4676c8`; merged-main Verify `37190970602` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+NEXT_EXACT_ACTION: state-sync branch `state/FMUX-013-main-verified` -> commit/push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; then claim dependency-ready FMUX-015 Backend / Isolation UX.
 
 Scope:
 - quarantine;
