@@ -268,6 +268,41 @@ private struct TerminalSessionEvent {
     var isControllable: Bool { state.caseInsensitiveCompare("running") == .orderedSame }
 }
 
+private struct RecoveryQuarantineEvent {
+    let quarantineRef: String
+    let originalPath: String
+    let state: String
+    let isTree: Bool
+    let expired: Bool
+    let createdEpochMs: Int64
+    let expiresEpochMs: Int64
+    let entryCount: Int
+    let totalBytes: Int64
+    let lastRestoreTarget: String?
+    let recoveryRef: String?
+
+    var canRestore: Bool { !expired && (state == "quarantined" || state == "prepared") }
+}
+
+private struct RecoveryCheckpointEvent {
+    let checkpointRef: String
+    let repositoryPath: String
+    let headOID: String?
+    let sourceStateID: String
+    let expired: Bool
+    let createdEpochMs: Int64
+    let expiresEpochMs: Int64
+    let entryCount: Int
+    let totalBytes: Int64
+    let stagedCount: Int
+    let unstagedCount: Int
+    let untrackedCount: Int
+    let ignoredCount: Int
+    let excludedCount: Int
+
+    var canPlan: Bool { !expired }
+}
+
 private struct ArtifactBatchEntryEvent {
     let path: String
     let state: String
@@ -330,6 +365,11 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private var terminalSessions: [TerminalSessionEvent] = []
     private var terminalReadCursors: [String: String] = [:]
     private var terminalRefreshInProgress = false
+    private var recoveryQuarantineItems: [RecoveryQuarantineEvent] = []
+    private var recoveryCheckpoints: [RecoveryCheckpointEvent] = []
+    private var plannedRecoveryCheckpointRefs: Set<String> = []
+    private var recoveryRefreshInProgress = false
+    private var recoveryPersistentNotice = ""
     private var terminalTimer: Timer?
     private let terminalReadWindowBytes = 16 * 1024
     private let maxTerminalOutputCharacters = 64 * 1024
@@ -377,6 +417,16 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
     private let terminalResizeButton = NSButton(title: "Resize", target: nil, action: nil)
     private let terminalColumnsField = NSTextField(string: "120")
     private let terminalRowsField = NSTextField(string: "30")
+    private let recoveryQuarantineTableView = NSTableView()
+    private let recoveryCheckpointTableView = NSTableView()
+    private let recoveryWorkspaceLabel = NSTextField(wrappingLabelWithString: "No connected workspace selected.")
+    private let recoveryPolicyLabel = NSTextField(wrappingLabelWithString: "Presentation grants no authority.")
+    private let recoveryDetailLabel = NSTextField(wrappingLabelWithString: "Select a quarantine item or checkpoint.")
+    private let recoveryStatusLabel = NSTextField(wrappingLabelWithString: "0 quarantine items | 0 checkpoints | partial recovery is surfaced explicitly")
+    private let recoveryRefreshButton = NSButton(title: "Refresh", target: nil, action: nil)
+    private let recoveryRestoreQuarantineButton = NSButton(title: "Restore quarantine", target: nil, action: nil)
+    private let recoveryPlanCheckpointButton = NSButton(title: "Plan checkpoint restore", target: nil, action: nil)
+    private let recoveryRestoreCheckpointButton = NSButton(title: "Restore checkpoint", target: nil, action: nil)
     private let artifactBatchTableView = NSTableView()
     private let artifactEntryTableView = NSTableView()
     private let artifactBatchSummaryLabel = NSTextField(wrappingLabelWithString: "No batch result captured yet.")
@@ -608,6 +658,57 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         terminalResizeButton.isEnabled = false
         terminalColumnsField.alignment = .right
         terminalRowsField.alignment = .right
+
+        recoveryQuarantineTableView.delegate = self
+        recoveryQuarantineTableView.dataSource = self
+        recoveryQuarantineTableView.headerView = NSTableHeaderView()
+        recoveryQuarantineTableView.usesAlternatingRowBackgroundColors = true
+        recoveryQuarantineTableView.allowsMultipleSelection = false
+        for (identifier, title, width) in [
+            ("recovery-q-state", "State", 120.0),
+            ("recovery-q-path", "Path", 260.0),
+            ("recovery-q-entries", "Entries", 72.0),
+            ("recovery-q-expires", "Expires", 120.0),
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = width
+            recoveryQuarantineTableView.addTableColumn(column)
+        }
+
+        recoveryCheckpointTableView.delegate = self
+        recoveryCheckpointTableView.dataSource = self
+        recoveryCheckpointTableView.headerView = NSTableHeaderView()
+        recoveryCheckpointTableView.usesAlternatingRowBackgroundColors = true
+        recoveryCheckpointTableView.allowsMultipleSelection = false
+        for (identifier, title, width) in [
+            ("recovery-c-repo", "Repository", 220.0),
+            ("recovery-c-entries", "Entries", 72.0),
+            ("recovery-c-excluded", "Excluded", 76.0),
+            ("recovery-c-expires", "Expires", 120.0),
+        ] {
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = width
+            recoveryCheckpointTableView.addTableColumn(column)
+        }
+        recoveryWorkspaceLabel.maximumNumberOfLines = 4
+        recoveryPolicyLabel.maximumNumberOfLines = 4
+        recoveryPolicyLabel.textColor = .secondaryLabelColor
+        recoveryDetailLabel.maximumNumberOfLines = 14
+        recoveryStatusLabel.maximumNumberOfLines = 3
+        recoveryStatusLabel.textColor = .secondaryLabelColor
+        recoveryRefreshButton.target = self
+        recoveryRefreshButton.action = #selector(recoveryRefresh)
+        recoveryRestoreQuarantineButton.target = self
+        recoveryRestoreQuarantineButton.action = #selector(recoveryRestoreQuarantine)
+        recoveryPlanCheckpointButton.target = self
+        recoveryPlanCheckpointButton.action = #selector(recoveryPlanCheckpoint)
+        recoveryRestoreCheckpointButton.target = self
+        recoveryRestoreCheckpointButton.action = #selector(recoveryRestoreCheckpoint)
+        recoveryRestoreQuarantineButton.isEnabled = false
+        recoveryPlanCheckpointButton.isEnabled = false
+        recoveryRestoreCheckpointButton.isEnabled = false
 
         artifactBatchTableView.delegate = self
         artifactBatchTableView.dataSource = self
@@ -1113,6 +1214,68 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             terminalOutputScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 300),
         ])
 
+        let recoveryQuarantineScroll = NSScrollView()
+        recoveryQuarantineScroll.documentView = recoveryQuarantineTableView
+        recoveryQuarantineScroll.hasVerticalScroller = true
+        recoveryQuarantineScroll.borderType = .bezelBorder
+        recoveryQuarantineScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let recoveryCheckpointScroll = NSScrollView()
+        recoveryCheckpointScroll.documentView = recoveryCheckpointTableView
+        recoveryCheckpointScroll.hasVerticalScroller = true
+        recoveryCheckpointScroll.borderType = .bezelBorder
+        recoveryCheckpointScroll.translatesAutoresizingMaskIntoConstraints = false
+
+        let recoveryHeader = FileMCPFeedbackComponents.pageHeader(
+            title: "Recovery",
+            description: "Workspace-scoped quarantine and checkpoint recovery. Restore actions remain subject to core policy, source/version checks and rollback safeguards."
+        )
+        let recoveryTruth = NSStackView(views: [recoveryWorkspaceLabel, recoveryPolicyLabel])
+        recoveryTruth.orientation = .vertical
+        recoveryTruth.alignment = .leading
+        recoveryTruth.spacing = 4
+
+        let recoveryTables = NSStackView(views: [recoveryQuarantineScroll, recoveryCheckpointScroll])
+        recoveryTables.orientation = .horizontal
+        recoveryTables.alignment = .top
+        recoveryTables.distribution = .fillEqually
+        recoveryTables.spacing = 10
+        recoveryTables.translatesAutoresizingMaskIntoConstraints = false
+
+        let recoveryControls = NSStackView(views: [
+            recoveryRefreshButton,
+            recoveryRestoreQuarantineButton,
+            recoveryPlanCheckpointButton,
+            recoveryRestoreCheckpointButton,
+        ])
+        recoveryControls.orientation = .horizontal
+        recoveryControls.alignment = .centerY
+        recoveryControls.spacing = 8
+
+        let recoveryRoot = NSStackView(views: [
+            recoveryHeader,
+            recoveryTruth,
+            recoveryTables,
+            recoveryDetailLabel,
+            recoveryControls,
+            recoveryStatusLabel,
+        ])
+        recoveryRoot.orientation = .vertical
+        recoveryRoot.alignment = .leading
+        recoveryRoot.spacing = 8
+        recoveryRoot.translatesAutoresizingMaskIntoConstraints = false
+
+        let recoveryPage = NSView()
+        recoveryPage.addSubview(recoveryRoot)
+        NSLayoutConstraint.activate([
+            recoveryRoot.leadingAnchor.constraint(equalTo: recoveryPage.leadingAnchor, constant: 12),
+            recoveryRoot.trailingAnchor.constraint(equalTo: recoveryPage.trailingAnchor, constant: -12),
+            recoveryRoot.topAnchor.constraint(equalTo: recoveryPage.topAnchor, constant: 12),
+            recoveryRoot.bottomAnchor.constraint(equalTo: recoveryPage.bottomAnchor, constant: -12),
+            recoveryQuarantineScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 240),
+            recoveryCheckpointScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 240),
+        ])
+
         let artifactBatchScroll = NSScrollView()
         artifactBatchScroll.documentView = artifactBatchTableView
         artifactBatchScroll.hasVerticalScroller = true
@@ -1284,6 +1447,10 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         terminalTab.label = "Terminal"
         terminalTab.view = terminalPage
 
+        let recoveryTab = NSTabViewItem(identifier: "recovery")
+        recoveryTab.label = "Recovery"
+        recoveryTab.view = recoveryPage
+
         let artifactTab = NSTabViewItem(identifier: "artifacts")
         artifactTab.label = "Artifacts"
         artifactTab.view = artifactPage
@@ -1301,6 +1468,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         tabs.addTabViewItem(evidenceTab)
         tabs.addTabViewItem(repositoryTab)
         tabs.addTabViewItem(terminalTab)
+        tabs.addTabViewItem(recoveryTab)
         tabs.addTabViewItem(artifactTab)
         tabs.addTabViewItem(logTab)
         tabs.selectTabViewItem(withIdentifier: "home")
@@ -1339,6 +1507,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             navigationButton("Evidence", action: #selector(showEvidence)),
             navigationButton("Repository", action: #selector(showRepository)),
             navigationButton("Terminal", action: #selector(showTerminal)),
+            navigationButton("Recovery", action: #selector(showRecovery)),
             navigationButton("Artifacts", action: #selector(showArtifacts)),
             navigationButton("Diagnostics", action: #selector(showDiagnostics)),
             NSView(),
@@ -1605,6 +1774,8 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if tableView == repositoryResultTableView { return repositoryEvents.count }
         if tableView == repositoryItemTableView { return selectedRepositoryEvent?.entries.count ?? 0 }
         if tableView == terminalTableView { return terminalSessions.count }
+        if tableView == recoveryQuarantineTableView { return recoveryQuarantineItems.count }
+        if tableView == recoveryCheckpointTableView { return recoveryCheckpoints.count }
         if tableView == artifactBatchTableView { return artifactBatchEvents.count }
         if tableView == artifactEntryTableView { return selectedArtifactBatch?.entries.count ?? 0 }
         return 0
@@ -1662,6 +1833,46 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
                 } else {
                     text = "-"
                 }
+            }
+            let label = NSTextField(labelWithString: text)
+            label.lineBreakMode = .byTruncatingTail
+            return label
+        }
+
+        if tableView == recoveryQuarantineTableView {
+            guard row >= 0, row < recoveryQuarantineItems.count, let tableColumn else { return nil }
+            let item = recoveryQuarantineItems[row]
+            let text: String
+            switch tableColumn.identifier.rawValue {
+            case "recovery-q-state": text = item.state
+            case "recovery-q-path": text = item.originalPath
+            case "recovery-q-entries": text = "\(item.entryCount)"
+            default:
+                if item.expiresEpochMs > 0 {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "MM-dd HH:mm"
+                    text = formatter.string(from: Date(timeIntervalSince1970: Double(item.expiresEpochMs) / 1000.0))
+                } else { text = "-" }
+            }
+            let label = NSTextField(labelWithString: text)
+            label.lineBreakMode = .byTruncatingTail
+            return label
+        }
+
+        if tableView == recoveryCheckpointTableView {
+            guard row >= 0, row < recoveryCheckpoints.count, let tableColumn else { return nil }
+            let item = recoveryCheckpoints[row]
+            let text: String
+            switch tableColumn.identifier.rawValue {
+            case "recovery-c-repo": text = item.repositoryPath
+            case "recovery-c-entries": text = "\(item.entryCount)"
+            case "recovery-c-excluded": text = "\(item.excludedCount)"
+            default:
+                if item.expiresEpochMs > 0 {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "MM-dd HH:mm"
+                    text = formatter.string(from: Date(timeIntervalSince1970: Double(item.expiresEpochMs) / 1000.0))
+                } else { text = "-" }
             }
             let label = NSTextField(labelWithString: text)
             label.lineBreakMode = .byTruncatingTail
@@ -1836,6 +2047,20 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             terminalOutputView.string = ""
             updateTerminalSelection(session)
             readTerminalOutput(session)
+            return
+        }
+
+        if table === recoveryQuarantineTableView {
+            guard !recoveryRefreshInProgress else { return }
+            recoveryCheckpointTableView.deselectAll(nil)
+            loadSelectedRecoveryQuarantineDetail()
+            return
+        }
+
+        if table === recoveryCheckpointTableView {
+            guard !recoveryRefreshInProgress else { return }
+            recoveryQuarantineTableView.deselectAll(nil)
+            loadSelectedRecoveryCheckpointDetail()
             return
         }
 
@@ -2387,6 +2612,11 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         object[key] as? String ?? fallback
     }
 
+    private func optionalTerminalString(_ object: [String: Any], _ key: String) -> String? {
+        let value = terminalString(object, key)
+        return value.isEmpty ? nil : value
+    }
+
     private func terminalInt(_ object: [String: Any], _ key: String) -> Int? {
         if object[key] is NSNull { return nil }
         return (object[key] as? NSNumber)?.intValue
@@ -2404,6 +2634,272 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if let values = object[key] as? [String] { return values.joined(separator: ",") }
         if let values = object[key] as? [Any] { return values.compactMap { $0 as? String }.joined(separator: ",") }
         return "none"
+    }
+
+    @objc private func showRecovery() {
+        tabs.selectTabViewItem(withIdentifier: "recovery")
+        refreshRecovery()
+    }
+
+    private func refreshRecovery() {
+        guard !recoveryRefreshInProgress else { return }
+        recoveryRefreshInProgress = true
+        defer { recoveryRefreshInProgress = false }
+
+        guard runtime.state == .running else {
+            recoveryQuarantineItems.removeAll()
+            recoveryCheckpoints.removeAll()
+            plannedRecoveryCheckpointRefs.removeAll()
+            recoveryQuarantineTableView.reloadData()
+            recoveryCheckpointTableView.reloadData()
+            recoveryQuarantineTableView.deselectAll(nil)
+            recoveryCheckpointTableView.deselectAll(nil)
+            recoveryWorkspaceLabel.stringValue = "Workspace runtime is not connected."
+            recoveryPolicyLabel.stringValue = "Recovery presentation grants no authority."
+            recoveryDetailLabel.stringValue = "No synthetic recovery state is shown."
+            recoveryStatusLabel.stringValue = "0 quarantine items | 0 checkpoints | runtime unavailable"
+            setRecoveryControls(quarantineRestore: false, checkpointPlan: false, checkpointRestore: false)
+            return
+        }
+
+        let priorQuarantineRef = selectedRecoveryQuarantine()?.quarantineRef
+        let priorCheckpointRef = selectedRecoveryCheckpoint()?.checkpointRef
+        do {
+            let policy = try runtime.presentationPolicyMetadata()
+            let quarantine = try runtime.callPresentationRecoveryTool(name: "quarantine_list", arguments: ["max_items": 200])
+            let checkpoints = try runtime.callPresentationRecoveryTool(name: "checkpoint_list", arguments: ["max_items": 200])
+
+            recoveryQuarantineItems = (quarantine["items"] as? [[String: Any]] ?? []).compactMap { item in
+                let ref = terminalString(item, "quarantine_ref")
+                guard !ref.isEmpty else { return nil }
+                return RecoveryQuarantineEvent(
+                    quarantineRef: ref,
+                    originalPath: terminalString(item, "original_relative_path", fallback: "(unknown)"),
+                    state: terminalString(item, "state", fallback: "unknown"),
+                    isTree: terminalBool(item, "is_tree"),
+                    expired: terminalBool(item, "expired"),
+                    createdEpochMs: terminalInt64(item, "created_epoch_ms"),
+                    expiresEpochMs: terminalInt64(item, "expires_epoch_ms"),
+                    entryCount: terminalInt(item, "entry_count") ?? 0,
+                    totalBytes: terminalInt64(item, "total_bytes"),
+                    lastRestoreTarget: optionalTerminalString(item, "last_restore_target"),
+                    recoveryRef: optionalTerminalString(item, "recovery_ref")
+                )
+            }.sorted { $0.createdEpochMs > $1.createdEpochMs }
+
+            recoveryCheckpoints = (checkpoints["items"] as? [[String: Any]] ?? []).compactMap { item in
+                let ref = terminalString(item, "checkpoint_ref")
+                guard !ref.isEmpty else { return nil }
+                return RecoveryCheckpointEvent(
+                    checkpointRef: ref,
+                    repositoryPath: terminalString(item, "repository_relative_path", fallback: "."),
+                    headOID: optionalTerminalString(item, "head_oid"),
+                    sourceStateID: terminalString(item, "source_state_id", fallback: "unknown"),
+                    expired: terminalBool(item, "expired"),
+                    createdEpochMs: terminalInt64(item, "created_epoch_ms"),
+                    expiresEpochMs: terminalInt64(item, "expires_epoch_ms"),
+                    entryCount: terminalInt(item, "entry_count") ?? 0,
+                    totalBytes: terminalInt64(item, "total_bytes"),
+                    stagedCount: terminalInt(item, "staged_count") ?? 0,
+                    unstagedCount: terminalInt(item, "unstaged_count") ?? 0,
+                    untrackedCount: terminalInt(item, "untracked_count") ?? 0,
+                    ignoredCount: terminalInt(item, "ignored_count") ?? 0,
+                    excludedCount: terminalInt(item, "excluded_count") ?? 0
+                )
+            }.sorted { $0.createdEpochMs > $1.createdEpochMs }
+
+            plannedRecoveryCheckpointRefs = Set(plannedRecoveryCheckpointRefs.filter { ref in recoveryCheckpoints.contains { $0.checkpointRef == ref } })
+            recoveryQuarantineTableView.reloadData()
+            recoveryCheckpointTableView.reloadData()
+
+            if let priorQuarantineRef, let index = recoveryQuarantineItems.firstIndex(where: { $0.quarantineRef == priorQuarantineRef }) {
+                recoveryQuarantineTableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+                recoveryCheckpointTableView.deselectAll(nil)
+                loadSelectedRecoveryQuarantineDetail()
+            } else if let priorCheckpointRef, let index = recoveryCheckpoints.firstIndex(where: { $0.checkpointRef == priorCheckpointRef }) {
+                recoveryCheckpointTableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+                recoveryQuarantineTableView.deselectAll(nil)
+                loadSelectedRecoveryCheckpointDetail()
+            } else if !recoveryQuarantineItems.isEmpty {
+                recoveryQuarantineTableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+                recoveryCheckpointTableView.deselectAll(nil)
+                loadSelectedRecoveryQuarantineDetail()
+            } else if !recoveryCheckpoints.isEmpty {
+                recoveryCheckpointTableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+                recoveryQuarantineTableView.deselectAll(nil)
+                loadSelectedRecoveryCheckpointDetail()
+            } else {
+                recoveryQuarantineTableView.deselectAll(nil)
+                recoveryCheckpointTableView.deselectAll(nil)
+                recoveryDetailLabel.stringValue = "No quarantine items or checkpoints observed."
+                setRecoveryControls(quarantineRestore: false, checkpointPlan: false, checkpointRestore: false)
+            }
+
+            let profile = terminalString(policy, "profile", fallback: "unknown")
+            let generation = terminalInt64(policy, "generation")
+            recoveryWorkspaceLabel.stringValue = "Workspace root: \(directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))"
+            recoveryPolicyLabel.stringValue = "profile=\(profile) | generation=\(generation) | presentation_grants_authority=false | core policy and rollback remain authoritative"
+            let recoverySummary = "\(recoveryQuarantineItems.count) quarantine item(s) | \(recoveryCheckpoints.count) checkpoint(s) | partial recovery is never hidden"
+            recoveryStatusLabel.stringValue = recoveryPersistentNotice.isEmpty ? recoverySummary : "\(recoveryPersistentNotice) | \(recoverySummary)"
+        } catch {
+            recoveryQuarantineItems.removeAll()
+            recoveryCheckpoints.removeAll()
+            plannedRecoveryCheckpointRefs.removeAll()
+            recoveryQuarantineTableView.reloadData()
+            recoveryCheckpointTableView.reloadData()
+            recoveryDetailLabel.stringValue = "Recovery data unavailable without expanding authority."
+            recoveryStatusLabel.stringValue = "Recovery unavailable: \(error.localizedDescription)"
+            setRecoveryControls(quarantineRestore: false, checkpointPlan: false, checkpointRestore: false)
+        }
+    }
+
+    private func selectedRecoveryQuarantine() -> RecoveryQuarantineEvent? {
+        let row = recoveryQuarantineTableView.selectedRow
+        guard row >= 0, row < recoveryQuarantineItems.count else { return nil }
+        return recoveryQuarantineItems[row]
+    }
+
+    private func selectedRecoveryCheckpoint() -> RecoveryCheckpointEvent? {
+        let row = recoveryCheckpointTableView.selectedRow
+        guard row >= 0, row < recoveryCheckpoints.count else { return nil }
+        return recoveryCheckpoints[row]
+    }
+
+    private func loadSelectedRecoveryQuarantineDetail() {
+        guard let item = selectedRecoveryQuarantine() else {
+            recoveryDetailLabel.stringValue = "Select a quarantine item."
+            setRecoveryControls(quarantineRestore: false, checkpointPlan: false, checkpointRestore: false)
+            return
+        }
+        setRecoveryControls(quarantineRestore: item.canRestore, checkpointPlan: false, checkpointRestore: false)
+        do {
+            let detail = try runtime.callPresentationRecoveryTool(name: "quarantine_get", arguments: ["quarantine_ref": item.quarantineRef])
+            recoveryDetailLabel.stringValue =
+                "Root: \(directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))\n" +
+                "Quarantine: \(item.originalPath) | state=\(terminalString(detail, "state", fallback: "unknown")) | tree=\(terminalBool(detail, "is_tree")) | expired=\(terminalBool(detail, "expired"))\n" +
+                "Entries=\(terminalInt(detail, "entry_count") ?? 0) | bytes=\(terminalInt64(detail, "total_bytes")) | original path only; existing targets are never silently replaced.\n" +
+                "Last restore target: \(terminalString(detail, "last_restore_target", fallback: "-")) | recovery ref present=\(!terminalString(detail, "recovery_ref").isEmpty)"
+        } catch {
+            recoveryDetailLabel.stringValue = "Quarantine detail unavailable. Root: \(directoryField.stringValue) | \(error.localizedDescription)"
+            setRecoveryControls(quarantineRestore: false, checkpointPlan: false, checkpointRestore: false)
+        }
+    }
+
+    private func loadSelectedRecoveryCheckpointDetail() {
+        guard let item = selectedRecoveryCheckpoint() else {
+            recoveryDetailLabel.stringValue = "Select a checkpoint."
+            setRecoveryControls(quarantineRestore: false, checkpointPlan: false, checkpointRestore: false)
+            return
+        }
+        let planned = plannedRecoveryCheckpointRefs.contains(item.checkpointRef)
+        setRecoveryControls(quarantineRestore: false, checkpointPlan: item.canPlan, checkpointRestore: item.canPlan && planned)
+        do {
+            let detail = try runtime.callPresentationRecoveryTool(name: "checkpoint_get", arguments: ["checkpoint_ref": item.checkpointRef])
+            let entries = detail["entries"] as? [[String: Any]] ?? []
+            let preview = entries.prefix(12).map { entry in
+                let path = terminalString(entry, "relative_path", fallback: "?")
+                let exclusion = terminalString(entry, "worktree_excluded_reason", fallback: "-")
+                return "\(path) [staged=\(terminalBool(entry, "staged")), unstaged=\(terminalBool(entry, "unstaged")), untracked=\(terminalBool(entry, "untracked")), excluded=\(exclusion)]"
+            }
+            recoveryDetailLabel.stringValue =
+                "Root: \(directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)) | repository: \(item.repositoryPath)\n" +
+                "Expired=\(item.expired) | entries=\(item.entryCount) | excluded=\(item.excludedCount) | bytes=\(item.totalBytes)\n" +
+                "Git staged=\(item.stagedCount), unstaged=\(item.unstagedCount), untracked=\(item.untrackedCount), ignored=\(item.ignoredCount) | head=\(item.headOID ?? "-")\n" +
+                "Source state: \(item.sourceStateID) | restore plan ready=\(planned)\n" +
+                (preview.isEmpty ? "No captured entry metadata." : preview.joined(separator: "\n"))
+        } catch {
+            recoveryDetailLabel.stringValue = "Checkpoint detail unavailable. Root: \(directoryField.stringValue) | \(error.localizedDescription)"
+            setRecoveryControls(quarantineRestore: false, checkpointPlan: false, checkpointRestore: false)
+        }
+    }
+
+    private func setRecoveryControls(quarantineRestore: Bool, checkpointPlan: Bool, checkpointRestore: Bool) {
+        recoveryRestoreQuarantineButton.isEnabled = quarantineRestore
+        recoveryPlanCheckpointButton.isEnabled = checkpointPlan
+        recoveryRestoreCheckpointButton.isEnabled = checkpointRestore
+    }
+
+    private func confirmRecovery(title: String, message: String) -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "Restore")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    @objc private func recoveryRefresh() { refreshRecovery() }
+
+    @objc private func recoveryRestoreQuarantine() {
+        guard let item = selectedRecoveryQuarantine(), item.canRestore else { return }
+        let root = directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard confirmRecovery(
+            title: "Restore quarantined item?",
+            message: "Workspace root: \(root)\nTarget: \(item.originalPath)\n\nThis UI restores only to the original path. Existing targets are not replaced; core policy and Mutation Guard revalidate before write."
+        ) else { return }
+        do {
+            let result = try runtime.callPresentationRecoveryTool(name: "quarantine_restore", arguments: ["quarantine_ref": item.quarantineRef])
+            let state = terminalString(result, "state", fallback: "unknown")
+            switch state {
+            case "restored": recoveryStatusLabel.stringValue = "Quarantine restore completed: \(item.originalPath)"
+            case "rolled_back": recoveryStatusLabel.stringValue = "Quarantine restore failed and rollback completed: \(item.originalPath)"
+            case "partial_recovery_required": recoveryStatusLabel.stringValue = "HIGH SEVERITY: quarantine restore requires partial recovery: \(item.originalPath)"
+            default: recoveryStatusLabel.stringValue = "Quarantine restore returned state=\(state): \(item.originalPath)"
+            }
+            recoveryPersistentNotice = state == "partial_recovery_required" ? recoveryStatusLabel.stringValue : ""
+        } catch {
+            recoveryStatusLabel.stringValue = "Quarantine restore blocked/failed; state may be unchanged. \(error.localizedDescription)"
+        }
+        refreshRecovery()
+    }
+
+    @objc private func recoveryPlanCheckpoint() {
+        guard let item = selectedRecoveryCheckpoint(), item.canPlan else { return }
+        do {
+            let result = try runtime.callPresentationRecoveryTool(name: "checkpoint_restore", arguments: [
+                "checkpoint_ref": item.checkpointRef,
+                "history_mode": "preserve",
+                "dry_run": true,
+            ])
+            let state = terminalString(result, "state", fallback: "unknown")
+            if state == "planned" { plannedRecoveryCheckpointRefs.insert(item.checkpointRef) }
+            else { plannedRecoveryCheckpointRefs.remove(item.checkpointRef) }
+            recoveryStatusLabel.stringValue = "Checkpoint restore plan state=\(state) | paths=\(terminalInt(result, "path_count") ?? 0) | skipped=\(terminalInt(result, "skipped_count") ?? 0)"
+            loadSelectedRecoveryCheckpointDetail()
+        } catch {
+            plannedRecoveryCheckpointRefs.remove(item.checkpointRef)
+            recoveryStatusLabel.stringValue = "Checkpoint restore plan blocked/failed; no restore started. \(error.localizedDescription)"
+            loadSelectedRecoveryCheckpointDetail()
+        }
+    }
+
+    @objc private func recoveryRestoreCheckpoint() {
+        guard let item = selectedRecoveryCheckpoint(), plannedRecoveryCheckpointRefs.contains(item.checkpointRef) else { return }
+        let root = directoryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard confirmRecovery(
+            title: "Restore checkpoint?",
+            message: "Workspace root: \(root)\nRepository: \(item.repositoryPath)\nHistory mode: preserve\n\nCore source-state validation and rollback checkpoint protection run again before mutation."
+        ) else { return }
+        do {
+            let result = try runtime.callPresentationRecoveryTool(name: "checkpoint_restore", arguments: [
+                "checkpoint_ref": item.checkpointRef,
+                "history_mode": "preserve",
+                "dry_run": false,
+            ])
+            plannedRecoveryCheckpointRefs.remove(item.checkpointRef)
+            let state = terminalString(result, "state", fallback: "unknown")
+            switch state {
+            case "restored": recoveryStatusLabel.stringValue = "Checkpoint restored: \(item.repositoryPath)"
+            case "rolled_back": recoveryStatusLabel.stringValue = "Checkpoint restore failed and rollback completed: \(item.repositoryPath)"
+            case "partial_recovery_required": recoveryStatusLabel.stringValue = "HIGH SEVERITY: checkpoint restore requires partial recovery; rollback checkpoint retained."
+            default: recoveryStatusLabel.stringValue = "Checkpoint restore returned state=\(state): \(item.repositoryPath)"
+            }
+            recoveryPersistentNotice = state == "partial_recovery_required" ? recoveryStatusLabel.stringValue : ""
+        } catch {
+            recoveryStatusLabel.stringValue = "Checkpoint restore blocked/failed; inspect current recovery state before retry. \(error.localizedDescription)"
+        }
+        refreshRecovery()
     }
 
     @objc private func showArtifacts() {

@@ -149,3 +149,32 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 
 - State-sync attempt 2: lifecycle-fix head `ad199846fd2d7fe50311c7965f11ca88ddda0999` passed push Verify `37183856103` on macOS / Windows x64 / native Windows ARM64; scoped review PASS, no P0/P1.
 - Next: evidence-state-only closure commit -> side-effect guard -> push new closure head -> exact-head three-lane Verify -> one reviewed PR -> merge -> merged-main Verify -> only then claim FMUX-013.
+
+
+## FMUX-013 Recovery claim - 2026-10-04
+
+- FMUX-012 governance state-sync: DONE / MAIN VERIFIED. PR #51 merged as `dad103c569cbfc6d68b343445287152013c6f29e`; merged-main Verify `37186288521` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- FMUX-013 Recovery: ACTIVE / CLAIMED on `chatgpt/FMUX-013-recovery`, based exactly on verified main `dad103c569cbfc6d68b343445287152013c6f29e`.
+- Dependencies FMUX-002, FMUX-003, FMG-016, FMG-021, FMG-022: DONE / MAIN VERIFIED.
+- Frozen scope: quarantine; checkpoints; restore plan; rollback; partial-recovery states.
+- NEXT: inspect existing Windows/macOS quarantine/checkpoint/restore presentation bridges and frozen design specs -> implement truthful Recovery UX only -> targeted contract/build evidence -> exact-head verification lifecycle.
+
+
+## FMUX-013 Recovery local verification - 2026-10-04
+
+- State: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-013-recovery`.
+- Base: verified main `dad103c569cbfc6d68b343445287152013c6f29e`.
+- Recovery UX: quarantine/checkpoint master-detail; original-path quarantine restore; checkpoint dry-run plan before preserve-history restore; rollback/partial-recovery state explicit and persistent.
+- Presentation authority: exact six-tool Recovery allowlist; no quarantine delete, checkpoint capture/delete, PTY write/start, shell, replace-existing or target override.
+- Local gates PASS: FMUX-013 contract, app-shell, presentation, project-state, diff check, workflow YAML parse, Windows Release build 0 warnings / 0 errors.
+- macOS native typecheck/build: pending exact-head GitHub Verify because local host has no `swiftc`.
+- Next: scoped diff review -> candidate commit -> side-effect guard -> push exact head -> require all native lanes PASS before PR.
+
+
+## FMUX-013 exact-head verification - 2026-10-04
+
+- Candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc`: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS.
+- Push Verify `37189165659`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- macOS typecheck/integration/build and Windows full native lanes are green.
+- Runtime PID `17860` remained correct; no restart.
+- Next: evidence/state-only closure commit -> closure exact-head Verify -> one reviewed PR -> merge -> merged-main Verify.

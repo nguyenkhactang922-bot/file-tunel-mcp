@@ -175,6 +175,12 @@ final class LocalMCPRuntime {
         }
     }
 
+    func callPresentationRecoveryTool(name: String, arguments: [String: Any]) throws -> [String: Any] {
+        try withPresentationServer { server in
+            try server.callPresentationRecoveryTool(name: name, arguments: arguments)
+        }
+    }
+
     func presentationPolicyMetadata() throws -> [String: Any] {
         try withPresentationServer { $0.presentationPolicyMetadata() }
     }

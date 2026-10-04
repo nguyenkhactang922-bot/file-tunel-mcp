@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `state/FMUX-012-main-verified`
+Active branch: `chatgpt/FMUX-013-recovery`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1515,3 +1515,22 @@ NEXT_EXACT_ACTION: commit state-sync contract fix -> confirm remote branch remai
 FMUX-012 state-sync attempt 2: fix head `ad199846fd2d7fe50311c7965f11ca88ddda0999` is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS. Push Verify `37183856103` SUCCESS on macOS / Windows x64 / native Windows ARM64. The lifecycle contract now accepts the already-closed `DONE / MAIN VERIFIED` state without changing product/runtime authority.
 
 NEXT_EXACT_ACTION: commit/push the evidence-state-only state-sync closure head -> exact-head three-lane Verify -> one reviewed PR -> guarded merge -> merged-main Verify -> claim FMUX-013 Recovery from verified main.
+
+
+FMUX-012 state-sync: DONE / MAIN VERIFIED. PR #51 merged exact reviewed head `35420f96965ad46bec61a3e804800fcbe989ce13` as main `dad103c569cbfc6d68b343445287152013c6f29e`; merged-main Verify `37186288521` SUCCESS on all three native lanes.
+
+FMUX-013 Recovery: ACTIVE / CLAIMED on `chatgpt/FMUX-013-recovery`, based exactly on verified main `dad103c569cbfc6d68b343445287152013c6f29e`. All declared dependencies are DONE / MAIN VERIFIED. Scope is presentation-only recovery UX over existing FMG-016/021/022 truth: quarantine, checkpoints, restore plan, rollback and partial-recovery states; no new runtime authority.
+
+NEXT_EXACT_ACTION: analyze current Windows/macOS presentation bridges and FMUX design requirements for Recovery, then implement the minimal truthful cross-platform surface and targeted verification.
+
+
+FMUX-013 Recovery: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-013-recovery`, base verified main `dad103c569cbfc6d68b343445287152013c6f29e`. Presentation bridge is bounded to quarantine list/get/restore and checkpoint list/get/restore; create/delete/shell/PTy-write authority is absent. Checkpoint restore is plan-before-apply with preserve history; partial recovery remains explicit/persistent.
+
+Local evidence PASS: Recovery/app-shell/presentation/project-state contracts, diff hygiene, workflow YAML parse, Windows Release build 0 warnings / 0 errors. macOS native compile/build is PENDING exact-head GitHub Verify because local Windows host has no `swiftc`. Runtime PID `17860` unchanged.
+
+NEXT_EXACT_ACTION: scoped review -> candidate commit -> remote/PR guard -> push exact head -> three-lane Verify; only after exact-head native PASS proceed to closure commit and GitHub PR lifecycle.
+
+
+FMUX-013 exact-head candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc`: NATIVE VERIFIED / SCOPED REVIEW PASS. Push Verify `37189165659` SUCCESS on macOS / Windows x64 / native Windows ARM64. macOS native compile/typecheck gap is closed. No P0/P1 found; Recovery authority remains bounded to the six declared list/get/restore tools.
+
+NEXT_EXACT_ACTION: evidence/state-only closure commit -> push exact closure head -> exact-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify; do not rerun `37189165659`.

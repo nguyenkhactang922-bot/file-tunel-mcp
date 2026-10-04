@@ -2810,6 +2810,7 @@ private final class MCPConnectionLease {
 final class LocalMCPServer {
     private static let handlerToolNames: Set<String> = ["filemcp_observability_connect", "evidence_get"]
     private static let presentationPtyToolNames: Set<String> = ["pty_list", "pty_read", "pty_resize", "pty_signal", "pty_stop"]
+    private static let presentationRecoveryToolNames: Set<String> = ["quarantine_list", "quarantine_get", "quarantine_restore", "checkpoint_list", "checkpoint_get", "checkpoint_restore"]
     private let port: UInt16
     private let localAuthToken: String
     private let tools: LocalTools
@@ -2893,6 +2894,16 @@ final class LocalMCPServer {
     func callPresentationPtyTool(name: String, arguments: [String: Any]) throws -> [String: Any] {
         guard Self.presentationPtyToolNames.contains(name) else {
             throw MCPServerError.operationFailed("Tool is not available to the desktop presentation bridge: \(name)")
+        }
+        guard isReady else {
+            throw MCPServerError.operationFailed("Local MCP server is not ready")
+        }
+        return try tools.call(name: name, arguments: arguments).structuredContent
+    }
+
+    func callPresentationRecoveryTool(name: String, arguments: [String: Any]) throws -> [String: Any] {
+        guard Self.presentationRecoveryToolNames.contains(name) else {
+            throw MCPServerError.operationFailed("Tool is not available to the desktop Recovery presentation bridge: \(name)")
         }
         guard isReady else {
             throw MCPServerError.operationFailed("Local MCP server is not ready")

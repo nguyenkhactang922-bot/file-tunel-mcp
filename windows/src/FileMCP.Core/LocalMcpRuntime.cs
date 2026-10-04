@@ -160,6 +160,22 @@ public sealed class LocalMcpRuntime : IAsyncDisposable
         return await server.CallPresentationPtyToolAsync(toolName, arguments, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<JsonObject> CallPresentationRecoveryToolAsync(
+        string toolName,
+        JsonObject arguments,
+        CancellationToken cancellationToken = default)
+    {
+        LocalMcpServer server;
+        lock (_stateGate)
+        {
+            if (_state.Status != LocalMcpRuntimeStatus.Running || _server is null || !_server.IsReady)
+                throw new FileMcpException("Workspace runtime is not connected");
+            server = _server;
+        }
+
+        return await server.CallPresentationRecoveryToolAsync(toolName, arguments, cancellationToken).ConfigureAwait(false);
+    }
+
     public JsonObject PresentationPolicyMetadata()
     {
         lock (_stateGate)

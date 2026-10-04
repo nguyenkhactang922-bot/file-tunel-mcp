@@ -39,8 +39,13 @@ public partial class MainWindow : Window
     private readonly List<RepositoryResultRow> _repositoryRows = new();
     private readonly List<TerminalSessionRow> _terminalRows = new();
     private readonly Dictionary<string, string> _terminalReadCursors = new(StringComparer.Ordinal);
+    private readonly List<RecoveryQuarantineRow> _recoveryQuarantineRows = new();
+    private readonly List<RecoveryCheckpointRow> _recoveryCheckpointRows = new();
+    private readonly HashSet<string> _plannedCheckpointKeys = new(StringComparer.Ordinal);
     private readonly List<ArtifactBatchRow> _artifactBatchRows = new();
     private bool _terminalRefreshRunning;
+    private bool _recoveryRefreshRunning;
+    private string _recoveryPersistentNotice = "";
     private const int TerminalReadWindowBytes = 16 * 1024;
     private const int MaxTerminalOutputCharacters = 64 * 1024;
     private const int MaxActivityRows = 500;
@@ -1113,6 +1118,11 @@ public partial class MainWindow : Window
         MainTabs.SelectedItem = TerminalTab;
         await RefreshTerminalAsync(readSelectedOutput: true);
     }
+    private async void NavigateRecovery_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedItem = RecoveryTab;
+        await RefreshRecoveryAsync();
+    }
     private void NavigateArtifacts_Click(object sender, RoutedEventArgs e)
     {
         MainTabs.SelectedItem = ArtifactsTab;
@@ -1135,6 +1145,8 @@ public partial class MainWindow : Window
         SetNavigationButtonPresentation(NavChangesButton, "Changes", "C");
         SetNavigationButtonPresentation(NavEvidenceButton, "Evidence", "E");
         SetNavigationButtonPresentation(NavRepositoryButton, "Repository", "R");
+        SetNavigationButtonPresentation(NavTerminalButton, "Terminal", "T");
+        SetNavigationButtonPresentation(NavRecoveryButton, "Recovery", "Y");
         SetNavigationButtonPresentation(NavArtifactsButton, "Artifacts", "B");
         SetNavigationButtonPresentation(NavDiagnosticsButton, "Diagnostics", "D");
 
@@ -1325,6 +1337,47 @@ public partial class MainWindow : Window
         "F" => FStatusText,
         _ => throw new ArgumentOutOfRangeException(nameof(key)),
     };
+
+    private sealed record RecoveryQuarantineRow(
+        string Workspace,
+        string QuarantineRef,
+        string OriginalPath,
+        string State,
+        bool IsTree,
+        bool Expired,
+        long CreatedEpochMs,
+        long ExpiresEpochMs,
+        int EntryCount,
+        long TotalBytes,
+        string? LastRestoreTarget,
+        string? RecoveryRef)
+    {
+        public string Key => $"{Workspace}|{QuarantineRef}";
+        public string ExpiryDisplay => ExpiresEpochMs <= 0 ? "-" : DateTimeOffset.FromUnixTimeMilliseconds(ExpiresEpochMs).ToLocalTime().ToString("MM-dd HH:mm");
+        public bool CanRestore => !Expired && (string.Equals(State, "quarantined", StringComparison.OrdinalIgnoreCase) || string.Equals(State, "prepared", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed record RecoveryCheckpointRow(
+        string Workspace,
+        string CheckpointRef,
+        string RepositoryPath,
+        string? HeadOid,
+        string SourceStateId,
+        bool Expired,
+        long CreatedEpochMs,
+        long ExpiresEpochMs,
+        int EntryCount,
+        long TotalBytes,
+        int StagedCount,
+        int UnstagedCount,
+        int UntrackedCount,
+        int IgnoredCount,
+        int ExcludedCount)
+    {
+        public string Key => $"{Workspace}|{CheckpointRef}";
+        public string ExpiryDisplay => ExpiresEpochMs <= 0 ? "-" : DateTimeOffset.FromUnixTimeMilliseconds(ExpiresEpochMs).ToLocalTime().ToString("MM-dd HH:mm");
+        public bool CanPlan => !Expired;
+    }
 
     private sealed record TerminalSessionRow(
         string Workspace,
@@ -1854,6 +1907,317 @@ public partial class MainWindow : Window
         {
             TerminalStatusText.Text = $"PTY control blocked/unavailable: {ex.Message}";
         }
+    }
+
+    private async Task RefreshRecoveryAsync()
+    {
+        if (_recoveryRefreshRunning) return;
+        _recoveryRefreshRunning = true;
+        try
+        {
+            var priorQuarantineKey = (RecoveryQuarantineGrid.SelectedItem as RecoveryQuarantineRow)?.Key;
+            var priorCheckpointKey = (RecoveryCheckpointGrid.SelectedItem as RecoveryCheckpointRow)?.Key;
+            var quarantineRows = new List<RecoveryQuarantineRow>();
+            var checkpointRows = new List<RecoveryCheckpointRow>();
+            var unavailable = new List<string>();
+            var connected = new List<string>();
+
+            foreach (var workspace in WorkspaceKeys)
+            {
+                if (!_runtimes.TryGetValue(workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running)
+                    continue;
+
+                try
+                {
+                    _ = runtime.PresentationPolicyMetadata();
+                    connected.Add(workspace);
+                    var quarantine = await runtime.CallPresentationRecoveryToolAsync("quarantine_list", new JsonObject { ["max_items"] = 200 });
+                    if (quarantine["items"] is JsonArray quarantineItems)
+                    {
+                        foreach (var node in quarantineItems)
+                        {
+                            if (node is not JsonObject item) continue;
+                            var quarantineRef = JsonText(item, "quarantine_ref", "");
+                            if (quarantineRef.Length == 0) continue;
+                            quarantineRows.Add(new RecoveryQuarantineRow(
+                                workspace,
+                                quarantineRef,
+                                JsonText(item, "original_relative_path", "(unknown)"),
+                                JsonText(item, "state", "unknown"),
+                                JsonBool(item, "is_tree"),
+                                JsonBool(item, "expired"),
+                                JsonLong(item, "created_epoch_ms"),
+                                JsonLong(item, "expires_epoch_ms"),
+                                JsonInt(item, "entry_count"),
+                                JsonLong(item, "total_bytes"),
+                                JsonText(item, "last_restore_target", "") is var last && last.Length > 0 ? last : null,
+                                JsonText(item, "recovery_ref", "") is var recovery && recovery.Length > 0 ? recovery : null));
+                        }
+                    }
+
+                    var checkpoints = await runtime.CallPresentationRecoveryToolAsync("checkpoint_list", new JsonObject { ["max_items"] = 200 });
+                    if (checkpoints["items"] is JsonArray checkpointItems)
+                    {
+                        foreach (var node in checkpointItems)
+                        {
+                            if (node is not JsonObject item) continue;
+                            var checkpointRef = JsonText(item, "checkpoint_ref", "");
+                            if (checkpointRef.Length == 0) continue;
+                            var head = JsonText(item, "head_oid", "");
+                            checkpointRows.Add(new RecoveryCheckpointRow(
+                                workspace,
+                                checkpointRef,
+                                JsonText(item, "repository_relative_path", "."),
+                                head.Length == 0 ? null : head,
+                                JsonText(item, "source_state_id", "unknown"),
+                                JsonBool(item, "expired"),
+                                JsonLong(item, "created_epoch_ms"),
+                                JsonLong(item, "expires_epoch_ms"),
+                                JsonInt(item, "entry_count"),
+                                JsonLong(item, "total_bytes"),
+                                JsonInt(item, "staged_count"),
+                                JsonInt(item, "unstaged_count"),
+                                JsonInt(item, "untracked_count"),
+                                JsonInt(item, "ignored_count"),
+                                JsonInt(item, "excluded_count")));
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    unavailable.Add($"{workspace}: {ex.Message}");
+                }
+            }
+
+            _recoveryQuarantineRows.Clear();
+            _recoveryQuarantineRows.AddRange(quarantineRows.OrderBy(row => row.Workspace, StringComparer.Ordinal).ThenByDescending(row => row.CreatedEpochMs));
+            _recoveryCheckpointRows.Clear();
+            _recoveryCheckpointRows.AddRange(checkpointRows.OrderBy(row => row.Workspace, StringComparer.Ordinal).ThenByDescending(row => row.CreatedEpochMs));
+            _plannedCheckpointKeys.RemoveWhere(key => !_recoveryCheckpointRows.Any(row => row.Key == key));
+
+            RecoveryQuarantineGrid.ItemsSource = null;
+            RecoveryQuarantineGrid.ItemsSource = _recoveryQuarantineRows;
+            RecoveryCheckpointGrid.ItemsSource = null;
+            RecoveryCheckpointGrid.ItemsSource = _recoveryCheckpointRows;
+
+            var quarantineSelection = priorQuarantineKey is null ? null : _recoveryQuarantineRows.FirstOrDefault(row => row.Key == priorQuarantineKey);
+            var checkpointSelection = priorCheckpointKey is null ? null : _recoveryCheckpointRows.FirstOrDefault(row => row.Key == priorCheckpointKey);
+            if (quarantineSelection is not null)
+                RecoveryQuarantineGrid.SelectedItem = quarantineSelection;
+            else if (checkpointSelection is not null)
+                RecoveryCheckpointGrid.SelectedItem = checkpointSelection;
+            else if (_recoveryQuarantineRows.Count > 0)
+                RecoveryQuarantineGrid.SelectedItem = _recoveryQuarantineRows[0];
+            else if (_recoveryCheckpointRows.Count > 0)
+                RecoveryCheckpointGrid.SelectedItem = _recoveryCheckpointRows[0];
+
+            RecoveryWorkspaceText.Text = connected.Count == 0
+                ? "No connected workspace exposes Recovery state."
+                : $"Connected workspace(s): {string.Join(", ", connected)} | root paths are shown in the selected detail before mutation.";
+            RecoveryPolicyText.Text = "Recovery presentation grants no authority. Core policy, expected-version/source-state checks and rollback rules remain authoritative.";
+            var recoverySummary = unavailable.Count == 0
+                ? $"{_recoveryQuarantineRows.Count} quarantine item(s) | {_recoveryCheckpointRows.Count} checkpoint(s) | partial recovery is never hidden"
+                : $"{_recoveryQuarantineRows.Count} quarantine item(s) | {_recoveryCheckpointRows.Count} checkpoint(s) | unavailable: {string.Join("; ", unavailable)}";
+            RecoveryStatusText.Text = string.IsNullOrWhiteSpace(_recoveryPersistentNotice)
+                ? recoverySummary
+                : $"{_recoveryPersistentNotice} | {recoverySummary}";
+
+            if (RecoveryQuarantineGrid.SelectedItem is RecoveryQuarantineRow selectedQuarantine)
+                await LoadRecoveryQuarantineDetailAsync(selectedQuarantine);
+            else if (RecoveryCheckpointGrid.SelectedItem is RecoveryCheckpointRow selectedCheckpoint)
+                await LoadRecoveryCheckpointDetailAsync(selectedCheckpoint);
+            else
+                ResetRecoveryDetail();
+        }
+        finally
+        {
+            _recoveryRefreshRunning = false;
+        }
+    }
+
+    private async Task LoadRecoveryQuarantineDetailAsync(RecoveryQuarantineRow row)
+    {
+        SetRecoveryButtons(row.CanRestore, false, false);
+        RecoveryDetailTitle.Text = $"Quarantine | {row.Workspace}: {row.OriginalPath}";
+        if (!_runtimes.TryGetValue(row.Workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running)
+        {
+            RecoveryDetailText.Text = $"Root: {PathBox(row.Workspace).Text.Trim()} | workspace is not connected.";
+            return;
+        }
+        try
+        {
+            var detail = await runtime.CallPresentationRecoveryToolAsync("quarantine_get", new JsonObject { ["quarantine_ref"] = row.QuarantineRef });
+            RecoveryDetailText.Text =
+                $"Root: {PathBox(row.Workspace).Text.Trim()}\nState: {JsonText(detail, "state", "unknown")} | tree={JsonBool(detail, "is_tree")} | expired={JsonBool(detail, "expired")}\n" +
+                $"Entries: {JsonInt(detail, "entry_count")} | bytes: {JsonLong(detail, "total_bytes"):N0} | expires: {row.ExpiryDisplay}\n" +
+                $"Original path: {JsonText(detail, "original_relative_path", row.OriginalPath)} | last restore target: {JsonText(detail, "last_restore_target", "-")}\n" +
+                $"Recovery state is core-authenticated; restore uses the original path only and refuses silent replacement.";
+        }
+        catch (Exception ex)
+        {
+            RecoveryDetailText.Text = $"Quarantine detail unavailable. Root: {PathBox(row.Workspace).Text.Trim()} | {ex.Message}";
+            SetRecoveryButtons(false, false, false);
+        }
+    }
+
+    private async Task LoadRecoveryCheckpointDetailAsync(RecoveryCheckpointRow row)
+    {
+        var planned = _plannedCheckpointKeys.Contains(row.Key);
+        SetRecoveryButtons(false, row.CanPlan, row.CanPlan && planned);
+        RecoveryDetailTitle.Text = $"Checkpoint | {row.Workspace}: {row.RepositoryPath}";
+        if (!_runtimes.TryGetValue(row.Workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running)
+        {
+            RecoveryDetailText.Text = $"Root: {PathBox(row.Workspace).Text.Trim()} | workspace is not connected.";
+            return;
+        }
+        try
+        {
+            var detail = await runtime.CallPresentationRecoveryToolAsync("checkpoint_get", new JsonObject { ["checkpoint_ref"] = row.CheckpointRef });
+            var preview = new List<string>();
+            if (detail["entries"] is JsonArray entries)
+            {
+                foreach (var node in entries.Take(12))
+                {
+                    if (node is not JsonObject entry) continue;
+                    preview.Add($"{JsonText(entry, "relative_path", "?")} [staged={JsonBool(entry, "staged")}, unstaged={JsonBool(entry, "unstaged")}, untracked={JsonBool(entry, "untracked")}, excluded={JsonText(entry, "worktree_excluded_reason", "-")}] ");
+                }
+            }
+            var head = JsonText(detail, "head_oid", "-");
+            RecoveryDetailText.Text =
+                $"Root: {PathBox(row.Workspace).Text.Trim()} | repository: {row.RepositoryPath}\nExpired: {row.Expired} | entries={row.EntryCount} | excluded={row.ExcludedCount} | bytes={row.TotalBytes:N0}\n" +
+                $"Git: staged={row.StagedCount}, unstaged={row.UnstagedCount}, untracked={row.UntrackedCount}, ignored={row.IgnoredCount} | head={head}\n" +
+                $"Source state: {row.SourceStateId} | restore plan ready={planned}\n" +
+                (preview.Count == 0 ? "No captured entry metadata." : string.Join("\n", preview));
+        }
+        catch (Exception ex)
+        {
+            RecoveryDetailText.Text = $"Checkpoint detail unavailable. Root: {PathBox(row.Workspace).Text.Trim()} | {ex.Message}";
+            SetRecoveryButtons(false, false, false);
+        }
+    }
+
+    private void ResetRecoveryDetail()
+    {
+        RecoveryDetailTitle.Text = "Select a quarantine item or checkpoint";
+        RecoveryDetailText.Text = "No synthetic recovery state is shown.";
+        SetRecoveryButtons(false, false, false);
+    }
+
+    private void SetRecoveryButtons(bool quarantineRestore, bool checkpointPlan, bool checkpointRestore)
+    {
+        RecoveryRestoreQuarantineButton.IsEnabled = quarantineRestore;
+        RecoveryPlanCheckpointButton.IsEnabled = checkpointPlan;
+        RecoveryRestoreCheckpointButton.IsEnabled = checkpointRestore;
+    }
+
+    private async void RecoveryQuarantineGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_recoveryRefreshRunning || RecoveryQuarantineGrid.SelectedItem is not RecoveryQuarantineRow row) return;
+        RecoveryCheckpointGrid.SelectedItem = null;
+        await LoadRecoveryQuarantineDetailAsync(row);
+    }
+
+    private async void RecoveryCheckpointGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_recoveryRefreshRunning || RecoveryCheckpointGrid.SelectedItem is not RecoveryCheckpointRow row) return;
+        RecoveryQuarantineGrid.SelectedItem = null;
+        await LoadRecoveryCheckpointDetailAsync(row);
+    }
+
+    private async void RecoveryRefresh_Click(object sender, RoutedEventArgs e) => await RefreshRecoveryAsync();
+
+    private async void RecoveryRestoreQuarantine_Click(object sender, RoutedEventArgs e)
+    {
+        if (RecoveryQuarantineGrid.SelectedItem is not RecoveryQuarantineRow row || !row.CanRestore) return;
+        var root = PathBox(row.Workspace).Text.Trim();
+        var answer = System.Windows.MessageBox.Show(
+            $"Restore quarantine item to its original path?\n\nWorkspace root: {root}\nTarget: {row.OriginalPath}\n\nExisting targets are not replaced by this UI; core policy and Mutation Guard revalidate before write.",
+            "Restore quarantined item",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes) return;
+        if (!_runtimes.TryGetValue(row.Workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running) return;
+        try
+        {
+            var result = await runtime.CallPresentationRecoveryToolAsync("quarantine_restore", new JsonObject { ["quarantine_ref"] = row.QuarantineRef });
+            var state = JsonText(result, "state", "unknown");
+            RecoveryStatusText.Text = state switch
+            {
+                "restored" => $"Quarantine restore completed: {row.Workspace}:{row.OriginalPath}",
+                "rolled_back" => $"Quarantine restore failed and rollback completed: {row.Workspace}:{row.OriginalPath}",
+                "partial_recovery_required" => $"HIGH SEVERITY: quarantine restore requires partial recovery: {row.Workspace}:{row.OriginalPath}",
+                _ => $"Quarantine restore returned state={state}: {row.Workspace}:{row.OriginalPath}",
+            };
+            _recoveryPersistentNotice = state == "partial_recovery_required" ? RecoveryStatusText.Text : "";
+        }
+        catch (Exception ex)
+        {
+            RecoveryStatusText.Text = $"Quarantine restore blocked/failed; state may be unchanged. {ex.Message}";
+        }
+        await RefreshRecoveryAsync();
+    }
+
+    private async void RecoveryPlanCheckpoint_Click(object sender, RoutedEventArgs e)
+    {
+        if (RecoveryCheckpointGrid.SelectedItem is not RecoveryCheckpointRow row || !row.CanPlan) return;
+        if (!_runtimes.TryGetValue(row.Workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running) return;
+        try
+        {
+            var result = await runtime.CallPresentationRecoveryToolAsync("checkpoint_restore", new JsonObject
+            {
+                ["checkpoint_ref"] = row.CheckpointRef,
+                ["history_mode"] = "preserve",
+                ["dry_run"] = true,
+            });
+            var state = JsonText(result, "state", "unknown");
+            if (string.Equals(state, "planned", StringComparison.OrdinalIgnoreCase))
+                _plannedCheckpointKeys.Add(row.Key);
+            RecoveryStatusText.Text = $"Checkpoint restore plan state={state} | workspace={row.Workspace} | paths={JsonInt(result, "path_count")} | skipped={JsonInt(result, "skipped_count")}";
+            await LoadRecoveryCheckpointDetailAsync(row);
+        }
+        catch (Exception ex)
+        {
+            _plannedCheckpointKeys.Remove(row.Key);
+            RecoveryStatusText.Text = $"Checkpoint restore plan blocked/failed; no restore was started. {ex.Message}";
+            await LoadRecoveryCheckpointDetailAsync(row);
+        }
+    }
+
+    private async void RecoveryRestoreCheckpoint_Click(object sender, RoutedEventArgs e)
+    {
+        if (RecoveryCheckpointGrid.SelectedItem is not RecoveryCheckpointRow row || !_plannedCheckpointKeys.Contains(row.Key)) return;
+        var root = PathBox(row.Workspace).Text.Trim();
+        var answer = System.Windows.MessageBox.Show(
+            $"Apply the checkpoint restore plan?\n\nWorkspace root: {root}\nRepository: {row.RepositoryPath}\nHistory mode: preserve\n\nCore source-state validation and rollback checkpoint protection run again before mutation.",
+            "Restore checkpoint",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes) return;
+        if (!_runtimes.TryGetValue(row.Workspace, out var runtime) || runtime.State.Status != LocalMcpRuntimeStatus.Running) return;
+        try
+        {
+            var result = await runtime.CallPresentationRecoveryToolAsync("checkpoint_restore", new JsonObject
+            {
+                ["checkpoint_ref"] = row.CheckpointRef,
+                ["history_mode"] = "preserve",
+                ["dry_run"] = false,
+            });
+            _plannedCheckpointKeys.Remove(row.Key);
+            var state = JsonText(result, "state", "unknown");
+            RecoveryStatusText.Text = state switch
+            {
+                "restored" => $"Checkpoint restored: {row.Workspace}:{row.RepositoryPath}",
+                "rolled_back" => $"Checkpoint restore failed and rollback completed: {row.Workspace}:{row.RepositoryPath}",
+                "partial_recovery_required" => $"HIGH SEVERITY: checkpoint restore requires partial recovery; rollback checkpoint retained.",
+                _ => $"Checkpoint restore returned state={state}: {row.Workspace}:{row.RepositoryPath}",
+            };
+            _recoveryPersistentNotice = state == "partial_recovery_required" ? RecoveryStatusText.Text : "";
+        }
+        catch (Exception ex)
+        {
+            RecoveryStatusText.Text = $"Checkpoint restore blocked/failed; inspect current recovery state before retry. {ex.Message}";
+        }
+        await RefreshRecoveryAsync();
     }
 
     private static string JsonText(JsonObject obj, string key, string fallback) =>

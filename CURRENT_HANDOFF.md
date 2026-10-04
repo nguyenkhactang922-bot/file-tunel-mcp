@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `state/FMUX-012-main-verified`
+Branch: `chatgpt/FMUX-013-recovery`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: FMUX-012 state-only MAIN VERIFIED closure on `state/FMUX-012-main-verified`, based exactly on verified main `38b20e633957ea6c279b110dac54072b29df14a6`; product implementation is already DONE / MAIN VERIFIED and runtime PID `17860` remains correct.
+Expected worktree at handoff: FMUX-013 Recovery ACTIVE / CLAIMED on `chatgpt/FMUX-013-recovery`, based exactly on verified main `dad103c569cbfc6d68b343445287152013c6f29e`; FMUX-012 state-sync is MAIN VERIFIED via PR #51 and merged-main Verify `37186288521`; runtime PID `17860` remains correct and must not be restarted.
 
 ## Completed technical program
 
@@ -1615,3 +1615,22 @@ NEXT_EXACT_ACTION: commit the state-sync lifecycle-contract fix -> side-effect g
 State-sync attempt 2 checkpoint: fix head `ad199846fd2d7fe50311c7965f11ca88ddda0999` is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS. Push Verify `37183856103` completed SUCCESS on macOS / Windows x64 / native Windows ARM64. Review confirms the only behavioral change is the FMUX-012 lifecycle contract accepting `DONE / MAIN VERIFIED` after closure; no product/runtime authority changed. Runtime PID `17860` remains correct and was not restarted.
 
 NEXT_EXACT_ACTION: commit/push this evidence-state-only checkpoint as the final state-sync closure head -> require exact-head three-lane Verify on that new closure SHA -> create/review exactly one PR to `main` -> merge exact reviewed head -> verify exact resulting `main`; only then claim FMUX-013 Recovery.
+
+
+FMUX-012 governance state-sync: DONE / MAIN VERIFIED. PR #51 head `35420f96965ad46bec61a3e804800fcbe989ce13` passed PR Verify `37185895914`; merged as `dad103c569cbfc6d68b343445287152013c6f29e`; merged-main Verify `37186288521` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMUX-013 Recovery: ACTIVE / CLAIMED on `chatgpt/FMUX-013-recovery`, based exactly on verified main `dad103c569cbfc6d68b343445287152013c6f29e`. Dependencies FMUX-002, FMUX-003, FMG-016, FMG-021 and FMG-022 are all DONE / MAIN VERIFIED. Frozen scope: quarantine, checkpoints, restore plan, rollback, partial-recovery states. Runtime PID `17860` remains correct and was not restarted.
+
+NEXT_EXACT_ACTION: inspect existing Windows/macOS quarantine/checkpoint/restore presentation bridges and frozen Recovery UX specs; then implement the smallest truthful FMUX-013 Recovery surface without expanding runtime authority, followed by targeted contract/build evidence.
+
+
+FMUX-013 local verification checkpoint: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-013-recovery`, base `dad103c569cbfc6d68b343445287152013c6f29e`. Recovery now presents quarantine/checkpoint master-detail truth on Windows/macOS through a dedicated six-tool least-authority bridge (`quarantine_list/get/restore`, `checkpoint_list/get/restore` only). Quarantine restore is original-path-only; checkpoint restore requires a successful dry-run plan and uses `history_mode=preserve`; `partial_recovery_required` is HIGH SEVERITY and persistent across refresh.
+
+Local gates PASS: FMUX-013 Recovery contract; app-shell contract; presentation contract; project-state contract; `git diff --check`; Verify YAML parse; Windows Release build 0 warnings / 0 errors. Windows host has no `swiftc`; exact-head GitHub macOS native Verify is mandatory. Runtime PID `17860` remains correct and was not restarted.
+
+NEXT_EXACT_ACTION: final scoped diff review -> commit FMUX-013 candidate -> side-effect guard -> push exact head -> require GitHub Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> then closure evidence/state, PR/review/merge and merged-main Verify. Local verification is not DONE.
+
+
+FMUX-013 exact-head checkpoint: candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc` is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS. GitHub Verify `37189165659` SUCCESS on macOS / Windows x64 / native Windows ARM64, including macOS typecheck/integration/build and Windows Recovery contract/build/integration/package/smoke. Forbidden UI-authority scan remains empty; runtime PID `17860` remains correct and was not restarted.
+
+NEXT_EXACT_ACTION: commit/push evidence-state-only FMUX-013 closure head -> require exact-head three-lane Verify on the closure SHA -> create/review exactly one PR to `main` -> guarded merge -> merged-main Verify. Do not rerun successful Verify `37189165659`.

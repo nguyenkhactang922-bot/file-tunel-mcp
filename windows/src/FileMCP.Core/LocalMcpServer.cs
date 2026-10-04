@@ -31,6 +31,11 @@ public sealed class LocalMcpServer : IAsyncDisposable
     {
         "pty_list", "pty_read", "pty_resize", "pty_signal", "pty_stop",
     };
+    private static readonly HashSet<string> PresentationRecoveryToolNames = new(StringComparer.Ordinal)
+    {
+        "quarantine_list", "quarantine_get", "quarantine_restore",
+        "checkpoint_list", "checkpoint_get", "checkpoint_restore",
+    };
     private static readonly HashSet<string> UnauthenticatedOAuthDiscoveryPaths = new(StringComparer.Ordinal)
     {
         "/.well-known/oauth-protected-resource/mcp",
@@ -105,6 +110,20 @@ public sealed class LocalMcpServer : IAsyncDisposable
     {
         if (!PresentationPtyToolNames.Contains(toolName))
             throw new FileMcpException($"Tool is not available to the desktop presentation bridge: {toolName}");
+        if (!IsReady)
+            throw new FileMcpException("Local MCP server is not ready");
+
+        var output = await _tools.CallAsync(toolName, arguments, cancellationToken).ConfigureAwait(false);
+        return output.StructuredContent.DeepClone().AsObject();
+    }
+
+    public async Task<JsonObject> CallPresentationRecoveryToolAsync(
+        string toolName,
+        JsonObject arguments,
+        CancellationToken cancellationToken = default)
+    {
+        if (!PresentationRecoveryToolNames.Contains(toolName))
+            throw new FileMcpException($"Tool is not available to the desktop Recovery presentation bridge: {toolName}");
         if (!IsReady)
             throw new FileMcpException("Local MCP server is not ready");
 
