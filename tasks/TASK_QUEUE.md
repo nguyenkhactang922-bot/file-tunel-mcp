@@ -133,3 +133,19 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Exact-head attempt 1: candidate `bae6bea5cf23a2577cd474068472de752cb1944e`, Verify `37175574357` FAIL from stale FMUX-011 lifecycle assertion on Windows x64/ARM64 plus macOS non-escaping closure compile error; both were repaired by the targeted fix checkpoint.
 - Exact-head attempt 2: fix checkpoint `edd996bd43642e8c5399a90ca14cb109db858fd1`, push Verify `37176690710` SUCCESS on macOS / Windows x64 / native Windows ARM64. Scoped review PASS; no P0/P1; presentation allowlist remains list/read/resize/signal/stop only, bounded and non-authoritative.
 - NEXT_EXACT_ACTION: evidence-state-only closure commit -> side-effect guard -> push closure head -> exact-head Verify on closure SHA -> reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify.
+
+
+## FMUX-012 closure / next-ready pointer - 2026-10-04
+
+- FMUX-012 Terminal / PTY: DONE / MAIN VERIFIED.
+- Closure head `feb365864c32a3f7bb297bc4bba59c6171a73a9d`; push Verify `37177215836` SUCCESS; PR #50 Verify `37177568204` SUCCESS; merged main `38b20e633957ea6c279b110dac54072b29df14a6`; merged-main Verify `37177832479` SUCCESS across macOS / Windows x64 / native Windows ARM64.
+- Runtime checkpoint: correct FMG026-ready FileMCP remains PID `17860`; no restart performed.
+- State-sync branch: `state/FMUX-012-main-verified`, based exactly on verified main `38b20e633957ea6c279b110dac54072b29df14a6`.
+- FMUX-013 Recovery dependencies FMUX-002, FMUX-003, FMG-016, FMG-021 and FMG-022 are DONE / MAIN VERIFIED; FMUX-013 becomes the lowest-numbered next task after this state-sync is MAIN VERIFIED.
+- State-sync next action: commit -> push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; only then claim FMUX-013.
+
+- State-sync attempt 1: head `6a6d247f774a379426dc32c9e7022477d888ed95`, Verify `37183274280` completed FAILURE. macOS SUCCESS; Windows x64/native ARM64 failed only stale FMUX-012 lifecycle assertion after graph closure. Targeted contract fix is local PASS; no product source or runtime changed.
+- State-sync retry action: commit fix -> side-effect guard remote exact old head/no PR -> push new exact head -> three-lane Verify -> reviewed PR -> merge -> merged-main Verify -> only then claim FMUX-013.
+
+- State-sync attempt 2: lifecycle-fix head `ad199846fd2d7fe50311c7965f11ca88ddda0999` passed push Verify `37183856103` on macOS / Windows x64 / native Windows ARM64; scoped review PASS, no P0/P1.
+- Next: evidence-state-only closure commit -> side-effect guard -> push new closure head -> exact-head three-lane Verify -> one reviewed PR -> merge -> merged-main Verify -> only then claim FMUX-013.

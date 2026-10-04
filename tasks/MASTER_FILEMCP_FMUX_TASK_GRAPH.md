@@ -178,11 +178,11 @@ Scope:
 
 ## FMUX-012 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Terminal / PTY
 
-State: ACTIVE / LOCAL VERIFIED
+State: DONE / MAIN VERIFIED
 Branch: `chatgpt/FMUX-012-terminal-pty`.
 Depends: FMUX-002, FMUX-003, FMG-020 — all DONE / MAIN VERIFIED.
-Checkpoint: NATIVE VERIFIED / SCOPED REVIEW PASS. Fix candidate `edd996bd43642e8c5399a90ca14cb109db858fd1`; push Verify `37176690710` SUCCESS on macOS / Windows x64 / native Windows ARM64. Presentation bridge remains bounded/non-authoritative with list/read/resize/signal/stop only and no start/write. No P0/P1 remains. Evidence `docs/evidence/FMUX-012_TERMINAL_PTY_UX_EVIDENCE.md`.
-NEXT_EXACT_ACTION: evidence-state-only closure commit -> push closure SHA -> exact-head native Verify -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify.
+Checkpoint: closure head `feb365864c32a3f7bb297bc4bba59c6171a73a9d`; PR #50 exact-head Verify `37177568204` SUCCESS; PR #50 merged as `38b20e633957ea6c279b110dac54072b29df14a6`; merged-main Verify `37177832479` SUCCESS on macOS / Windows x64 / native Windows ARM64. Evidence `docs/evidence/FMUX-012_TERMINAL_PTY_UX_EVIDENCE.md`.
+NEXT_EXACT_ACTION: state-sync branch `state/FMUX-012-main-verified` -> commit/push -> exact-head Verify -> reviewed PR -> merge -> merged-main Verify; then claim dependency-ready FMUX-013 Recovery.
 
 Scope:
 - session list;

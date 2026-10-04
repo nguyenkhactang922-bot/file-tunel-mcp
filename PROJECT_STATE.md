@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `chatgpt/FMUX-012-terminal-pty`
+Active branch: `state/FMUX-012-main-verified`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1498,3 +1498,20 @@ FMUX-012 Terminal / PTY: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-012-terminal-p
 FMUX-012 exact-head checkpoint: NATIVE VERIFIED / SCOPED REVIEW PASS. Fix candidate `edd996bd43642e8c5399a90ca14cb109db858fd1` passed push Verify `37176690710` on macOS / Windows x64 / native Windows ARM64. Windows stale FMUX-011 lifecycle regression and macOS non-escaping closure compile failure from attempt 1 are repaired. Presentation bridge remains bounded and non-authoritative: only list/read/resize/signal/stop are exposed; no start/write; no PTY output is copied into diagnostics/activity; no P0/P1 remains. Runtime PID `17860` is unchanged.
 
 NEXT_EXACT_ACTION: commit/push evidence-state-only FMUX-012 closure head -> require exact-head native Verify on closure SHA -> create/review exactly one PR to `main` -> merge exact reviewed head -> verify exact resulting main. Do not rerun successful Verify `37176690710`.
+
+
+FMUX-012 Terminal / PTY: DONE / MAIN VERIFIED. Closure head `feb365864c32a3f7bb297bc4bba59c6171a73a9d`; push Verify `37177215836` SUCCESS; PR #50 exact-head Verify `37177568204` SUCCESS; merged main `38b20e633957ea6c279b110dac54072b29df14a6`; merged-main Verify `37177832479` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Governance state-sync for FMUX-012 is ACTIVE on `state/FMUX-012-main-verified`, based exactly on verified main `38b20e633957ea6c279b110dac54072b29df14a6`. No product/runtime source changes are part of this sync. FMUX-013 Recovery is dependency-ready but MUST NOT be claimed until this state-sync itself is MAIN VERIFIED.
+
+NEXT_EXACT_ACTION: commit/push the FMUX-012 state-only closure -> exact-head Verify -> one reviewed PR to `main` -> merge exact head -> merged-main Verify; then claim FMUX-013 Recovery from verified main.
+
+
+FMUX-012 state-sync attempt 1: head `6a6d247f774a379426dc32c9e7022477d888ed95`, Verify `37183274280` completed FAILURE. macOS SUCCESS; Windows x64 and native ARM64 failed only the stale FMUX-012 lifecycle assertion in the presentation contract after the graph moved to `DONE / MAIN VERIFIED`. Targeted contract fix is local PASS together with project-state contract and `git diff --check`; no product/runtime source changed.
+
+NEXT_EXACT_ACTION: commit state-sync contract fix -> confirm remote branch remains `6a6d247f774a379426dc32c9e7022477d888ed95` with no PR -> push new exact head -> require three-lane Verify -> reviewed PR -> merge -> merged-main Verify -> claim FMUX-013.
+
+
+FMUX-012 state-sync attempt 2: fix head `ad199846fd2d7fe50311c7965f11ca88ddda0999` is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS. Push Verify `37183856103` SUCCESS on macOS / Windows x64 / native Windows ARM64. The lifecycle contract now accepts the already-closed `DONE / MAIN VERIFIED` state without changing product/runtime authority.
+
+NEXT_EXACT_ACTION: commit/push the evidence-state-only state-sync closure head -> exact-head three-lane Verify -> one reviewed PR -> guarded merge -> merged-main Verify -> claim FMUX-013 Recovery from verified main.

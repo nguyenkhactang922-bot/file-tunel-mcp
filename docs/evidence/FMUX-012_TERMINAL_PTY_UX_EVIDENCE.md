@@ -125,3 +125,33 @@ Scoped review result: PASS; no P0/P1 remains.
 - Runtime PID `17860` was not restarted.
 
 Remaining closure gates: evidence-state-only closure commit -> push exact closure SHA -> exact-head Verify -> reviewed PR to `main` -> guarded merge -> merged-main Verify.
+
+
+## Final GitHub lifecycle / MAIN VERIFIED
+
+- Closure head: `feb365864c32a3f7bb297bc4bba59c6171a73a9d`.
+- Push Verify `37177215836`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #50 exact-head Verify `37177568204`: SUCCESS on all three native lanes.
+- PR #50 merged to `main` as `38b20e633957ea6c279b110dac54072b29df14a6`.
+- Merged-main Verify `37177832479`: SUCCESS on the exact resulting main commit, including FMUX Terminal / PTY presentation contract, native builds, integration, packages, app smoke and resource gates.
+- Final task state: `DONE / MAIN VERIFIED`.
+- Runtime PID `17860` remained the correct FMG026-ready runtime throughout; no restart was required.
+
+
+## Governance state-sync attempt 1
+
+- State-sync head: `6a6d247f774a379426dc32c9e7022477d888ed95`.
+- Push Verify `37183274280`: completed FAILURE.
+- macOS lane: SUCCESS.
+- Windows x64 and native Windows ARM64: each failed only `Verify FMUX Terminal / PTY presentation contract` because the contract lifecycle assertion still accepted only active FMUX-012 states after the canonical graph correctly recorded `DONE / MAIN VERIFIED`.
+- Targeted repair: scope lifecycle assertion to the FMUX-012 graph section and accept `ACTIVE / CLAIMED`, `ACTIVE / LOCAL VERIFIED`, or `DONE / MAIN VERIFIED`.
+- Targeted local verification after repair: `tests/test_fmux_terminal_pty_contract.ps1` PASS; `tests/test_project_state_contract.ps1` PASS; `git diff --check` PASS.
+- No product/runtime source changed; runtime PID `17860` was not restarted.
+
+
+## State-sync lifecycle repair verification
+
+- Attempt 1 state-sync head `6a6d247f774a379426dc32c9e7022477d888ed95`, Verify `37183274280`: macOS SUCCESS; Windows x64/native ARM64 failed only the stale lifecycle assertion that did not accept the already-closed FMUX-012 state.
+- Repair head `ad199846fd2d7fe50311c7965f11ca88ddda0999`: contract is scoped to the FMUX-012 graph section and accepts active verification states or `DONE / MAIN VERIFIED` after closure.
+- Push Verify `37183856103`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Scoped review: PASS; no P0/P1; no product/runtime authority change; runtime PID `17860` was not restarted.
