@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `chatgpt/FMUX-015-backend-isolation-ux`
+Active branch: `state/FMUX-015-main-verified`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1581,3 +1581,16 @@ FMUX-015 Backend / Isolation UX is ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED 
 - Runtime PID `17860` unchanged; Docker daemon remains environment-blocked.
 
 NEXT_EXACT_ACTION: create an evidence-state-only closure commit, push exact closure head, require three-lane Verify, then one reviewed PR -> guarded merge -> exact resulting-main Verify. FMUX-016 remains blocked until FMUX-015 is DONE / MAIN VERIFIED.
+
+
+## FMUX-015 technical MAIN VERIFIED / governance state-sync - 2026-10-04
+
+FMUX-015 Backend / Isolation UX: DONE / MAIN VERIFIED technically.
+- Closure head `0c475bc1454bf1eb462931cf91aab1e9f099fd6b`; push Verify `37199011451` SUCCESS.
+- PR #54 exact-head Verify `37199312646` SUCCESS; PR #54 merged as `e481b86569a61af89f448eb8ccfcdd4b3881cebd`.
+- Merged-main Verify `37199892956` SUCCESS on the exact resulting main commit across macOS / Windows x64 / native Windows ARM64.
+- Runtime PID `17860` remains correct; no restart. Docker live engine remains environment-blocked and presentation does not synthesize availability.
+
+Governance state-sync is ACTIVE on `state/FMUX-015-main-verified`, based exactly on verified main `e481b86569a61af89f448eb8ccfcdd4b3881cebd`. No product/runtime source changes are part of this sync. FMUX-016 Onboarding is dependency-ready in the product graph but remains blocked until this state-sync itself is MAIN VERIFIED.
+
+NEXT_EXACT_ACTION: commit/push this state-only closure -> exact-head Verify -> one reviewed PR to `main` -> merge exact reviewed head -> merged-main Verify; then claim FMUX-016 Onboarding from verified main.

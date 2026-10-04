@@ -87,3 +87,16 @@ Create the exact candidate commit, side-effect-guard remote branch/PR state, pus
 State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS / CLOSURE PENDING.
 
 NEXT_EXACT_ACTION: commit/push an evidence-state-only closure head -> require exact-head three-lane Verify on that closure SHA -> create/review exactly one PR to `main` -> guarded merge -> verify the exact resulting `main`; only then mark FMUX-015 DONE / MAIN VERIFIED and unlock FMUX-016 Onboarding.
+
+
+## Final GitHub lifecycle / MAIN VERIFIED
+
+- Closure head: `0c475bc1454bf1eb462931cf91aab1e9f099fd6b`.
+- Push Verify `37199011451`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #54 exact-head Verify `37199312646`: SUCCESS on all three native lanes.
+- PR #54 merged to `main` as `e481b86569a61af89f448eb8ccfcdd4b3881cebd`.
+- Merged-main Verify `37199892956`: SUCCESS on the exact resulting main commit across macOS / Windows x64 / native Windows ARM64, including FMUX Backend / Isolation presentation contract, native builds, integration, packages, app smoke and resource gates.
+- Final implementation state: `DONE / MAIN VERIFIED`.
+- Runtime PID `17860` remained the correct FMG026-ready runtime; no restart was required.
+- Docker live daemon remains environment-blocked on this host; no synthetic Docker availability is claimed.
+- Governance state-sync is intentionally separate on `state/FMUX-015-main-verified`; FMUX-016 remains blocked until that state-sync itself is MAIN VERIFIED.
