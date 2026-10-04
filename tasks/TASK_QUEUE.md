@@ -169,3 +169,12 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Local gates PASS: FMUX-013 contract, app-shell, presentation, project-state, diff check, workflow YAML parse, Windows Release build 0 warnings / 0 errors.
 - macOS native typecheck/build: pending exact-head GitHub Verify because local host has no `swiftc`.
 - Next: scoped diff review -> candidate commit -> side-effect guard -> push exact head -> require all native lanes PASS before PR.
+
+
+## FMUX-013 exact-head verification - 2026-10-04
+
+- Candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc`: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS.
+- Push Verify `37189165659`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- macOS typecheck/integration/build and Windows full native lanes are green.
+- Runtime PID `17860` remained correct; no restart.
+- Next: evidence/state-only closure commit -> closure exact-head Verify -> one reviewed PR -> merge -> merged-main Verify.

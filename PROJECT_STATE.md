@@ -1529,3 +1529,8 @@ FMUX-013 Recovery: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-013-recovery`, base 
 Local evidence PASS: Recovery/app-shell/presentation/project-state contracts, diff hygiene, workflow YAML parse, Windows Release build 0 warnings / 0 errors. macOS native compile/build is PENDING exact-head GitHub Verify because local Windows host has no `swiftc`. Runtime PID `17860` unchanged.
 
 NEXT_EXACT_ACTION: scoped review -> candidate commit -> remote/PR guard -> push exact head -> three-lane Verify; only after exact-head native PASS proceed to closure commit and GitHub PR lifecycle.
+
+
+FMUX-013 exact-head candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc`: NATIVE VERIFIED / SCOPED REVIEW PASS. Push Verify `37189165659` SUCCESS on macOS / Windows x64 / native Windows ARM64. macOS native compile/typecheck gap is closed. No P0/P1 found; Recovery authority remains bounded to the six declared list/get/restore tools.
+
+NEXT_EXACT_ACTION: evidence/state-only closure commit -> push exact closure head -> exact-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify; do not rerun `37189165659`.

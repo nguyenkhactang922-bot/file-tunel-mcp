@@ -69,3 +69,12 @@ Scoped local review: PASS, no P0/P1 found. Recovery is capability-backed, least-
 ## Next gate
 
 Create the task candidate commit, side-effect guard remote/PR state, push exact head, and require GitHub Verify success on macOS / Windows x64 / native Windows ARM64 before opening the reviewed PR. Local commit is not DONE.
+
+
+## Exact-head native verification
+
+Candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc` passed GitHub Verify `37189165659` on macOS / Windows x64 / native Windows ARM64. macOS native static/typecheck, integration and app build all passed; Windows lanes passed FMUX Recovery contract plus full build/integration/package/smoke coverage.
+
+Scoped exact-head review: PASS, no P0/P1 found. Forbidden authority scan is empty in Recovery UI sections; the bridge remains the exact six-tool allowlist and runtime PID `17860` remains correct/unrestarted.
+
+State: EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS. Next: evidence/state-only closure commit -> exact-head Verify of closure SHA -> one reviewed PR -> guarded merge -> merged-main Verify.

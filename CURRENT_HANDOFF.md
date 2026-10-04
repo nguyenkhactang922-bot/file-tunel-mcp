@@ -1629,3 +1629,8 @@ FMUX-013 local verification checkpoint: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX
 Local gates PASS: FMUX-013 Recovery contract; app-shell contract; presentation contract; project-state contract; `git diff --check`; Verify YAML parse; Windows Release build 0 warnings / 0 errors. Windows host has no `swiftc`; exact-head GitHub macOS native Verify is mandatory. Runtime PID `17860` remains correct and was not restarted.
 
 NEXT_EXACT_ACTION: final scoped diff review -> commit FMUX-013 candidate -> side-effect guard -> push exact head -> require GitHub Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> then closure evidence/state, PR/review/merge and merged-main Verify. Local verification is not DONE.
+
+
+FMUX-013 exact-head checkpoint: candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc` is EXACT-HEAD NATIVE VERIFIED / SCOPED REVIEW PASS. GitHub Verify `37189165659` SUCCESS on macOS / Windows x64 / native Windows ARM64, including macOS typecheck/integration/build and Windows Recovery contract/build/integration/package/smoke. Forbidden UI-authority scan remains empty; runtime PID `17860` remains correct and was not restarted.
+
+NEXT_EXACT_ACTION: commit/push evidence-state-only FMUX-013 closure head -> require exact-head three-lane Verify on the closure SHA -> create/review exactly one PR to `main` -> guarded merge -> merged-main Verify. Do not rerun successful Verify `37189165659`.

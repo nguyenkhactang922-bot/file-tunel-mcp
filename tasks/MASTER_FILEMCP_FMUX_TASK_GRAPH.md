@@ -196,8 +196,8 @@ Scope:
 State: ACTIVE / LOCAL VERIFIED
 Branch: `chatgpt/FMUX-013-recovery`.
 Depends: FMUX-002, FMUX-003, FMG-016, FMG-021, FMG-022 — all DONE / MAIN VERIFIED.
-Checkpoint: local Recovery implementation verified from base main `dad103c569cbfc6d68b343445287152013c6f29e`; `test_fmux_recovery_contract.ps1`, app-shell, presentation, project-state and diff hygiene PASS; Windows Release build PASS 0 warnings / 0 errors. Local Windows host has no `swiftc`, so exact-head GitHub macOS native Verify remains mandatory.
-NEXT_EXACT_ACTION: scoped final diff review -> commit candidate -> side-effect guard -> push exact head -> require GitHub Verify success on macOS / Windows x64 / native Windows ARM64; do not claim task DONE before PR merge and merged-main Verify.
+Checkpoint: exact-head candidate `8e444cc5ffa76b0c97cb756d04b3be7620a87ccc` passed GitHub Verify `37189165659` on macOS / Windows x64 / native Windows ARM64; scoped review PASS, no P0/P1.
+NEXT_EXACT_ACTION: commit/push evidence-state-only closure head -> require exact-head three-lane Verify -> one reviewed PR -> guarded merge -> merged-main Verify; do not rerun successful candidate Verify `37189165659`.
 
 Scope:
 - quarantine;
