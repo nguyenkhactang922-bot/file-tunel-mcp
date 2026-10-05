@@ -44,11 +44,15 @@ if (-not $mac.Contains('shellStatusLabel')) {
     throw "macOS global runtime status context is missing."
 }
 
-if (-not $graph.Contains('State: DONE / MAIN VERIFIED')) {
-    throw "FMUX-001 is not recorded MAIN VERIFIED."
-}
-if (-not $graph.Contains('State: ACTIVE / CLAIMED')) {
-    throw "FMUX-002 is not recorded ACTIVE / CLAIMED."
+$fmux001Start = $graph.IndexOf('## FMUX-001', [StringComparison]::Ordinal)
+$fmux002Start = $graph.IndexOf('## FMUX-002', [StringComparison]::Ordinal)
+$fmux003Start = $graph.IndexOf('## FMUX-003', [StringComparison]::Ordinal)
+if ($fmux001Start -lt 0 -or $fmux002Start -le $fmux001Start -or $fmux003Start -le $fmux002Start) { throw 'FMUX-001/002 task graph sections missing.' }
+$fmux001 = $graph.Substring($fmux001Start, $fmux002Start - $fmux001Start)
+$fmux002 = $graph.Substring($fmux002Start, $fmux003Start - $fmux002Start)
+if (-not $fmux001.Contains('State: DONE / MAIN VERIFIED')) { throw 'FMUX-001 is not recorded MAIN VERIFIED.' }
+if (-not $fmux002.Contains('State: ACTIVE / CLAIMED') -and -not $fmux002.Contains('State: ACTIVE / LOCAL VERIFIED') -and -not $fmux002.Contains('State: DONE / MAIN VERIFIED')) {
+    throw 'FMUX-002 lifecycle is not active/verified/done.'
 }
 
 Write-Output "fmux-app-shell-contract: PASS"

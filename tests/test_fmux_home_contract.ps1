@@ -16,9 +16,11 @@ foreach($name in @("UpdateHomeSummary","_lastImportantEvent","PresentationStatus
 foreach($name in @('identifier: "home"','navigationButton("Home"','showHome','homeWorkspaceLabel','homeRecentEventLabel','refreshHomeSummary')) {
   if(-not $mac.Contains($name)) { throw "macOS Home missing: $name" }
 }
-if(-not $graph.Contains("FMUX-004") -or -not $graph.Contains("State: ACTIVE / CLAIMED")) {
-  throw "FMUX-004 not claimed."
-}
+$fmuxStart = $graph.IndexOf('## FMUX-004', [StringComparison]::Ordinal)
+$fmuxNext = $graph.IndexOf('## FMUX-005', [StringComparison]::Ordinal)
+if ($fmuxStart -lt 0 -or $fmuxNext -le $fmuxStart) { throw 'FMUX-004 task graph section missing.' }
+$fmuxSection = $graph.Substring($fmuxStart, $fmuxNext - $fmuxStart)
+if (-not $fmuxSection.Contains('State: ACTIVE / CLAIMED') -and -not $fmuxSection.Contains('State: ACTIVE / LOCAL VERIFIED') -and -not $fmuxSection.Contains('State: DONE / MAIN VERIFIED')) { throw 'FMUX-004 lifecycle is not active/verified/done.' }
 Write-Output "fmux-home-contract: PASS"
 Write-Output "health-workspace-running-recent-event: covered"
 Write-Output "quick-actions: Connections Settings"

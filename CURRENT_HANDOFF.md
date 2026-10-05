@@ -1866,3 +1866,10 @@ Test-first RED proved only two gaps: eleven foundation FMUX contracts lacked dur
 Local PASS: FMUX-019 aggregate gate; affected feedback/connections/settings/onboarding/accessibility/performance contracts; project-state contract; raw-error scan; workflow count 2; core-source diff guard; `git diff --check`; Windows Release win-x64 compile 0 warnings / 0 errors. macOS native and Windows ARM64 remain exact-head CI requirements.
 
 NEXT_EXACT_ACTION: scoped diff/security review -> commit exact FMUX-019 candidate -> guard remote branch/PR/main -> push exact head -> require macOS / Windows x64 / native Windows ARM64 Verify -> exact-head review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-020 remains BLOCKED until FMUX-019 MAIN VERIFIED.
+## FMUX-019 exact-head attempt 1 failed / targeted test repair - 2026-10-05
+
+Candidate `ce935f760c51bbb76cf4b8f003a339c483e3b227`; Verify `37312247737` is complete. macOS native lane SUCCESS. Windows x64 + native Windows ARM64 failed only `Verify FMUX Cross-Platform UX Adversarial Gate`; logs prove stale historical lifecycle assertions in FMUX-002/004-010 foundation tests (`ACTIVE / CLAIMED` only). No production/runtime/core failure.
+
+Targeted repair modifies only those eight test contracts to read their own FMUX section and accept lifecycle ACTIVE / CLAIMED, ACTIVE / LOCAL VERIFIED, or DONE / MAIN VERIFIED. Only the failed FMUX-019 aggregate stage was rerun locally and PASSed with 11/11 foundation contracts. Runtime PID `14804` unchanged; no restart.
+
+NEXT_EXACT_ACTION: state/diff hygiene -> commit targeted test/evidence repair -> guard remote branch/PR/main -> push new exact head -> require fresh macOS / Windows x64 / native Windows ARM64 Verify. Preserve attempt-1 evidence; do not rerun run `37312247737`.

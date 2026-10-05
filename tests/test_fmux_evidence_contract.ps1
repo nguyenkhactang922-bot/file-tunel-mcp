@@ -22,7 +22,11 @@ if(-not $macEvidence.Contains("[EvidenceResult]")) { throw "macOS server evidenc
 foreach($state in @("passed","failed","stale","blocked","not-run","unknown","not-applicable")) {
   if(-not (($cs+$core+$macApp+$macEvidence).Contains($state))) { throw "Evidence state coverage missing: $state" }
 }
-if(-not $graph.Contains("FMUX-010") -or -not $graph.Contains("State: ACTIVE / CLAIMED")) { throw "FMUX-010 not claimed" }
+$fmuxStart = $graph.IndexOf('## FMUX-010', [StringComparison]::Ordinal)
+$fmuxNext = $graph.IndexOf('## FMUX-011', [StringComparison]::Ordinal)
+if ($fmuxStart -lt 0 -or $fmuxNext -le $fmuxStart) { throw 'FMUX-010 task graph section missing.' }
+$fmuxSection = $graph.Substring($fmuxStart, $fmuxNext - $fmuxStart)
+if (-not $fmuxSection.Contains('State: ACTIVE / CLAIMED') -and -not $fmuxSection.Contains('State: ACTIVE / LOCAL VERIFIED') -and -not $fmuxSection.Contains('State: DONE / MAIN VERIFIED')) { throw 'FMUX-010 lifecycle is not active/verified/done.' }
 
 Write-Output "fmux-evidence-contract: PASS"
 Write-Output "states: passed failed stale blocked not-run unknown N/A"

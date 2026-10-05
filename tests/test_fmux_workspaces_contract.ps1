@@ -15,7 +15,11 @@ foreach($name in @("NavigateWorkspaces_Click","RefreshWorkspaceRows","WorkspaceR
 foreach($name in @('identifier: "workspaces"','navigationButton("Workspaces"','showWorkspaces','workspaceRootLabel','workspaceStatusLabel','workspacePolicyLabel','refreshWorkspaceSummary')) {
   if(-not $mac.Contains($name)){ throw "macOS Workspaces missing: $name" }
 }
-if(-not $graph.Contains("FMUX-005") -or -not $graph.Contains("State: ACTIVE / CLAIMED")) { throw "FMUX-005 not claimed" }
+$fmuxStart = $graph.IndexOf('## FMUX-005', [StringComparison]::Ordinal)
+$fmuxNext = $graph.IndexOf('## FMUX-006', [StringComparison]::Ordinal)
+if ($fmuxStart -lt 0 -or $fmuxNext -le $fmuxStart) { throw 'FMUX-005 task graph section missing.' }
+$fmuxSection = $graph.Substring($fmuxStart, $fmuxNext - $fmuxStart)
+if (-not $fmuxSection.Contains('State: ACTIVE / CLAIMED') -and -not $fmuxSection.Contains('State: ACTIVE / LOCAL VERIFIED') -and -not $fmuxSection.Contains('State: DONE / MAIN VERIFIED')) { throw 'FMUX-005 lifecycle is not active/verified/done.' }
 
 Write-Output "fmux-workspaces-contract: PASS"
 Write-Output "windows-multi-drive: C D E F"

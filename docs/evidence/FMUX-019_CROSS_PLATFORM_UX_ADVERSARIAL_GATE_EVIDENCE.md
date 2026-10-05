@@ -91,3 +91,16 @@ macOS native typecheck/integration/build/package is not claimed locally on Windo
 11. require exact merged-main Verify SUCCESS;
 12. governance state-sync to MAIN VERIFIED;
 13. only then unlock FMUX-020.
+## Exact-head Verify attempt 1 / targeted repair
+
+Candidate `ce935f760c51bbb76cf4b8f003a339c483e3b227` triggered Verify `37312247737`.
+
+- macOS native lane: SUCCESS; preserve this PASS and do not rerun it manually.
+- Windows x64: FAIL only at `Verify FMUX Cross-Platform UX Adversarial Gate`.
+- native Windows ARM64: FAIL only at the same FMUX-019 gate.
+- Failed logs on both Windows lanes showed the same cause: historical foundation tests FMUX-002 and FMUX-004..010 required the obsolete literal lifecycle `State: ACTIVE / CLAIMED`, although those historical tasks are now `DONE / MAIN VERIFIED`.
+- No production/runtime/core failure was observed.
+
+Targeted repair only: eight legacy foundation contract files now resolve their own FMUX task-graph section and accept the valid lifecycle progression `ACTIVE / CLAIMED`, `ACTIVE / LOCAL VERIFIED`, or `DONE / MAIN VERIFIED`. No production source changed in this repair.
+
+Only the failed FMUX-019 aggregate stage was rerun locally after the repair; it PASSed with all eleven foundation contracts green. The next remote action is a fix commit + guarded push of the new exact head; the old failed run is complete and must not be rerun.
