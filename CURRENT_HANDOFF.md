@@ -1873,3 +1873,10 @@ Candidate `ce935f760c51bbb76cf4b8f003a339c483e3b227`; Verify `37312247737` is co
 Targeted repair modifies only those eight test contracts to read their own FMUX section and accept lifecycle ACTIVE / CLAIMED, ACTIVE / LOCAL VERIFIED, or DONE / MAIN VERIFIED. Only the failed FMUX-019 aggregate stage was rerun locally and PASSed with 11/11 foundation contracts. Runtime PID `14804` unchanged; no restart.
 
 NEXT_EXACT_ACTION: state/diff hygiene -> commit targeted test/evidence repair -> guard remote branch/PR/main -> push new exact head -> require fresh macOS / Windows x64 / native Windows ARM64 Verify. Preserve attempt-1 evidence; do not rerun run `37312247737`.
+## FMUX-019 exact-head native verified / closure pending - 2026-10-05
+
+Targeted repair head `1fc91be563d70306bdfe84216906198723604a22` passed exact-head Verify `37313099533` on macOS / Windows x64 / native Windows ARM64. Windows x64 and native ARM64 both passed the new FMUX-019 aggregate adversarial gate; macOS passed static/integration/native build. Scoped diff/security review PASS: presentation + CI/tests + evidence/state only; no core/runtime/tool authority expansion. Runtime PID `14804` remains correct and was not restarted.
+
+Checkpoint: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Failed attempt `37312247737` remains durable evidence and must not be rerun.
+
+NEXT_EXACT_ACTION: evidence/state-only closure commit -> guard remote branch/PR/main -> push exact closure head -> require three-lane exact-head Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-020 remains BLOCKED until FMUX-019 MAIN VERIFIED.

@@ -292,7 +292,7 @@ Branch: `chatgpt/FMUX-019-cross-platform-adversarial`.
 Claim base: verified main `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf`.
 Depends: FMUX-018 DONE / MAIN VERIFIED including governance closure.
 Evidence: `docs/evidence/FMUX-019_CROSS_PLATFORM_UX_ADVERSARIAL_GATE_EVIDENCE.md`.
-Local checkpoint: test-first aggregate adversarial gate PASS after minimal CI/error-UX repairs; eleven foundation FMUX contracts retained; affected contracts + project-state + diff hygiene PASS; Windows Release win-x64 build PASS with 0 warnings / 0 errors. Native macOS and Windows ARM64 remain exact-head Verify requirements.
+Local checkpoint: test-first aggregate adversarial gate PASS after minimal CI/error-UX repairs; eleven foundation FMUX contracts retained; affected contracts + project-state + diff hygiene PASS; Windows Release win-x64 build PASS with 0 warnings / 0 errors. Exact-head repair `1fc91be563d70306bdfe84216906198723604a22` passed Verify `37313099533` on macOS / Windows x64 / native Windows ARM64; scoped review PASS. Governance/evidence closure commit remains required before PR.
 
 Scope:
 - Windows/macOS parity;

@@ -104,3 +104,14 @@ Candidate `ce935f760c51bbb76cf4b8f003a339c483e3b227` triggered Verify `373122477
 Targeted repair only: eight legacy foundation contract files now resolve their own FMUX task-graph section and accept the valid lifecycle progression `ACTIVE / CLAIMED`, `ACTIVE / LOCAL VERIFIED`, or `DONE / MAIN VERIFIED`. No production source changed in this repair.
 
 Only the failed FMUX-019 aggregate stage was rerun locally after the repair; it PASSed with all eleven foundation contracts green. The next remote action is a fix commit + guarded push of the new exact head; the old failed run is complete and must not be rerun.
+## Exact-head native verification / review PASS
+
+Targeted repair head `1fc91be563d70306bdfe84216906198723604a22` passed exact-head Verify `37313099533` on all required native lanes:
+
+- macOS: SUCCESS (static verification, integration, native app build/resources);
+- Windows x64: SUCCESS, including the FMUX-019 aggregate gate, runtime integration, x64/arm64 package build and app smoke;
+- native Windows ARM64: SUCCESS, including the FMUX-019 aggregate gate, native solution/release build, smoke and package upload.
+
+Scoped review from verified base `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf` to `1fc91be563d70306bdfe84216906198723604a22` is PASS. Changes are limited to presentation source, CI/test gates and durable evidence/state. No `FileMCP.Core`, LocalMCPServer/Runtime, policy/backend/service authority surface changed. Runtime PID `14804` remains unchanged.
+
+Checkpoint: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Next is an evidence/state-only closure commit, guarded push and exact closure-SHA Verify before the single reviewed PR. Do not rerun the failed attempt `37312247737`.
