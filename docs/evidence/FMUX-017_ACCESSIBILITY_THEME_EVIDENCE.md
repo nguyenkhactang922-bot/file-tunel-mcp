@@ -92,3 +92,16 @@ Scoped review -> exact candidate commit -> side-effect guard remote branch/PR ->
 - Runtime remains PID `14804` at the FMG026-ready executable; no restart was performed.
 
 Next: commit this targeted macOS compile fix plus durable checkpoint -> side-effect guard -> push exact new head -> require a fresh three-lane Verify. Do not manually rerun failed attempt `37260149053`.
+
+
+## Exact-head attempt 2 / native verified - 2026-10-05
+
+- Remote canonical branch `chatgpt/FMUX-017-accessibility` exact head: `5bdb64235148ed9212a2a61a55faeade05054f57`.
+- Push Verify `37261687541`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- The macOS lane passed native `Static verification`, integration tests, app build and bundled-resource checks, proving the AppKit `recalculateKeyViewLoop()` fix on a native runner.
+- Windows x64 and native Windows ARM64 also completed their full contract/build/package/smoke lanes successfully.
+- Scoped review PASS: FMUX-017 changes are limited to accessibility/keyboard/theme presentation behavior, semantic resources and their CI contract; no MCP/tool authority, shell, network, credential, filesystem scope or raw-data surface was added.
+- `git diff --check fork/main...HEAD`: PASS.
+- Runtime truth remains correct FMG026-ready PID `14804`; no restart performed.
+
+Checkpoint state: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Not DONE yet. Next: create an evidence/state-only closure commit on the local repair branch -> guarded explicit push to remote canonical `chatgpt/FMUX-017-accessibility` -> require a Verify on that closure SHA -> create/review exactly one PR -> guarded merge -> exact merged-main Verify -> governance state-sync before FMUX-018.

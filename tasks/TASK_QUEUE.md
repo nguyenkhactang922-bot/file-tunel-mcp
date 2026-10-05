@@ -309,3 +309,13 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - No history/source loss: repair commit parent is `d68e7d2342dc7c37eec2cadf4feadda4510e8572` and tree equals the intended staged fix tree.
 - Canonical remote task branch remains `chatgpt/FMUX-017-accessibility`; use explicit guarded refspec from repair HEAD when pushing.
 - Next: state-contract + diff hygiene -> commit recovery metadata -> side-effect guard -> push repair HEAD to remote canonical branch -> fresh exact-head three-lane Verify.
+
+
+## FMUX-017 exact-head native verified / closure pending - 2026-10-05
+
+- Remote canonical branch head `5bdb64235148ed9212a2a61a55faeade05054f57`.
+- Push Verify `37261687541`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Scoped diff/security review: PASS; no new MCP/tool authority, shell/network/credential/filesystem-scope or raw-data surface.
+- Runtime PID `14804` remains correct; no restart.
+- State: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS; not DONE yet.
+- Next: evidence/state-only closure commit on local repair branch -> guarded explicit push to remote canonical FMUX-017 branch -> closure-SHA Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. Do not rerun `37261687541`.

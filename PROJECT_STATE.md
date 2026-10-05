@@ -1682,3 +1682,10 @@ Active branch: `chatgpt/FMUX-017-accessibility-repair`
 Local Git recovery only: original local branch ref `chatgpt/FMUX-017-accessibility` is ACL-locked and cannot be atomically replaced by the current medium-token process. Repair branch `chatgpt/FMUX-017-accessibility-repair` points at `bb51a994e93e03134669db689fe9ecfe7e3644bf`, whose parent/tree exactly match the intended targeted macOS fix checkpoint. Canonical remote task branch remains `chatgpt/FMUX-017-accessibility`.
 
 NEXT_EXACT_ACTION: state-contract/diff hygiene -> commit recovery metadata -> guarded explicit push of repair HEAD to remote canonical FMUX-017 branch -> fresh exact-head three-lane Verify. Do not hand-edit the locked legacy ref.
+
+
+## FMUX-017 exact-head native verified - 2026-10-05
+
+FMUX-017 remains ACTIVE but is EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Remote canonical branch head `5bdb64235148ed9212a2a61a55faeade05054f57`; push Verify `37261687541` SUCCESS across macOS / Windows x64 / native Windows ARM64. Scoped review PASS; no authority/runtime expansion. Runtime PID `14804` unchanged.
+
+NEXT_EXACT_ACTION: evidence/state-only closure commit on local repair branch -> guarded explicit push to remote canonical FMUX-017 branch -> closure-SHA Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. Do not rerun `37261687541`.

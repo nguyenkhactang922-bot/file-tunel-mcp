@@ -1792,3 +1792,12 @@ Branch: `chatgpt/FMUX-017-accessibility-repair`
 The original local ref `chatgpt/FMUX-017-accessibility` is ACL-locked from an older elevated Git write and cannot be atomically replaced by the current medium-token process. No source/history was discarded: orphan checkpoint `bb51a994e93e03134669db689fe9ecfe7e3644bf` has the exact staged tree and parent expected for the targeted macOS fix. A user-owned local repair branch was created at that commit. The canonical remote task branch remains `chatgpt/FMUX-017-accessibility`; pushes from the repair branch must use an explicit guarded refspec to that remote branch.
 
 NEXT_EXACT_ACTION: verify state contract on the repair branch -> commit only branch-recovery state metadata if needed -> side-effect guard remote canonical branch/PR/main -> push exact repair HEAD to remote `chatgpt/FMUX-017-accessibility` -> require fresh three-lane Verify. Do not modify the ACL-locked legacy local ref manually and do not rerun failed run `37260149053`.
+
+
+## FMUX-017 exact-head native verified / review PASS - 2026-10-05
+
+Remote canonical branch `chatgpt/FMUX-017-accessibility` exact head `5bdb64235148ed9212a2a61a55faeade05054f57`; push Verify `37261687541` SUCCESS on macOS / Windows x64 / native Windows ARM64. macOS native Static verification, integration, build and resources all passed; targeted AppKit fix is proven. Scoped diff/security review PASS with no new MCP/tool authority, shell/network/credential/filesystem-scope or raw-data surface. Runtime PID `14804` remains correct and was not restarted.
+
+Checkpoint: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. FMUX-017 is not DONE until closure SHA -> PR -> guarded merge -> exact merged-main Verify -> governance state-sync.
+
+NEXT_EXACT_ACTION: create evidence/state-only FMUX-017 closure commit on `chatgpt/FMUX-017-accessibility-repair` -> side-effect guard remote canonical branch/PR/main -> explicit push repair HEAD to remote `chatgpt/FMUX-017-accessibility` -> require closure-SHA three-lane Verify -> exactly one reviewed PR -> guarded merge -> exact merged-main Verify. Do not rerun Verify `37261687541` or restart PID `14804`.
