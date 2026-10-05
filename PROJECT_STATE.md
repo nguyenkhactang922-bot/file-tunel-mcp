@@ -1673,3 +1673,12 @@ FMUX-017 remains ACTIVE. Candidate `d68e7d2342dc7c37eec2cadf4feadda4510e8572`; p
 Targeted fix: `window.recalculateKeyViewLoop()` plus matching contract update. Targeted local PASS: FMUX-017 accessibility/theme contract and diff hygiene. Runtime PID `14804` unchanged; no authority/runtime semantics changed.
 
 NEXT_EXACT_ACTION: commit/push targeted fix -> require fresh exact-head three-lane Verify; if green, record native-verified closure checkpoint before PR. Do not rerun failed run `37260149053` manually.
+
+
+## FMUX-017 local ref recovery - 2026-10-05
+
+Active branch: `chatgpt/FMUX-017-accessibility-repair`
+
+Local Git recovery only: original local branch ref `chatgpt/FMUX-017-accessibility` is ACL-locked and cannot be atomically replaced by the current medium-token process. Repair branch `chatgpt/FMUX-017-accessibility-repair` points at `bb51a994e93e03134669db689fe9ecfe7e3644bf`, whose parent/tree exactly match the intended targeted macOS fix checkpoint. Canonical remote task branch remains `chatgpt/FMUX-017-accessibility`.
+
+NEXT_EXACT_ACTION: state-contract/diff hygiene -> commit recovery metadata -> guarded explicit push of repair HEAD to remote canonical FMUX-017 branch -> fresh exact-head three-lane Verify. Do not hand-edit the locked legacy ref.

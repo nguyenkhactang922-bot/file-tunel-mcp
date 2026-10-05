@@ -300,3 +300,12 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Targeted local recheck PASS: FMUX-017 accessibility/theme contract; `git diff --check`.
 - Runtime PID `14804` remains correct; no restart.
 - Next: commit targeted fix/checkpoint -> side-effect guard -> push exact new head -> require fresh three-lane Verify. Do not rerun attempt `37260149053`.
+
+
+## FMUX-017 local ref recovery - 2026-10-05
+
+- Local repair branch: `chatgpt/FMUX-017-accessibility-repair` at `bb51a994e93e03134669db689fe9ecfe7e3644bf`.
+- Original local ref `chatgpt/FMUX-017-accessibility` is ACL-locked by legacy elevated ownership; current medium-token Git cannot atomically replace it.
+- No history/source loss: repair commit parent is `d68e7d2342dc7c37eec2cadf4feadda4510e8572` and tree equals the intended staged fix tree.
+- Canonical remote task branch remains `chatgpt/FMUX-017-accessibility`; use explicit guarded refspec from repair HEAD when pushing.
+- Next: state-contract + diff hygiene -> commit recovery metadata -> side-effect guard -> push repair HEAD to remote canonical branch -> fresh exact-head three-lane Verify.

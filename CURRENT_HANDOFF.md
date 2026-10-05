@@ -1783,3 +1783,12 @@ Candidate `d68e7d2342dc7c37eec2cadf4feadda4510e8572`; push Verify `37260149053` 
 Targeted fix only: use valid AppKit `window.recalculateKeyViewLoop()` and keep the FMUX-017 contract aligned. Targeted local recheck PASS: FMUX-017 accessibility/theme contract and `git diff --check`. No runtime/tool authority changed. Runtime PID `14804` remains the correct FMG026-ready process and was not restarted.
 
 NEXT_EXACT_ACTION: commit this targeted macOS compile fix + durable checkpoint -> side-effect guard remote branch/PR/main -> push exact new head -> require a fresh macOS / Windows x64 / native Windows ARM64 Verify. Do not rerun attempt `37260149053` or any unrelated local PASS gate.
+
+
+## FMUX-017 local ref recovery branch - 2026-10-05
+
+Branch: `chatgpt/FMUX-017-accessibility-repair`
+
+The original local ref `chatgpt/FMUX-017-accessibility` is ACL-locked from an older elevated Git write and cannot be atomically replaced by the current medium-token process. No source/history was discarded: orphan checkpoint `bb51a994e93e03134669db689fe9ecfe7e3644bf` has the exact staged tree and parent expected for the targeted macOS fix. A user-owned local repair branch was created at that commit. The canonical remote task branch remains `chatgpt/FMUX-017-accessibility`; pushes from the repair branch must use an explicit guarded refspec to that remote branch.
+
+NEXT_EXACT_ACTION: verify state contract on the repair branch -> commit only branch-recovery state metadata if needed -> side-effect guard remote canonical branch/PR/main -> push exact repair HEAD to remote `chatgpt/FMUX-017-accessibility` -> require fresh three-lane Verify. Do not modify the ACL-locked legacy local ref manually and do not rerun failed run `37260149053`.
