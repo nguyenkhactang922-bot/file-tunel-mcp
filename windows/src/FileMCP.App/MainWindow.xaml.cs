@@ -593,7 +593,13 @@ public partial class MainWindow : Window
         try { return _settingsStore.Load(); }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show(this, ex.Message, "FileMCP", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ShowOperationalError(
+                "Settings unavailable",
+                "Saved desktop settings could not be loaded.",
+                "Local desktop settings",
+                "Stored settings were not modified; defaults are being used for this launch.",
+                "Review Settings before connecting or saving changes.",
+                ex.GetType().Name);
             return new FileMcpSettings();
         }
     }
@@ -705,7 +711,13 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError(ex.Message);
+            ShowOperationalError(
+                "Connection failed",
+                "One or more configured runtimes could not be started.",
+                "Enabled workspace runtimes",
+                "Runtime state may be partial; current runtime status remains authoritative.",
+                "Open Connections, inspect each runtime state, then retry after resolving the reported condition.",
+                ex.GetType().Name);
         }
     }
 
@@ -727,7 +739,13 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError(ex.Message);
+            ShowOperationalError(
+                "Connection settings not confirmed",
+                "Connection settings could not be persisted completely.",
+                "Local connection settings and secure credential state",
+                "Credential or local fields may have partially changed; persisted state is not confirmed.",
+                "Review Connection status and settings before retrying.",
+                ex.GetType().Name);
         }
     }
 
@@ -749,7 +767,13 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError(ex.Message);
+            ShowOperationalError(
+                "Workspace settings not confirmed",
+                "Workspace settings could not be persisted completely.",
+                "Local workspace settings",
+                "In-memory fields may differ from persisted settings; saved state is not confirmed.",
+                "Review Settings and save again after resolving the reported condition.",
+                ex.GetType().Name);
         }
     }
 
@@ -763,7 +787,13 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError(ex.Message);
+            ShowOperationalError(
+                "Credential removal not confirmed",
+                "The saved runtime credential could not be removed completely.",
+                "Secure runtime credential storage",
+                "Credential removal is not confirmed.",
+                "Check the saved-credential status before retrying.",
+                ex.GetType().Name);
         }
     }
 
@@ -909,7 +939,13 @@ public partial class MainWindow : Window
             {
                 MainTabs.SelectedItem = SettingsTab;
                 AdvancedExpander.IsExpanded = true;
-                ShowError(ex.Message);
+                ShowOperationalError(
+                    "Telemetry settings invalid",
+                    "The OTLP endpoint could not be validated.",
+                    "Advanced telemetry settings",
+                    "No telemetry setting was saved by this validation.",
+                    "Correct the endpoint and validate again.",
+                    ex.GetType().Name);
                 return false;
             }
         }
@@ -1062,7 +1098,13 @@ public partial class MainWindow : Window
         RefreshOnboardingExperience();
 
         if (state.Status == LocalMcpRuntimeStatus.Failed && !string.IsNullOrEmpty(state.Error))
-            ShowError($"Drive {key}: {state.Error}");
+            ShowOperationalError(
+                "Runtime failed",
+                "The workspace runtime reported a failure.",
+                $"Drive {key}",
+                "This workspace is Failed; other workspace states are unchanged.",
+                "Open Connections and inspect current runtime diagnostics before retrying.",
+                state.Error);
     }
 
     private void RefreshRuntimeUi()
@@ -2809,6 +2851,33 @@ public partial class MainWindow : Window
             _logBuffer = "[...older log truncated...]\n" + _logBuffer[^MaxLogCharacters..];
 
         ScheduleLivePresentationRefresh();
+    }
+
+    private void ShowOperationalError(
+        string title,
+        string failure,
+        string scope,
+        string stateChanged,
+        string nextAction,
+        string? technicalDetail = null)
+    {
+        ShowError(new PresentationFeedback(
+            PresentationSeverity.Danger,
+            title,
+            $"What failed: {failure}\nScope: {scope}\nState changed: {stateChanged}\nNext: {nextAction}",
+            ActionLabel: nextAction,
+            TechnicalDetail: technicalDetail));
+    }
+
+    private void ShowError(PresentationFeedback feedback)
+    {
+        var text = feedback.Message;
+        if (!string.IsNullOrWhiteSpace(feedback.TechnicalDetail))
+            text += $"\n\nTechnical detail: {feedback.TechnicalDetail}";
+        _lastImportantEvent = $"{feedback.Title}: {feedback.Message}";
+        if (IsLoaded) HomeRecentEventText.Text = _lastImportantEvent;
+        var icon = feedback.Severity == PresentationSeverity.Danger ? MessageBoxImage.Error : MessageBoxImage.Warning;
+        System.Windows.MessageBox.Show(this, text, feedback.Title, MessageBoxButton.OK, icon);
     }
 
     private void ShowError(string message)

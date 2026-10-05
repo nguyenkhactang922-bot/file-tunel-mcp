@@ -15,7 +15,11 @@ foreach($name in @("MaxActivityRows","RecordActivity","RefreshActivityGrid","Act
 foreach($name in @("ActivityEvent","activityTableView","activityFilterPopup","showActivity","refreshActivityFilter","recordActivity","maxActivityEvents","Diagnostics")) {
  if(-not $mac.Contains($name)){ throw "macOS Activity missing: $name" }
 }
-if(-not $graph.Contains("FMUX-008") -or -not $graph.Contains("State: ACTIVE / CLAIMED")) { throw "FMUX-008 not claimed" }
+$fmuxStart = $graph.IndexOf('## FMUX-008', [StringComparison]::Ordinal)
+$fmuxNext = $graph.IndexOf('## FMUX-009', [StringComparison]::Ordinal)
+if ($fmuxStart -lt 0 -or $fmuxNext -le $fmuxStart) { throw 'FMUX-008 task graph section missing.' }
+$fmuxSection = $graph.Substring($fmuxStart, $fmuxNext - $fmuxStart)
+if (-not $fmuxSection.Contains('State: ACTIVE / CLAIMED') -and -not $fmuxSection.Contains('State: ACTIVE / LOCAL VERIFIED') -and -not $fmuxSection.Contains('State: DONE / MAIN VERIFIED')) { throw 'FMUX-008 lifecycle is not active/verified/done.' }
 
 Write-Output "fmux-structured-activity-contract: PASS"
 Write-Output "timeline-filter-master-detail: present"

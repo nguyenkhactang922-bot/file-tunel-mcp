@@ -15,7 +15,11 @@ foreach($name in @("ChangeRow","TryCreateChangeRow","RefreshChangesGrid","Change
 foreach($name in @("ChangeEvent","changesTableView","showChanges","changeEvent(from","File/version context: not emitted by runtime event","No synthetic diff")) {
   if(-not $mac.Contains($name)){ throw "macOS Changes missing: $name" }
 }
-if(-not $graph.Contains("FMUX-009") -or -not $graph.Contains("State: ACTIVE / CLAIMED")) { throw "FMUX-009 not claimed" }
+$fmuxStart = $graph.IndexOf('## FMUX-009', [StringComparison]::Ordinal)
+$fmuxNext = $graph.IndexOf('## FMUX-010', [StringComparison]::Ordinal)
+if ($fmuxStart -lt 0 -or $fmuxNext -le $fmuxStart) { throw 'FMUX-009 task graph section missing.' }
+$fmuxSection = $graph.Substring($fmuxStart, $fmuxNext - $fmuxStart)
+if (-not $fmuxSection.Contains('State: ACTIVE / CLAIMED') -and -not $fmuxSection.Contains('State: ACTIVE / LOCAL VERIFIED') -and -not $fmuxSection.Contains('State: DONE / MAIN VERIFIED')) { throw 'FMUX-009 lifecycle is not active/verified/done.' }
 
 Write-Output "fmux-changes-contract: PASS"
 Write-Output "mutation-events: write/delete/apply_edits"

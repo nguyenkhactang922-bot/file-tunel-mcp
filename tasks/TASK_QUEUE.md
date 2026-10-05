@@ -363,3 +363,34 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Runtime PID `14804` remains correct; no restart.
 - FMUX-019 remains BLOCKED until governance state-sync is MAIN VERIFIED.
 - Next: finish durable state/evidence sync -> project-state contract + diff hygiene -> commit -> guarded push -> exact-head Verify -> reviewed PR -> guarded merge -> exact merged-main Verify -> then claim FMUX-019.
+
+## FMUX-018 fully MAIN VERIFIED / FMUX-019 claimed - 2026-10-05
+
+FMUX-018 governance closure is DONE / MAIN VERIFIED. State head `d5112ab47f5c1d3d3b35ecd3a76da583479593be`; push Verify `37300900430` SUCCESS; PR #61 Verify `37301719404` SUCCESS; PR #61 merged as main `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf`; merged-main Verify `37302476304` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Current task: FMUX-019 Cross-Platform UX Adversarial Gate - ACTIVE / CLAIMED on `chatgpt/FMUX-019-cross-platform-adversarial`, base exact verified main `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf`. Runtime PID `14804` remains correct and was not restarted.
+
+- Next: audit frozen Windows/macOS parity, error/empty/stale/offline states, keyboard-only completion, feature gating, security language and legacy/core regressions -> add a test-first FMUX-019 aggregate gate -> repair only proven gaps -> local evidence/review -> exact-head native Verify -> one PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-020 remains BLOCKED until FMUX-019 MAIN VERIFIED.
+## FMUX-019 local verified - 2026-10-05
+
+FMUX-019 Cross-Platform UX Adversarial Gate is ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-019-cross-platform-adversarial` from exact verified main `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf`. Runtime PID `14804` remains correct and was not restarted. Evidence: `docs/evidence/FMUX-019_CROSS_PLATFORM_UX_ADVERSARIAL_GATE_EVIDENCE.md`.
+
+Test-first RED proved only two gaps: eleven foundation FMUX contracts lacked durable Verify wiring, and caught operational exceptions could be raw-only modal UX. Minimal repairs added the FMUX-019 aggregate gate exactly once per Windows native job and structured operational error presentation on Windows/macOS. No core/runtime/tool authority changed.
+
+Local PASS: FMUX-019 aggregate gate; affected feedback/connections/settings/onboarding/accessibility/performance contracts; project-state contract; raw-error scan; workflow count 2; core-source diff guard; `git diff --check`; Windows Release win-x64 compile 0 warnings / 0 errors. macOS native and Windows ARM64 remain exact-head CI requirements.
+
+- Next: scoped diff/security review -> commit exact FMUX-019 candidate -> guard remote branch/PR/main -> push exact head -> require macOS / Windows x64 / native Windows ARM64 Verify -> exact-head review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-020 remains BLOCKED until FMUX-019 MAIN VERIFIED.
+## FMUX-019 exact-head attempt 1 failed / targeted test repair - 2026-10-05
+
+Candidate `ce935f760c51bbb76cf4b8f003a339c483e3b227`; Verify `37312247737` is complete. macOS native lane SUCCESS. Windows x64 + native Windows ARM64 failed only `Verify FMUX Cross-Platform UX Adversarial Gate`; logs prove stale historical lifecycle assertions in FMUX-002/004-010 foundation tests (`ACTIVE / CLAIMED` only). No production/runtime/core failure.
+
+Targeted repair modifies only those eight test contracts to read their own FMUX section and accept lifecycle ACTIVE / CLAIMED, ACTIVE / LOCAL VERIFIED, or DONE / MAIN VERIFIED. Only the failed FMUX-019 aggregate stage was rerun locally and PASSed with 11/11 foundation contracts. Runtime PID `14804` unchanged; no restart.
+
+- Next: state/diff hygiene -> commit targeted test/evidence repair -> guard remote branch/PR/main -> push new exact head -> require fresh macOS / Windows x64 / native Windows ARM64 Verify. Preserve attempt-1 evidence; do not rerun run `37312247737`.
+## FMUX-019 exact-head native verified / closure pending - 2026-10-05
+
+Targeted repair head `1fc91be563d70306bdfe84216906198723604a22` passed exact-head Verify `37313099533` on macOS / Windows x64 / native Windows ARM64. Windows x64 and native ARM64 both passed the new FMUX-019 aggregate adversarial gate; macOS passed static/integration/native build. Scoped diff/security review PASS: presentation + CI/tests + evidence/state only; no core/runtime/tool authority expansion. Runtime PID `14804` remains correct and was not restarted.
+
+Checkpoint: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Failed attempt `37312247737` remains durable evidence and must not be rerun.
+
+- Next: evidence/state-only closure commit -> guard remote branch/PR/main -> push exact closure head -> require three-lane exact-head Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-020 remains BLOCKED until FMUX-019 MAIN VERIFIED.

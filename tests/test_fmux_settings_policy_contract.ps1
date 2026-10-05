@@ -15,7 +15,11 @@ foreach($name in @("PolicyProfileComboBox_SelectionChanged","UpdatePolicyExplana
 foreach($name in @("policyExplanationLabel","policyProfileChanged","updatePolicyExplanation","Workspace & access","Appearance","Follows macOS system appearance")) {
  if(-not $mac.Contains($name)){ throw "macOS Settings missing: $name" }
 }
-if(-not $graph.Contains("FMUX-007") -or -not $graph.Contains("State: ACTIVE / CLAIMED")) { throw "FMUX-007 not claimed" }
+$fmuxStart = $graph.IndexOf('## FMUX-007', [StringComparison]::Ordinal)
+$fmuxNext = $graph.IndexOf('## FMUX-008', [StringComparison]::Ordinal)
+if ($fmuxStart -lt 0 -or $fmuxNext -le $fmuxStart) { throw 'FMUX-007 task graph section missing.' }
+$fmuxSection = $graph.Substring($fmuxStart, $fmuxNext - $fmuxStart)
+if (-not $fmuxSection.Contains('State: ACTIVE / CLAIMED') -and -not $fmuxSection.Contains('State: ACTIVE / LOCAL VERIFIED') -and -not $fmuxSection.Contains('State: DONE / MAIN VERIFIED')) { throw 'FMUX-007 lifecycle is not active/verified/done.' }
 
 Write-Output "fmux-settings-policy-contract: PASS"
 Write-Output "sections: workspace policy advanced appearance"

@@ -15,7 +15,11 @@ foreach($name in @("UpdateConnectionExperience","ConnectionCredentialBadge.Statu
 foreach($name in @("connectionStatusLabel","connectionDiagnosticsLabel","refreshConnectionDiagnostics","API key is saved in Keychain","Tunnel ID configured")) {
   if(-not $mac.Contains($name)){ throw "macOS Connections missing: $name" }
 }
-if(-not $graph.Contains("FMUX-006") -or -not $graph.Contains("State: ACTIVE / CLAIMED")) { throw "FMUX-006 not claimed" }
+$fmuxStart = $graph.IndexOf('## FMUX-006', [StringComparison]::Ordinal)
+$fmuxNext = $graph.IndexOf('## FMUX-007', [StringComparison]::Ordinal)
+if ($fmuxStart -lt 0 -or $fmuxNext -le $fmuxStart) { throw 'FMUX-006 task graph section missing.' }
+$fmuxSection = $graph.Substring($fmuxStart, $fmuxNext - $fmuxStart)
+if (-not $fmuxSection.Contains('State: ACTIVE / CLAIMED') -and -not $fmuxSection.Contains('State: ACTIVE / LOCAL VERIFIED') -and -not $fmuxSection.Contains('State: DONE / MAIN VERIFIED')) { throw 'FMUX-006 lifecycle is not active/verified/done.' }
 
 Write-Output "fmux-connections-contract: PASS"
 Write-Output "credential-status: present"

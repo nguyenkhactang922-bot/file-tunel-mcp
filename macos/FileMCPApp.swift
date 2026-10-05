@@ -3188,7 +3188,16 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
                 execEnvironmentAllowList: execEnvironmentAllowList(),
                 dockerExecutionBackend: dockerExecutionBackendConfiguration()
             ))
-        } catch { showError(error.localizedDescription) }
+        } catch {
+            showOperationalError(
+                title: "Connection failed",
+                failure: "The configured runtime could not be started.",
+                scope: "Configured workspace runtime",
+                stateChanged: "Runtime state may be partial; current runtime status remains authoritative.",
+                nextAction: "Open Connections, inspect the runtime state, then retry after resolving the reported condition.",
+                technicalDetail: String(describing: type(of: error))
+            )
+        }
     }
 
     @objc private func saveConnectionOnly() {
@@ -3208,7 +3217,14 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             finishLoading(saveConnectionButton)
         } catch {
             saveConnectionButton.setLoading(false)
-            showError(error.localizedDescription)
+            showOperationalError(
+                title: "Connection settings not confirmed",
+                failure: "Connection settings could not be persisted completely.",
+                scope: "Local connection settings and secure credential state",
+                stateChanged: "Credential or local fields may have partially changed; persisted state is not confirmed.",
+                nextAction: "Review Connection status and settings before retrying.",
+                technicalDetail: String(describing: type(of: error))
+            )
         }
     }
 
@@ -3250,7 +3266,14 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         } catch {
             tabs.selectTabViewItem(withIdentifier: "settings")
             setAdvancedSettingsExpanded(true)
-            showError(error.localizedDescription)
+            showOperationalError(
+                title: "Execution environment settings invalid",
+                failure: "The execution environment allowlist could not be validated.",
+                scope: "Advanced execution settings",
+                stateChanged: "No execution setting was saved by this validation.",
+                nextAction: "Correct the allowlist and validate again.",
+                technicalDetail: String(describing: type(of: error))
+            )
             return false
         }
         return true
@@ -3268,7 +3291,16 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             try storage.deleteAPIKey()
             apiKeyField.stringValue = ""
             updateAPIKeyPlaceholder()
-        } catch { showError(error.localizedDescription) }
+        } catch {
+            showOperationalError(
+                title: "Credential removal not confirmed",
+                failure: "The saved runtime credential could not be removed completely.",
+                scope: "Secure runtime credential storage",
+                stateChanged: "Credential removal is not confirmed.",
+                nextAction: "Check the saved-credential status before retrying.",
+                technicalDetail: String(describing: type(of: error))
+            )
+        }
     }
 
     @objc private func quitApp() { NSApp.terminate(nil) }
@@ -3312,7 +3344,16 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             DispatchQueue.main.async {
                 self?.updateRunButton(state: state)
                 self?.refreshOnboardingExperience()
-                if case let .failed(message) = state { self?.showError(message) }
+                if case let .failed(message) = state {
+                    self?.showOperationalError(
+                        title: "Runtime failed",
+                        failure: "The workspace runtime reported a failure.",
+                        scope: "Configured workspace runtime",
+                        stateChanged: "The runtime is Failed; configuration state was not reinterpreted by the UI.",
+                        nextAction: "Open Connections and inspect current runtime diagnostics before retrying.",
+                        technicalDetail: message
+                    )
+                }
             }
         }
     }
@@ -3456,6 +3497,40 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         default:
             break
         }
+    }
+
+    private func showOperationalError(
+        title: String,
+        failure: String,
+        scope: String,
+        stateChanged: String,
+        nextAction: String,
+        technicalDetail: String? = nil
+    ) {
+        showError(FileMCPPresentationFeedback(
+            severity: .danger,
+            title: title,
+            message: "What failed: \(failure)\nScope: \(scope)\nState changed: \(stateChanged)\nNext: \(nextAction)",
+            actionLabel: nextAction,
+            technicalDetail: technicalDetail
+        ))
+    }
+
+    private func showError(_ feedback: FileMCPPresentationFeedback) {
+        var text = feedback.message
+        if let technicalDetail = feedback.technicalDetail, !technicalDetail.isEmpty {
+            text += "\n\nTechnical detail: \(technicalDetail)"
+        }
+        lastImportantEvent = "\(feedback.title): \(feedback.message)"
+        homeRecentEventLabel.stringValue = lastImportantEvent
+        let alert = NSAlert()
+        alert.messageText = feedback.title
+        alert.informativeText = text
+        switch feedback.severity {
+        case .danger: alert.alertStyle = .critical
+        default: alert.alertStyle = .warning
+        }
+        alert.runModal()
     }
 
     private func showError(_ message: String) {
