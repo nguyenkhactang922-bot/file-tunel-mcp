@@ -1789,3 +1789,15 @@ Local final acceptance PASS: FMUX-020 aggregate gate; live core-to-UI proof on u
 Next exact action: state/diff hygiene + scoped authority/security review -> commit exact FMUX-020 candidate -> guard remote branch/PR/main -> push exact head -> exact-head native Verify (macOS / Windows x64 / native Windows ARM64) -> exact-head review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX program governance state-sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.
 
 Active branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
+
+## FMUX-020 candidate committed / remote pending - 2026-10-05
+
+Current task: FMUX-020 Product UI/UX Main Verification - ACTIVE / LOCAL VERIFIED. Technical candidate commit `c31a5393ed55c6906bf5d36c0456ae0c9b515db8` is based directly on exact verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`; runtime PID `14804` remains correct and was not restarted.
+
+Post-commit review/hygiene PASS: state contracts PASS, `git diff --check` clean, no production Windows/macOS source diff, final FMUX-020 Verify wiring count = 2, no added credential/authority surface. Candidate contains final screenshots/evidence, test-only health-url read-race hardening, and no production core/runtime authority change.
+
+Remote/PR guard: `fork/main` remains `11d40cf277a490a360cb3f9ee61b690a292dfb7b`; no FMUX-020 remote branch exists yet on `fork` or `origin`; GitHub PR query returns none. This state-sync commit may become the exact head to push; use current `git rev-parse HEAD` as source of truth.
+
+Next exact action: re-check remote branch/PR/main -> push current HEAD to `fork` -> exact-head native Verify on macOS / Windows x64 / native Windows ARM64 -> exact-head review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX governance sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.
+
+Active branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`

@@ -1907,3 +1907,15 @@ Local final acceptance PASS: FMUX-020 aggregate gate; live core-to-UI proof on u
 NEXT_EXACT_ACTION: project-state contract + diff hygiene + scoped authority/security review -> commit exact FMUX-020 candidate -> guard remote branch/PR/main -> push exact head -> require exact-head Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> exact-head review -> create exactly one PR -> require PR Verify SUCCESS -> guarded merge -> require exact merged-main Verify SUCCESS -> final FMUX program governance state-sync and only then create/record `PRODUCT_UI_UX_MAIN_VERIFIED`.
 
 Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
+
+## FMUX-020 candidate committed / remote pending - 2026-10-05
+
+Technical candidate commit `c31a5393ed55c6906bf5d36c0456ae0c9b515db8` exists on `chatgpt/FMUX-020-product-ui-ux-main-verification`, parent exact verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`. Local acceptance remains PASS / LOCAL VERIFIED; runtime PID `14804` remains unchanged and was not restarted.
+
+Post-commit hygiene/review PASS: file-version source-state contract PASS; project-state contract PASS; `git diff --check` clean; no production source diff under `windows/src` or `macos`; final FMUX-020 gate wired exactly twice; scoped secret/authority scan found no added credential/authority surface. Candidate artifact set includes the regenerated 14-page contact sheet and the final-gate ASCII hygiene fix.
+
+Side-effect guard before remote work: `fork/main` remains `11d40cf277a490a360cb3f9ee61b690a292dfb7b`; no remote `chatgpt/FMUX-020-product-ui-ux-main-verification` branch exists on `fork` or `origin`; GitHub PR query for that head returns none. Do not create a duplicate commit/PR. This checkpoint state sync may become the current exact HEAD; remote verification must use current `git rev-parse HEAD`.
+
+NEXT_EXACT_ACTION: re-check remote branch/PR/main guard -> push current HEAD to `fork` branch `chatgpt/FMUX-020-product-ui-ux-main-verification` -> require exact-head Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> exact-head review -> create exactly one PR to `main` -> require PR Verify SUCCESS -> guarded merge -> require exact merged-main Verify SUCCESS -> final FMUX program governance state-sync -> only then create/record `PRODUCT_UI_UX_MAIN_VERIFIED`.
+
+Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
