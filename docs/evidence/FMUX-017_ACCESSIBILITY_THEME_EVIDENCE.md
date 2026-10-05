@@ -105,3 +105,14 @@ Next: commit this targeted macOS compile fix plus durable checkpoint -> side-eff
 - Runtime truth remains correct FMG026-ready PID `14804`; no restart performed.
 
 Checkpoint state: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Not DONE yet. Next: create an evidence/state-only closure commit on the local repair branch -> guarded explicit push to remote canonical `chatgpt/FMUX-017-accessibility` -> require a Verify on that closure SHA -> create/review exactly one PR -> guarded merge -> exact merged-main Verify -> governance state-sync before FMUX-018.
+
+
+## Closure / merged-main verification - 2026-10-05
+
+- Closure head `0a4efa03b6b78afa3fee6c8e0b076ede87170faf` passed push Verify `37262375573` on macOS / Windows x64 / native Windows ARM64.
+- PR #58 exact-head Verify `37284215643` passed on all three native lanes.
+- PR #58 merged exact reviewed head into `main` as `508987d0d659890bbcb63973437858099d462615`.
+- Merged-main Verify `37292127945`, exact `headSha=508987d0d659890bbcb63973437858099d462615`, completed SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- FMUX-017 implementation is therefore DONE / MAIN VERIFIED technically.
+- Governance state-sync branch `state/FMUX-017-main-verified` is required to record this durable truth before FMUX-018 may be claimed.
+- Runtime PID `14804` remains unchanged; no runtime restart was required.

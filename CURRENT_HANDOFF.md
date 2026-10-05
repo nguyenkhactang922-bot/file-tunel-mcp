@@ -1801,3 +1801,13 @@ Remote canonical branch `chatgpt/FMUX-017-accessibility` exact head `5bdb6423514
 Checkpoint: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. FMUX-017 is not DONE until closure SHA -> PR -> guarded merge -> exact merged-main Verify -> governance state-sync.
 
 NEXT_EXACT_ACTION: create evidence/state-only FMUX-017 closure commit on `chatgpt/FMUX-017-accessibility-repair` -> side-effect guard remote canonical branch/PR/main -> explicit push repair HEAD to remote `chatgpt/FMUX-017-accessibility` -> require closure-SHA three-lane Verify -> exactly one reviewed PR -> guarded merge -> exact merged-main Verify. Do not rerun Verify `37261687541` or restart PID `14804`.
+
+
+## FMUX-017 technical MAIN VERIFIED / governance state-sync active - 2026-10-05
+
+FMUX-017 Accessibility / Keyboard / Theme Enforcement implementation is DONE / MAIN VERIFIED technically. Closure head `0a4efa03b6b78afa3fee6c8e0b076ede87170faf` passed push Verify `37262375573`; PR #58 exact-head Verify `37284215643` passed; PR #58 merged as main `508987d0d659890bbcb63973437858099d462615`; merged-main Verify `37292127945` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Branch: `state/FMUX-017-main-verified`
+Base: exact verified main `508987d0d659890bbcb63973437858099d462615`. Runtime PID `14804` remains the FMG026-ready FileMCP and was not restarted.
+
+NEXT_EXACT_ACTION: finish governance state/evidence sync on this branch -> run state-contract + `git diff --check` -> commit -> side-effect guard remote branch/PR/main -> push exact head -> require exact-head three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify. Only after this governance state-sync is MAIN VERIFIED may FMUX-018 be claimed.
