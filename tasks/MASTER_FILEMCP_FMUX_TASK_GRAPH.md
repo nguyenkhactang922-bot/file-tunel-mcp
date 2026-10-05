@@ -270,10 +270,12 @@ Scope:
 
 ## FMUX-018 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Performance + Visual Consistency Gate
 
-State: ACTIVE / CLAIMED
+State: ACTIVE / LOCAL VERIFIED
 Branch: `chatgpt/FMUX-018-performance-visual-consistency`.
 Claim base: verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`.
 Depends: FMUX-017 DONE / MAIN VERIFIED including governance closure.
+Evidence: `docs/evidence/FMUX-018_PERFORMANCE_VISUAL_CONSISTENCY_EVIDENCE.md`.
+Local checkpoint: FMUX-018 contract + affected FMUX contracts + state contract + `git diff --check` PASS; Windows Release win-x64 compile PASS with 0 warnings / 0 errors. Exact-head native three-lane Verify remains required before PR/merge.
 
 Scope:
 - live-list performance;

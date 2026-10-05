@@ -1709,3 +1709,15 @@ Current task: FMUX-018 Performance + Visual Consistency Gate — ACTIVE / CLAIME
 Runtime PID `14804` unchanged; no restart.
 
 NEXT_EXACT_ACTION: audit live-list performance/bounds/virtualization/coalescing/live-tail behavior, semantic-token drift, layout consistency, startup/render regressions -> add targeted contracts/tests and only repair proven gaps -> local evidence/review -> exact-head Verify -> PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
+
+
+## FMUX-018 local verified - 2026-10-05
+
+Active branch: `chatgpt/FMUX-018-performance-visual-consistency`, based exactly on verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`.
+Current task: FMUX-018 Performance + Visual Consistency Gate — ACTIVE / LOCAL VERIFIED.
+Runtime PID `14804` unchanged; no restart.
+Evidence: `docs/evidence/FMUX-018_PERFORMANCE_VISUAL_CONSISTENCY_EVIDENCE.md`.
+
+Local verification PASS: FMUX-018 contract; accessibility/theme; structured activity; terminal PTY; app shell; project-state contract; diff hygiene; Windows Release win-x64 compile with 0 warnings / 0 errors. Native macOS typecheck/build/package and Windows packaged startup/smoke remain required at exact-head Verify.
+
+NEXT_EXACT_ACTION: scoped diff/state review -> commit candidate -> guarded push -> exact-head three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.

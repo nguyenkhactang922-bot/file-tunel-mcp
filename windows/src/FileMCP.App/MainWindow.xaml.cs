@@ -46,6 +46,7 @@ public partial class MainWindow : Window
     private readonly List<BackendStatusRow> _backendRows = new();
     private bool _terminalRefreshRunning;
     private bool _recoveryRefreshRunning;
+    private bool _livePresentationRefreshScheduled;
     private string _recoveryPersistentNotice = "";
     private const int TerminalReadWindowBytes = 16 * 1024;
     private const int MaxTerminalOutputCharacters = 64 * 1024;
@@ -1238,7 +1239,11 @@ public partial class MainWindow : Window
         MainTabs.SelectedItem = BackendTab;
         RefreshBackendGrid();
     }
-    private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e) => MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
+    private void NavigateDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        MainTabs.SelectedIndex = MainTabs.Items.Count - 1;
+        ApplyTextPreservingLiveTail(LogBox, _logBuffer);
+    }
 
     private void CompactNavigation_Click(object sender, RoutedEventArgs e)
     {
@@ -1700,16 +1705,6 @@ public partial class MainWindow : Window
         if (_artifactBatchRows.Count > MaxArtifactBatchRows)
             _artifactBatchRows.RemoveRange(0, _artifactBatchRows.Count - MaxArtifactBatchRows);
 
-        if (IsLoaded && MainTabs.SelectedItem == ActivityTab)
-            RefreshActivityGrid();
-        if (IsLoaded && MainTabs.SelectedItem == ChangesTab)
-            RefreshChangesGrid();
-        if (IsLoaded && MainTabs.SelectedItem == EvidenceTab)
-            RefreshEvidenceGrid();
-        if (IsLoaded && MainTabs.SelectedItem == RepositoryTab)
-            RefreshRepositoryGrid();
-        if (IsLoaded && MainTabs.SelectedItem == ArtifactsTab)
-            RefreshArtifactBatchGrid();
     }
 
     private void TryCaptureRepositoryRow(string line, string workspace)
@@ -2037,8 +2032,20 @@ public partial class MainWindow : Window
         var combined = TerminalOutputText.Text + text;
         if (combined.Length > MaxTerminalOutputCharacters)
             combined = combined[^MaxTerminalOutputCharacters..];
-        TerminalOutputText.Text = combined;
-        TerminalOutputText.ScrollToEnd();
+        ApplyTextPreservingLiveTail(TerminalOutputText, combined);
+    }
+
+    private static void ApplyTextPreservingLiveTail(System.Windows.Controls.TextBox textBox, string text)
+    {
+        var priorOffset = textBox.VerticalOffset;
+        var scrollableHeight = Math.Max(0d, textBox.ExtentHeight - textBox.ViewportHeight);
+        var wasFollowingTail = scrollableHeight <= 1d || priorOffset >= scrollableHeight - 1d;
+
+        textBox.Text = text;
+        if (wasFollowingTail)
+            textBox.ScrollToEnd();
+        else
+            textBox.ScrollToVerticalOffset(priorOffset);
     }
 
     private void UpdateTerminalSelection(TerminalSessionRow row)
@@ -2767,6 +2774,33 @@ public partial class MainWindow : Window
             : "Select an activity event.";
     }
 
+    private void ScheduleLivePresentationRefresh()
+    {
+        if (_livePresentationRefreshScheduled || _quitting) return;
+        _livePresentationRefreshScheduled = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(FlushLivePresentationRefresh));
+    }
+
+    private void FlushLivePresentationRefresh()
+    {
+        _livePresentationRefreshScheduled = false;
+        if (_quitting) return;
+
+        if (IsLoaded && MainTabs.SelectedItem == ActivityTab)
+            RefreshActivityGrid();
+        if (IsLoaded && MainTabs.SelectedItem == ChangesTab)
+            RefreshChangesGrid();
+        if (IsLoaded && MainTabs.SelectedItem == EvidenceTab)
+            RefreshEvidenceGrid();
+        if (IsLoaded && MainTabs.SelectedItem == RepositoryTab)
+            RefreshRepositoryGrid();
+        if (IsLoaded && MainTabs.SelectedItem == ArtifactsTab)
+            RefreshArtifactBatchGrid();
+
+        if (IsLoaded && MainTabs.SelectedIndex == MainTabs.Items.Count - 1)
+            ApplyTextPreservingLiveTail(LogBox, _logBuffer);
+    }
+
     private void AppendLog(string text)
     {
         RecordActivity(text);
@@ -2774,8 +2808,7 @@ public partial class MainWindow : Window
         if (_logBuffer.Length > MaxLogCharacters)
             _logBuffer = "[...older log truncated...]\n" + _logBuffer[^MaxLogCharacters..];
 
-        LogBox.Text = _logBuffer;
-        LogBox.ScrollToEnd();
+        ScheduleLivePresentationRefresh();
     }
 
     private void ShowError(string message)

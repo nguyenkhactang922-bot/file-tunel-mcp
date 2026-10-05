@@ -27,14 +27,14 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="OverviewCardStyle" TargetType="Border">
-            <Setter Property="BorderBrush" Value="#D8D8D8"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource FileMcpBorderSubtleBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="Padding" Value="12"/>
             <Setter Property="Margin" Value="0,0,10,10"/>
         </Style>
         <Style x:Key="OverviewLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#666666"/>
+            <Setter Property="Foreground" Value="{DynamicResource FileMcpTextSecondaryBrush}"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
@@ -134,7 +134,7 @@
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock FontWeight="SemiBold" Text="1. Workspace"/>
-                                    <TextBlock x:Name="OnboardingWorkspaceStatusText" Foreground="Gray" Text="Choose at least one existing workspace root." TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="OnboardingWorkspaceStatusText" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Choose at least one existing workspace root." TextWrapping="Wrap"/>
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="Configure workspace" Click="OnboardingWorkspace_Click" Margin="12,0,0,0"/>
                             </Grid>
@@ -144,7 +144,7 @@
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock FontWeight="SemiBold" Text="2. Policy"/>
-                                    <TextBlock x:Name="OnboardingPolicyStatusText" Foreground="Gray" Text="Choose the local policy profile enforced by the server." TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="OnboardingPolicyStatusText" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Choose the local policy profile enforced by the server." TextWrapping="Wrap"/>
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="Choose policy" Click="OnboardingPolicy_Click" Margin="12,0,0,0"/>
                             </Grid>
@@ -154,7 +154,7 @@
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock FontWeight="SemiBold" Text="3. Credential &amp; tunnel"/>
-                                    <TextBlock x:Name="OnboardingCredentialStatusText" Foreground="Gray" Text="Store the runtime API key securely and configure Tunnel IDs." TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="OnboardingCredentialStatusText" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Store the runtime API key securely and configure Tunnel IDs." TextWrapping="Wrap"/>
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="Configure connection" Click="OnboardingConnection_Click" Margin="12,0,0,0"/>
                             </Grid>
@@ -164,7 +164,7 @@
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock FontWeight="SemiBold" Text="4. Test connection"/>
-                                    <TextBlock x:Name="OnboardingConnectionStatusText" Foreground="Gray" Text="Not tested. PASS requires every enabled runtime to report Running." TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="OnboardingConnectionStatusText" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Not tested. PASS requires every enabled runtime to report Running." TextWrapping="Wrap"/>
                                 </StackPanel>
                                 <Button x:Name="OnboardingTestButton" Grid.Column="1" Content="Test connection" Click="OnboardingTestConnection_Click" Margin="12,0,0,0"/>
                             </Grid>
@@ -193,7 +193,7 @@
                             <TextBlock x:Name="HomeSummaryText" Style="{StaticResource FileMcpCaptionText}" Text="Runtime stopped"/>
                             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                                 <TextBlock x:Name="OverviewClockText" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-                                <TextBlock x:Name="OverviewAppUptimeText" Margin="0,3,0,0" Foreground="Gray" HorizontalAlignment="Right"/>
+                                <TextBlock x:Name="OverviewAppUptimeText" Margin="0,3,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" HorizontalAlignment="Right"/>
                             </StackPanel>
                         </Grid>
                         <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,12">
@@ -236,8 +236,8 @@
                                 <ComboBoxItem Content="7 days" Tag="SevenDays"/>
                                 <ComboBoxItem Content="30 days" Tag="ThirtyDays"/>
                             </ComboBox>
-                            <TextBlock x:Name="OverviewPeriodRangeText" Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="Gray"/>
-                            <TextBlock x:Name="OverviewPeriodUpdatedText" Grid.Column="3" VerticalAlignment="Center" Foreground="Gray" Text="Not loaded"/>
+                            <TextBlock x:Name="OverviewPeriodRangeText" Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource FileMcpTextSecondaryBrush}"/>
+                            <TextBlock x:Name="OverviewPeriodUpdatedText" Grid.Column="3" VerticalAlignment="Center" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Not loaded"/>
                         </Grid>
 <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,12">
                             <Grid>
@@ -336,12 +336,12 @@
                             <StackPanel>
                                 <Grid Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Foreground="Gray" Text="Calls / second and MCP token estimate / second"/>
-                                    <TextBlock x:Name="OverviewRealtimeCurrentText" Grid.Column="1" Foreground="Gray" Text="Calls/s: 0 | Tokens est./s: 0"/>
+                                    <TextBlock Grid.Column="0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Calls / second and MCP token estimate / second"/>
+                                    <TextBlock x:Name="OverviewRealtimeCurrentText" Grid.Column="1" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Calls/s: 0 | Tokens est./s: 0"/>
                                 </Grid>
                                 <Canvas x:Name="OverviewRealtimeCanvas" Height="190" ClipToBounds="True" Background="{DynamicResource FileMcpSurfaceRaisedBrush}">
-                                    <Polyline x:Name="OverviewCallsPolyline" Stroke="#2F6FED" StrokeThickness="2"/>
-                                    <Polyline x:Name="OverviewTokensPolyline" Stroke="#17A673" StrokeThickness="2"/>
+                                    <Polyline x:Name="OverviewCallsPolyline" Stroke="{DynamicResource FileMcpStatusInfoBrush}" StrokeThickness="2"/>
+                                    <Polyline x:Name="OverviewTokensPolyline" Stroke="{DynamicResource FileMcpStatusSuccessBrush}" StrokeThickness="2"/>
                                 </Canvas>
                                 <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
                                     <TextBlock Foreground="{DynamicResource FileMcpStatusInfoBrush}" FontWeight="SemiBold" Text="Calls/s" Margin="0,0,18,0"/>
@@ -361,21 +361,21 @@
                             </Grid.RowDefinitions>
 
                             <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource OverviewCardStyle}">
-                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive C"/><TextBlock x:Name="COverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="COverviewUptimeText" Foreground="Gray" Text="Uptime: -"/><TextBlock x:Name="COverviewHealthText" Margin="0,3,0,0" Foreground="Gray" Text="MCP: down | Tunnel: down | Health: unknown"/><TextBlock x:Name="COverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="COverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
+                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive C"/><TextBlock x:Name="COverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="COverviewUptimeText" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Uptime: -"/><TextBlock x:Name="COverviewHealthText" Margin="0,3,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="MCP: down | Tunnel: down | Health: unknown"/><TextBlock x:Name="COverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="COverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
                             </Border>
                             <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,10">
-                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive D"/><TextBlock x:Name="DOverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="DOverviewUptimeText" Foreground="Gray" Text="Uptime: -"/><TextBlock x:Name="DOverviewHealthText" Margin="0,3,0,0" Foreground="Gray" Text="MCP: down | Tunnel: down | Health: unknown"/><TextBlock x:Name="DOverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="DOverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
+                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive D"/><TextBlock x:Name="DOverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="DOverviewUptimeText" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Uptime: -"/><TextBlock x:Name="DOverviewHealthText" Margin="0,3,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="MCP: down | Tunnel: down | Health: unknown"/><TextBlock x:Name="DOverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="DOverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
                             </Border>
                             <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource OverviewCardStyle}">
-                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive E"/><TextBlock x:Name="EOverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="EOverviewUptimeText" Foreground="Gray" Text="Uptime: -"/><TextBlock x:Name="EOverviewHealthText" Margin="0,3,0,0" Foreground="Gray" Text="MCP: down | Tunnel: down | Health: unknown"/><TextBlock x:Name="EOverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="EOverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
+                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive E"/><TextBlock x:Name="EOverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="EOverviewUptimeText" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Uptime: -"/><TextBlock x:Name="EOverviewHealthText" Margin="0,3,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="MCP: down | Tunnel: down | Health: unknown"/><TextBlock x:Name="EOverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="EOverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
                             </Border>
                             <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,10">
-                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive F"/><TextBlock x:Name="FOverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="FOverviewUptimeText" Foreground="Gray" Text="Uptime: -"/><TextBlock x:Name="FOverviewHealthText" Margin="0,3,0,0" Foreground="Gray" Text="MCP: down | Tunnel: down | Health: unknown"/><TextBlock x:Name="FOverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="FOverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
+                                <StackPanel><TextBlock FontSize="18" FontWeight="SemiBold" Text="Drive F"/><TextBlock x:Name="FOverviewStatusText" Margin="0,5,0,0" Text="Stopped"/><TextBlock x:Name="FOverviewUptimeText" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Uptime: -"/><TextBlock x:Name="FOverviewHealthText" Margin="0,3,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="MCP: down | Tunnel: down | Health: unknown"/><TextBlock x:Name="FOverviewCallsText" Margin="0,6,0,0" Text="Calls: 0"/><TextBlock x:Name="FOverviewTokensText" Text="MCP tokens (est.): 0"/></StackPanel>
                             </Border>
                         </Grid>
 
                         <TextBlock Margin="0,6,0,8" FontWeight="SemiBold" Text="AI chats"/>
-                        <TextBlock x:Name="OverviewSessionSummaryText" Margin="0,0,0,8" Foreground="Gray" Text="No correlated AI chats yet."/>
+                        <TextBlock x:Name="OverviewSessionSummaryText" Margin="0,0,0,8" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="No correlated AI chats yet."/>
                         <DataGrid x:Name="OverviewSessionsGrid" Height="190" Margin="0,0,0,10"
                                   AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
                                   HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="OverviewSessionsGrid_SelectionChanged">
@@ -396,7 +396,7 @@
                                 <TextBlock x:Name="OverviewSessionDetailText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Select an AI chat or unbound activity row."/>
                             </StackPanel>
                         </Border>
-                        <TextBlock Margin="0,4,0,0" Foreground="Gray" TextWrapping="Wrap"
+                        <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" TextWrapping="Wrap"
                                    Text="* Token values are deterministic estimates from accepted MCP JSON payload bytes (bytes_div_4_v1). They are not ChatGPT account/model token usage."/>
                     </StackPanel>
                 </ScrollViewer>
@@ -465,7 +465,7 @@
                         </Grid>
 
                         <StackPanel Orientation="Horizontal" Margin="140,6,0,0">
-                            <TextBlock x:Name="ApiKeyStatusText" VerticalAlignment="Center" Foreground="Gray"/>
+                            <TextBlock x:Name="ApiKeyStatusText" VerticalAlignment="Center" Foreground="{DynamicResource FileMcpTextSecondaryBrush}"/>
                             <Button x:Name="DeleteApiKeyButton" Margin="12,0,0,0" Content="Delete API key" Click="DeleteApiKey_Click"/>
                         </StackPanel>
 
@@ -495,23 +495,23 @@
 
                                 <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource WorkspaceLabelStyle}" Text="C"/>
                                 <TextBox x:Name="CTunnelIdBox" Grid.Row="2" Grid.Column="1" Margin="0,0,10,0"/>
-                                <TextBlock x:Name="CStatusText" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Foreground="Gray" Text="Disabled"/>
+                                <TextBlock x:Name="CStatusText" Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Disabled"/>
 
                                 <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource WorkspaceLabelStyle}" Text="D"/>
                                 <TextBox x:Name="DTunnelIdBox" Grid.Row="4" Grid.Column="1" Margin="0,0,10,0"/>
-                                <TextBlock x:Name="DStatusText" Grid.Row="4" Grid.Column="2" VerticalAlignment="Center" Foreground="Gray" Text="Disabled"/>
+                                <TextBlock x:Name="DStatusText" Grid.Row="4" Grid.Column="2" VerticalAlignment="Center" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Disabled"/>
 
                                 <TextBlock Grid.Row="6" Grid.Column="0" Style="{StaticResource WorkspaceLabelStyle}" Text="E"/>
                                 <TextBox x:Name="ETunnelIdBox" Grid.Row="6" Grid.Column="1" Margin="0,0,10,0"/>
-                                <TextBlock x:Name="EStatusText" Grid.Row="6" Grid.Column="2" VerticalAlignment="Center" Foreground="Gray" Text="Disabled"/>
+                                <TextBlock x:Name="EStatusText" Grid.Row="6" Grid.Column="2" VerticalAlignment="Center" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Disabled"/>
 
                                 <TextBlock Grid.Row="8" Grid.Column="0" Style="{StaticResource WorkspaceLabelStyle}" Text="F"/>
                                 <TextBox x:Name="FTunnelIdBox" Grid.Row="8" Grid.Column="1" Margin="0,0,10,0"/>
-                                <TextBlock x:Name="FStatusText" Grid.Row="8" Grid.Column="2" VerticalAlignment="Center" Foreground="Gray" Text="Disabled"/>
+                                <TextBlock x:Name="FStatusText" Grid.Row="8" Grid.Column="2" VerticalAlignment="Center" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Disabled"/>
                             </Grid>
                         </Border>
 
-                        <TextBlock Margin="0,12,0,0" Foreground="Gray" TextWrapping="Wrap"
+                        <TextBlock Margin="0,12,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" TextWrapping="Wrap"
                                    Text="Each enabled drive uses its own local MCP port, profile and Secure MCP Tunnel while remaining inside this single FileMCP desktop app."/>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
@@ -530,7 +530,7 @@
                                              Margin="0,0,0,12"/>
                         <TextBlock Style="{StaticResource FileMcpSectionTitleText}" Text="Workspace &amp; access"/>
                         <TextBlock FontWeight="SemiBold" Text="Workspace roots" Margin="0,6,0,0"/>
-                        <TextBlock Margin="0,4,0,10" Foreground="Gray" TextWrapping="Wrap"
+                        <TextBlock Margin="0,4,0,10" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" TextWrapping="Wrap"
                                    Text="Enable the drives you want FileMCP to expose. Every workspace remains isolated to its configured root."/>
 
                         <Border BorderBrush="{DynamicResource FileMcpBorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="10">
@@ -590,7 +590,7 @@
                                 <ComboBoxItem Content="Custom (advanced local policy)" Tag="custom"/>
                                 <ComboBoxItem Content="Legacy command compatible (migrated only)" Tag="legacy-command-compatible" IsEnabled="False"/>
                             </ComboBox>
-                            <TextBlock x:Name="PolicyExplanationText" Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
+                            <TextBlock x:Name="PolicyExplanationText" Margin="0,5,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" TextWrapping="Wrap"
                                        Text="Policy is owned by local settings."/>
                             <CheckBox x:Name="EnableCommandsCheckBox" Visibility="Collapsed"/>
                             </StackPanel>
@@ -662,7 +662,7 @@
                                 <StackPanel Margin="0,16,0,0">
                                     <TextBlock Text="Exec environment allowlist" FontWeight="SemiBold"/>
                                     <TextBox x:Name="ExecEnvironmentAllowListBox" Margin="0,6,0,0"/>
-                                    <TextBlock Margin="0,5,0,0" Foreground="Gray" TextWrapping="Wrap"
+                                    <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" TextWrapping="Wrap"
                                                Text="Comma-separated environment names or glob patterns allowed for exec_process pass-through/request overrides. Empty by default. Secret-like names require an exact entry; wildcard matches never forward them."/>
                                 </StackPanel>
 
@@ -677,7 +677,7 @@
                                             <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="OTLP endpoint"/>
                                             <TextBox x:Name="OtlpEndpointBox" Grid.Column="1"/>
                                         </Grid>
-                                        <TextBlock Margin="0,7,0,0" Foreground="Gray" TextWrapping="Wrap"
+                                        <TextBlock Margin="0,7,0,0" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" TextWrapping="Wrap"
                                                    Text="Disabled by default. FileMCP exports only bounded metadata/metrics; it does not export tool arguments, file contents, raw chat handles, or baggage. Endpoint must be a base http(s) collector URI; FileMCP adds /v1/traces and /v1/metrics."/>
                                     </StackPanel>
                                 </Border>
@@ -1210,7 +1210,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="Gray"
+            <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="{DynamicResource FileMcpTextSecondaryBrush}"
                        Text="Closing the window keeps FileMCP running in the system tray."/>
             <Button Grid.Column="1" Content="Quit FileMCP" Click="Quit_Click"/>
         </Grid>

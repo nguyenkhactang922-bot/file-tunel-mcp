@@ -342,3 +342,13 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Scope: live-list performance; bounded rendering; token drift scan; layout consistency; startup/render regressions.
 - FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
 - Next: audit frozen scope against Windows/macOS source and existing tests -> add targeted gate/tests and minimal proven repairs only -> local evidence/review -> exact-head native Verify -> PR -> guarded merge -> exact merged-main Verify -> governance state-sync.
+
+
+## FMUX-018 local verified - 2026-10-05
+
+- FMUX-018 Performance + Visual Consistency Gate: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-018-performance-visual-consistency` from verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`.
+- Evidence: `docs/evidence/FMUX-018_PERFORMANCE_VISUAL_CONSISTENCY_EVIDENCE.md`.
+- Local PASS: new FMUX-018 contract; affected FMUX contracts; project-state contract; diff hygiene; Windows Release win-x64 compile with 0 warnings / 0 errors.
+- Runtime PID `14804` remains correct; no restart.
+- FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
+- Next: scoped diff/state review -> commit candidate -> remote guards -> push exact head -> exact-head native three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync.
