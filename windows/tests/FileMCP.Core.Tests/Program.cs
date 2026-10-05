@@ -6580,7 +6580,7 @@ internal static class Program
                     if (!File.Exists(dynamicHealthUrlFile)) return false;
                     try { return File.ReadAllText(dynamicHealthUrlFile).Trim() == $"http://127.0.0.1:{dynamicHealthPort}"; }
                     catch (IOException) { return false; }
-                }, TimeSpan.FromSeconds(2)), "tunnel run writes readable resolved health URL file and replaces stale launch state");
+                }, TimeSpan.FromSeconds(2)), "stale health URL file is replaced by current tunnel launch after becoming readable");
                 var dynamicHealth = await dynamicRuntime.RefreshHealthAsync();
                 Assert(dynamicHealth.TunnelHealth == TunnelHealthProbeState.Reachable && dynamicHealth.LastTunnelHealthSuccessUtc.HasValue, "dynamic :0 tunnel health resolves and probes reachable endpoint");
                 dynamicHealthListener.Stop();

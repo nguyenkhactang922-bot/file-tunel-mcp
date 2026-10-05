@@ -1801,3 +1801,15 @@ Remote/PR guard: `fork/main` remains `11d40cf277a490a360cb3f9ee61b690a292dfb7b`;
 Next exact action: re-check remote branch/PR/main -> push current HEAD to `fork` -> exact-head native Verify on macOS / Windows x64 / native Windows ARM64 -> exact-head review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX governance sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.
 
 Active branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
+
+## FMUX-020 exact-head attempt 1 failed / targeted contract repair - 2026-10-05
+
+Remote Verify `37335689404` for technical head `c31a5393ed55c6906bf5d36c0456ae0c9b515db8` is complete: macOS SUCCESS; Windows x64 FAIL and native Windows ARM64 FAIL only at `Verify dynamic health discovery contract`.
+
+The failure is test-contract drift, not product/runtime failure: the dynamic-health contract requires literal `stale health URL file is replaced by current tunnel launch`; the earlier test race hardening changed the assertion message while preserving behavior. Targeted local repair restores that literal in the assertion message and keeps the readable-file/`IOException` retry unchanged.
+
+Failed stage local rerun PASS: `dynamic-health-discovery-contract: ok (official tunnel-client health.url-file)`. No production source changed. Runtime PID `14804` remains unchanged; all prior local acceptance checkpoints remain PASS.
+
+Next exact action: state/diff hygiene + scoped review -> commit targeted repair/state/evidence -> remote guard -> push one new exact head -> fresh three-lane Verify -> review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX governance sync. Failed run `37335689404` is durable evidence and must not be rerun.
+
+Active branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`

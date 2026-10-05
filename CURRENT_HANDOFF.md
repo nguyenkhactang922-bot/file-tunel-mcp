@@ -1919,3 +1919,15 @@ Side-effect guard before remote work: `fork/main` remains `11d40cf277a490a360cb3
 NEXT_EXACT_ACTION: re-check remote branch/PR/main guard -> push current HEAD to `fork` branch `chatgpt/FMUX-020-product-ui-ux-main-verification` -> require exact-head Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> exact-head review -> create exactly one PR to `main` -> require PR Verify SUCCESS -> guarded merge -> require exact merged-main Verify SUCCESS -> final FMUX program governance state-sync -> only then create/record `PRODUCT_UI_UX_MAIN_VERIFIED`.
 
 Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
+
+## FMUX-020 exact-head attempt 1 failed / targeted contract repair - 2026-10-05
+
+Remote technical head `c31a5393ed55c6906bf5d36c0456ae0c9b515db8` ran Verify `37335689404` to completion. macOS lane SUCCESS. Windows x64 and native Windows ARM64 both failed only `Verify dynamic health discovery contract`; no production/runtime/core test failure was reached.
+
+Root cause is static-contract drift introduced by the earlier test-only race hardening: `tests/test_dynamic_health_discovery_contract.ps1` requires the literal `stale health URL file is replaced by current tunnel launch`, while the hardened assertion message had been renamed. The retry/readable-file logic itself remains correct and unchanged.
+
+Targeted repair changes only that assertion message to retain the required literal while keeping the `IOException` retry. Only the failed `test_dynamic_health_discovery_contract.ps1` stage was rerun locally and PASSed. Runtime PID `14804` remains unchanged; completed macOS/local acceptance stages were not rerun.
+
+NEXT_EXACT_ACTION: state/diff hygiene + scoped review -> commit targeted contract repair + this durable state/evidence -> guard remote branch/PR/main -> push one new exact head -> require fresh Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final governance sync. Preserve failed run `37335689404`; do not rerun that run/head.
+
+Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`

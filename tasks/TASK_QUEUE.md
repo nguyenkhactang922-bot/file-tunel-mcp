@@ -424,3 +424,13 @@ Hygiene/scoped review PASS: state contracts, diff check, no production source di
 Remote guard found no FMUX-020 branch on `fork`/`origin`, no PR for this head, and `fork/main` still `11d40cf277a490a360cb3f9ee61b690a292dfb7b`.
 
 - Next: commit this durable state checkpoint -> re-check remote branch/PR/main -> push current HEAD -> exact-head three-lane Verify -> exact-head review -> create one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX program governance sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.
+
+## FMUX-020 exact-head attempt 1 failed / targeted contract repair - 2026-10-05
+
+Verify `37335689404` for remote head `c31a5393ed55c6906bf5d36c0456ae0c9b515db8` completed: macOS SUCCESS; Windows x64 and native Windows ARM64 failed only `Verify dynamic health discovery contract`.
+
+Root cause: static contract literal drift from the prior test-only health-url race hardening; production/runtime behavior was not the failure. Targeted repair restores the required `stale health URL file is replaced by current tunnel launch` phrase while preserving the readable-file retry.
+
+Only the failed dynamic-health contract stage was rerun locally and PASSed. Runtime PID `14804` unchanged; no completed local acceptance stage was rerun.
+
+- Next: state/diff hygiene + scoped review -> commit targeted repair/state/evidence -> guard remote branch/PR/main -> push one new exact head -> fresh three-lane Verify -> review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final governance sync. Preserve failed run `37335689404`.

@@ -109,3 +109,13 @@ ACTIVE / CANDIDATE EVIDENCE. Final gate wiring and local final verification are 
 The first local runtime regression attempt reached the dynamic-health fixture and exposed a test-only race: the fake tunnel process could create the health-url file while still holding its write handle, while the test asserted only `File.Exists` and immediately called `File.ReadAllText`. Production runtime behavior did not fail. The targeted repair changes only `windows/tests/FileMCP.Core.Tests/Program.cs` to wait until the expected health URL is both present and readable, treating transient `IOException` as not-ready. This matches retry patterns already used by adjacent process/file fixtures. The failed runtime stage alone was resumed and then PASSed all 995 assertions.
 
 Checkpoint: ACTIVE / LOCAL VERIFIED. Exact-head macOS / Windows x64 / native Windows ARM64 Verify, review, one PR, guarded merge, exact merged-main Verify, and final FMUX program state sync are still required. No claim of `PRODUCT_UI_UX_MAIN_VERIFIED` is made before those stages pass.
+
+## Exact-head Verify attempt 1
+
+Remote head `c31a5393ed55c6906bf5d36c0456ae0c9b515db8` ran Verify `37335689404` to completion.
+
+- macOS: SUCCESS.
+- Windows x64: FAIL only at `Verify dynamic health discovery contract`.
+- native Windows ARM64: FAIL only at `Verify dynamic health discovery contract`.
+
+The contract failure was caused by assertion-message drift from the test-only health-url race hardening: the static contract intentionally requires literal `stale health URL file is replaced by current tunnel launch`. Targeted repair restores that phrase while keeping the readable-file wait and transient `IOException` retry unchanged. The failed contract alone was rerun locally and PASSed. No production/runtime/core source changed; runtime PID `14804` was not restarted. Run `37335689404` is preserved as failed-attempt evidence and must not be rerun.
