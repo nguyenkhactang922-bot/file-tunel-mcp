@@ -1698,3 +1698,14 @@ FMUX-017 implementation is DONE / MAIN VERIFIED technically at main `508987d0d65
 Active branch: `state/FMUX-017-main-verified`, based exactly on verified main `508987d0d659890bbcb63973437858099d462615`. Runtime PID `14804` unchanged; no restart.
 
 NEXT_EXACT_ACTION: complete governance state/evidence sync -> state-contract + diff hygiene -> commit -> guarded push -> exact-head Verify -> reviewed PR -> guarded merge -> exact merged-main Verify. FMUX-018 remains BLOCKED until this governance state-sync is MAIN VERIFIED.
+
+
+## FMUX-018 claimed / analysis active - 2026-10-05
+
+FMUX-017 is fully DONE / MAIN VERIFIED including governance closure: head `2674e3488476dd87e9748ff680f8a98bf0ae4c8b`; push Verify `37293244839` SUCCESS; PR #59 Verify `37294160218` SUCCESS; PR #59 merged as main `6f5a14492d99e00d202d793eeb1525141aa0cd92`; merged-main Verify `37295036110` SUCCESS across macOS / Windows x64 / native Windows ARM64.
+
+Active branch: `chatgpt/FMUX-018-performance-visual-consistency`, based exactly on verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`.
+Current task: FMUX-018 Performance + Visual Consistency Gate — ACTIVE / CLAIMED / ANALYZE.
+Runtime PID `14804` unchanged; no restart.
+
+NEXT_EXACT_ACTION: audit live-list performance/bounds/virtualization/coalescing/live-tail behavior, semantic-token drift, layout consistency, startup/render regressions -> add targeted contracts/tests and only repair proven gaps -> local evidence/review -> exact-head Verify -> PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
