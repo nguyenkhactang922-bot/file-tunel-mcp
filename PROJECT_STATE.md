@@ -2,7 +2,7 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Active branch: `state/FMUX-016-main-verified`
+Active branch: `state/FMUX-020-main-verified`
 Git SHA source of truth: resolve dynamically with git rev-parse HEAD.
 Architecture law: docs/process/IDEA_CAPTURE_AND_DESIGN_LAW.md
 Execution law: docs/CHATCODE_GLOBAL_MULTI_PROJECT_EXECUTION_LAW.md
@@ -1825,3 +1825,16 @@ All exact-head acceptance proof is green, including FMUX-020 aggregate product g
 Next exact action: evidence/state-only closure commit -> guard remote head still `79d423b480f90fde6e195941c219f9e15e32163e`, no PR, main still `11d40cf277a490a360cb3f9ee61b690a292dfb7b` -> push closure head -> fresh three-lane exact-head Verify -> one reviewed PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX governance sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.
 
 Active branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
+
+
+## FMUX-020 implementation MAIN VERIFIED / final governance state-sync - 2026-10-05
+
+Current task: FMUX-020 Product UI/UX Main Verification - DONE / MAIN VERIFIED technically. Closure head `788b82bd8e248d67c18ad2279d00eec2ede5fcd8` passed push Verify `37339216002`; PR #64 Verify `37340337547` SUCCESS; PR #64 merged as main `821015002ca92f339df3434aa73e4887fd905670`; exact merged-main Verify `37341640268` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Final product status: `PRODUCT_UI_UX_MAIN_VERIFIED` at verified main `821015002ca92f339df3434aa73e4887fd905670`. Canonical marker: `docs/evidence/PRODUCT_UI_UX_MAIN_VERIFIED.md`; canonical task evidence: `docs/evidence/FMUX-020_PRODUCT_UI_UX_MAIN_VERIFICATION_EVIDENCE.md`.
+
+Final governance state-sync is ACTIVE on `state/FMUX-020-main-verified`, based exactly on that verified main. Runtime PID `14804` remains correct and was not restarted. Governance diff is state/evidence only and must not expand production/runtime/core/tool authority.
+
+Next exact action: project-state contract + `git diff --check` + scoped state-only review -> commit final governance marker/evidence -> guard remote state branch/PR/main -> push exact governance head -> exact-head Verify on macOS / Windows x64 / native Windows ARM64 -> one reviewed PR -> PR Verify -> guarded merge -> exact resulting-main Verify -> program closure complete; do not rerun implementation acceptance stages.
+
+Active branch: `state/FMUX-020-main-verified`

@@ -131,3 +131,14 @@ Targeted repair head `79d423b480f90fde6e195941c219f9e15e32163e` passed Verify `3
 Scoped review from verified base `11d40cf277a490a360cb3f9ee61b690a292dfb7b` to `79d423b480f90fde6e195941c219f9e15e32163e` is PASS. The candidate changes CI/test contracts, durable state/evidence and visual proof artifacts only. There is no production source diff under `windows/src` or `macos`, and no FileMCP.Core/runtime/server/policy authority expansion. Runtime PID `14804` remains unchanged.
 
 Checkpoint: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Next is an evidence/state-only closure commit, guarded push and fresh exact closure-SHA three-lane Verify before the single reviewed PR. No claim of `PRODUCT_UI_UX_MAIN_VERIFIED` is made before PR merge and exact merged-main Verify pass.
+
+
+## Implementation MAIN VERIFIED / final governance state-sync
+
+Closure head `788b82bd8e248d67c18ad2279d00eec2ede5fcd8` passed push Verify `37339216002` on macOS / Windows x64 / native Windows ARM64. PR #64 retained that exact closure head; PR Verify `37340337547` completed SUCCESS on all three required lanes.
+
+PR #64 merged as main `821015002ca92f339df3434aa73e4887fd905670`. Exact merged-main Verify `37341640268` completed SUCCESS on macOS / Windows x64 / native Windows ARM64, including the FMUX-020 aggregate product gate, dynamic-health contract, Windows integration/build/package/smoke, native ARM64 build/smoke/package, and macOS integration/build/resources.
+
+Therefore FMUX-020 implementation is DONE / MAIN VERIFIED and the frozen criterion for recording `PRODUCT_UI_UX_MAIN_VERIFIED` has been met. Canonical product marker: `docs/evidence/PRODUCT_UI_UX_MAIN_VERIFIED.md`, verified against main `821015002ca92f339df3434aa73e4887fd905670`.
+
+Final governance state-sync is ACTIVE on `state/FMUX-020-main-verified`, based exactly on that verified main. Runtime PID `14804` remains unchanged and was not restarted. This governance diff is state/evidence only and does not authorize any production/core/runtime/tool-policy expansion. Failed run `37335689404` remains preserved historical evidence and must not be rerun.
