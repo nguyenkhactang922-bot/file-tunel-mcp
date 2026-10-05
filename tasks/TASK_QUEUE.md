@@ -352,3 +352,14 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Runtime PID `14804` remains correct; no restart.
 - FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
 - Next: scoped diff/state review -> commit candidate -> remote guards -> push exact head -> exact-head native three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync.
+
+## FMUX-018 technical MAIN VERIFIED / governance state-sync active - 2026-10-05
+
+- FMUX-018 implementation: DONE / MAIN VERIFIED technically.
+- Candidate/closure head `26d5bfae656ea434265c8ada18fe31a034193a68`; push Verify `37298258574` SUCCESS.
+- PR #60 exact-head Verify `37299043731`: SUCCESS; PR #60 merged as `e85f666dcc03a6b659acbea9f03197649bc2e728`.
+- Merged-main Verify `37299902349`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Governance branch `state/FMUX-018-main-verified` is ACTIVE from exact verified main `e85f666dcc03a6b659acbea9f03197649bc2e728`.
+- Runtime PID `14804` remains correct; no restart.
+- FMUX-019 remains BLOCKED until governance state-sync is MAIN VERIFIED.
+- Next: finish durable state/evidence sync -> project-state contract + diff hygiene -> commit -> guarded push -> exact-head Verify -> reviewed PR -> guarded merge -> exact merged-main Verify -> then claim FMUX-019.
