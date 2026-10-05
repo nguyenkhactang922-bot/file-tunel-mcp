@@ -210,6 +210,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_fmux_cross_platform_adversarial_gate.ps1
 
+      - name: Verify FMUX Product UI/UX Main Verification gate
+        shell: pwsh
+        run: ./tests/test_fmux_product_ui_ux_main_verification.ps1
+
       - name: Verify project context contract
         shell: pwsh
         run: ./tests/test_project_context_contract.ps1
@@ -396,6 +400,10 @@ jobs:
       - name: Verify FMUX Cross-Platform UX Adversarial Gate
         shell: pwsh
         run: ./tests/test_fmux_cross_platform_adversarial_gate.ps1
+
+      - name: Verify FMUX Product UI/UX Main Verification gate
+        shell: pwsh
+        run: ./tests/test_fmux_product_ui_ux_main_verification.ps1
 
       - name: Verify project context contract
         shell: pwsh

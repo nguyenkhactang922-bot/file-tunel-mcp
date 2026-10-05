@@ -123,3 +123,9 @@ FMUX-019 closure head `04daf8443b4e74ab6ed80124319977d5eb656fc1` passed push Ver
 PR #62 merged as main `70e4379c11339a32ae794157eeb5d3f1fb471998`. Post-merge Verify `37316174195` SUCCESS on macOS / Windows x64 / native Windows ARM64. Therefore the FMUX-019 implementation result is DONE / MAIN VERIFIED at that main commit.
 
 Governance state-sync is ACTIVE on `state/FMUX-019-main-verified`, based exactly on verified main `70e4379c11339a32ae794157eeb5d3f1fb471998`. Runtime PID `14804` remains unchanged. FMUX-020 is intentionally not claimed until this governance state-sync is pushed, exact-head verified, reviewed/merged by PR, and its resulting main commit passes exact merged-main Verify.
+
+## Governance MAIN VERIFIED
+
+Governance head `5531189e229c2761b2e252cc3d6834d331d36af8` passed push Verify `37318438738` on macOS / Windows x64 / native Windows ARM64. PR #63 retained that exact head and PR Verify `37319341667` SUCCESS on all three required lanes.
+
+PR #63 merged as main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`. Post-merge Verify `37320240021` SUCCESS on macOS / Windows x64 / native Windows ARM64. FMUX-019 governance closure is therefore DONE / MAIN VERIFIED, and FMUX-020 may be claimed from exact verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`.

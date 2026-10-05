@@ -6575,8 +6575,12 @@ internal static class Program
                     false);
                 await dynamicRuntime.StartAsync(dynamicConfig);
                 Assert(dynamicRuntime.State.Status == LocalMcpRuntimeStatus.Running, "dynamic-health runtime running");
-                Assert(await WaitUntilAsync(() => File.Exists(dynamicHealthUrlFile), TimeSpan.FromSeconds(2)), "tunnel run writes resolved health URL file");
-                Assert(File.ReadAllText(dynamicHealthUrlFile).Trim() == $"http://127.0.0.1:{dynamicHealthPort}", "stale health URL file is replaced by current tunnel launch");
+                Assert(await WaitUntilAsync(() =>
+                {
+                    if (!File.Exists(dynamicHealthUrlFile)) return false;
+                    try { return File.ReadAllText(dynamicHealthUrlFile).Trim() == $"http://127.0.0.1:{dynamicHealthPort}"; }
+                    catch (IOException) { return false; }
+                }, TimeSpan.FromSeconds(2)), "stale health URL file is replaced by current tunnel launch after becoming readable");
                 var dynamicHealth = await dynamicRuntime.RefreshHealthAsync();
                 Assert(dynamicHealth.TunnelHealth == TunnelHealthProbeState.Reachable && dynamicHealth.LastTunnelHealthSuccessUtc.HasValue, "dynamic :0 tunnel health resolves and probes reachable endpoint");
                 dynamicHealthListener.Stop();

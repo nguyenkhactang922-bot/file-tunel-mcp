@@ -1,0 +1,14 @@
+setup	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\setup.png
+home	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\home.png
+workspaces	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\workspaces.png
+connections	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\connections.png
+settings	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\settings.png
+activity	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\activity.png
+changes	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\changes.png
+evidence	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\evidence.png
+repository	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\repository.png
+terminal	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\terminal.png
+recovery	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\recovery.png
+artifacts	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\artifacts.png
+backend	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\backend.png
+diagnostics	selected=True	width=1280	height=900	file=D:\Tools\FileMCP\docs\evidence\artifacts\FMUX-020\current-ui\diagnostics.png
