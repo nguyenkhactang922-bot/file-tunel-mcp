@@ -4,9 +4,9 @@
 
 Project: FileMCP
 PROJECT_ROOT: `D:\Tools\FileMCP`
-Branch: `state/FMUX-016-main-verified`
+Branch: `state/FMUX-020-main-verified`
 Git SHA source of truth: run git rev-parse HEAD.
-Expected worktree at handoff: FMUX-015 governance state-sync is DONE / MAIN VERIFIED via PR #55, main `987c7f836830b55f019a786b0a7b218281d7ef99`, merged-main Verify `37215916252`; FMUX-016 Onboarding is ACTIVE / CLAIMED on `chatgpt/FMUX-016-onboarding`, based exactly on that verified main; runtime PID `17860` remains correct and must not be restarted.
+Expected worktree at handoff: FMUX-020 implementation is DONE / MAIN VERIFIED via PR #64, main `821015002ca92f339df3434aa73e4887fd905670`, merged-main Verify `37341640268`; final FMUX governance state-sync is ACTIVE on `state/FMUX-020-main-verified`, based exactly on that verified main; runtime PID `14804` remains correct and must not be restarted.
 
 ## Completed technical program
 
@@ -1943,3 +1943,16 @@ Checkpoint: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Failed attempt `3
 NEXT_EXACT_ACTION: create evidence/state-only FMUX-020 closure commit -> guard remote branch still at `79d423b480f90fde6e195941c219f9e15e32163e`, PR absent, `fork/main` still `11d40cf277a490a360cb3f9ee61b690a292dfb7b` -> push exact closure head -> require fresh three-lane exact-head Verify -> create exactly one reviewed PR -> require PR Verify SUCCESS -> guarded merge -> require exact merged-main Verify SUCCESS -> final FMUX governance state-sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.
 
 Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
+
+
+## FMUX-020 implementation MAIN VERIFIED / final governance state-sync - 2026-10-05
+
+FMUX-020 implementation is DONE / MAIN VERIFIED. Closure head `788b82bd8e248d67c18ad2279d00eec2ede5fcd8` passed push Verify `37339216002` on macOS / Windows x64 / native Windows ARM64. PR #64 retained that exact head; PR Verify `37340337547` SUCCESS on all three required lanes. PR #64 merged as main `821015002ca92f339df3434aa73e4887fd905670`; exact merged-main Verify `37341640268` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+The frozen final product criterion is now satisfied, so `PRODUCT_UI_UX_MAIN_VERIFIED` is recorded for verified main `821015002ca92f339df3434aa73e4887fd905670`. Canonical marker: `docs/evidence/PRODUCT_UI_UX_MAIN_VERIFIED.md`; supporting evidence remains `docs/evidence/FMUX-020_PRODUCT_UI_UX_MAIN_VERIFICATION_EVIDENCE.md`. Failed attempt `37335689404` remains historical evidence only and must not be rerun.
+
+Final FMUX governance state-sync is ACTIVE on `state/FMUX-020-main-verified`, based exactly on verified main `821015002ca92f339df3434aa73e4887fd905670`. Runtime PID `14804` remains correct and was not restarted. This governance branch is state/evidence only; no production/runtime/core authority change is permitted.
+
+NEXT_EXACT_ACTION: project-state contract + diff hygiene + scoped state-only review -> commit final governance marker/evidence -> side-effect guard remote state branch/PR/main -> push exact governance head -> exact-head Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> exactly one reviewed PR -> PR Verify SUCCESS -> guarded merge -> exact resulting-main Verify SUCCESS -> FMUX program fully closed / PRODUCT_UI_UX_MAIN_VERIFIED durable on main; no implementation stage rerun.
+
+Branch: `state/FMUX-020-main-verified`

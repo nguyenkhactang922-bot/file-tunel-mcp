@@ -444,3 +444,14 @@ Scoped review from verified base `11d40cf277a490a360cb3f9ee61b690a292dfb7b` to r
 Checkpoint: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Failed run `37335689404` remains durable evidence and must not be rerun.
 
 - Next: evidence/state-only closure commit -> guard remote head/PR/main -> push closure head -> fresh exact-head three-lane Verify -> exactly one reviewed PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX governance sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.
+
+
+## FMUX-020 implementation MAIN VERIFIED / final governance state-sync - 2026-10-05
+
+FMUX-020 implementation is DONE / MAIN VERIFIED. Closure head `788b82bd8e248d67c18ad2279d00eec2ede5fcd8` passed push Verify `37339216002`; PR #64 Verify `37340337547` SUCCESS; PR #64 merged as main `821015002ca92f339df3434aa73e4887fd905670`; exact merged-main Verify `37341640268` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+`PRODUCT_UI_UX_MAIN_VERIFIED` is now recorded for verified main `821015002ca92f339df3434aa73e4887fd905670`. Evidence: `docs/evidence/PRODUCT_UI_UX_MAIN_VERIFIED.md` and `docs/evidence/FMUX-020_PRODUCT_UI_UX_MAIN_VERIFICATION_EVIDENCE.md`. Runtime PID `14804` remains unchanged; do not restart or rerun completed implementation/build/screenshot/native verification stages.
+
+Final governance state-sync branch: `state/FMUX-020-main-verified`, based exactly on verified main `821015002ca92f339df3434aa73e4887fd905670`.
+
+- Next: project-state contract + diff hygiene + state-only review -> commit governance marker/evidence -> guard remote state branch/PR/main -> push exact governance head -> exact-head three-lane Verify -> exactly one reviewed PR -> PR Verify -> guarded merge -> exact resulting-main Verify -> final FMUX program closure. No further implementation task is dependency-ready because FMUX-020 is the terminal product gate.

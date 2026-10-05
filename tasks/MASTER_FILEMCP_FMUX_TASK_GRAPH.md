@@ -305,12 +305,14 @@ Scope:
 
 ## FMUX-020 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Product UI/UX Main Verification
 
-State: ACTIVE / LOCAL VERIFIED
+State: DONE / MAIN VERIFIED
 Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`.
 Claim base: exact verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`.
 Depends: FMUX-019 and FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED.
 Evidence: `docs/evidence/FMUX-020_PRODUCT_UI_UX_MAIN_VERIFICATION_EVIDENCE.md`.
-Local checkpoint: final aggregate gate PASS; live core-to-UI proof on unchanged PID `14804`; live screenshots 2/2; current-build render and screenshot QA 14/14; Windows Release build 0 warnings / 0 errors; Windows core/runtime regression 995 assertions PASS. Targeted repair head `79d423b480f90fde6e195941c219f9e15e32163e` passed exact-head Verify `37337080123` on macOS / Windows x64 / native Windows ARM64; scoped review PASS with no production core/runtime/tool-authority expansion. Evidence/state-only closure commit remains required before PR.
+Implementation verification: closure head `788b82bd8e248d67c18ad2279d00eec2ede5fcd8`; push Verify `37339216002` SUCCESS; PR #64 Verify `37340337547` SUCCESS; PR #64 merged as main `821015002ca92f339df3434aa73e4887fd905670`; exact merged-main Verify `37341640268` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Final product result: `PRODUCT_UI_UX_MAIN_VERIFIED` at verified main `821015002ca92f339df3434aa73e4887fd905670`; marker `docs/evidence/PRODUCT_UI_UX_MAIN_VERIFIED.md`.
+Governance state-sync: ACTIVE on `state/FMUX-020-main-verified` from exact verified main `821015002ca92f339df3434aa73e4887fd905670`; no implementation stage may be rerun during state-only closure.
 
 Scope:
 - clean build/package;
