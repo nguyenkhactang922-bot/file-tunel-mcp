@@ -289,3 +289,14 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Evidence: `docs/evidence/FMUX-017_ACCESSIBILITY_THEME_EVIDENCE.md`.
 - Runtime truth: current FMG026-ready PID `14804`; historical PID `17860` is stale; no restart performed.
 - Next: scoped review -> exact candidate commit -> remote/PR/main guard -> push exact head -> three-lane Verify; then closure evidence/state -> closure Verify -> reviewed PR -> guarded merge -> merged-main Verify. FMUX-018 stays blocked until FMUX-017 governance is MAIN VERIFIED.
+
+
+## FMUX-017 exact-head attempt 1 / targeted macOS fix - 2026-10-05
+
+- Candidate `d68e7d2342dc7c37eec2cadf4feadda4510e8572`; push Verify `37260149053` completed FAILURE.
+- Windows x64: SUCCESS. Native Windows ARM64: SUCCESS. Preserve both checkpoints.
+- macOS failed only `Static verification`: invalid AppKit member `NSWindow.recalculatesKeyViewLoop`.
+- Targeted fix: valid `window.recalculateKeyViewLoop()` + matching FMUX-017 contract update.
+- Targeted local recheck PASS: FMUX-017 accessibility/theme contract; `git diff --check`.
+- Runtime PID `14804` remains correct; no restart.
+- Next: commit targeted fix/checkpoint -> side-effect guard -> push exact new head -> require fresh three-lane Verify. Do not rerun attempt `37260149053`.

@@ -1774,3 +1774,12 @@ Local PASS evidence: FMUX-017 accessibility/theme contract, app-shell contract, 
 Runtime truth supersedes older PID references: current FileMCP PID is `14804`, executable `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`; runtime was not restarted for FMUX-017. Historical PID `17860` is stale.
 
 NEXT_EXACT_ACTION: scoped final diff/security review -> exact candidate commit -> side-effect guard remote branch/PR/main -> push exact head -> require macOS / Windows x64 / native Windows ARM64 Verify. macOS native AppKit compile is pending that exact-head Verify. Do not rerun the local PASS gates unless affected source changes and do not restart correct runtime PID `14804`.
+
+
+## FMUX-017 exact-head attempt 1 / targeted macOS fix - 2026-10-05
+
+Candidate `d68e7d2342dc7c37eec2cadf4feadda4510e8572`; push Verify `37260149053` completed FAILURE. Windows x64 and native Windows ARM64 both SUCCESS and are preserved. macOS failed only `Static verification`: `NSWindow` has no member `recalculatesKeyViewLoop`.
+
+Targeted fix only: use valid AppKit `window.recalculateKeyViewLoop()` and keep the FMUX-017 contract aligned. Targeted local recheck PASS: FMUX-017 accessibility/theme contract and `git diff --check`. No runtime/tool authority changed. Runtime PID `14804` remains the correct FMG026-ready process and was not restarted.
+
+NEXT_EXACT_ACTION: commit this targeted macOS compile fix + durable checkpoint -> side-effect guard remote branch/PR/main -> push exact new head -> require a fresh macOS / Windows x64 / native Windows ARM64 Verify. Do not rerun attempt `37260149053` or any unrelated local PASS gate.

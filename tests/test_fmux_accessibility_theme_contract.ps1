@@ -58,7 +58,7 @@ foreach ($needle in @(
     'button.refusesFirstResponder = false',
     'styleMask: [.titled, .closable, .miniaturizable, .resizable]',
     'window.contentMinSize = NSSize(width: Layout.windowWidth, height: Layout.collapsedWindowHeight)',
-    'window.recalculatesKeyViewLoop = true',
+    'window.recalculateKeyViewLoop()',
     '.secondaryLabelColor',
     'NSTextField(wrappingLabelWithString:'
 )) {

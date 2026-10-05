@@ -79,3 +79,16 @@ Historical state references to PID `17860` are stale and superseded by this runt
 ## Next exact action
 
 Scoped review -> exact candidate commit -> side-effect guard remote branch/PR -> push exact head -> require three-lane Verify (macOS / Windows x64 / native Windows ARM64). If exact-head Verify passes, write evidence/state-only closure head -> verify closure SHA -> one reviewed PR -> guarded merge -> exact merged-main Verify. FMUX-018 stays blocked until FMUX-017 and its governance closure are MAIN VERIFIED.
+
+
+## Exact-head attempt 1 / targeted macOS compile fix - 2026-10-05
+
+- Candidate `d68e7d2342dc7c37eec2cadf4feadda4510e8572`; push Verify `37260149053` completed FAILURE.
+- Windows x64: SUCCESS. Native Windows ARM64: SUCCESS. These lane checkpoints are preserved and are not rerun locally.
+- macOS failed only `Static verification` at native AppKit typecheck: `NSWindow` has no member `recalculatesKeyViewLoop`.
+- Root cause was a presentation-only API spelling/shape defect, not an accessibility-policy or runtime-authority defect.
+- Targeted fix: replace `window.recalculatesKeyViewLoop = true` with the valid AppKit call `window.recalculateKeyViewLoop()` and update the FMUX-017 contract to assert the same semantic.
+- Targeted local recheck: `tests/test_fmux_accessibility_theme_contract.ps1` PASS; `git diff --check` PASS.
+- Runtime remains PID `14804` at the FMG026-ready executable; no restart was performed.
+
+Next: commit this targeted macOS compile fix plus durable checkpoint -> side-effect guard -> push exact new head -> require a fresh three-lane Verify. Do not manually rerun failed attempt `37260149053`.

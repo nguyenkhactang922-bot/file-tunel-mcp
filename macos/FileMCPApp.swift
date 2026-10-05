@@ -3465,7 +3465,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.setContentSize(NSSize(width: Layout.windowWidth, height: Layout.collapsedWindowHeight))
         window.isReleasedWhenClosed = false
         window.contentMinSize = NSSize(width: Layout.windowWidth, height: Layout.collapsedWindowHeight)
-        window.recalculatesKeyViewLoop = true
+        window.recalculateKeyViewLoop()
         window.center()
         self.window = window
         configureMainMenu()

@@ -1664,3 +1664,12 @@ Local PASS: FMUX-017 accessibility/theme contract; app-shell contract; presentat
 Runtime truth: PID `14804` at `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`; no FMUX-017 restart. Older PID `17860` references are historical/stale.
 
 NEXT_EXACT_ACTION: final scoped review -> candidate commit -> remote/PR/main side-effect guard -> push exact head -> three-lane native Verify. FMUX-018 remains blocked until FMUX-017 and its governance closure are MAIN VERIFIED.
+
+
+## FMUX-017 exact-head attempt 1 / targeted macOS fix - 2026-10-05
+
+FMUX-017 remains ACTIVE. Candidate `d68e7d2342dc7c37eec2cadf4feadda4510e8572`; push Verify `37260149053` FAILURE only because macOS `Static verification` rejected invalid `NSWindow.recalculatesKeyViewLoop`. Windows x64 and native Windows ARM64 are SUCCESS checkpoints.
+
+Targeted fix: `window.recalculateKeyViewLoop()` plus matching contract update. Targeted local PASS: FMUX-017 accessibility/theme contract and diff hygiene. Runtime PID `14804` unchanged; no authority/runtime semantics changed.
+
+NEXT_EXACT_ACTION: commit/push targeted fix -> require fresh exact-head three-lane Verify; if green, record native-verified closure checkpoint before PR. Do not rerun failed run `37260149053` manually.
