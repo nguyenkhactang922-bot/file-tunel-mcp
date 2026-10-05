@@ -1931,3 +1931,15 @@ Targeted repair changes only that assertion message to retain the required liter
 NEXT_EXACT_ACTION: state/diff hygiene + scoped review -> commit targeted contract repair + this durable state/evidence -> guard remote branch/PR/main -> push one new exact head -> require fresh Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final governance sync. Preserve failed run `37335689404`; do not rerun that run/head.
 
 Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
+
+## FMUX-020 exact-head native verified / closure pending - 2026-10-05
+
+Targeted repair head `79d423b480f90fde6e195941c219f9e15e32163e` passed exact-head Verify `37337080123` on macOS / Windows x64 / native Windows ARM64. Windows x64 and native ARM64 both passed the FMUX-020 product gate, dynamic-health contract, native build/package/smoke requirements; macOS passed static verification, integration, native build and bundled-resource checks.
+
+Scoped review from verified base `11d40cf277a490a360cb3f9ee61b690a292dfb7b` to `79d423b480f90fde6e195941c219f9e15e32163e` is PASS. Changes are CI/tests, durable evidence/state and screenshot artifacts only; there is no production source diff under `windows/src` or `macos`, and no FileMCP.Core/runtime/server/policy authority change. Runtime PID `14804` remains correct and was not restarted.
+
+Checkpoint: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Failed attempt `37335689404` remains durable evidence and must not be rerun.
+
+NEXT_EXACT_ACTION: create evidence/state-only FMUX-020 closure commit -> guard remote branch still at `79d423b480f90fde6e195941c219f9e15e32163e`, PR absent, `fork/main` still `11d40cf277a490a360cb3f9ee61b690a292dfb7b` -> push exact closure head -> require fresh three-lane exact-head Verify -> create exactly one reviewed PR -> require PR Verify SUCCESS -> guarded merge -> require exact merged-main Verify SUCCESS -> final FMUX governance state-sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.
+
+Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`

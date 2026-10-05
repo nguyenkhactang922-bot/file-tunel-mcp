@@ -119,3 +119,15 @@ Remote head `c31a5393ed55c6906bf5d36c0456ae0c9b515db8` ran Verify `37335689404` 
 - native Windows ARM64: FAIL only at `Verify dynamic health discovery contract`.
 
 The contract failure was caused by assertion-message drift from the test-only health-url race hardening: the static contract intentionally requires literal `stale health URL file is replaced by current tunnel launch`. Targeted repair restores that phrase while keeping the readable-file wait and transient `IOException` retry unchanged. The failed contract alone was rerun locally and PASSed. No production/runtime/core source changed; runtime PID `14804` was not restarted. Run `37335689404` is preserved as failed-attempt evidence and must not be rerun.
+
+## Exact-head native verification / review PASS
+
+Targeted repair head `79d423b480f90fde6e195941c219f9e15e32163e` passed Verify `37337080123` on all required lanes:
+
+- macOS: SUCCESS, including static verification, integration tests, native app build and bundled legal resources;
+- Windows x64: SUCCESS, including FMUX-020 product gate, dynamic-health contract, Windows integration tests, x64/ARM64 release builds, app smoke and x64 package upload;
+- native Windows ARM64: SUCCESS, including FMUX-020 product gate, dynamic-health contract, native runner assurance, solution/release build, app smoke, release resources and package upload.
+
+Scoped review from verified base `11d40cf277a490a360cb3f9ee61b690a292dfb7b` to `79d423b480f90fde6e195941c219f9e15e32163e` is PASS. The candidate changes CI/test contracts, durable state/evidence and visual proof artifacts only. There is no production source diff under `windows/src` or `macos`, and no FileMCP.Core/runtime/server/policy authority expansion. Runtime PID `14804` remains unchanged.
+
+Checkpoint: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Next is an evidence/state-only closure commit, guarded push and fresh exact closure-SHA three-lane Verify before the single reviewed PR. No claim of `PRODUCT_UI_UX_MAIN_VERIFIED` is made before PR merge and exact merged-main Verify pass.

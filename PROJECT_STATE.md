@@ -1813,3 +1813,15 @@ Failed stage local rerun PASS: `dynamic-health-discovery-contract: ok (official 
 Next exact action: state/diff hygiene + scoped review -> commit targeted repair/state/evidence -> remote guard -> push one new exact head -> fresh three-lane Verify -> review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX governance sync. Failed run `37335689404` is durable evidence and must not be rerun.
 
 Active branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
+
+## FMUX-020 exact-head native verified / closure pending - 2026-10-05
+
+Current task: FMUX-020 Product UI/UX Main Verification - ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Repair head `79d423b480f90fde6e195941c219f9e15e32163e` passed Verify `37337080123` on macOS / Windows x64 / native Windows ARM64.
+
+Review from exact verified base `11d40cf277a490a360cb3f9ee61b690a292dfb7b` to `79d423b480f90fde6e195941c219f9e15e32163e` is PASS: CI/test/evidence/state/screenshots only; no production diff in `windows/src` or `macos`, no FileMCP.Core/runtime/server/policy authority expansion. Runtime PID `14804` remains unchanged.
+
+All exact-head acceptance proof is green, including FMUX-020 aggregate product gate, dynamic-health contract, Windows integration, x64/ARM64 build/package/smoke, native ARM64 runner proof, and macOS native integration/build/resources. Failed attempt `37335689404` remains historical evidence only.
+
+Next exact action: evidence/state-only closure commit -> guard remote head still `79d423b480f90fde6e195941c219f9e15e32163e`, no PR, main still `11d40cf277a490a360cb3f9ee61b690a292dfb7b` -> push closure head -> fresh three-lane exact-head Verify -> one reviewed PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX governance sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.
+
+Active branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`

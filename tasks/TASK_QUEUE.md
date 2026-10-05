@@ -434,3 +434,13 @@ Root cause: static contract literal drift from the prior test-only health-url ra
 Only the failed dynamic-health contract stage was rerun locally and PASSed. Runtime PID `14804` unchanged; no completed local acceptance stage was rerun.
 
 - Next: state/diff hygiene + scoped review -> commit targeted repair/state/evidence -> guard remote branch/PR/main -> push one new exact head -> fresh three-lane Verify -> review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final governance sync. Preserve failed run `37335689404`.
+
+## FMUX-020 exact-head native verified / closure pending - 2026-10-05
+
+Repair head `79d423b480f90fde6e195941c219f9e15e32163e` passed exact-head Verify `37337080123` on macOS / Windows x64 / native Windows ARM64. FMUX-020 product gate, dynamic-health contract, Windows integration/build/package/smoke, native ARM64 build/smoke/package, and macOS integration/build/resources all PASS.
+
+Scoped review from verified base `11d40cf277a490a360cb3f9ee61b690a292dfb7b` to repair head PASS: no production `windows/src` or `macos` source diff and no core/runtime/server/policy authority expansion. Runtime PID `14804` remains unchanged.
+
+Checkpoint: ACTIVE / EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Failed run `37335689404` remains durable evidence and must not be rerun.
+
+- Next: evidence/state-only closure commit -> guard remote head/PR/main -> push closure head -> fresh exact-head three-lane Verify -> exactly one reviewed PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX governance sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.

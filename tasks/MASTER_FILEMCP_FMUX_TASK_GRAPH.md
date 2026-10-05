@@ -310,7 +310,7 @@ Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`.
 Claim base: exact verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`.
 Depends: FMUX-019 and FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED.
 Evidence: `docs/evidence/FMUX-020_PRODUCT_UI_UX_MAIN_VERIFICATION_EVIDENCE.md`.
-Local checkpoint: final aggregate gate PASS; live core-to-UI proof on unchanged PID `14804`; live screenshots 2/2; current-build render and screenshot QA 14/14; Windows Release build 0 warnings / 0 errors; Windows core/runtime regression 995 assertions PASS; test-only dynamic-health file-read race hardened with no production runtime/core authority change.
+Local checkpoint: final aggregate gate PASS; live core-to-UI proof on unchanged PID `14804`; live screenshots 2/2; current-build render and screenshot QA 14/14; Windows Release build 0 warnings / 0 errors; Windows core/runtime regression 995 assertions PASS. Targeted repair head `79d423b480f90fde6e195941c219f9e15e32163e` passed exact-head Verify `37337080123` on macOS / Windows x64 / native Windows ARM64; scoped review PASS with no production core/runtime/tool-authority expansion. Evidence/state-only closure commit remains required before PR.
 
 Scope:
 - clean build/package;
