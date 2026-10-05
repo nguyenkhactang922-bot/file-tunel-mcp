@@ -251,10 +251,13 @@ Scope:
 
 ## FMUX-017 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Accessibility / Keyboard / Theme Enforcement
 
-State: ACTIVE / LOCAL VERIFIED
+State: DONE / MAIN VERIFIED technically.
 Branch: `chatgpt/FMUX-017-accessibility`.
 Depends: FMUX-001 through FMUX-016 implemented surfaces — all DONE / MAIN VERIFIED.
 Claim base: verified main `680b426fb076e9ab0da249a41eda508aa7d5b760`.
+Checkpoint: closure head `0a4efa03b6b78afa3fee6c8e0b076ede87170faf`; push Verify `37262375573` SUCCESS; PR #58 Verify `37284215643` SUCCESS; PR #58 merged as `508987d0d659890bbcb63973437858099d462615`; merged-main Verify `37292127945` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Evidence: `docs/evidence/FMUX-017_ACCESSIBILITY_THEME_EVIDENCE.md`.
+Governance note: implementation is MAIN VERIFIED; `state/FMUX-017-main-verified` must itself reach MAIN VERIFIED before FMUX-018 may be claimed.
 
 Scope:
 - focus order;

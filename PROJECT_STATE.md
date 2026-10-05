@@ -1689,3 +1689,12 @@ NEXT_EXACT_ACTION: state-contract/diff hygiene -> commit recovery metadata -> gu
 FMUX-017 remains ACTIVE but is EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Remote canonical branch head `5bdb64235148ed9212a2a61a55faeade05054f57`; push Verify `37261687541` SUCCESS across macOS / Windows x64 / native Windows ARM64. Scoped review PASS; no authority/runtime expansion. Runtime PID `14804` unchanged.
 
 NEXT_EXACT_ACTION: evidence/state-only closure commit on local repair branch -> guarded explicit push to remote canonical FMUX-017 branch -> closure-SHA Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. Do not rerun `37261687541`.
+
+
+## FMUX-017 technical MAIN VERIFIED / governance state-sync active - 2026-10-05
+
+FMUX-017 implementation is DONE / MAIN VERIFIED technically at main `508987d0d659890bbcb63973437858099d462615`. Closure head `0a4efa03b6b78afa3fee6c8e0b076ede87170faf`; push Verify `37262375573` SUCCESS; PR #58 Verify `37284215643` SUCCESS; merged-main Verify `37292127945` SUCCESS across macOS / Windows x64 / native Windows ARM64.
+
+Active branch: `state/FMUX-017-main-verified`, based exactly on verified main `508987d0d659890bbcb63973437858099d462615`. Runtime PID `14804` unchanged; no restart.
+
+NEXT_EXACT_ACTION: complete governance state/evidence sync -> state-contract + diff hygiene -> commit -> guarded push -> exact-head Verify -> reviewed PR -> guarded merge -> exact merged-main Verify. FMUX-018 remains BLOCKED until this governance state-sync is MAIN VERIFIED.
