@@ -1838,3 +1838,12 @@ Evidence: `docs/evidence/FMUX-018_PERFORMANCE_VISUAL_CONSISTENCY_EVIDENCE.md`.
 Local PASS: FMUX-018 performance/visual contract; accessibility/theme; structured activity; terminal PTY; app shell; project-state contract; `git diff --check`; Windows `Release win-x64` compile with 0 warnings / 0 errors. Candidate repairs only proven presentation gaps: coalesced live refresh, bounded hidden rendering, preserved live-tail, semantic Windows feature colors, semantic macOS code surfaces. Existing native startup/build smoke remains the regression proof path.
 
 NEXT_EXACT_ACTION: scoped review + state contract -> commit FMUX-018 candidate -> guard remote branch/PR/main -> push exact head -> require exact-head macOS / Windows x64 / native Windows ARM64 Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
+
+## FMUX-018 technical MAIN VERIFIED / governance state-sync active - 2026-10-05
+
+FMUX-018 Performance + Visual Consistency Gate implementation is DONE / MAIN VERIFIED technically. Candidate/closure head `26d5bfae656ea434265c8ada18fe31a034193a68` passed push Verify `37298258574`; PR #60 exact-head Verify `37299043731` passed; PR #60 merged as main `e85f666dcc03a6b659acbea9f03197649bc2e728`; merged-main Verify `37299902349` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Branch: `state/FMUX-018-main-verified`
+Base: exact verified main `e85f666dcc03a6b659acbea9f03197649bc2e728`. Runtime PID `14804` remains the FMG026-ready FileMCP and was not restarted.
+
+NEXT_EXACT_ACTION: finish governance state/evidence sync on this branch -> run project-state contract + `git diff --check` -> commit -> side-effect guard remote branch/PR/main -> push exact governance head -> require exact-head three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify. Only after this governance state-sync is MAIN VERIFIED may FMUX-019 be claimed.

@@ -1721,3 +1721,11 @@ Evidence: `docs/evidence/FMUX-018_PERFORMANCE_VISUAL_CONSISTENCY_EVIDENCE.md`.
 Local verification PASS: FMUX-018 contract; accessibility/theme; structured activity; terminal PTY; app shell; project-state contract; diff hygiene; Windows Release win-x64 compile with 0 warnings / 0 errors. Native macOS typecheck/build/package and Windows packaged startup/smoke remain required at exact-head Verify.
 
 NEXT_EXACT_ACTION: scoped diff/state review -> commit candidate -> guarded push -> exact-head three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
+
+## FMUX-018 technical MAIN VERIFIED / governance state-sync active - 2026-10-05
+
+FMUX-018 implementation is DONE / MAIN VERIFIED technically at main `e85f666dcc03a6b659acbea9f03197649bc2e728`. Candidate/closure head `26d5bfae656ea434265c8ada18fe31a034193a68`; push Verify `37298258574` SUCCESS; PR #60 Verify `37299043731` SUCCESS; merged-main Verify `37299902349` SUCCESS across macOS / Windows x64 / native Windows ARM64.
+
+Active branch: `state/FMUX-018-main-verified`, based exactly on verified main `e85f666dcc03a6b659acbea9f03197649bc2e728`. Runtime PID `14804` unchanged; no restart.
+
+NEXT_EXACT_ACTION: complete governance state/evidence sync -> project-state contract + diff hygiene -> commit -> guarded push -> exact-head Verify -> reviewed PR -> guarded merge -> exact merged-main Verify. FMUX-019 remains BLOCKED until this governance state-sync is MAIN VERIFIED.

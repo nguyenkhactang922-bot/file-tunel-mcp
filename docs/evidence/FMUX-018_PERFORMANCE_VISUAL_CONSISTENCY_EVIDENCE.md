@@ -1,6 +1,6 @@
 # FMUX-018 Performance + Visual Consistency Evidence
 
-Status: LOCAL VERIFIED
+Status: TECHNICAL MAIN VERIFIED / GOVERNANCE STATE-SYNC ACTIVE
 Date: 2026-10-05
 Branch: `chatgpt/FMUX-018-performance-visual-consistency`
 Claim base: verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`
@@ -60,3 +60,15 @@ The existing FMG026-ready runtime PID `14804` was not restarted. No production/A
 9. exact merged-main Verify;
 10. governance state-sync to MAIN VERIFIED;
 11. claim FMUX-019.
+
+## Remote lifecycle / technical MAIN VERIFIED - 2026-10-05
+
+- Candidate/closure head: `26d5bfae656ea434265c8ada18fe31a034193a68`.
+- Push Verify `37298258574`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Scoped review: PASS; no MCP/tool authority, credential, network, filesystem, execution or policy expansion.
+- PR #60 exact-head Verify `37299043731`: SUCCESS on all three native lanes.
+- PR #60 merged as main `e85f666dcc03a6b659acbea9f03197649bc2e728`.
+- Merged-main Verify `37299902349`: SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- Runtime PID `14804` remained unchanged throughout; no restart.
+
+Checkpoint: TECHNICAL MAIN VERIFIED. Governance state-sync is ACTIVE on `state/FMUX-018-main-verified`. FMUX-019 remains BLOCKED until that state-sync is itself MAIN VERIFIED.
