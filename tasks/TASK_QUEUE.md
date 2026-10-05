@@ -269,3 +269,23 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Governance state-sync branch: `state/FMUX-016-main-verified`, based exactly on verified main `4ec9ad43f1190074c64bea814976e333640707ab`.
 - FMUX-017 Accessibility / Keyboard / Theme Enforcement becomes the lowest-numbered dependency-valid next task only after this governance state-sync itself is MAIN VERIFIED.
 - State-sync action: state-only gates -> commit -> push -> exact-head Verify -> reviewed PR -> guarded merge -> merged-main Verify; only then claim FMUX-017.
+
+
+## FMUX-016 governance closure / FMUX-017 active pointer - 2026-10-05
+
+- FMUX-016 governance state-sync: DONE / MAIN VERIFIED. State head `c830a29ef8d62a57532efc24cb4811099464c20f`; push Verify `37220842670` SUCCESS; PR #57 Verify `37221761688` SUCCESS; merged main `680b426fb076e9ab0da249a41eda508aa7d5b760`; merged-main Verify `37222164301` SUCCESS across macOS / Windows x64 / native Windows ARM64.
+- FMUX-017 Accessibility / Keyboard / Theme Enforcement: ACTIVE / CLAIMED on `chatgpt/FMUX-017-accessibility`, based exactly on verified main `680b426fb076e9ab0da249a41eda508aa7d5b760`.
+- Dependencies FMUX-001 through FMUX-016: DONE / MAIN VERIFIED.
+- Frozen scope: focus order; keyboard navigation; accessible names; contrast; high contrast/system appearance; reduced motion; scaling/reflow.
+- Runtime PID `17860` remains correct; no restart performed.
+- Next: audit existing cross-platform accessibility/theme behavior against frozen FMUX scope -> define minimal enforcement + contract gates -> implement affected surfaces -> local targeted verification -> exact-head GitHub lifecycle.
+
+
+## FMUX-017 local verified checkpoint - 2026-10-05
+
+- FMUX-017 Accessibility / Keyboard / Theme Enforcement: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-017-accessibility` from verified main `680b426fb076e9ab0da249a41eda508aa7d5b760`.
+- PASS local gates: FMUX-017 accessibility/theme contract; app-shell; presentation; project-state; diff hygiene; Windows Release build 0 warnings / 0 errors.
+- macOS native compile/build: pending exact-head GitHub Verify.
+- Evidence: `docs/evidence/FMUX-017_ACCESSIBILITY_THEME_EVIDENCE.md`.
+- Runtime truth: current FMG026-ready PID `14804`; historical PID `17860` is stale; no restart performed.
+- Next: scoped review -> exact candidate commit -> remote/PR/main guard -> push exact head -> three-lane Verify; then closure evidence/state -> closure Verify -> reviewed PR -> guarded merge -> merged-main Verify. FMUX-018 stays blocked until FMUX-017 governance is MAIN VERIFIED.

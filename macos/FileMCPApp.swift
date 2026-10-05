@@ -94,7 +94,7 @@ private final class LoadingButton: NSButton {
         isEnabled = !loading
         loadingGradientLayer.isHidden = !loading
 
-        if loading {
+        if loading && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             loadingBorderMaskLayer.lineDashPhase = 0
             let animation = CABasicAnimation(keyPath: "lineDashPhase")
             animation.fromValue = 0
@@ -1570,6 +1570,9 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             button.isBordered = false
             button.alignment = .left
             button.font = .systemFont(ofSize: 13, weight: .medium)
+            button.setAccessibilityLabel(title)
+            button.setAccessibilityHelp("Navigate to \(title)")
+            button.refusesFirstResponder = false
             button.translatesAutoresizingMaskIntoConstraints = false
             button.widthAnchor.constraint(equalToConstant: 132).isActive = true
             return button
@@ -3453,7 +3456,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.controller = controller
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: Layout.windowWidth, height: Layout.collapsedWindowHeight),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -3461,6 +3464,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentViewController = controller
         window.setContentSize(NSSize(width: Layout.windowWidth, height: Layout.collapsedWindowHeight))
         window.isReleasedWhenClosed = false
+        window.contentMinSize = NSSize(width: Layout.windowWidth, height: Layout.collapsedWindowHeight)
+        window.recalculatesKeyViewLoop = true
         window.center()
         self.window = window
         configureMainMenu()

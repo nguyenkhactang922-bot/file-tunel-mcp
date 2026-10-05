@@ -1749,3 +1749,28 @@ FMUX-016 Onboarding is DONE / MAIN VERIFIED technically.
 Governance state-sync is ACTIVE on `state/FMUX-016-main-verified`, based exactly on verified main `4ec9ad43f1190074c64bea814976e333640707ab`. No product/runtime source change belongs to this sync. FMUX-017 is dependency-ready by the product graph but MUST NOT be claimed until this state-sync itself is MAIN VERIFIED.
 
 NEXT_EXACT_ACTION: complete this state-only closure through state/onboarding contracts + diff hygiene -> commit -> push -> exact-head Verify -> one reviewed PR to `main` -> guarded merge -> merged-main Verify; only then claim FMUX-017 from the resulting verified main.
+
+
+## FMUX-016 governance MAIN VERIFIED / FMUX-017 claim - 2026-10-05
+
+FMUX-016 governance state-sync: DONE / MAIN VERIFIED.
+- State-sync head `c830a29ef8d62a57532efc24cb4811099464c20f`; push Verify `37220842670` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+- PR #57 exact-head Verify `37221761688`: SUCCESS; scoped review PASS; PR #57 merged as `680b426fb076e9ab0da249a41eda508aa7d5b760`.
+- Merged-main Verify `37222164301`: SUCCESS on the exact resulting main across macOS / Windows x64 / native Windows ARM64.
+
+FMUX-017 Accessibility / Keyboard / Theme Enforcement is CLAIMED / ACTIVE on `chatgpt/FMUX-017-accessibility`, created directly from verified main `680b426fb076e9ab0da249a41eda508aa7d5b760`. Dependencies FMUX-001 through FMUX-016 are DONE / MAIN VERIFIED. Runtime PID `17860` remains the correct FMG026-ready runtime and was not restarted.
+
+NEXT_EXACT_ACTION: deep-read frozen FMUX accessibility requirements plus current Windows WPF/macOS AppKit focus order, keyboard navigation, accessible-name, contrast/high-contrast/system appearance, reduced-motion and scaling/reflow surfaces; derive the smallest cross-platform enforcement changes and contract gates, then implement and verify only affected stages. Preserve presentation/runtime authority boundaries and do not restart PID `17860`.
+
+Branch: `chatgpt/FMUX-017-accessibility`
+
+
+## FMUX-017 local verified checkpoint - 2026-10-05
+
+FMUX-017 Accessibility / Keyboard / Theme Enforcement: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-017-accessibility`, based exactly on verified main `680b426fb076e9ab0da249a41eda508aa7d5b760`.
+
+Local PASS evidence: FMUX-017 accessibility/theme contract, app-shell contract, presentation contract, project-state contract, `git diff --check`, and `dotnet build windows/FileMCP.Windows.sln -c Release --no-restore -warnaserror` with 0 warnings / 0 errors. Windows enforces system light/dark/high-contrast semantic resources plus visible keyboard focus; macOS navigation has accessible labels/focusability, resizable/reflow support, native system appearance, and loading animation respects reduced-motion preference. Evidence: `docs/evidence/FMUX-017_ACCESSIBILITY_THEME_EVIDENCE.md`.
+
+Runtime truth supersedes older PID references: current FileMCP PID is `14804`, executable `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`; runtime was not restarted for FMUX-017. Historical PID `17860` is stale.
+
+NEXT_EXACT_ACTION: scoped final diff/security review -> exact candidate commit -> side-effect guard remote branch/PR/main -> push exact head -> require macOS / Windows x64 / native Windows ARM64 Verify. macOS native AppKit compile is pending that exact-head Verify. Do not rerun the local PASS gates unless affected source changes and do not restart correct runtime PID `14804`.

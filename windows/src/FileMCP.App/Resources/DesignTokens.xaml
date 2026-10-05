@@ -12,6 +12,7 @@
     <Color x:Key="FileMcpTextPrimaryColor">#FF171A1F</Color>
     <Color x:Key="FileMcpTextSecondaryColor">#FF5D6672</Color>
     <Color x:Key="FileMcpTextDisabledColor">#FF929AA4</Color>
+    <Color x:Key="FileMcpCodeTextColor">#FFFFFFFF</Color>
     <Color x:Key="FileMcpAccentPrimaryColor">#FF2563EB</Color>
     <Color x:Key="FileMcpStatusInfoColor">#FF2563EB</Color>
     <Color x:Key="FileMcpStatusSuccessColor">#FF15803D</Color>
@@ -30,6 +31,7 @@
     <SolidColorBrush x:Key="FileMcpTextPrimaryBrush" Color="{StaticResource FileMcpTextPrimaryColor}"/>
     <SolidColorBrush x:Key="FileMcpTextSecondaryBrush" Color="{StaticResource FileMcpTextSecondaryColor}"/>
     <SolidColorBrush x:Key="FileMcpTextDisabledBrush" Color="{StaticResource FileMcpTextDisabledColor}"/>
+    <SolidColorBrush x:Key="FileMcpCodeTextBrush" Color="{StaticResource FileMcpCodeTextColor}"/>
     <SolidColorBrush x:Key="FileMcpAccentPrimaryBrush" Color="{StaticResource FileMcpAccentPrimaryColor}"/>
     <SolidColorBrush x:Key="FileMcpStatusInfoBrush" Color="{StaticResource FileMcpStatusInfoColor}"/>
     <SolidColorBrush x:Key="FileMcpStatusSuccessBrush" Color="{StaticResource FileMcpStatusSuccessColor}"/>

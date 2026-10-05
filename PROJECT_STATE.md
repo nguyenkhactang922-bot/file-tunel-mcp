@@ -1642,3 +1642,25 @@ FMUX-016 Onboarding: DONE / MAIN VERIFIED technically. Candidate `bb8480d05e8045
 Governance state-sync is ACTIVE on `state/FMUX-016-main-verified`, based exactly on verified main `4ec9ad43f1190074c64bea814976e333640707ab`. This sync is state/evidence-only. FMUX-017 Accessibility / Keyboard / Theme Enforcement is dependency-ready but remains blocked until this governance sync itself is MAIN VERIFIED. Runtime PID `17860` remains correct and was not restarted.
 
 NEXT_EXACT_ACTION: state/onboarding contract + diff hygiene -> commit/push state-only closure -> exact-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify -> then claim FMUX-017 from verified main.
+
+
+## FMUX-016 governance MAIN VERIFIED / FMUX-017 active - 2026-10-05
+
+FMUX-016 governance state-sync: DONE / MAIN VERIFIED. State-sync head `c830a29ef8d62a57532efc24cb4811099464c20f`; push Verify `37220842670` SUCCESS; PR #57 Verify `37221761688` SUCCESS; PR #57 merged main `680b426fb076e9ab0da249a41eda508aa7d5b760`; merged-main Verify `37222164301` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMUX-017 Accessibility / Keyboard / Theme Enforcement: ACTIVE / CLAIMED on `chatgpt/FMUX-017-accessibility`, based exactly on verified main `680b426fb076e9ab0da249a41eda508aa7d5b760`. Dependencies FMUX-001 through FMUX-016 are DONE / MAIN VERIFIED. Runtime PID `17860` remains correct and unchanged.
+
+NEXT_EXACT_ACTION: audit frozen FMUX accessibility requirements and existing Windows/macOS focus, keyboard, accessible-name, contrast/system appearance, reduced-motion and scaling/reflow implementation; define affected contract gates; implement only the smallest truthful cross-platform enforcement delta, then run affected local gates before exact-head GitHub verification.
+
+Active branch: `chatgpt/FMUX-017-accessibility`
+
+
+## FMUX-017 local verified - 2026-10-05
+
+FMUX-017 Accessibility / Keyboard / Theme Enforcement: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-017-accessibility`, base `680b426fb076e9ab0da249a41eda508aa7d5b760`.
+
+Local PASS: FMUX-017 accessibility/theme contract; app-shell contract; presentation contract; project-state contract; diff hygiene; Windows Release build 0 warnings / 0 errors. macOS native compile/build is intentionally deferred to exact-head GitHub Verify on a macOS runner. Evidence: `docs/evidence/FMUX-017_ACCESSIBILITY_THEME_EVIDENCE.md`.
+
+Runtime truth: PID `14804` at `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`; no FMUX-017 restart. Older PID `17860` references are historical/stale.
+
+NEXT_EXACT_ACTION: final scoped review -> candidate commit -> remote/PR/main side-effect guard -> push exact head -> three-lane native Verify. FMUX-018 remains blocked until FMUX-017 and its governance closure are MAIN VERIFIED.
