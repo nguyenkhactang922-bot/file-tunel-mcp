@@ -114,4 +114,12 @@ Targeted repair head `1fc91be563d70306bdfe84216906198723604a22` passed exact-hea
 
 Scoped review from verified base `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf` to `1fc91be563d70306bdfe84216906198723604a22` is PASS. Changes are limited to presentation source, CI/test gates and durable evidence/state. No `FileMCP.Core`, LocalMCPServer/Runtime, policy/backend/service authority surface changed. Runtime PID `14804` remains unchanged.
 
-Checkpoint: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Next is an evidence/state-only closure commit, guarded push and exact closure-SHA Verify before the single reviewed PR. Do not rerun the failed attempt `37312247737`.
+Checkpoint: EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Do not rerun the failed attempt `37312247737`.
+
+## Implementation MAIN VERIFIED / governance state-sync
+
+FMUX-019 closure head `04daf8443b4e74ab6ed80124319977d5eb656fc1` passed push Verify `37314184374` on macOS / Windows x64 / native Windows ARM64. PR #62 retained that exact head; PR Verify `37315279071` SUCCESS on all three required lanes; scoped review PASS with no core/runtime/tool-authority expansion.
+
+PR #62 merged as main `70e4379c11339a32ae794157eeb5d3f1fb471998`. Post-merge Verify `37316174195` SUCCESS on macOS / Windows x64 / native Windows ARM64. Therefore the FMUX-019 implementation result is DONE / MAIN VERIFIED at that main commit.
+
+Governance state-sync is ACTIVE on `state/FMUX-019-main-verified`, based exactly on verified main `70e4379c11339a32ae794157eeb5d3f1fb471998`. Runtime PID `14804` remains unchanged. FMUX-020 is intentionally not claimed until this governance state-sync is pushed, exact-head verified, reviewed/merged by PR, and its resulting main commit passes exact merged-main Verify.

@@ -287,12 +287,13 @@ Scope:
 
 ## FMUX-019 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Cross-Platform UX Adversarial Gate
 
-State: ACTIVE / LOCAL VERIFIED
+State: DONE / MAIN VERIFIED
 Branch: `chatgpt/FMUX-019-cross-platform-adversarial`.
 Claim base: verified main `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf`.
 Depends: FMUX-018 DONE / MAIN VERIFIED including governance closure.
 Evidence: `docs/evidence/FMUX-019_CROSS_PLATFORM_UX_ADVERSARIAL_GATE_EVIDENCE.md`.
-Local checkpoint: test-first aggregate adversarial gate PASS after minimal CI/error-UX repairs; eleven foundation FMUX contracts retained; affected contracts + project-state + diff hygiene PASS; Windows Release win-x64 build PASS with 0 warnings / 0 errors. Exact-head repair `1fc91be563d70306bdfe84216906198723604a22` passed Verify `37313099533` on macOS / Windows x64 / native Windows ARM64; scoped review PASS. Governance/evidence closure commit remains required before PR.
+Implementation verification: closure head `04daf8443b4e74ab6ed80124319977d5eb656fc1`; push Verify `37314184374` SUCCESS; PR #62 Verify `37315279071` SUCCESS; PR #62 merged as main `70e4379c11339a32ae794157eeb5d3f1fb471998`; merged-main Verify `37316174195` SUCCESS on macOS / Windows x64 / native Windows ARM64; scoped authority/security review PASS.
+Governance state-sync: ACTIVE on `state/FMUX-019-main-verified` from exact verified main `70e4379c11339a32ae794157eeb5d3f1fb471998`; FMUX-020 remains blocked until governance closure is MAIN VERIFIED.
 
 Scope:
 - Windows/macOS parity;
