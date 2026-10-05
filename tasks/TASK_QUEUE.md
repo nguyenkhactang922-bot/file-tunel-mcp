@@ -396,3 +396,21 @@ Governance branch `state/FMUX-019-main-verified` is ACTIVE from exact verified m
 - FMUX-020 remains BLOCKED until governance state-sync is MAIN VERIFIED.
 
 - Next: project-state contract + diff hygiene -> commit -> guarded push -> exact-head Verify -> reviewed PR -> guarded merge -> exact merged-main Verify -> then claim FMUX-020.
+
+## FMUX-019 governance closure / FMUX-020 claim - 2026-10-05
+
+FMUX-019 governance closure is DONE / MAIN VERIFIED. Governance head `5531189e229c2761b2e252cc3d6834d331d36af8`; push Verify `37318438738` SUCCESS; PR #63 Verify `37319341667` SUCCESS; PR #63 merged as main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`; merged-main Verify `37320240021` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMUX-020 Product UI/UX Main Verification is ACTIVE / CLAIMED on `chatgpt/FMUX-020-product-ui-ux-main-verification`, based exactly on verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`. FMG-026 remains COMPLETE_UPGRADE_MAIN_VERIFIED. Runtime PID `14804` unchanged.
+
+- Next: audit final FMUX-020 acceptance -> establish final product UI/UX verification evidence/gate -> prove clean build/package, end-to-end flows, live core-to-UI state, screenshot/manual visual QA, no-fake-state semantic parity and core FMG regression -> repair only proven gaps -> verify -> exact-head native Verify -> reviewed PR -> guarded merge -> exact merged-main Verify -> final FMUX program state sync.
+
+- Do not rerun completed FMUX-019 implementation/governance stages.
+
+## FMUX-020 local verified - 2026-10-05
+
+FMUX-020 Product UI/UX Main Verification is ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-020-product-ui-ux-main-verification`, based exactly on verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`. Evidence: `docs/evidence/FMUX-020_PRODUCT_UI_UX_MAIN_VERIFICATION_EVIDENCE.md`.
+
+Local final acceptance PASS: final aggregate gate; live core-to-UI proof without restarting PID `14804`; live screenshots 2/2; current-build render 14/14 pages; screenshot QA 14/14 unique page renders; Windows Release build 0/0; Windows core/runtime regression 995 assertions PASS. A test-only dynamic-health file-read race was hardened; production runtime/core authority unchanged.
+
+- Next: state/diff hygiene + scoped review -> commit exact candidate -> guarded remote check -> push exact head -> exact-head three-lane Verify -> review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> final FMUX program governance state-sync -> only then record `PRODUCT_UI_UX_MAIN_VERIFIED`.

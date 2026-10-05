@@ -293,7 +293,7 @@ Claim base: verified main `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf`.
 Depends: FMUX-018 DONE / MAIN VERIFIED including governance closure.
 Evidence: `docs/evidence/FMUX-019_CROSS_PLATFORM_UX_ADVERSARIAL_GATE_EVIDENCE.md`.
 Implementation verification: closure head `04daf8443b4e74ab6ed80124319977d5eb656fc1`; push Verify `37314184374` SUCCESS; PR #62 Verify `37315279071` SUCCESS; PR #62 merged as main `70e4379c11339a32ae794157eeb5d3f1fb471998`; merged-main Verify `37316174195` SUCCESS on macOS / Windows x64 / native Windows ARM64; scoped authority/security review PASS.
-Governance state-sync: ACTIVE on `state/FMUX-019-main-verified` from exact verified main `70e4379c11339a32ae794157eeb5d3f1fb471998`; FMUX-020 remains blocked until governance closure is MAIN VERIFIED.
+Governance state-sync: DONE / MAIN VERIFIED. Governance head `5531189e229c2761b2e252cc3d6834d331d36af8`; push Verify `37318438738` SUCCESS; PR #63 Verify `37319341667` SUCCESS; PR #63 merged as main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`; merged-main Verify `37320240021` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 
 Scope:
 - Windows/macOS parity;
@@ -305,8 +305,12 @@ Scope:
 
 ## FMUX-020 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Product UI/UX Main Verification
 
-State: BLOCKED
+State: ACTIVE / LOCAL VERIFIED
+Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`.
+Claim base: exact verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`.
 Depends: FMUX-019 and FMG-026 COMPLETE_UPGRADE_MAIN_VERIFIED.
+Evidence: `docs/evidence/FMUX-020_PRODUCT_UI_UX_MAIN_VERIFICATION_EVIDENCE.md`.
+Local checkpoint: final aggregate gate PASS; live core-to-UI proof on unchanged PID `14804`; live screenshots 2/2; current-build render and screenshot QA 14/14; Windows Release build 0 warnings / 0 errors; Windows core/runtime regression 995 assertions PASS; test-only dynamic-health file-read race hardened with no production runtime/core authority change.
 
 Scope:
 - clean build/package;

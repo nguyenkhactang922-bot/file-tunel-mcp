@@ -1886,3 +1886,24 @@ FMUX-020 remains BLOCKED until this governance state-sync is itself merged and e
 NEXT_EXACT_ACTION: project-state contract + diff hygiene -> commit governance state/evidence only -> guard remote state branch/PR/main -> push exact governance head -> exact-head three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> only then claim FMUX-020.
 
 Branch: `state/FMUX-019-main-verified`
+
+## FMUX-019 governance MAIN VERIFIED / FMUX-020 claimed - 2026-10-05
+
+FMUX-019 governance closure is DONE / MAIN VERIFIED. Governance head `5531189e229c2761b2e252cc3d6834d331d36af8`; push Verify `37318438738` SUCCESS; PR #63 Verify `37319341667` SUCCESS; PR #63 merged as main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`; merged-main Verify `37320240021` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMUX-020 Product UI/UX Main Verification is ACTIVE / CLAIMED on `chatgpt/FMUX-020-product-ui-ux-main-verification`, based exactly on verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`. FMG-026 remains COMPLETE_UPGRADE_MAIN_VERIFIED. Runtime PID `14804` remains correct and was not restarted.
+
+NEXT_EXACT_ACTION: audit the frozen FMUX-020 acceptance against current main -> build a final product-verification evidence/gate covering clean build/package, complete end-to-end product flows, live core-to-UI state proof, final screenshot/manual visual QA evidence, no-fake-state semantic parity and core FMG regression -> repair only proven gaps -> verify locally where possible -> exact-head native Verify -> reviewed PR -> guarded merge -> exact merged-main Verify -> final FMUX program state sync.
+
+Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
+
+
+## FMUX-020 local verified - 2026-10-05
+
+FMUX-020 Product UI/UX Main Verification is ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-020-product-ui-ux-main-verification`, based exactly on verified main `11d40cf277a490a360cb3f9ee61b690a292dfb7b`. Evidence: `docs/evidence/FMUX-020_PRODUCT_UI_UX_MAIN_VERIFICATION_EVIDENCE.md`.
+
+Local final acceptance PASS: FMUX-020 aggregate gate; live core-to-UI proof on unchanged runtime PID `14804`; live runtime screenshots 2/2; isolated current-build screenshot render 14/14 pages; screenshot QA 14/14 unique 1280x900 renders PASS; Windows Release build 0 warnings / 0 errors; Windows core/runtime regression PASS with 995 assertions. The only local regression-test defect found was a test-only dynamic-health file-read race; only `windows/tests/FileMCP.Core.Tests/Program.cs` was hardened to wait for a readable expected URL, with no production runtime change.
+
+NEXT_EXACT_ACTION: project-state contract + diff hygiene + scoped authority/security review -> commit exact FMUX-020 candidate -> guard remote branch/PR/main -> push exact head -> require exact-head Verify SUCCESS on macOS / Windows x64 / native Windows ARM64 -> exact-head review -> create exactly one PR -> require PR Verify SUCCESS -> guarded merge -> require exact merged-main Verify SUCCESS -> final FMUX program governance state-sync and only then create/record `PRODUCT_UI_UX_MAIN_VERIFIED`.
+
+Branch: `chatgpt/FMUX-020-product-ui-ux-main-verification`
