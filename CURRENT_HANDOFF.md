@@ -1847,3 +1847,22 @@ Branch: `state/FMUX-018-main-verified`
 Base: exact verified main `e85f666dcc03a6b659acbea9f03197649bc2e728`. Runtime PID `14804` remains the FMG026-ready FileMCP and was not restarted.
 
 NEXT_EXACT_ACTION: finish governance state/evidence sync on this branch -> run project-state contract + `git diff --check` -> commit -> side-effect guard remote branch/PR/main -> push exact governance head -> require exact-head three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify. Only after this governance state-sync is MAIN VERIFIED may FMUX-019 be claimed.
+
+## FMUX-018 fully MAIN VERIFIED / FMUX-019 claimed - 2026-10-05
+
+FMUX-018 governance closure is DONE / MAIN VERIFIED. State head `d5112ab47f5c1d3d3b35ecd3a76da583479593be`; push Verify `37300900430` SUCCESS; PR #61 Verify `37301719404` SUCCESS; PR #61 merged as main `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf`; merged-main Verify `37302476304` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Current task: FMUX-019 Cross-Platform UX Adversarial Gate - ACTIVE / CLAIMED on `chatgpt/FMUX-019-cross-platform-adversarial`, base exact verified main `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf`. Runtime PID `14804` remains correct and was not restarted.
+
+NEXT_EXACT_ACTION: audit frozen Windows/macOS parity, error/empty/stale/offline states, keyboard-only completion, feature gating, security language and legacy/core regressions -> add a test-first FMUX-019 aggregate gate -> repair only proven gaps -> local evidence/review -> exact-head native Verify -> one PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-020 remains BLOCKED until FMUX-019 MAIN VERIFIED.
+Branch: `chatgpt/FMUX-019-cross-platform-adversarial`
+
+## FMUX-019 local verified - 2026-10-05
+
+FMUX-019 Cross-Platform UX Adversarial Gate is ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-019-cross-platform-adversarial` from exact verified main `253901ff2fc5eb4996c2842d3a4a2d05d87fcebf`. Runtime PID `14804` remains correct and was not restarted. Evidence: `docs/evidence/FMUX-019_CROSS_PLATFORM_UX_ADVERSARIAL_GATE_EVIDENCE.md`.
+
+Test-first RED proved only two gaps: eleven foundation FMUX contracts lacked durable Verify wiring, and caught operational exceptions could be raw-only modal UX. Minimal repairs added the FMUX-019 aggregate gate exactly once per Windows native job and structured operational error presentation on Windows/macOS. No core/runtime/tool authority changed.
+
+Local PASS: FMUX-019 aggregate gate; affected feedback/connections/settings/onboarding/accessibility/performance contracts; project-state contract; raw-error scan; workflow count 2; core-source diff guard; `git diff --check`; Windows Release win-x64 compile 0 warnings / 0 errors. macOS native and Windows ARM64 remain exact-head CI requirements.
+
+NEXT_EXACT_ACTION: scoped diff/security review -> commit exact FMUX-019 candidate -> guard remote branch/PR/main -> push exact head -> require macOS / Windows x64 / native Windows ARM64 Verify -> exact-head review -> one PR -> PR Verify -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-020 remains BLOCKED until FMUX-019 MAIN VERIFIED.
