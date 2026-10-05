@@ -257,7 +257,7 @@ Depends: FMUX-001 through FMUX-016 implemented surfaces — all DONE / MAIN VERI
 Claim base: verified main `680b426fb076e9ab0da249a41eda508aa7d5b760`.
 Checkpoint: closure head `0a4efa03b6b78afa3fee6c8e0b076ede87170faf`; push Verify `37262375573` SUCCESS; PR #58 Verify `37284215643` SUCCESS; PR #58 merged as `508987d0d659890bbcb63973437858099d462615`; merged-main Verify `37292127945` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 Evidence: `docs/evidence/FMUX-017_ACCESSIBILITY_THEME_EVIDENCE.md`.
-Governance note: implementation is MAIN VERIFIED; `state/FMUX-017-main-verified` must itself reach MAIN VERIFIED before FMUX-018 may be claimed.
+Governance closure: `state/FMUX-017-main-verified` head `2674e3488476dd87e9748ff680f8a98bf0ae4c8b` passed push Verify `37293244839` and PR #59 Verify `37294160218`; PR #59 merged as main `6f5a14492d99e00d202d793eeb1525141aa0cd92`; merged-main Verify `37295036110` SUCCESS on macOS / Windows x64 / native Windows ARM64. FMUX-017 is fully DONE / MAIN VERIFIED and FMUX-018 may be claimed.
 
 Scope:
 - focus order;
@@ -270,8 +270,12 @@ Scope:
 
 ## FMUX-018 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Performance + Visual Consistency Gate
 
-State: BLOCKED
-Depends: FMUX-017.
+State: ACTIVE / LOCAL VERIFIED
+Branch: `chatgpt/FMUX-018-performance-visual-consistency`.
+Claim base: verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`.
+Depends: FMUX-017 DONE / MAIN VERIFIED including governance closure.
+Evidence: `docs/evidence/FMUX-018_PERFORMANCE_VISUAL_CONSISTENCY_EVIDENCE.md`.
+Local checkpoint: FMUX-018 contract + affected FMUX contracts + state contract + `git diff --check` PASS; Windows Release win-x64 compile PASS with 0 warnings / 0 errors. Exact-head native three-lane Verify remains required before PR/merge.
 
 Scope:
 - live-list performance;

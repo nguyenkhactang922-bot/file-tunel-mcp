@@ -331,3 +331,24 @@ Historical closure sequence: verify state contract + `git diff --check` + exact 
 - Runtime PID `14804` remains correct; no restart.
 - FMUX-018 remains BLOCKED until governance state-sync is MAIN VERIFIED.
 - Next: finish durable state/evidence sync -> state-contract + diff hygiene -> commit -> guarded push -> exact-head Verify -> reviewed PR -> guarded merge -> exact merged-main Verify -> then claim FMUX-018.
+
+
+## FMUX-018 claimed / analysis active - 2026-10-05
+
+- FMUX-017: fully DONE / MAIN VERIFIED including governance closure.
+- Governance head `2674e3488476dd87e9748ff680f8a98bf0ae4c8b`; push Verify `37293244839` SUCCESS; PR #59 Verify `37294160218` SUCCESS; merged main `6f5a14492d99e00d202d793eeb1525141aa0cd92`; merged-main Verify `37295036110` SUCCESS on all three native lanes.
+- FMUX-018 Performance + Visual Consistency Gate: ACTIVE / CLAIMED / ANALYZE on `chatgpt/FMUX-018-performance-visual-consistency` from verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`.
+- Runtime PID `14804` remains correct; no restart.
+- Scope: live-list performance; bounded rendering; token drift scan; layout consistency; startup/render regressions.
+- FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
+- Next: audit frozen scope against Windows/macOS source and existing tests -> add targeted gate/tests and minimal proven repairs only -> local evidence/review -> exact-head native Verify -> PR -> guarded merge -> exact merged-main Verify -> governance state-sync.
+
+
+## FMUX-018 local verified - 2026-10-05
+
+- FMUX-018 Performance + Visual Consistency Gate: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-018-performance-visual-consistency` from verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`.
+- Evidence: `docs/evidence/FMUX-018_PERFORMANCE_VISUAL_CONSISTENCY_EVIDENCE.md`.
+- Local PASS: new FMUX-018 contract; affected FMUX contracts; project-state contract; diff hygiene; Windows Release win-x64 compile with 0 warnings / 0 errors.
+- Runtime PID `14804` remains correct; no restart.
+- FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
+- Next: scoped diff/state review -> commit candidate -> remote guards -> push exact head -> exact-head native three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync.

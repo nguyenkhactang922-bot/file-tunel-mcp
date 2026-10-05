@@ -504,9 +504,9 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         logView.isHorizontallyResizable = true
         logView.autoresizingMask = [.width, .height]
         logView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        logView.backgroundColor = NSColor(calibratedWhite: 0.10, alpha: 1.0)
-        logView.textColor = NSColor.white
-        logView.insertionPointColor = NSColor.white
+        logView.backgroundColor = .textBackgroundColor
+        logView.textColor = .textColor
+        logView.insertionPointColor = .textColor
         logView.string = ""
         let logScroll = NSScrollView()
         logScroll.hasVerticalScroller = true
@@ -652,9 +652,9 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         terminalOutputView.isHorizontallyResizable = true
         terminalOutputView.autoresizingMask = [.width, .height]
         terminalOutputView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        terminalOutputView.backgroundColor = NSColor(calibratedWhite: 0.10, alpha: 1.0)
-        terminalOutputView.textColor = .white
-        terminalOutputView.insertionPointColor = .white
+        terminalOutputView.backgroundColor = .textBackgroundColor
+        terminalOutputView.textColor = .textColor
+        terminalOutputView.insertionPointColor = .textColor
         terminalOutputView.string = ""
         terminalBackendLabel.maximumNumberOfLines = 4
         terminalPolicyLabel.maximumNumberOfLines = 4
@@ -2573,23 +2573,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if artifactBatchEvents.count > maxArtifactBatchEvents {
             artifactBatchEvents.removeFirst(artifactBatchEvents.count - maxArtifactBatchEvents)
         }
-        if tabs.selectedTabViewItem?.identifier as? String == "activity" {
-            refreshActivityFilter()
-        }
-        if tabs.selectedTabViewItem?.identifier as? String == "changes" {
-            changesTableView.reloadData()
-        }
-        if tabs.selectedTabViewItem?.identifier as? String == "evidence" {
-            evidenceTableView.reloadData()
-        }
-        if tabs.selectedTabViewItem?.identifier as? String == "repository" {
-            repositoryResultTableView.reloadData()
-            if selectedRepositoryEvent != nil { repositoryItemTableView.reloadData() }
-        }
-        if tabs.selectedTabViewItem?.identifier as? String == "artifacts" {
-            artifactBatchTableView.reloadData()
-            if selectedArtifactBatch != nil { artifactEntryTableView.reloadData() }
-        }
+
     }
 
     @objc private func showChanges() {
@@ -2730,8 +2714,25 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
         if combined.count > maxTerminalOutputCharacters {
             combined = String(combined.suffix(maxTerminalOutputCharacters))
         }
-        terminalOutputView.string = combined
-        terminalOutputView.scrollToEndOfDocument(nil)
+        replaceTextPreservingLiveTail(combined, in: terminalOutputView)
+    }
+
+    private func replaceTextPreservingLiveTail(_ text: String, in textView: NSTextView) {
+        let visibleRect = textView.visibleRect
+        let priorOrigin = textView.enclosingScrollView?.contentView.bounds.origin
+        let wasFollowingTail = textView.bounds.height <= visibleRect.height + 1
+            || visibleRect.maxY >= textView.bounds.maxY - 2
+
+        textView.string = text
+        if let textContainer = textView.textContainer {
+            textView.layoutManager?.ensureLayout(for: textContainer)
+        }
+        if wasFollowingTail {
+            textView.scrollToEndOfDocument(nil)
+        } else if let scrollView = textView.enclosingScrollView, let priorOrigin {
+            scrollView.contentView.scroll(to: priorOrigin)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
     }
 
     private func selectedTerminalSession() -> TerminalSessionEvent? {
@@ -3411,7 +3412,7 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
             startButton.title = "DisconnectingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"; startButton.bezelColor = .systemRed; startButton.isEnabled = false
             shellStatusLabel.stringValue = "Runtime stopping"
         }
-        startButton.contentTintColor = .white
+        startButton.contentTintColor = .alternateSelectedControlTextColor
     }
 
     private func appendLog(_ text: String) {
@@ -3429,11 +3430,32 @@ private final class MainViewController: NSViewController, NSTabViewDelegate, NST
 
     private func flushLogBuffer() {
         logFlushScheduled = false
-        logView.string = logBuffer
-        logView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        logView.textColor = .white
-        logView.scrollToEndOfDocument(nil)
-        logView.needsDisplay = true
+        if (tabs.selectedTabViewItem?.identifier as? String) == "log" {
+            logView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+            logView.textColor = .textColor
+            replaceTextPreservingLiveTail(logBuffer, in: logView)
+            logView.needsDisplay = true
+        }
+        refreshSelectedLiveEventViews()
+    }
+
+    private func refreshSelectedLiveEventViews() {
+        switch tabs.selectedTabViewItem?.identifier as? String {
+        case "activity":
+            refreshActivityFilter()
+        case "changes":
+            changesTableView.reloadData()
+        case "evidence":
+            evidenceTableView.reloadData()
+        case "repository":
+            repositoryResultTableView.reloadData()
+            if selectedRepositoryEvent != nil { repositoryItemTableView.reloadData() }
+        case "artifacts":
+            artifactBatchTableView.reloadData()
+            if selectedArtifactBatch != nil { artifactEntryTableView.reloadData() }
+        default:
+            break
+        }
     }
 
     private func showError(_ message: String) {

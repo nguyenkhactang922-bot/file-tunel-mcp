@@ -1811,3 +1811,30 @@ Branch: `state/FMUX-017-main-verified`
 Base: exact verified main `508987d0d659890bbcb63973437858099d462615`. Runtime PID `14804` remains the FMG026-ready FileMCP and was not restarted.
 
 NEXT_EXACT_ACTION: finish governance state/evidence sync on this branch -> run state-contract + `git diff --check` -> commit -> side-effect guard remote branch/PR/main -> push exact head -> require exact-head three-lane Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify. Only after this governance state-sync is MAIN VERIFIED may FMUX-018 be claimed.
+
+
+## FMUX-018 claimed / analysis active - 2026-10-05
+
+FMUX-017 is fully DONE / MAIN VERIFIED including governance closure. Governance head `2674e3488476dd87e9748ff680f8a98bf0ae4c8b` passed push Verify `37293244839` and PR #59 Verify `37294160218`; PR #59 merged as main `6f5a14492d99e00d202d793eeb1525141aa0cd92`; merged-main Verify `37295036110` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+Branch: `chatgpt/FMUX-018-performance-visual-consistency`
+Base: exact verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`.
+Task: FMUX-018 Performance + Visual Consistency Gate — ACTIVE / CLAIMED / ANALYZE.
+Runtime: PID `14804` (`D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`) remains correct and was not restarted.
+
+Frozen scope: live-list performance; bounded rendering; token drift scan; layout consistency; startup/render regressions. Frozen audit additionally requires bounded in-memory live windows, virtualized/list-efficient rendering where applicable, throttled/coalesced refresh, and no forced live-tail while the user has scrolled away.
+
+NEXT_EXACT_ACTION: audit Windows/macOS implementation and existing contracts for each FMUX-018 scope item -> identify proven gaps only -> add targeted contract/gate/tests and minimal repairs where required -> local evidence and review -> exact-head native Verify -> one PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
+
+
+## FMUX-018 local verified - 2026-10-05
+
+Branch: `chatgpt/FMUX-018-performance-visual-consistency`
+Base: exact verified main `6f5a14492d99e00d202d793eeb1525141aa0cd92`.
+Task: FMUX-018 Performance + Visual Consistency Gate — ACTIVE / LOCAL VERIFIED.
+Runtime: PID `14804` remains correct and was not restarted.
+Evidence: `docs/evidence/FMUX-018_PERFORMANCE_VISUAL_CONSISTENCY_EVIDENCE.md`.
+
+Local PASS: FMUX-018 performance/visual contract; accessibility/theme; structured activity; terminal PTY; app shell; project-state contract; `git diff --check`; Windows `Release win-x64` compile with 0 warnings / 0 errors. Candidate repairs only proven presentation gaps: coalesced live refresh, bounded hidden rendering, preserved live-tail, semantic Windows feature colors, semantic macOS code surfaces. Existing native startup/build smoke remains the regression proof path.
+
+NEXT_EXACT_ACTION: scoped review + state contract -> commit FMUX-018 candidate -> guard remote branch/PR/main -> push exact head -> require exact-head macOS / Windows x64 / native Windows ARM64 Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. FMUX-019 remains BLOCKED until FMUX-018 MAIN VERIFIED.
