@@ -4,6 +4,8 @@
         xmlns:controls="clr-namespace:FileMCP.App.Controls"
         Title="FileMCP" Width="980" Height="760" MinWidth="860" MinHeight="650"
         WindowStartupLocation="CenterScreen" ResizeMode="CanResizeWithGrip"
+        Background="{DynamicResource FileMcpSurfaceAppBrush}"
+        Foreground="{DynamicResource FileMcpTextPrimaryBrush}"
         Icon="Assets/filemcp.ico">
     <Window.Resources>
         <Style TargetType="TextBox">
@@ -17,6 +19,7 @@
         <Style TargetType="Button">
             <Setter Property="MinHeight" Value="30"/>
             <Setter Property="Padding" Value="12,4"/>
+            <Setter Property="FocusVisualStyle" Value="{DynamicResource FileMcpKeyboardFocusVisual}"/>
         </Style>
         <Style x:Key="WorkspaceLabelStyle" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -336,13 +339,13 @@
                                     <TextBlock Grid.Column="0" Foreground="Gray" Text="Calls / second and MCP token estimate / second"/>
                                     <TextBlock x:Name="OverviewRealtimeCurrentText" Grid.Column="1" Foreground="Gray" Text="Calls/s: 0 | Tokens est./s: 0"/>
                                 </Grid>
-                                <Canvas x:Name="OverviewRealtimeCanvas" Height="190" ClipToBounds="True" Background="#08000000">
+                                <Canvas x:Name="OverviewRealtimeCanvas" Height="190" ClipToBounds="True" Background="{DynamicResource FileMcpSurfaceRaisedBrush}">
                                     <Polyline x:Name="OverviewCallsPolyline" Stroke="#2F6FED" StrokeThickness="2"/>
                                     <Polyline x:Name="OverviewTokensPolyline" Stroke="#17A673" StrokeThickness="2"/>
                                 </Canvas>
                                 <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
-                                    <TextBlock Foreground="#2F6FED" FontWeight="SemiBold" Text="Calls/s" Margin="0,0,18,0"/>
-                                    <TextBlock Foreground="#17A673" FontWeight="SemiBold" Text="MCP token est./s"/>
+                                    <TextBlock Foreground="{DynamicResource FileMcpStatusInfoBrush}" FontWeight="SemiBold" Text="Calls/s" Margin="0,0,18,0"/>
+                                    <TextBlock Foreground="{DynamicResource FileMcpStatusSuccessBrush}" FontWeight="SemiBold" Text="MCP token est./s"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -390,7 +393,7 @@
                         <Border Style="{StaticResource OverviewCardStyle}" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock FontWeight="SemiBold" Text="Selected session detail"/>
-                                <TextBlock x:Name="OverviewSessionDetailText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#444444" Text="Select an AI chat or unbound activity row."/>
+                                <TextBlock x:Name="OverviewSessionDetailText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{DynamicResource FileMcpTextSecondaryBrush}" Text="Select an AI chat or unbound activity row."/>
                             </StackPanel>
                         </Border>
                         <TextBlock Margin="0,4,0,0" Foreground="Gray" TextWrapping="Wrap"
@@ -467,7 +470,7 @@
                         </StackPanel>
 
                         <TextBlock Margin="0,16,0,8" FontWeight="SemiBold" Text="Workspace tunnels"/>
-                        <Border BorderBrush="#D0D0D0" BorderThickness="1" CornerRadius="4" Padding="10">
+                        <Border BorderBrush="{DynamicResource FileMcpBorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="70"/>
@@ -530,7 +533,7 @@
                         <TextBlock Margin="0,4,0,10" Foreground="Gray" TextWrapping="Wrap"
                                    Text="Enable the drives you want FileMCP to expose. Every workspace remains isolated to its configured root."/>
 
-                        <Border BorderBrush="#D0D0D0" BorderThickness="1" CornerRadius="4" Padding="10">
+                        <Border BorderBrush="{DynamicResource FileMcpBorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="60"/>
@@ -663,7 +666,7 @@
                                                Text="Comma-separated environment names or glob patterns allowed for exec_process pass-through/request overrides. Empty by default. Secret-like names require an exact entry; wildcard matches never forward them."/>
                                 </StackPanel>
 
-                                <Border Margin="0,16,0,0" Padding="12" BorderBrush="#22000000" BorderThickness="1" CornerRadius="6">
+                                <Border Margin="0,16,0,0" Padding="12" BorderBrush="{DynamicResource FileMcpBorderSubtleBrush}" BorderThickness="1" CornerRadius="6">
                                     <StackPanel>
                                         <CheckBox x:Name="OtlpEnabledCheckBox" Content="Enable optional OTLP telemetry export (HTTP/Protobuf)"/>
                                         <Grid Margin="0,10,0,0">
@@ -1196,7 +1199,7 @@
                 <Grid Margin="10">
                     <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                             FontFamily="Consolas" FontSize="11" Background="#191919" Foreground="White"/>
+                             FontFamily="Consolas" FontSize="11" Background="{DynamicResource FileMcpSurfaceCodeBrush}" Foreground="{DynamicResource FileMcpCodeTextBrush}"/>
                 </Grid>
             </TabItem>
     </TabControl>

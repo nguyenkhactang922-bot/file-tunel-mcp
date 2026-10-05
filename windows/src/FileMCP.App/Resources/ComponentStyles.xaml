@@ -34,5 +34,19 @@
         <Setter Property="MinHeight" Value="34"/>
         <Setter Property="Padding" Value="14,6"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FocusVisualStyle" Value="{DynamicResource FileMcpKeyboardFocusVisual}"/>
+    </Style>
+
+    <!-- Explicit keyboard focus treatment survives light/dark/high-contrast resource remapping. -->
+    <Style x:Key="FileMcpKeyboardFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Rectangle Margin="-2" SnapsToDevicePixels="True"
+                               Stroke="{DynamicResource FileMcpAccentPrimaryBrush}"
+                               StrokeThickness="2" StrokeDashArray="1 1"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 </ResourceDictionary>

@@ -238,8 +238,8 @@ Branch: `chatgpt/FMUX-016-onboarding`.
 Depends: FMUX-004 through FMUX-015 applicable implemented surfaces — all DONE / MAIN VERIFIED.
 Checkpoint: candidate `bb8480d05e80459865dbac8322813c4309d2ea19` passed push Verify `37218197455`; closure head `4003ab7569a544f9e5eda54e01f48f6903579e46` passed push Verify `37218732623`; PR #56 exact-head Verify `37219510769` SUCCESS; PR #56 merged as `4ec9ad43f1190074c64bea814976e333640707ab`; merged-main Verify `37219941223` SUCCESS on macOS / Windows x64 / native Windows ARM64.
 Evidence: `docs/evidence/FMUX-016_ONBOARDING_UX_EVIDENCE.md`.
-Governance note: implementation is MAIN VERIFIED; `state/FMUX-016-main-verified` must itself reach MAIN VERIFIED before FMUX-017 may be claimed.
-NEXT_EXACT_ACTION: complete FMUX-016 governance state-sync -> exact-head Verify -> reviewed PR -> guarded merge -> merged-main Verify; only then claim FMUX-017 from the resulting verified `main`.
+Governance state-sync: DONE / MAIN VERIFIED. State-sync head `c830a29ef8d62a57532efc24cb4811099464c20f`; push Verify `37220842670` SUCCESS; PR #57 exact-head Verify `37221761688` SUCCESS; PR #57 merged as `680b426fb076e9ab0da249a41eda508aa7d5b760`; merged-main Verify `37222164301` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+Governance handoff: FMUX-017 may be claimed only from verified main `680b426fb076e9ab0da249a41eda508aa7d5b760` or a later verified main containing it.
 
 Scope:
 - first-run setup;
@@ -251,8 +251,10 @@ Scope:
 
 ## FMUX-017 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Accessibility / Keyboard / Theme Enforcement
 
-State: BLOCKED
-Depends: FMUX-001 through FMUX-016 implemented surfaces.
+State: ACTIVE / LOCAL VERIFIED
+Branch: `chatgpt/FMUX-017-accessibility`.
+Depends: FMUX-001 through FMUX-016 implemented surfaces — all DONE / MAIN VERIFIED.
+Claim base: verified main `680b426fb076e9ab0da249a41eda508aa7d5b760`.
 
 Scope:
 - focus order;

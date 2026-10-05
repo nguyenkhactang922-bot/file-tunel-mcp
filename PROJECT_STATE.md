@@ -1642,3 +1642,50 @@ FMUX-016 Onboarding: DONE / MAIN VERIFIED technically. Candidate `bb8480d05e8045
 Governance state-sync is ACTIVE on `state/FMUX-016-main-verified`, based exactly on verified main `4ec9ad43f1190074c64bea814976e333640707ab`. This sync is state/evidence-only. FMUX-017 Accessibility / Keyboard / Theme Enforcement is dependency-ready but remains blocked until this governance sync itself is MAIN VERIFIED. Runtime PID `17860` remains correct and was not restarted.
 
 NEXT_EXACT_ACTION: state/onboarding contract + diff hygiene -> commit/push state-only closure -> exact-head Verify -> one reviewed PR -> guarded merge -> merged-main Verify -> then claim FMUX-017 from verified main.
+
+
+## FMUX-016 governance MAIN VERIFIED / FMUX-017 active - 2026-10-05
+
+FMUX-016 governance state-sync: DONE / MAIN VERIFIED. State-sync head `c830a29ef8d62a57532efc24cb4811099464c20f`; push Verify `37220842670` SUCCESS; PR #57 Verify `37221761688` SUCCESS; PR #57 merged main `680b426fb076e9ab0da249a41eda508aa7d5b760`; merged-main Verify `37222164301` SUCCESS on macOS / Windows x64 / native Windows ARM64.
+
+FMUX-017 Accessibility / Keyboard / Theme Enforcement: ACTIVE / CLAIMED on `chatgpt/FMUX-017-accessibility`, based exactly on verified main `680b426fb076e9ab0da249a41eda508aa7d5b760`. Dependencies FMUX-001 through FMUX-016 are DONE / MAIN VERIFIED. Runtime PID `17860` remains correct and unchanged.
+
+NEXT_EXACT_ACTION: audit frozen FMUX accessibility requirements and existing Windows/macOS focus, keyboard, accessible-name, contrast/system appearance, reduced-motion and scaling/reflow implementation; define affected contract gates; implement only the smallest truthful cross-platform enforcement delta, then run affected local gates before exact-head GitHub verification.
+
+Active branch: `chatgpt/FMUX-017-accessibility`
+
+
+## FMUX-017 local verified - 2026-10-05
+
+FMUX-017 Accessibility / Keyboard / Theme Enforcement: ACTIVE / LOCAL VERIFIED on `chatgpt/FMUX-017-accessibility`, base `680b426fb076e9ab0da249a41eda508aa7d5b760`.
+
+Local PASS: FMUX-017 accessibility/theme contract; app-shell contract; presentation contract; project-state contract; diff hygiene; Windows Release build 0 warnings / 0 errors. macOS native compile/build is intentionally deferred to exact-head GitHub Verify on a macOS runner. Evidence: `docs/evidence/FMUX-017_ACCESSIBILITY_THEME_EVIDENCE.md`.
+
+Runtime truth: PID `14804` at `D:\Tools\FileMCP\dist\windows-x64\FileMCP-FMG026-ready\FileMCP.exe`; no FMUX-017 restart. Older PID `17860` references are historical/stale.
+
+NEXT_EXACT_ACTION: final scoped review -> candidate commit -> remote/PR/main side-effect guard -> push exact head -> three-lane native Verify. FMUX-018 remains blocked until FMUX-017 and its governance closure are MAIN VERIFIED.
+
+
+## FMUX-017 exact-head attempt 1 / targeted macOS fix - 2026-10-05
+
+FMUX-017 remains ACTIVE. Candidate `d68e7d2342dc7c37eec2cadf4feadda4510e8572`; push Verify `37260149053` FAILURE only because macOS `Static verification` rejected invalid `NSWindow.recalculatesKeyViewLoop`. Windows x64 and native Windows ARM64 are SUCCESS checkpoints.
+
+Targeted fix: `window.recalculateKeyViewLoop()` plus matching contract update. Targeted local PASS: FMUX-017 accessibility/theme contract and diff hygiene. Runtime PID `14804` unchanged; no authority/runtime semantics changed.
+
+NEXT_EXACT_ACTION: commit/push targeted fix -> require fresh exact-head three-lane Verify; if green, record native-verified closure checkpoint before PR. Do not rerun failed run `37260149053` manually.
+
+
+## FMUX-017 local ref recovery - 2026-10-05
+
+Active branch: `chatgpt/FMUX-017-accessibility-repair`
+
+Local Git recovery only: original local branch ref `chatgpt/FMUX-017-accessibility` is ACL-locked and cannot be atomically replaced by the current medium-token process. Repair branch `chatgpt/FMUX-017-accessibility-repair` points at `bb51a994e93e03134669db689fe9ecfe7e3644bf`, whose parent/tree exactly match the intended targeted macOS fix checkpoint. Canonical remote task branch remains `chatgpt/FMUX-017-accessibility`.
+
+NEXT_EXACT_ACTION: state-contract/diff hygiene -> commit recovery metadata -> guarded explicit push of repair HEAD to remote canonical FMUX-017 branch -> fresh exact-head three-lane Verify. Do not hand-edit the locked legacy ref.
+
+
+## FMUX-017 exact-head native verified - 2026-10-05
+
+FMUX-017 remains ACTIVE but is EXACT-HEAD NATIVE VERIFIED / REVIEW PASS. Remote canonical branch head `5bdb64235148ed9212a2a61a55faeade05054f57`; push Verify `37261687541` SUCCESS across macOS / Windows x64 / native Windows ARM64. Scoped review PASS; no authority/runtime expansion. Runtime PID `14804` unchanged.
+
+NEXT_EXACT_ACTION: evidence/state-only closure commit on local repair branch -> guarded explicit push to remote canonical FMUX-017 branch -> closure-SHA Verify -> one reviewed PR -> guarded merge -> exact merged-main Verify -> governance state-sync. Do not rerun `37261687541`.
